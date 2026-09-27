@@ -33,6 +33,18 @@ func (r *Registry) Add(tool harness.Tool) error {
 	return nil
 }
 
+func (r *Registry) Upsert(tool harness.Tool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.tools[tool.Name()] = tool
+}
+
+func (r *Registry) Remove(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.tools, name)
+}
+
 func (r *Registry) Get(name string) (harness.Tool, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

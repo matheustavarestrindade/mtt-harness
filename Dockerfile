@@ -9,7 +9,7 @@ RUN go build -trimpath -ldflags="-s -w" -o /out/mtt ./cmd/mtt
 FROM alpine:3.22
 RUN adduser -D -u 10001 mtt
 COPY --from=builder /out/mtt /usr/local/bin/mtt
-COPY --from=builder /src/providers.json /src/plugins.json /src/mtt.example.json /workspace/
+COPY --from=builder /src/providers.json /src/mcp.example.json /src/mtt.example.json /workspace/
 WORKDIR /workspace
 USER mtt
 EXPOSE 8080

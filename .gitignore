@@ -1,5 +1,6 @@
 # local configuration
 mtt.json
+mcp.json
 .env
 .env.*
 !.env.example

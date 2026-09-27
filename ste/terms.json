@@ -1342,6 +1342,31 @@
       ],
       "meaning": "the secret text for a provider",
       "source": "mtt-harness specification"
+    },
+    {
+      "term": "MCP",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the protocol for tools between the harness and a server",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "server",
+      "category": "technical_noun",
+      "approved_forms": [
+        "servers"
+      ],
+      "meaning": "a program that gives data to other programs",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "protocol",
+      "category": "technical_noun",
+      "approved_forms": [
+        "protocols"
+      ],
+      "meaning": "the rules for the data between 2 programs",
+      "source": "mtt-harness specification"
     }
   ]
 }

@@ -3,7 +3,7 @@
 ## Decisions
 
 - Language: Go.
-- Plugins: Go packages in the module. External plugins use `plugins.json` and the RPC bridge.
+- Plugins: Go packages in the module. External tools come from MCP servers (`mcp.json`, stdio or HTTP).
 - First user surface: a headless API (HTTP + WebSocket).
 - Database: Postgres. Vector recall is deferred to version 2.
 - Configuration: no `.env`. `mtt.json` is the bootstrap file (port, database URL, file paths, optional token). The database holds the settings and the provider secrets.
@@ -43,7 +43,7 @@ go test ./...
 - Provider keys are database configuration: `PUT /providers/{id}/key` sets the key for the harness; `PUT /instances/{id}/providers/{provider}/key` sets the key for one instance. The instance key wins.
 - Settings are database configuration: `PUT /settings/{key}` sets a value for the harness; `PUT /instances/{id}/settings/{key}` sets a value for one instance. Keys: `agent_depth_limit`, `process_limit`, `api_token`.
 - The initial start makes the API token and shows it one time. The user can also set `api_token` in `mtt.json`.
-- `plugins.json` holds external plugin entries: `{name, command, args, enabled}`.
+- `mcp.json` lists the MCP servers: `{name, command, args, env, url, headers, enabled}`. It is local and gitignored; `mcp.example.json` shows the keys.
 
 ## Docker
 

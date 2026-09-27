@@ -12,14 +12,15 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
 	"github.com/matheustavarestrindade/mtt-harness/internal/api"
-	"github.com/matheustavarestrindade/mtt-harness/internal/bridge"
 	"github.com/matheustavarestrindade/mtt-harness/internal/config"
+	"github.com/matheustavarestrindade/mtt-harness/internal/mcp"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/eventbus"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/permission"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/process"
@@ -43,7 +44,7 @@ func main() {
 	port := flag.Int("port", 0, "the API port")
 	databaseURL := flag.String("database-url", "", "the Postgres URL")
 	providersFile := flag.String("providers-file", "", "the providers file")
-	pluginsFile := flag.String("plugins-file", "", "the plugins file")
+	mcpFile := flag.String("mcp-file", "", "the MCP server file")
 	testProvider := flag.Bool("test-provider", false, "use the test provider")
 	flag.Parse()
 
@@ -60,8 +61,8 @@ func main() {
 	if *providersFile != "" {
 		bootstrap.ProvidersFile = *providersFile
 	}
-	if *pluginsFile != "" {
-		bootstrap.PluginsFile = *pluginsFile
+	if *mcpFile != "" {
+		bootstrap.MCPFile = *mcpFile
 	}
 	if *testProvider {
 		bootstrap.TestProvider = true
@@ -136,7 +137,7 @@ func main() {
 	} else {
 		loadProviders(ctx, bootstrap.ProvidersFile, models, h, database)
 	}
-	loadPlugins(ctx, bootstrap.PluginsFile, h, reg, bus)
+	loadMCP(ctx, bootstrap.MCPFile, reg)
 
 	server := &http.Server{
 		Addr: ":" + strconv.Itoa(bootstrap.Port),
@@ -226,28 +227,59 @@ func loadProviders(ctx context.Context, path string, models *gateway.Gateway, h 
 	}
 }
 
-func loadPlugins(ctx context.Context, path string, h *harness.Harness, reg *registry.Registry, bus *eventbus.Bus) {
-	entries, err := bridge.LoadFile(path)
+var mcpTools sync.Map
+
+func loadMCP(ctx context.Context, path string, reg *registry.Registry) {
+	servers, err := mcp.LoadFile(path)
 	switch {
 	case err == nil:
-		for _, entry := range entries {
-			if !entry.Enabled || entry.Command == "" {
+		for _, server := range servers {
+			if !server.Enabled {
 				continue
 			}
-			external, err := bridge.Start(ctx, bridge.Config{Harness: h, Registry: reg}, entry.Command, entry.Args...)
+			client, err := mcp.Start(ctx, server, 30*time.Second)
 			if err != nil {
-				log.Fatalf("mtt: the plugin %s: %v", entry.Name, err)
+				log.Printf("mtt: the MCP server %s: %v", server.Name, err)
+				continue
 			}
-			defer external.Close()
-			bus.On("*", func(ctx context.Context, event atom.Event) {
-				external.Notify(event)
+			defer client.Close()
+			if err := registerMCPTools(ctx, client, server.Name, reg); err != nil {
+				log.Printf("mtt: the MCP server %s: %v", server.Name, err)
+				continue
+			}
+			current := client
+			name := server.Name
+			client.OnToolsChanged(func(ctx context.Context) {
+				if err := registerMCPTools(ctx, current, name, reg); err != nil {
+					log.Printf("mtt: the MCP server %s: %v", name, err)
+				}
 			})
-			log.Printf("mtt: the plugin %s is connected", entry.Name)
+			log.Printf("mtt: the MCP server %s is connected", server.Name)
 		}
 	case errors.Is(err, os.ErrNotExist):
 	default:
 		log.Fatalf("mtt: %v", err)
 	}
+}
+
+func registerMCPTools(ctx context.Context, client *mcp.Client, server string, reg *registry.Registry) error {
+	tools, err := client.ListTools(ctx)
+	if err != nil {
+		return err
+	}
+	if previous, ok := mcpTools.Load(server); ok {
+		for _, name := range previous.([]string) {
+			reg.Remove(name)
+		}
+	}
+	var names []string
+	for _, spec := range tools {
+		tool := &mcp.Tool{Client: client, Server: server, Spec: spec}
+		reg.Upsert(tool)
+		names = append(names, tool.Name())
+	}
+	mcpTools.Store(server, names)
+	return nil
 }
 
 func refresh(ctx context.Context, models *gateway.Gateway, database store.Store, spec atom.ProviderSpec) {

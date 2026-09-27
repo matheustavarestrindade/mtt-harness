@@ -9,7 +9,7 @@ type File struct {
 	Port          int    `json:"port"`
 	DatabaseURL   string `json:"database_url"`
 	ProvidersFile string `json:"providers_file"`
-	PluginsFile   string `json:"plugins_file"`
+	MCPFile       string `json:"mcp_file"`
 	APIToken      string `json:"api_token"`
 	TestProvider  bool   `json:"test_provider"`
 }
@@ -18,7 +18,7 @@ func Default() File {
 	return File{
 		Port:          8080,
 		ProvidersFile: "providers.json",
-		PluginsFile:   "plugins.json",
+		MCPFile:       "mcp.json",
 	}
 }
 
