@@ -39,3 +39,23 @@ type ToolResult struct {
 	Error    string
 	Duration time.Duration
 }
+
+func (r ToolResult) Text() string {
+	var builder []byte
+	for _, item := range r.Content {
+		if item.Type != Text {
+			continue
+		}
+		if len(builder) > 0 {
+			builder = append(builder, '\n')
+		}
+		builder = append(builder, item.Text...)
+	}
+	if r.Error != "" {
+		if len(builder) > 0 {
+			builder = append(builder, '\n')
+		}
+		builder = append(builder, r.Error...)
+	}
+	return string(builder)
+}

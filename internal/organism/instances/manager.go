@@ -21,21 +21,10 @@ type Instance struct {
 	sessions SessionManager
 }
 
-func (i *Instance) ID() string {
-	return i.spec.ID
-}
-
-func (i *Instance) Workspace() string {
-	return i.spec.Workspace
-}
-
-func (i *Instance) Sessions() SessionManager {
-	return i.sessions
-}
-
-func (i *Instance) Spec() atom.InstanceSpec {
-	return i.spec
-}
+func (i *Instance) ID() string               { return i.spec.ID }
+func (i *Instance) Workspace() string        { return i.spec.Workspace }
+func (i *Instance) Sessions() SessionManager { return i.sessions }
+func (i *Instance) Spec() atom.InstanceSpec  { return i.spec }
 
 type Manager struct {
 	mu          sync.RWMutex

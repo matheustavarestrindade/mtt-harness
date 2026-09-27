@@ -14,11 +14,13 @@ const (
 type SessionID string
 
 type Message struct {
-	ID        string
-	SessionID SessionID
-	Seq       int64
-	Role      Role
-	Content   []Content
-	Usage     *Usage
-	CreatedAt time.Time
+	ID         string
+	SessionID  SessionID
+	Seq        int64
+	Role       Role
+	Content    []Content
+	ToolCalls  []ToolCall
+	ToolCallID string
+	Usage      *Usage
+	CreatedAt  time.Time
 }

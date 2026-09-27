@@ -59,6 +59,7 @@ type Statistics struct {
 	Output     int
 	Reasoning  int
 	Cost       *Cost
+	Costs      []Cost
 }
 
 func (s Statistics) CacheHitRate() float64 {

@@ -27,8 +27,10 @@ type ProcessSpec struct {
 type StreamName string
 
 const (
+	StreamStart  StreamName = "start"
 	StreamStdout StreamName = "stdout"
 	StreamStderr StreamName = "stderr"
+	StreamExit   StreamName = "exit"
 )
 
 type ProcessEvent struct {

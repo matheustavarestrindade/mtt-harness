@@ -8,9 +8,12 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
+type Recorder func(ctx context.Context, event atom.Event)
+
 type Bus struct {
 	mu       sync.RWMutex
 	handlers map[atom.EventName][]harness.Handler
+	recorder Recorder
 	seq      uint64
 }
 
@@ -18,13 +21,27 @@ func New() *Bus {
 	return &Bus{handlers: map[atom.EventName][]harness.Handler{}}
 }
 
+func (b *Bus) SetRecorder(recorder Recorder) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.recorder = recorder
+}
+
 func (b *Bus) Send(ctx context.Context, event atom.Event) {
 	b.mu.Lock()
 	b.seq++
 	event.Seq = b.seq
 	list := append([]harness.Handler(nil), b.handlers[event.Name]...)
+	all := append([]harness.Handler(nil), b.handlers[atom.EventName("*")]...)
+	recorder := b.recorder
 	b.mu.Unlock()
+	if recorder != nil {
+		recorder(ctx, event)
+	}
 	for _, handler := range list {
+		handler(ctx, event)
+	}
+	for _, handler := range all {
 		handler(ctx, event)
 	}
 }

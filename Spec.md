@@ -574,9 +574,11 @@ Postgres is the default database. The tables are:
 - `events`
 - `processes`
 - `permissions`
-- `usage`
+- `usage_records`
 - `providers`
 - `models`
+
+The `messages` table keeps the content, the tool call data, and the tool results of a message.
 
 Requirements:
 
@@ -586,7 +588,9 @@ Requirements:
 - R102: The database must write one message and the tool calls of the message in one transaction.
 - R103: The row of the data must have the instance ID.
 - R104: The harness must write the usage of a model call to the `usage` table.
-- R105: The row of the usage must have the instance ID, the session ID, and the model ID.
+- R105: The harness must write the usage of a model call to the `usage_records` table.
+- R106: The row of the usage must have the instance ID, the session ID, and the model ID.
+- R107: The harness can use the memory store when the database is not available.
 
 Vector data is for version 2. The tables must have space for a vector column.
 
@@ -610,6 +614,7 @@ The initial API paths are:
 - `POST /sessions/{id}/messages`: send a user message.
 - `GET /sessions/{id}/events`: send events through WebSocket.
 - `GET /sessions/{id}/agents`: read the child agents of a session.
+- `GET /sessions/{id}/processes`: read the processes of a session.
 - `POST /permissions/{id}`: give the response to a permission request.
 - `GET /processes/{id}/output`: send process output through WebSocket.
 - `GET /providers`: read the providers.
@@ -622,18 +627,18 @@ The initial API paths are:
 
 Requirements:
 
-- R106: The API must send a permission request to the attached clients.
-- R107: The API must use the initial response to a permission request.
-- R108: The API must use a token.
-- R109: The API must send an event with a sequence number.
-- R110: The API must start an instance from a workspace directory.
-- R111: The API must give the sessions of an instance.
-- R112: The API must give the model list of an instance.
-- R113: The API must give the statistics of a session.
-- R114: The API must give the statistics of an instance.
-- R115: The API must give the full statistics of the harness.
-- R116: The API must give the providers and the provider models.
-- R117: The API must let the user refresh the model data of a provider.
+- R108: The API must send a permission request to the attached clients.
+- R109: The API must use the initial response to a permission request.
+- R110: The API must use a token.
+- R111: The API must send an event with a sequence number.
+- R112: The API must start an instance from a workspace directory.
+- R113: The API must give the sessions of an instance.
+- R114: The API must give the model list of an instance.
+- R115: The API must give the statistics of a session.
+- R116: The API must give the statistics of an instance.
+- R117: The API must give the full statistics of the harness.
+- R118: The API must give the providers and the provider models.
+- R119: The API must let the user refresh the model data of a provider.
 
 ## 15. Atoms, Molecules, Organisms
 
@@ -698,6 +703,7 @@ mtt-harness/
     stage.go
   harness/                     # the plugin interface
     harness.go                 # the Harness object
+    context.go                 # the session in the context
     plugin.go                  # the Plugin interface
     tool.go                    # the Tool interface
     provider.go                # the Provider interface
@@ -707,10 +713,13 @@ mtt-harness/
       pipeline/pipeline.go     # the middleware chain
       contextbuilder/context.go
       provider/standard.go     # the standard adapter
+      provider/test.go         # the test provider
       store/store.go           # the data interfaces
+      store/memory/memory.go   # the memory store
       store/postgres/postgres.go
       process/supervisor.go
       permission/engine.go
+      permission/broker.go     # the permission broker
       eventbus/eventbus.go
     organism/
       loop/loop.go             # the AgentLoop
@@ -722,15 +731,17 @@ mtt-harness/
       permissions/system.go    # the PermissionSystem
       gateway/gateway.go       # the ModelGateway
     api/
-      http.go
-      websocket.go
+      server.go                # the HTTP handlers
+      websocket.go             # the event and output streams
     bridge/bridge.go           # the JSON-RPC bridge
     tools/
       bash.go
       read.go
       write.go
       search.go                # the `search_tool` tool
+      process.go               # the process tools
       agent.go
+      finish.go                # the agent stop tool
       schema.go                # the input schema helper
   plugins/
     pathtools/pathtools.go     # a plugin in the same module
@@ -754,11 +765,11 @@ The program in `cmd/mtt` attaches the tools and the plugins in the `plugins` dir
 
 ### 16.3 Rules
 
-- R118: The `atom` package must not use a package of the project.
-- R119: The `harness` package must use the `atom` package only.
-- R120: A molecule must be in the `internal/molecule` directory.
-- R121: An organism must be in the `internal/organism` directory.
-- R122: The program must attach the tools and the plugins in the `plugins` directory.
+- R120: The `atom` package must not use a package of the project.
+- R121: The `harness` package must use the `atom` package only.
+- R122: A molecule must be in the `internal/molecule` directory.
+- R123: An organism must be in the `internal/organism` directory.
+- R124: The program must attach the tools and the plugins in the `plugins` directory.
 
 ## 17. Interfaces
 
@@ -904,9 +915,9 @@ type ModelGateway interface {
 
 Requirements:
 
-- R123: The `harness` package must contain the `Harness`, `Plugin`, `Tool`, `Provider`, and `ProcessWatcher` interfaces.
-- R124: The `internal/molecule/store` package must contain the data interfaces.
-- R125: The Postgres adapter must use the data interfaces.
+- R125: The `harness` package must contain the `Harness`, `Plugin`, `Tool`, `Provider`, and `ProcessWatcher` interfaces.
+- R126: The `internal/molecule/store` package must contain the data interfaces.
+- R127: The Postgres adapter must use the data interfaces.
 
 ## 18. Protection
 

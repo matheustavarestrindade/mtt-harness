@@ -12,14 +12,12 @@ type Engine struct {
 	cache map[string]atom.PermissionDecision
 }
 
-func New() *Engine {
+func NewEngine() *Engine {
 	return &Engine{cache: map[string]atom.PermissionDecision{}}
 }
 
 func (e *Engine) Ask(ctx context.Context, request atom.PermissionRequest) (atom.PermissionDecision, error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if decision, ok := e.cache[request.Target]; ok {
+	if decision, ok := e.Cached(request.Target); ok {
 		decision.RequestID = request.ID
 		return decision, nil
 	}
@@ -30,10 +28,10 @@ func (e *Engine) Ask(ctx context.Context, request atom.PermissionRequest) (atom.
 	}, nil
 }
 
-func (e *Engine) Remember(decision atom.PermissionDecision) {
+func (e *Engine) Remember(target string, decision atom.PermissionDecision) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.cache[decision.RequestID] = decision
+	e.cache[target] = decision
 }
 
 func (e *Engine) Cached(target string) (atom.PermissionDecision, bool) {

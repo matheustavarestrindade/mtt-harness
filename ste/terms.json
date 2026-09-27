@@ -1283,6 +1283,22 @@
       ],
       "meaning": "one group of changes in git",
       "source": "mtt-harness specification"
+    },
+    {
+      "term": "memory",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the fast data area of the program",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "store",
+      "category": "technical_noun",
+      "approved_forms": [
+        "stores"
+      ],
+      "meaning": "the software that keeps the data of the harness",
+      "source": "mtt-harness specification"
     }
   ]
 }

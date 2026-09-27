@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -49,6 +50,27 @@ func (g *Gateway) Providers() []harness.Provider {
 		list = append(list, provider)
 	}
 	return list
+}
+
+func (g *Gateway) Refresh(ctx context.Context, name string) ([]atom.ModelInfo, error) {
+	provider, ok := g.Provider(name)
+	if !ok {
+		return nil, fmt.Errorf("gateway: the provider %q is not in the gateway", name)
+	}
+	refresher, ok := provider.(harness.Refresher)
+	if !ok {
+		return nil, fmt.Errorf("gateway: the provider %q cannot refresh the models", name)
+	}
+	models, err := refresher.Refresh(ctx)
+	if err != nil {
+		return nil, err
+	}
+	g.mu.Lock()
+	for _, model := range models {
+		g.models[model.ID] = provider
+	}
+	g.mu.Unlock()
+	return models, nil
 }
 
 func (g *Gateway) Model(id string) (atom.ModelInfo, harness.Provider, bool) {

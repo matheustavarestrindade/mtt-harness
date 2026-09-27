@@ -4,31 +4,26 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"sort"
-	"sync"
 	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
 type Memory struct {
-	mu         sync.RWMutex
 	instanceID string
-	sessions   map[atom.SessionID]atom.Session
+	sessions   store.SessionStore
 }
 
-func New(instanceID string) *Memory {
-	return &Memory{
-		instanceID: instanceID,
-		sessions:   map[atom.SessionID]atom.Session{},
-	}
+func New(instanceID string, sessions store.SessionStore) *Memory {
+	return &Memory{instanceID: instanceID, sessions: sessions}
 }
 
 func (m *Memory) Start(ctx context.Context, parent atom.SessionID) (atom.SessionID, error) {
 	id := atom.SessionID(newID())
 	depth := 0
 	if parent != "" {
-		if session, ok := m.Get(ctx, parent); ok {
+		if session, err := m.sessions.Get(ctx, parent); err == nil {
 			depth = session.Depth + 1
 		}
 	}
@@ -39,30 +34,19 @@ func (m *Memory) Start(ctx context.Context, parent atom.SessionID) (atom.Session
 		Depth:      depth,
 		CreatedAt:  time.Now(),
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.sessions[id] = session
+	if err := m.sessions.Save(ctx, session); err != nil {
+		return "", err
+	}
 	return id, nil
 }
 
 func (m *Memory) Get(ctx context.Context, id atom.SessionID) (atom.Session, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	session, ok := m.sessions[id]
-	return session, ok
+	session, err := m.sessions.Get(ctx, id)
+	return session, err == nil
 }
 
 func (m *Memory) Agents(ctx context.Context, parent atom.SessionID) ([]atom.SessionID, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	var list []atom.SessionID
-	for id, session := range m.sessions {
-		if session.Parent == parent {
-			list = append(list, id)
-		}
-	}
-	sort.Slice(list, func(i, j int) bool { return list[i] < list[j] })
-	return list, nil
+	return m.sessions.Agents(ctx, parent)
 }
 
 func newID() string {
