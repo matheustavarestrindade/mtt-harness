@@ -1299,6 +1299,49 @@
       ],
       "meaning": "the software that keeps the data of the harness",
       "source": "mtt-harness specification"
+    },
+    {
+      "term": "setting",
+      "category": "technical_noun",
+      "approved_forms": [
+        "settings"
+      ],
+      "meaning": "a value in the database that changes the operation of the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "bootstrap file",
+      "category": "technical_noun",
+      "approved_forms": [
+        "bootstrap files"
+      ],
+      "meaning": "the file that gives the database URL and the port at the start",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "JSON",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "a text format for data",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "port",
+      "category": "technical_noun",
+      "approved_forms": [
+        "ports"
+      ],
+      "meaning": "the number of the API on the computer",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "key",
+      "category": "technical_noun",
+      "approved_forms": [
+        "keys"
+      ],
+      "meaning": "the secret text for a provider",
+      "source": "mtt-harness specification"
     }
   ]
 }

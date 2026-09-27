@@ -5,9 +5,16 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"strconv"
 	"sync"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
+)
+
+const (
+	defaultAgentDepthLimit = 2
+	defaultProcessLimit    = 8
 )
 
 type SessionManager interface {
@@ -30,13 +37,44 @@ type Manager struct {
 	mu          sync.RWMutex
 	instances   map[string]*Instance
 	newSessions func(instanceID string) SessionManager
+	settings    store.SettingsStore
 }
 
-func New(newSessions func(instanceID string) SessionManager) *Manager {
+func New(newSessions func(instanceID string) SessionManager, settings store.SettingsStore) *Manager {
 	return &Manager{
 		instances:   map[string]*Instance{},
 		newSessions: newSessions,
+		settings:    settings,
 	}
+}
+
+func (m *Manager) AgentDepthLimit(ctx context.Context, instanceID string) int {
+	if instance, ok := m.Get(instanceID); ok && instance.Spec().AgentDepthLimit > 0 {
+		return instance.Spec().AgentDepthLimit
+	}
+	return m.limit(ctx, instanceID, "agent_depth_limit", defaultAgentDepthLimit)
+}
+
+func (m *Manager) ProcessLimit(ctx context.Context, instanceID string) int {
+	if instance, ok := m.Get(instanceID); ok && instance.Spec().ProcessLimit > 0 {
+		return instance.Spec().ProcessLimit
+	}
+	return m.limit(ctx, instanceID, "process_limit", defaultProcessLimit)
+}
+
+func (m *Manager) limit(ctx context.Context, instanceID string, key string, fallback int) int {
+	if m.settings == nil {
+		return fallback
+	}
+	value, err := m.settings.Resolve(ctx, instanceID, key)
+	if err != nil || value == "" {
+		return fallback
+	}
+	number, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return number
 }
 
 func (m *Manager) Start(ctx context.Context, spec atom.InstanceSpec) (*Instance, error) {
@@ -45,12 +83,6 @@ func (m *Manager) Start(ctx context.Context, spec atom.InstanceSpec) (*Instance,
 	}
 	if spec.ID == "" {
 		spec.ID = newID()
-	}
-	if spec.ProcessLimit <= 0 {
-		spec.ProcessLimit = 8
-	}
-	if spec.AgentDepthLimit <= 0 {
-		spec.AgentDepthLimit = 2
 	}
 	instance := &Instance{spec: spec, sessions: m.newSessions(spec.ID)}
 	m.mu.Lock()

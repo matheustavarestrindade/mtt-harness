@@ -18,7 +18,7 @@ func TestManagerSendsNotification(t *testing.T) {
 	bus := eventbus.New()
 	h := harness.New()
 	supervisor := process.New(4)
-	manager := New(supervisor, database, h, bus)
+	manager := New(supervisor, database, h, bus, nil)
 	session := atom.Session{ID: "session-1", InstanceID: "instance-1", CreatedAt: time.Now()}
 	if err := database.Sessions().Save(context.Background(), session); err != nil {
 		t.Fatal(err)

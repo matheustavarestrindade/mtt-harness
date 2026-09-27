@@ -55,7 +55,9 @@ func TestStandardStreamsParts(t *testing.T) {
 		Name:         "test",
 		APIURL:       server.URL,
 		ModelListURL: server.URL + "/models",
-		Secret:       "key",
+	})
+	provider.SetKeyResolver(func(ctx context.Context, instanceID string, name string) (string, error) {
+		return "key", nil
 	})
 	stream, err := provider.Stream(context.Background(), atom.Request{
 		Model: "m1",

@@ -19,11 +19,15 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
+type KeyResolver func(ctx context.Context, instanceID string, provider string) (string, error)
+
 type Standard struct {
-	spec   atom.ProviderSpec
-	client *http.Client
-	mu     sync.RWMutex
-	models []atom.ModelInfo
+	spec         atom.ProviderSpec
+	client       *http.Client
+	mu           sync.RWMutex
+	models       []atom.ModelInfo
+	inlinePrices map[string]atom.Prices
+	key          KeyResolver
 }
 
 func New(spec atom.ProviderSpec) *Standard {
@@ -49,6 +53,43 @@ func (s *Standard) SetModels(models []atom.ModelInfo) {
 	s.models = append([]atom.ModelInfo(nil), models...)
 }
 
+func (s *Standard) SetKeyResolver(resolver KeyResolver) {
+	s.key = resolver
+}
+
+func (s *Standard) secret(ctx context.Context) string {
+	if s.key == nil {
+		return ""
+	}
+	instanceID := ""
+	if session, ok := harness.SessionFrom(ctx); ok {
+		instanceID = session.InstanceID
+	}
+	value, err := s.key(ctx, instanceID, s.spec.Name)
+	if err != nil {
+		return ""
+	}
+	return value
+}
+
+func (s *Standard) SetPrices(prices map[string]atom.Prices) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.inlinePrices = map[string]atom.Prices{}
+	for id, price := range prices {
+		s.inlinePrices[id] = price
+	}
+	for index := range s.models {
+		if s.models[index].Prices != nil {
+			continue
+		}
+		if price, ok := s.inlinePrices[s.models[index].ID]; ok {
+			value := price
+			s.models[index].Prices = &value
+		}
+	}
+}
+
 func (s *Standard) Stream(ctx context.Context, request atom.Request) (harness.Stream, error) {
 	payload := map[string]any{
 		"model":          request.Model,
@@ -72,8 +113,8 @@ func (s *Standard) Stream(ctx context.Context, request atom.Request) (harness.St
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if s.spec.Secret != "" {
-		req.Header.Set("Authorization", "Bearer "+s.spec.Secret)
+	if key := s.secret(ctx); key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
 	}
 	response, err := s.client.Do(req)
 	if err != nil {
@@ -101,8 +142,8 @@ func (s *Standard) Refresh(ctx context.Context) ([]atom.ModelInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.spec.Secret != "" {
-		req.Header.Set("Authorization", "Bearer "+s.spec.Secret)
+	if key := s.secret(ctx); key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
 	}
 	response, err := s.client.Do(req)
 	if err != nil {
@@ -165,6 +206,11 @@ func (s *Standard) Refresh(ctx context.Context) ([]atom.ModelInfo, error) {
 
 func (s *Standard) prices(ctx context.Context) (map[string]atom.Prices, error) {
 	result := map[string]atom.Prices{}
+	s.mu.RLock()
+	for id, price := range s.inlinePrices {
+		result[id] = price
+	}
+	s.mu.RUnlock()
 	source := s.spec.PriceTableURL
 	if source == "" {
 		return result, nil

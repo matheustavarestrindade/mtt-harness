@@ -1,4 +1,5 @@
-# secrets
+# local configuration
+mtt.json
 .env
 .env.*
 !.env.example
@@ -13,6 +14,8 @@
 *.test
 coverage.out
 coverage.html
+
+.cortexkit/
 
 # editor and system
 .DS_Store

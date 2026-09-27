@@ -314,9 +314,8 @@ func (l *Loop) RunAgentTask(ctx context.Context, task atom.AgentTask) (atom.Tool
 	if !ok {
 		return atom.ToolResult{Status: atom.StatusError, Error: "agent: the parent session is not in the context"}, nil
 	}
-	instance, _ := l.cfg.Instances.Get(parent.InstanceID)
 	depth := parent.Depth + 1
-	if instance != nil && depth > instance.Spec().AgentDepthLimit {
+	if l.cfg.Instances != nil && depth > l.cfg.Instances.AgentDepthLimit(ctx, parent.InstanceID) {
 		return atom.ToolResult{
 			Status:  atom.StatusError,
 			Error:   "agent: the agent depth limit is reached",
@@ -324,8 +323,10 @@ func (l *Loop) RunAgentTask(ctx context.Context, task atom.AgentTask) (atom.Tool
 		}, nil
 	}
 	model := task.Model
-	if model == "" && instance != nil {
-		model = instance.Spec().DefaultModel
+	if model == "" {
+		if instance, ok := l.cfg.Instances.Get(parent.InstanceID); ok {
+			model = instance.Spec().DefaultModel
+		}
 	}
 	child := atom.Session{
 		ID:         atom.SessionID(newID()),
@@ -398,7 +399,7 @@ func (l *Loop) toolsFor(ctx context.Context, session atom.Session) []atom.ToolSp
 			specs = append(specs, specOf(tool))
 		}
 	}
-	if instance, ok := l.cfg.Instances.Get(session.InstanceID); ok && session.Depth >= instance.Spec().AgentDepthLimit {
+	if l.cfg.Instances != nil && session.Depth >= l.cfg.Instances.AgentDepthLimit(ctx, session.InstanceID) {
 		specs = removeTool(specs, "agent")
 	}
 	return specs
@@ -409,7 +410,10 @@ func (l *Loop) absorb(ctx context.Context, session atom.Session, result atom.Too
 	if err := json.Unmarshal([]byte(result.Text()), &found); err != nil {
 		return
 	}
-	instance, _ := l.cfg.Instances.Get(session.InstanceID)
+	agentLimit := 0
+	if l.cfg.Instances != nil {
+		agentLimit = l.cfg.Instances.AgentDepthLimit(ctx, session.InstanceID)
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	known := map[string]bool{}
@@ -417,7 +421,7 @@ func (l *Loop) absorb(ctx context.Context, session atom.Session, result atom.Too
 		known[spec.Name] = true
 	}
 	for _, spec := range found {
-		if spec.Name == "agent" && instance != nil && session.Depth >= instance.Spec().AgentDepthLimit {
+		if spec.Name == "agent" && agentLimit > 0 && session.Depth >= agentLimit {
 			continue
 		}
 		if known[spec.Name] {

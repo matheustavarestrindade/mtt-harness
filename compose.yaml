@@ -1,0 +1,60 @@
+name: mtt-harness
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${MTT_DB_USER:-mtt}
+      POSTGRES_PASSWORD: ${MTT_DB_PASSWORD:-mtt}
+      POSTGRES_DB: ${MTT_DB_NAME:-mtt}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MTT_DB_USER:-mtt}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  mtt:
+    build: .
+    user: "${MTT_UID:-1000}:${MTT_GID:-1000}"
+    command:
+      - --database-url
+      - postgres://${MTT_DB_USER:-mtt}:${MTT_DB_PASSWORD:-mtt}@postgres:5432/${MTT_DB_NAME:-mtt}?sslmode=disable
+      - --port
+      - "8080"
+      - --test-provider=${MTT_TEST_PROVIDER:-true}
+    ports:
+      - "${MTT_HOST_PORT:-18080}:8080"
+    volumes:
+      - .:/workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  test:
+    profiles: ["test"]
+    build:
+      context: .
+      target: builder
+    environment:
+      CGO_ENABLED: "0"
+      MTT_TEST_DATABASE_URL: postgres://${MTT_DB_USER:-mtt}:${MTT_DB_PASSWORD:-mtt}@postgres:5432/${MTT_DB_NAME:-mtt}?sslmode=disable
+    command: ["go", "test", "./..."]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${MTT_DOCKER_SUBNET:-172.16.0.0/24}

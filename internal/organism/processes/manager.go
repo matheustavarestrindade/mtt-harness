@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -19,25 +20,38 @@ type outputter interface {
 	Output() ([]byte, []byte)
 }
 
+type InstanceLimits interface {
+	ProcessLimit(ctx context.Context, instanceID string) int
+}
+
 type Manager struct {
 	mu         sync.RWMutex
 	supervisor *process.Supervisor
 	store      store.Store
 	h          *harness.Harness
 	bus        *eventbus.Bus
+	limits     InstanceLimits
 }
 
-func New(supervisor *process.Supervisor, database store.Store, h *harness.Harness, bus *eventbus.Bus) *Manager {
+func New(supervisor *process.Supervisor, database store.Store, h *harness.Harness, bus *eventbus.Bus, limits InstanceLimits) *Manager {
 	return &Manager{
 		supervisor: supervisor,
 		store:      database,
 		h:          h,
 		bus:        bus,
+		limits:     limits,
 	}
 }
 
 func (m *Manager) Start(ctx context.Context, spec atom.ProcessSpec) (harness.Process, error) {
 	session, _ := harness.SessionFrom(ctx)
+	if session.InstanceID != "" && m.limits != nil {
+		if limit := m.limits.ProcessLimit(ctx, session.InstanceID); limit > 0 {
+			if count, err := m.store.Processes().CountRunning(ctx, session.InstanceID); err == nil && count >= limit {
+				return nil, errors.New("process: the process limit of the instance is reached")
+			}
+		}
+	}
 	proc, err := m.supervisor.Start(ctx, spec)
 	if err != nil {
 		return nil, err

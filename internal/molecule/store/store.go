@@ -30,6 +30,7 @@ type ProcessStore interface {
 	Save(ctx context.Context, process atom.ProcessRecord) error
 	Get(ctx context.Context, id string) (atom.ProcessRecord, error)
 	List(ctx context.Context, session atom.SessionID) ([]atom.ProcessRecord, error)
+	CountRunning(ctx context.Context, instanceID string) (int, error)
 }
 
 type PermissionStore interface {
@@ -53,6 +54,24 @@ type ProviderStore interface {
 	Models(ctx context.Context, provider string) ([]atom.ModelInfo, error)
 }
 
+type SecretStore interface {
+	SaveProviderKey(ctx context.Context, provider string, key string) error
+	ProviderKey(ctx context.Context, provider string) (string, error)
+	SaveInstanceKey(ctx context.Context, instanceID string, provider string, key string) error
+	InstanceKey(ctx context.Context, instanceID string, provider string) (string, error)
+	ResolveKey(ctx context.Context, instanceID string, provider string) (string, error)
+	DeleteProviderKey(ctx context.Context, provider string) error
+	DeleteInstanceKey(ctx context.Context, instanceID string, provider string) error
+}
+
+type SettingsStore interface {
+	Save(ctx context.Context, scope string, key string, value string) error
+	Get(ctx context.Context, scope string, key string) (string, error)
+	All(ctx context.Context, scope string) (map[string]string, error)
+	Delete(ctx context.Context, scope string, key string) error
+	Resolve(ctx context.Context, instanceID string, key string) (string, error)
+}
+
 type Store interface {
 	Instances() InstanceStore
 	Sessions() SessionStore
@@ -61,5 +80,7 @@ type Store interface {
 	Permissions() PermissionStore
 	Usage() UsageStore
 	Providers() ProviderStore
+	Secrets() SecretStore
+	Settings() SettingsStore
 	Close() error
 }

@@ -142,6 +142,27 @@ Requirements:
 - R15: The path guard must use the workspace directory of the instance.
 - R16: The harness must give the statistics and the total cost of an instance.
 
+### 5.1 Settings
+
+The database keeps the settings of the harness. A setting has a name and a value. A setting is for the harness or for one instance. The harness uses the instance value before the harness value.
+
+The settings are:
+
+- `agent_depth_limit`: the maximum depth of an agent.
+- `process_limit`: the maximum number of processes for an instance.
+- `api_token`: the token for the API.
+
+The initial start makes the `api_token` when the token is not in the bootstrap file. The harness shows the token one time. The user can change the token.
+
+The API gives the settings and changes the settings.
+
+Requirements:
+
+- R17: The database must keep the settings.
+- R18: The harness must use the instance value before the harness value.
+- R19: The agent depth limit must have the default 2.
+- R20: The process limit must have the default 8.
+
 ## 6. Models
 
 A provider connects the harness to one model API. One provider can give many models. Example: one API gives a small model, a large model, and a model with image input.
@@ -197,19 +218,19 @@ The request gives the model ID, the messages, the tool schemas, and the paramete
 
 Requirements:
 
-- R17: The harness must have one interface for the model providers.
-- R18: A provider must give the model list.
-- R19: A model must give the input media types and the output media types.
-- R20: A content item must have one media type and the data of the item.
-- R21: The harness must examine the input media types of the model before a model call.
-- R22: The harness must not send a content item with a media type which is not an input type of the model.
-- R23: The harness must use the standard adapter for a provider with the standard API shape.
-- R24: A provider must send the response as a flow of data.
-- R25: The harness must use the default model of the session when the request does not give a model.
+- R21: The harness must have one interface for the model providers.
+- R22: A provider must give the model list.
+- R23: A model must give the input media types and the output media types.
+- R24: A content item must have one media type and the data of the item.
+- R25: The harness must examine the input media types of the model before a model call.
+- R26: The harness must not send a content item with a media type which is not an input type of the model.
+- R27: The harness must use the standard adapter for a provider with the standard API shape.
+- R28: A provider must send the response as a flow of data.
+- R29: The harness must use the default model of the session when the request does not give a model.
 
 ### 6.1 Usage and Cost
 
-A model can give the prices of the tokens. The prices are for 1,000,000 tokens. A model call gives the usage. The usage has:
+The model can give the prices of the tokens. The prices are for 1,000,000 tokens. A model call gives the usage. The usage has:
 
 - The input tokens.
 - The cache read tokens.
@@ -258,33 +279,36 @@ type Statistics struct {
 
 Requirements:
 
-- R26: The prices must have a currency.
-- R27: A provider must give the usage of a model call when the response has the usage.
-- R28: The harness must record the usage of the model calls.
-- R29: The harness must calculate the cost of a model call from the usage and the prices.
-- R30: The harness must not give a cost when the model does not give the prices.
-- R31: The cache hit rate must be the cache read tokens divided by the full input tokens.
-- R32: The statistics must have the input tokens, the output tokens, the cache read tokens, the cache write tokens, the cache hit rate, and the cost.
-- R33: The statistics for different currencies must stay apart.
+- R30: The prices must have a currency.
+- R31: A provider must give the usage of a model call when the response has the usage.
+- R32: The harness must record the usage of the model messages.
+- R33: The harness must calculate the cost of a model call from the usage and the prices.
+- R34: The harness must not give a cost when the model does not give the prices.
+- R35: The cache hit rate must be the cache read tokens divided by the full input tokens.
+- R36: The statistics must have the input tokens, the output tokens, the cache read tokens, the cache write tokens, the cache hit rate, and the cost.
+- R37: The statistics for different currencies must stay apart.
 
 ### 6.2 Provider Data
 
-A plugin can attach a provider to the harness. The provider data has:
+The harness reads the providers from a JSON file. The file has one entry for a provider. The provider data has:
 
 - The name of the provider.
 - The API URL.
 - The model list URL.
 - The price table URL. The field is optional.
-- The secret for the API.
 - The interval for the model list.
+- The prices of the models. The field is optional.
+- The models. The field is optional.
 
 The harness keeps the provider data, the model lists, and the prices in the database. Thus, the instances read the model data from the database.
+
+The secret of a provider is not in the file. The secret is in the database. The API sets a secret for the harness and a secret for one instance. The harness uses the secret of the instance before the secret of the harness.
 
 A model list endpoint usually gives the model IDs and the limits. A model list endpoint can give the prices. Usually, the endpoint does not give the prices. Thus, the prices can come from:
 
 - The model list response.
+- The prices in the provider file.
 - A price table in a file or at a URL.
-- Empty data.
 
 The harness refreshes the model data at the interval. The default interval is 24 hours. The user can refresh the model data from the API. The harness keeps the last model list when the API gives an error.
 
@@ -300,14 +324,20 @@ The standard adapter uses `Refresher` when the provider data has a model list UR
 
 Requirements:
 
-- R34: A provider must have a name, an API URL, and a model list URL.
-- R35: The harness must keep the provider data, the model lists, and the prices in the database.
-- R36: The harness must refresh the model data at the interval.
-- R37: The default interval must be 24 hours.
-- R38: The harness must keep the last model list when the API gives an error.
-- R39: An instance must select the model list from the models of the providers.
-- R40: The `Refresher` interface must give the model list and the prices from the API.
-- R41: The standard adapter must implement `Refresher` when the provider data has a model list URL.
+- R38: The harness must read the provider data from a JSON file.
+- R39: The provider data must give a name, an API URL, and a model list URL.
+- R40: The provider file can give the prices and the models.
+- R41: The harness must keep the provider data, the model lists, and the prices in the database.
+- R42: The harness must keep the secret of a provider in the database.
+- R43: An instance can have a secret for a provider.
+- R44: The harness must use the secret of the instance before the secret of the harness.
+- R45: The API must let the user set the secret of a provider.
+- R46: The harness must refresh the model data at the interval.
+- R47: The default interval must be 24 hours.
+- R48: The harness must keep the last model list when the API gives an error.
+- R49: An instance must select the model list from the models of the providers.
+- R50: The `Refresher` interface must give the model list and the prices from the API.
+- R51: The standard adapter must implement `Refresher` when the provider data has a model list URL.
 
 ## 7. Stages
 
@@ -346,8 +376,8 @@ An event gives information to plugins. An event does not change the flow. The ev
 
 Requirements:
 
-- R42: The harness must record an event in the event record.
-- R43: The harness must send an event to the attached plugins.
+- R52: The harness must record an event in the event record.
+- R53: The harness must send an event to the attached plugins.
 
 ## 9. Plugins
 
@@ -377,12 +407,12 @@ The Go compiler does not let a method have a type parameter. Thus, `Pipe` and `D
 
 Requirements:
 
-- R44: A plugin must not use the internal packages of the harness.
-- R45: The harness must give the same 6 operations to an external plugin through the bridge.
-- R46: The bridge must use JSON-RPC on the standard input and the standard output of the plugin process.
-- R47: The harness must run handlers in the sequence that the plugin attaches them.
-- R48: The harness must stop the pipeline when a handler gives an error.
-- R49: A plugin must attach a tool, a watcher, or a stage handler before the loop starts.
+- R54: A plugin must not use the internal packages of the harness.
+- R55: The harness must give the same 6 operations to an external plugin through the bridge.
+- R56: The bridge must use JSON-RPC on the standard input and the standard output of the plugin process.
+- R57: The harness must run handlers in the sequence that the plugin attaches them.
+- R58: The harness must stop the pipeline when a handler gives an error.
+- R59: A plugin must attach a tool, a watcher, or a stage handler before the loop starts.
 
 ## 10. Tools
 
@@ -424,12 +454,14 @@ The harness sends a permission request to the API client. The user gives the res
 
 Requirements:
 
-- R50: The path guard must resolve a symbolic link before the check.
-- R51: The path guard must give the verdict `ask` when the path is not in the workspace directory.
-- R52: A permission decision must have a scope. The scope is one time, the session, or always.
-- R53: The harness must record the permission requests and the decisions.
-- R54: A tool must not start a process without a check.
-- R55: The harness must keep the sequence of the tool results.
+- R60: The path guard must resolve a symbolic link before the check.
+- R61: The path guard must give the verdict `ask` when the path is not in the workspace directory.
+- R62: A permission decision must have a scope. The scope is one time, the session, or always.
+- R63: The harness must record the permission requests and the decisions.
+- R64: The harness must wait for the permission decision.
+- R65: The permission request must not have a timeout.
+- R66: A tool must not start a process without a check.
+- R67: The harness must keep the sequence of the tool results.
 
 ### 10.2 Find Tools
 
@@ -457,23 +489,23 @@ The harness gives the tool group and the `search_tool` tool in the model request
 
 Requirements:
 
-- R56: A tool must have one or more categories.
-- R57: The `search_tool` function must compare the query with the search text.
-- R58: The `search_tool` function must not use a model.
-- R59: The `search_tool` function must divide the query into words.
-- R60: A tool must agree with the query when the search text of the tool has the words of the query.
-- R61: The `search_tool` function must ignore the difference between `A` and `a`.
-- R62: The `category` field must agree with the category of a tool.
-- R63: The result must not have a number of tools above the `limit` field.
-- R64: The default limit must be 10 and the maximum limit must be 50.
-- R65: The result must put the tools which agree by category before the tools which agree by name.
-- R66: The result must put the tools which agree by name before the tools which agree by description.
-- R67: The `search_tool` function must give the same result for the same query and the same tool group.
-- R68: The harness must give the `search_tool` tool to the model.
-- R69: The result of `search_tool` must give the name, the description, the category, and the input schema of the found tools.
-- R70: The harness must add the found tools to the tool group of the session.
-- R71: The harness must give the tool group and the `search_tool` tool in the model request.
-- R72: The harness must not give a tool to the model when the tool is not in the tool group.
+- R68: A tool must have one or more categories.
+- R69: The `search_tool` function must compare the query with the search text.
+- R70: The `search_tool` function must not use a model.
+- R71: The `search_tool` function must divide the query into words.
+- R72: A tool must agree with the query when the search text of the tool has the words of the query.
+- R73: The `search_tool` function must ignore the difference between `A` and `a`.
+- R74: The `category` field must agree with the category of a tool.
+- R75: The result must not have a number of tools above the `limit` field.
+- R76: The default limit must be 10 and the maximum limit must be 50.
+- R77: The result must put the tools which agree by category before the tools which agree by name.
+- R78: The result must put the tools which agree by name before the tools which agree by description.
+- R79: The `search_tool` function must give the same result for the same query and the same tool group.
+- R80: The harness must give the `search_tool` tool to the model.
+- R81: The result of `search_tool` must give the name, the description, the category, and the input schema of the found tools.
+- R82: The harness must add the found tools to the tool group of the session.
+- R83: The harness must give the tool group and the `search_tool` tool in the model request.
+- R84: The harness must not give a tool to the model when the tool is not in the tool group.
 
 ## 11. Processes
 
@@ -507,18 +539,18 @@ The interval is a number of milliseconds. The default mode is `exit`. A notifica
 
 Requirements:
 
-- R73: The harness must record a process and the status of a process in the database.
-- R74: The harness must send an output event to the watchers.
-- R75: A process must continue after the turn which starts it.
-- R76: A tool can read the output of a process.
-- R77: The harness must have a limit for the output buffer.
-- R78: The harness must stop a process after the timeout.
-- R79: A tool call must give the notification policy of the process.
-- R80: The notification policy must have the mode `exit`, `error`, or `interval`.
-- R81: On the mode `exit`, the harness must send a notification when the process stops.
-- R82: On the mode `error`, the harness must send a notification when the process stops with an error status.
-- R83: On the mode `interval`, the harness must send a notification at the interval.
-- R84: The default notification mode must be `exit`.
+- R85: The harness must record a process and the status of a process in the database.
+- R86: The harness must send an output event to the watchers.
+- R87: A process must continue after the turn which starts it.
+- R88: A tool can read the output of a process.
+- R89: The harness must have a limit for the output buffer.
+- R90: The harness must stop a process after the timeout.
+- R91: A tool call must give the notification policy of the process.
+- R92: The notification policy must have the mode `exit`, `error`, or `interval`.
+- R93: On the mode `exit`, the harness must send a notification when the process stops.
+- R94: On the mode `error`, the harness must send a notification when the process stops with an error status.
+- R95: On the mode `interval`, the harness must send a notification at the interval.
+- R96: The default notification mode must be `exit`.
 
 ## 12. Agents
 
@@ -547,20 +579,20 @@ parent session (depth 0)
 
 Requirements:
 
-- R85: A parent session can start a child agent.
-- R86: A child agent must have a task from the parent session.
-- R87: A child agent must have the `finish` tool.
-- R88: The `finish` tool must stop the agent loop and give the result to the parent session.
-- R89: An instance must have a limit for the agent depth.
-- R90: The harness must not give the `agent` tool to the model when the depth is at the limit.
-- R91: The harness must record the relation between a parent session and a child agent.
-- R92: A child agent must operate in the workspace directory of the instance.
-- R93: The `agent` tool can give the model for the child agent.
-- R94: The child agent must use a model from the model list.
-- R95: The child agent must use the default model when the `agent` tool does not give a model.
-- R96: The harness must keep the usage of the child agents.
-- R97: The result of the `agent` tool must give the usage of the child agent.
-- R98: The statistics of a parent session must include the usage of the child agents.
+- R97: A parent session can start a child agent.
+- R98: A child agent must have a task from the parent session.
+- R99: A child agent must have the `finish` tool.
+- R100: The `finish` tool must stop the agent loop and give the result to the parent session.
+- R101: An instance must have a limit for the agent depth.
+- R102: The harness must not give the `agent` tool to the model when the depth is at the limit.
+- R103: The harness must record the relation between a parent session and a child agent.
+- R104: A child agent must operate in the workspace directory of the instance.
+- R105: The `agent` tool can give the model for the child agent.
+- R106: The child agent must use a model from the model list.
+- R107: The child agent must use the default model when the `agent` tool does not give a model.
+- R108: The harness must keep the usage of the child agents.
+- R109: The result of the `agent` tool must give the usage of the child agent.
+- R110: The statistics of a parent session must include the usage of the child agents.
 
 ## 13. Database
 
@@ -577,20 +609,23 @@ Postgres is the default database. The tables are:
 - `usage_records`
 - `providers`
 - `models`
+- `provider_keys`
+- `settings`
 
 The `messages` table keeps the content, the tool call data, and the tool results of a message.
 
 Requirements:
 
-- R99: The database must have a table for the instances.
-- R100: The harness must write the messages, tool calls, tool results, and events to Postgres.
-- R101: The harness must use an interface for the database.
-- R102: The database must write one message and the tool calls of the message in one transaction.
-- R103: The row of the data must have the instance ID.
-- R104: The harness must write the usage of a model call to the `usage` table.
-- R105: The harness must write the usage of a model call to the `usage_records` table.
-- R106: The row of the usage must have the instance ID, the session ID, and the model ID.
-- R107: The harness can use the memory store when the database is not available.
+- R111: The database must have a table for the instances.
+- R112: The harness must write the messages, tool calls, tool results, and events to Postgres.
+- R113: The harness must use an interface for the database.
+- R114: The database must write one message and the tool calls of the message in one transaction.
+- R115: The row of the data must have the instance ID.
+- R116: The harness must write the usage of a model call to the `usage` table.
+- R117: The harness must write the usage of a model call to the `usage_records` table.
+- R118: The row of the usage must have the instance ID, the session ID, and the model ID.
+- R119: The harness can use the memory store when the database is not available.
+- R120: The harness must keep the settings and the provider secrets in the database.
 
 Vector data is for version 2. The tables must have space for a vector column.
 
@@ -620,6 +655,16 @@ The initial API paths are:
 - `GET /providers`: read the providers.
 - `GET /providers/{id}/models`: read the models of a provider.
 - `POST /providers/{id}/refresh`: refresh the model data.
+- `PUT /providers/{id}/key`: set the secret of a provider.
+- `DELETE /providers/{id}/key`: remove the secret of a provider.
+- `GET /settings`: read the harness settings.
+- `PUT /settings/{key}`: change a harness setting.
+- `DELETE /settings/{key}`: remove a harness setting.
+- `GET /instances/{id}/settings`: read the settings of an instance.
+- `PUT /instances/{id}/settings/{key}`: change a setting of an instance.
+- `DELETE /instances/{id}/settings/{key}`: remove a setting of an instance.
+- `PUT /instances/{id}/providers/{provider}/key`: set the secret of an instance.
+- `DELETE /instances/{id}/providers/{provider}/key`: remove the secret of an instance.
 - `GET /sessions/{id}/statistics`: read the statistics of a session.
 - `GET /instances/{id}/statistics`: read the statistics of an instance.
 - `GET /statistics`: read the full statistics of the harness.
@@ -627,18 +672,19 @@ The initial API paths are:
 
 Requirements:
 
-- R108: The API must send a permission request to the attached clients.
-- R109: The API must use the initial response to a permission request.
-- R110: The API must use a token.
-- R111: The API must send an event with a sequence number.
-- R112: The API must start an instance from a workspace directory.
-- R113: The API must give the sessions of an instance.
-- R114: The API must give the model list of an instance.
-- R115: The API must give the statistics of a session.
-- R116: The API must give the statistics of an instance.
-- R117: The API must give the full statistics of the harness.
-- R118: The API must give the providers and the provider models.
-- R119: The API must let the user refresh the model data of a provider.
+- R121: The API must send a permission request to the attached clients.
+- R122: The API must use the initial response to a permission request.
+- R123: The API must use a token.
+- R124: The API must send an event with a sequence number.
+- R125: The API must start an instance from a workspace directory.
+- R126: The API must give the sessions of an instance.
+- R127: The API must give the model list of an instance.
+- R128: The API must give the settings and change the settings.
+- R129: The API must give the statistics of a session.
+- R130: The API must give the statistics of an instance.
+- R131: The API must give the full statistics of the harness.
+- R132: The API must give the providers and the provider models.
+- R133: The API must let the user refresh the model data of a provider.
 
 ## 15. Atoms, Molecules, Organisms
 
@@ -690,6 +736,9 @@ The files of the project are:
 ```
 mtt-harness/
   go.mod
+  mtt.example.json             # the example bootstrap file
+  providers.json               # the provider data
+  plugins.json                 # the external plugin data
   cmd/mtt/main.go              # start the API
   atom/                        # atoms: values only
     message.go
@@ -709,10 +758,12 @@ mtt-harness/
     provider.go                # the Provider interface
     process.go                 # the Process interface
   internal/
+    config/config.go           # the bootstrap file
     molecule/
       pipeline/pipeline.go     # the middleware chain
       contextbuilder/context.go
       provider/standard.go     # the standard adapter
+      provider/config.go       # the provider file
       provider/test.go         # the test provider
       store/store.go           # the data interfaces
       store/memory/memory.go   # the memory store
@@ -733,7 +784,9 @@ mtt-harness/
     api/
       server.go                # the HTTP handlers
       websocket.go             # the event and output streams
-    bridge/bridge.go           # the JSON-RPC bridge
+    bridge/
+      bridge.go                # the JSON-RPC bridge
+      config.go                # the plugin file
     tools/
       bash.go
       read.go
@@ -761,15 +814,17 @@ The packages have 3 groups:
 - `harness`: the plugin interface. The package uses `atom` only.
 - `internal`: the molecules, the organisms, the API, the bridge, and the tools. A plugin cannot use the `internal` packages. The Go compiler gives an error.
 
-The program in `cmd/mtt` attaches the tools and the plugins in the `plugins` directory. Then the program starts the API.
+The bootstrap file gives the port, the database URL, the provider file, and the plugin file. The file `mtt.json` is local. The file `mtt.example.json` gives the keys.
+
+The program in `cmd/mtt` reads the bootstrap file. Then the program attaches the tools, the providers, and the plugins. Then the program starts the API.
 
 ### 16.3 Rules
 
-- R120: The `atom` package must not use a package of the project.
-- R121: The `harness` package must use the `atom` package only.
-- R122: A molecule must be in the `internal/molecule` directory.
-- R123: An organism must be in the `internal/organism` directory.
-- R124: The program must attach the tools and the plugins in the `plugins` directory.
+- R134: The `atom` package must not use a package of the project.
+- R135: The `harness` package must use the `atom` package only.
+- R136: A molecule must be in the `internal/molecule` directory.
+- R137: An organism must be in the `internal/organism` directory.
+- R138: The program must attach the tools and the plugins in the `plugins` directory.
 
 ## 17. Interfaces
 
@@ -915,9 +970,9 @@ type ModelGateway interface {
 
 Requirements:
 
-- R125: The `harness` package must contain the `Harness`, `Plugin`, `Tool`, `Provider`, and `ProcessWatcher` interfaces.
-- R126: The `internal/molecule/store` package must contain the data interfaces.
-- R127: The Postgres adapter must use the data interfaces.
+- R139: The `harness` package must contain the `Harness`, `Plugin`, `Tool`, `Provider`, and `ProcessWatcher` interfaces.
+- R140: The `internal/molecule/store` package must contain the data interfaces.
+- R141: The Postgres adapter must use the data interfaces.
 
 ## 18. Protection
 
@@ -925,7 +980,9 @@ Requirements:
 - The path guard must resolve a symbolic link before the path check.
 - The verdict `deny` must stop the tool call before the `Run` function.
 - The harness must only add to the event record.
-- The harness must get the secrets from the environment.
+- The harness must keep the secrets in the database.
+- The initial start must make the `api_token` and show the token one time.
+- The bootstrap file must not be in the repository.
 
 ## 19. Milestones
 

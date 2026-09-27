@@ -70,7 +70,7 @@ func newStack(t *testing.T, script ...[]atom.ResponsePart) *stack {
 	h := harness.New()
 	reg := registry.New()
 	engine := permission.NewEngine()
-	broker := permission.NewBroker(2 * time.Second)
+	broker := permission.NewBroker()
 	models := gateway.New()
 	testProvider := provider.NewTest("test", script...)
 	if err := models.Add(testProvider); err != nil {
@@ -78,7 +78,7 @@ func newStack(t *testing.T, script ...[]atom.ResponsePart) *stack {
 	}
 	instanceManager := instances.New(func(instanceID string) instances.SessionManager {
 		return nil
-	})
+	}, nil)
 	runner := loop.New(h, loop.Config{
 		Gateway:   models,
 		Registry:  reg,

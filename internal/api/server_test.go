@@ -2,12 +2,12 @@ package api_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
@@ -27,12 +27,12 @@ func TestAPIFlow(t *testing.T) {
 	bus := eventbus.New()
 	h := harness.New()
 	reg := registry.New()
-	broker := permission.NewBroker(time.Second)
+	broker := permission.NewBroker()
 	models := gateway.New()
 	if err := models.Add(provider.NewTest("test", provider.TextWithUsage("hello", atom.Usage{Input: 10, Output: 2}))); err != nil {
 		t.Fatal(err)
 	}
-	instanceManager := instances.New(func(instanceID string) instances.SessionManager { return nil })
+	instanceManager := instances.New(func(instanceID string) instances.SessionManager { return nil }, nil)
 	runner := loop.New(h, loop.Config{
 		Gateway:   models,
 		Registry:  reg,
@@ -106,6 +106,42 @@ func TestAPIFlow(t *testing.T) {
 	decode(t, response, &modelList)
 	if len(modelList) != 1 || modelList[0].ID != "test-model" {
 		t.Fatalf("models = %+v", modelList)
+	}
+
+	response = request(t, server.URL+"/settings/agent_depth_limit", "secret", "PUT", map[string]any{"value": "5"})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("global setting status = %d", response.StatusCode)
+	}
+	var settings map[string]string
+	response = request(t, server.URL+"/settings", "secret", "GET", nil)
+	decode(t, response, &settings)
+	if settings["agent_depth_limit"] != "5" {
+		t.Fatalf("global settings = %+v", settings)
+	}
+	response = request(t, server.URL+"/instances/"+instance.ID+"/settings/process_limit", "secret", "PUT", map[string]any{"value": "3"})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("instance setting status = %d", response.StatusCode)
+	}
+	response = request(t, server.URL+"/instances/"+instance.ID+"/settings", "secret", "GET", nil)
+	decode(t, response, &settings)
+	if settings["process_limit"] != "3" {
+		t.Fatalf("instance settings = %+v", settings)
+	}
+	response = request(t, server.URL+"/providers/openai/key", "secret", "PUT", map[string]any{"key": "sk-test"})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("provider key status = %d", response.StatusCode)
+	}
+	response = request(t, server.URL+"/instances/"+instance.ID+"/providers/openai/key", "secret", "PUT", map[string]any{"key": "sk-instance"})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("instance key status = %d", response.StatusCode)
+	}
+	key, err := database.Secrets().ResolveKey(context.Background(), instance.ID, "openai")
+	if err != nil || key != "sk-instance" {
+		t.Fatalf("resolved key = %q err = %v", key, err)
+	}
+	key, err = database.Secrets().ResolveKey(context.Background(), "other", "openai")
+	if err != nil || key != "sk-test" {
+		t.Fatalf("global key = %q err = %v", key, err)
 	}
 }
 

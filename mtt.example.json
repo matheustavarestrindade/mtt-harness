@@ -1,0 +1,8 @@
+{
+  "port": 8080,
+  "database_url": "",
+  "providers_file": "providers.json",
+  "plugins_file": "plugins.json",
+  "api_token": "",
+  "test_provider": false
+}

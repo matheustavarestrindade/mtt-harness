@@ -77,6 +77,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /providers", s.listProviders)
 	mux.HandleFunc("GET /providers/{id}/models", s.providerModels)
 	mux.HandleFunc("POST /providers/{id}/refresh", s.refreshProvider)
+	mux.HandleFunc("PUT /providers/{id}/key", s.saveProviderKey)
+	mux.HandleFunc("DELETE /providers/{id}/key", s.deleteProviderKey)
+	mux.HandleFunc("GET /settings", s.globalSettings)
+	mux.HandleFunc("PUT /settings/{key}", s.saveGlobalSetting)
+	mux.HandleFunc("DELETE /settings/{key}", s.deleteGlobalSetting)
+	mux.HandleFunc("GET /instances/{id}/settings", s.instanceSettings)
+	mux.HandleFunc("PUT /instances/{id}/settings/{key}", s.saveInstanceSetting)
+	mux.HandleFunc("DELETE /instances/{id}/settings/{key}", s.deleteInstanceSetting)
+	mux.HandleFunc("PUT /instances/{id}/providers/{provider}/key", s.saveInstanceKey)
+	mux.HandleFunc("DELETE /instances/{id}/providers/{provider}/key", s.deleteInstanceKey)
 	return s.auth(mux)
 }
 
@@ -205,20 +215,12 @@ func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) sessionsOf(ctx context.Context, instance *instances.Instance) []atom.Session {
 	ids, _ := instance.Sessions().Agents(ctx, "")
-	all, err := s.store.Instances().All(ctx)
-	if err != nil {
-		_ = all
-	}
 	var sessions []atom.Session
-	seen := map[atom.SessionID]bool{}
 	for _, id := range ids {
-		session, ok := instance.Sessions().Get(ctx, id)
-		if ok {
+		if session, ok := instance.Sessions().Get(ctx, id); ok {
 			sessions = append(sessions, session)
-			seen[id] = true
 		}
 	}
-	_ = seen
 	return sessions
 }
 
@@ -435,4 +437,107 @@ func newID() string {
 		return "unknown"
 	}
 	return hex.EncodeToString(data[:])
+}
+
+func (s *Server) globalSettings(w http.ResponseWriter, r *http.Request) {
+	values, err := s.store.Settings().All(r.Context(), "")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
+
+func (s *Server) saveGlobalSetting(w http.ResponseWriter, r *http.Request) {
+	s.saveSetting(w, r, "")
+}
+
+func (s *Server) deleteGlobalSetting(w http.ResponseWriter, r *http.Request) {
+	s.deleteSetting(w, r, "")
+}
+
+func (s *Server) instanceSettings(w http.ResponseWriter, r *http.Request) {
+	values, err := s.store.Settings().All(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
+
+func (s *Server) saveInstanceSetting(w http.ResponseWriter, r *http.Request) {
+	s.saveSetting(w, r, r.PathValue("id"))
+}
+
+func (s *Server) deleteInstanceSetting(w http.ResponseWriter, r *http.Request) {
+	s.deleteSetting(w, r, r.PathValue("id"))
+}
+
+func (s *Server) saveSetting(w http.ResponseWriter, r *http.Request, scope string) {
+	var input struct {
+		Value string `json:"value"`
+	}
+	if err := readJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.store.Settings().Save(r.Context(), scope, r.PathValue("key"), input.Value); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
+}
+
+func (s *Server) deleteSetting(w http.ResponseWriter, r *http.Request, scope string) {
+	if err := s.store.Settings().Delete(r.Context(), scope, r.PathValue("key")); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (s *Server) saveProviderKey(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Key string `json:"key"`
+	}
+	if err := readJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.store.Secrets().SaveProviderKey(r.Context(), r.PathValue("id"), input.Key); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
+}
+
+func (s *Server) deleteProviderKey(w http.ResponseWriter, r *http.Request) {
+	if err := s.store.Secrets().DeleteProviderKey(r.Context(), r.PathValue("id")); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (s *Server) saveInstanceKey(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Key string `json:"key"`
+	}
+	if err := readJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.store.Secrets().SaveInstanceKey(r.Context(), r.PathValue("id"), r.PathValue("provider"), input.Key); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
+}
+
+func (s *Server) deleteInstanceKey(w http.ResponseWriter, r *http.Request) {
+	if err := s.store.Secrets().DeleteInstanceKey(r.Context(), r.PathValue("id"), r.PathValue("provider")); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }

@@ -1,0 +1,27 @@
+{
+  "providers": [
+    {
+      "name": "openai",
+      "api_url": "https://api.openai.com/v1",
+      "model_list_url": "https://api.openai.com/v1/models",
+      "refresh_hours": 24,
+      "prices": {
+        "gpt-4o": {
+          "currency": "USD",
+          "input": 2.5,
+          "output": 10,
+          "cache_read": 1.25,
+          "cache_write": 0
+        },
+        "gpt-4o-mini": {
+          "currency": "USD",
+          "input": 0.15,
+          "output": 0.6,
+          "cache_read": 0.075,
+          "cache_write": 0
+        }
+      },
+      "models": []
+    }
+  ]
+}

@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -85,8 +84,21 @@ CREATE TABLE IF NOT EXISTS providers (
 	api_url text NOT NULL DEFAULT '',
 	model_list_url text NOT NULL DEFAULT '',
 	price_table_url text NOT NULL DEFAULT '',
-	secret text NOT NULL DEFAULT '',
 	interval_seconds bigint NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS provider_keys (
+	scope text NOT NULL,
+	provider text NOT NULL,
+	key text NOT NULL,
+	updated_at timestamptz NOT NULL DEFAULT now(),
+	PRIMARY KEY (scope, provider)
+);
+CREATE TABLE IF NOT EXISTS settings (
+	scope text NOT NULL,
+	key text NOT NULL,
+	value text NOT NULL,
+	updated_at timestamptz NOT NULL DEFAULT now(),
+	PRIMARY KEY (scope, key)
 );
 CREATE TABLE IF NOT EXISTS models (
 	provider text NOT NULL,
@@ -137,6 +149,8 @@ func (s *Store) Processes() store.ProcessStore      { return &processes{s} }
 func (s *Store) Permissions() store.PermissionStore { return &permissions{s} }
 func (s *Store) Usage() store.UsageStore            { return &usage{s} }
 func (s *Store) Providers() store.ProviderStore     { return &providers{s} }
+func (s *Store) Secrets() store.SecretStore         { return &secrets{s} }
+func (s *Store) Settings() store.SettingsStore      { return &settings{s} }
 
 type instances struct{ s *Store }
 
@@ -348,6 +362,12 @@ func (p *processes) Get(ctx context.Context, id string) (atom.ProcessRecord, err
 	return record, nil
 }
 
+func (p *processes) CountRunning(ctx context.Context, instanceID string) (int, error) {
+	var count int
+	err := p.s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM processes WHERE instance_id = $1 AND status = 'running'`, instanceID).Scan(&count)
+	return count, err
+}
+
 func (p *processes) List(ctx context.Context, session atom.SessionID) ([]atom.ProcessRecord, error) {
 	rows, err := p.s.pool.Query(ctx, `
 		SELECT id, instance_id, session_id, spec, pid, status, exit, started_at, ended_at
@@ -477,15 +497,14 @@ type providers struct{ s *Store }
 
 func (p *providers) Save(ctx context.Context, spec atom.ProviderSpec) error {
 	_, err := p.s.pool.Exec(ctx, `
-		INSERT INTO providers (name, api_url, model_list_url, price_table_url, secret, interval_seconds)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO providers (name, api_url, model_list_url, price_table_url, interval_seconds)
+		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (name) DO UPDATE SET
 			api_url = EXCLUDED.api_url,
 			model_list_url = EXCLUDED.model_list_url,
 			price_table_url = EXCLUDED.price_table_url,
-			secret = EXCLUDED.secret,
 			interval_seconds = EXCLUDED.interval_seconds`,
-		spec.Name, spec.APIURL, spec.ModelListURL, spec.PriceTableURL, spec.Secret, int64(spec.Interval/time.Second))
+		spec.Name, spec.APIURL, spec.ModelListURL, spec.PriceTableURL, int64(spec.Interval/time.Second))
 	return err
 }
 
@@ -493,16 +512,16 @@ func (p *providers) Get(ctx context.Context, id string) (atom.ProviderSpec, erro
 	var spec atom.ProviderSpec
 	var seconds int64
 	err := p.s.pool.QueryRow(ctx, `
-		SELECT name, api_url, model_list_url, price_table_url, secret, interval_seconds
+		SELECT name, api_url, model_list_url, price_table_url, interval_seconds
 		FROM providers WHERE name = $1`, id).
-		Scan(&spec.Name, &spec.APIURL, &spec.ModelListURL, &spec.PriceTableURL, &spec.Secret, &seconds)
+		Scan(&spec.Name, &spec.APIURL, &spec.ModelListURL, &spec.PriceTableURL, &seconds)
 	spec.Interval = time.Duration(seconds) * time.Second
 	return spec, err
 }
 
 func (p *providers) All(ctx context.Context) ([]atom.ProviderSpec, error) {
 	rows, err := p.s.pool.Query(ctx, `
-		SELECT name, api_url, model_list_url, price_table_url, secret, interval_seconds
+		SELECT name, api_url, model_list_url, price_table_url, interval_seconds
 		FROM providers ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -512,7 +531,7 @@ func (p *providers) All(ctx context.Context) ([]atom.ProviderSpec, error) {
 	for rows.Next() {
 		var spec atom.ProviderSpec
 		var seconds int64
-		if err := rows.Scan(&spec.Name, &spec.APIURL, &spec.ModelListURL, &spec.PriceTableURL, &spec.Secret, &seconds); err != nil {
+		if err := rows.Scan(&spec.Name, &spec.APIURL, &spec.ModelListURL, &spec.PriceTableURL, &seconds); err != nil {
 			return nil, err
 		}
 		spec.Interval = time.Duration(seconds) * time.Second
@@ -578,4 +597,112 @@ func (p *providers) Models(ctx context.Context, provider string) ([]atom.ModelIn
 	return list, rows.Err()
 }
 
-var _ = errors.New
+type secrets struct{ s *Store }
+
+func (s *secrets) SaveProviderKey(ctx context.Context, provider string, key string) error {
+	_, err := s.s.pool.Exec(ctx, `
+		INSERT INTO provider_keys (scope, provider, key) VALUES ('', $1, $2)
+		ON CONFLICT (scope, provider) DO UPDATE SET key = EXCLUDED.key, updated_at = now()`, provider, key)
+	return err
+}
+
+func (s *secrets) ProviderKey(ctx context.Context, provider string) (string, error) {
+	var key string
+	err := s.s.pool.QueryRow(ctx, `SELECT key FROM provider_keys WHERE scope = '' AND provider = $1`, provider).Scan(&key)
+	if err == pgx.ErrNoRows {
+		return "", nil
+	}
+	return key, err
+}
+
+func (s *secrets) SaveInstanceKey(ctx context.Context, instanceID string, provider string, key string) error {
+	_, err := s.s.pool.Exec(ctx, `
+		INSERT INTO provider_keys (scope, provider, key) VALUES ($1, $2, $3)
+		ON CONFLICT (scope, provider) DO UPDATE SET key = EXCLUDED.key, updated_at = now()`, instanceID, provider, key)
+	return err
+}
+
+func (s *secrets) InstanceKey(ctx context.Context, instanceID string, provider string) (string, error) {
+	var key string
+	err := s.s.pool.QueryRow(ctx, `SELECT key FROM provider_keys WHERE scope = $1 AND provider = $2`, instanceID, provider).Scan(&key)
+	if err == pgx.ErrNoRows {
+		return "", nil
+	}
+	return key, err
+}
+
+func (s *secrets) ResolveKey(ctx context.Context, instanceID string, provider string) (string, error) {
+	if instanceID != "" {
+		value, err := s.InstanceKey(ctx, instanceID, provider)
+		if err != nil {
+			return "", err
+		}
+		if value != "" {
+			return value, nil
+		}
+	}
+	return s.ProviderKey(ctx, provider)
+}
+
+func (s *secrets) DeleteProviderKey(ctx context.Context, provider string) error {
+	_, err := s.s.pool.Exec(ctx, `DELETE FROM provider_keys WHERE scope = '' AND provider = $1`, provider)
+	return err
+}
+
+func (s *secrets) DeleteInstanceKey(ctx context.Context, instanceID string, provider string) error {
+	_, err := s.s.pool.Exec(ctx, `DELETE FROM provider_keys WHERE scope = $1 AND provider = $2`, instanceID, provider)
+	return err
+}
+
+type settings struct{ s *Store }
+
+func (s *settings) Save(ctx context.Context, scope string, key string, value string) error {
+	_, err := s.s.pool.Exec(ctx, `
+		INSERT INTO settings (scope, key, value) VALUES ($1, $2, $3)
+		ON CONFLICT (scope, key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, scope, key, value)
+	return err
+}
+
+func (s *settings) Get(ctx context.Context, scope string, key string) (string, error) {
+	var value string
+	err := s.s.pool.QueryRow(ctx, `SELECT value FROM settings WHERE scope = $1 AND key = $2`, scope, key).Scan(&value)
+	if err == pgx.ErrNoRows {
+		return "", nil
+	}
+	return value, err
+}
+
+func (s *settings) All(ctx context.Context, scope string) (map[string]string, error) {
+	rows, err := s.s.pool.Query(ctx, `SELECT key, value FROM settings WHERE scope = $1 ORDER BY key`, scope)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := map[string]string{}
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, err
+		}
+		result[key] = value
+	}
+	return result, rows.Err()
+}
+
+func (s *settings) Delete(ctx context.Context, scope string, key string) error {
+	_, err := s.s.pool.Exec(ctx, `DELETE FROM settings WHERE scope = $1 AND key = $2`, scope, key)
+	return err
+}
+
+func (s *settings) Resolve(ctx context.Context, instanceID string, key string) (string, error) {
+	if instanceID != "" {
+		value, err := s.Get(ctx, instanceID, key)
+		if err != nil {
+			return "", err
+		}
+		if value != "" {
+			return value, nil
+		}
+	}
+	return s.Get(ctx, "", key)
+}

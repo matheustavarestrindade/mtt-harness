@@ -3,7 +3,6 @@ package permission
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
@@ -11,18 +10,11 @@ import (
 type Broker struct {
 	mu        sync.Mutex
 	pending   map[string]chan atom.PermissionDecision
-	timeout   time.Duration
 	onRequest func(request atom.PermissionRequest)
 }
 
-func NewBroker(timeout time.Duration) *Broker {
-	if timeout <= 0 {
-		timeout = 5 * time.Minute
-	}
-	return &Broker{
-		pending: map[string]chan atom.PermissionDecision{},
-		timeout: timeout,
-	}
+func NewBroker() *Broker {
+	return &Broker{pending: map[string]chan atom.PermissionDecision{}}
 }
 
 func (b *Broker) SetRequestHandler(handler func(request atom.PermissionRequest)) {
@@ -43,8 +35,6 @@ func (b *Broker) Request(ctx context.Context, request atom.PermissionRequest) (a
 	select {
 	case decision := <-channel:
 		return decision, nil
-	case <-time.After(b.timeout):
-		return atom.PermissionDecision{RequestID: request.ID, Kind: atom.VerdictDeny, Scope: atom.ScopeOnce}, nil
 	case <-ctx.Done():
 		return atom.PermissionDecision{RequestID: request.ID, Kind: atom.VerdictDeny, Scope: atom.ScopeOnce}, nil
 	}

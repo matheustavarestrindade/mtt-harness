@@ -2,13 +2,16 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/harness"
 	"github.com/matheustavarestrindade/mtt-harness/internal/api"
 	"github.com/matheustavarestrindade/mtt-harness/internal/bridge"
+	"github.com/matheustavarestrindade/mtt-harness/internal/config"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/eventbus"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/permission"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/process"
@@ -35,30 +39,54 @@ import (
 )
 
 func main() {
-	loadDotEnv(".env")
+	configPath := flag.String("config", "mtt.json", "the bootstrap config file")
+	port := flag.Int("port", 0, "the API port")
+	databaseURL := flag.String("database-url", "", "the Postgres URL")
+	providersFile := flag.String("providers-file", "", "the providers file")
+	pluginsFile := flag.String("plugins-file", "", "the plugins file")
+	testProvider := flag.Bool("test-provider", false, "use the test provider")
+	flag.Parse()
 
-	port := env("MTT_PORT", "8080")
-	token := env("MTT_API_TOKEN", "")
-	workspace := env("MTT_WORKSPACE", ".")
-	dsn := os.Getenv("MTT_DATABASE_URL")
+	bootstrap, err := config.LoadOrDefault(*configPath)
+	if err != nil {
+		log.Fatalf("mtt: %v", err)
+	}
+	if *port != 0 {
+		bootstrap.Port = *port
+	}
+	if *databaseURL != "" {
+		bootstrap.DatabaseURL = *databaseURL
+	}
+	if *providersFile != "" {
+		bootstrap.ProvidersFile = *providersFile
+	}
+	if *pluginsFile != "" {
+		bootstrap.PluginsFile = *pluginsFile
+	}
+	if *testProvider {
+		bootstrap.TestProvider = true
+	}
 
 	ctx := context.Background()
-	database := openStore(ctx, dsn)
+	database := openStore(ctx, bootstrap.DatabaseURL)
+	defer database.Close()
 	bus := eventbus.New()
 	bus.SetRecorder(func(ctx context.Context, event atom.Event) {
 		_ = database.Events().Append(ctx, event)
 	})
 
+	token := resolveToken(ctx, database, bootstrap.APIToken)
+
 	h := harness.New()
 	reg := registry.New()
 	engine := permission.NewEngine()
-	broker := permission.NewBroker(time.Duration(envInt("MTT_PERMISSION_TIMEOUT_SECONDS", 300)) * time.Second)
-	supervisor := process.New(envInt("MTT_PROCESS_LIMIT", 8))
+	broker := permission.NewBroker()
+	supervisor := process.New(globalProcessLimit(ctx, database))
 	models := gateway.New()
 	instanceManager := instances.New(func(instanceID string) instances.SessionManager {
 		return memory.New(instanceID, database.Sessions())
-	})
-	processManager := processes.New(supervisor, database, h, bus)
+	}, database.Settings())
+	processManager := processes.New(supervisor, database, h, bus, instanceManager)
 	runner := loop.New(h, loop.Config{
 		Gateway:   models,
 		Registry:  reg,
@@ -66,7 +94,6 @@ func main() {
 		Bus:       bus,
 		Broker:    broker,
 		Engine:    engine,
-		Processes: processManager,
 		Instances: instanceManager,
 	})
 
@@ -87,61 +114,32 @@ func main() {
 	}
 
 	host := plugins.New(h)
-	if err := host.Attach(&pathtools.PathGuard{Workspace: workspace}); err != nil {
+	if err := host.Attach(&pathtools.PathGuard{
+		WorkspaceOf: func(instanceID string) string {
+			instance, ok := instanceManager.Get(instanceID)
+			if !ok {
+				return ""
+			}
+			return instance.Workspace()
+		},
+	}); err != nil {
 		log.Fatalf("mtt: %v", err)
 	}
 
-	if os.Getenv("MTT_TEST_PROVIDER") == "1" {
-		testProvider := provider.NewTest("test", provider.Text("the test provider is active"))
-		if err := models.Add(testProvider); err != nil {
+	if bootstrap.TestProvider {
+		test := provider.NewTest("test", provider.Text("the test provider is active"))
+		if err := models.Add(test); err != nil {
 			log.Fatalf("mtt: %v", err)
 		}
-		h.Provider(testProvider)
-		if err := startInstance(ctx, instanceManager, database, "test-model"); err != nil {
-			log.Fatalf("mtt: %v", err)
-		}
+		h.Provider(test)
 		log.Printf("mtt: the test provider is in use")
-	} else if apiURL := os.Getenv("MTT_PROVIDER_API_URL"); apiURL != "" {
-		spec := atom.ProviderSpec{
-			Name:          env("MTT_PROVIDER_NAME", "default"),
-			APIURL:        apiURL,
-			ModelListURL:  os.Getenv("MTT_PROVIDER_MODEL_LIST_URL"),
-			PriceTableURL: os.Getenv("MTT_PROVIDER_PRICE_TABLE_URL"),
-			Secret:        os.Getenv("MTT_PROVIDER_API_KEY"),
-			Interval:      time.Duration(envInt("MTT_PROVIDER_REFRESH_HOURS", 24)) * time.Hour,
-		}
-		standard := provider.New(spec)
-		if cached, err := database.Providers().Models(ctx, spec.Name); err == nil && len(cached) > 0 {
-			standard.SetModels(cached)
-		}
-		if err := models.Add(standard); err != nil {
-			log.Fatalf("mtt: %v", err)
-		}
-		h.Provider(standard)
-		if err := database.Providers().Save(ctx, spec); err != nil {
-			log.Fatalf("mtt: %v", err)
-		}
-		refresh(ctx, models, database, spec)
-		if err := startInstance(ctx, instanceManager, database, defaultModel(models, spec.Name)); err != nil {
-			log.Fatalf("mtt: %v", err)
-		}
+	} else {
+		loadProviders(ctx, bootstrap.ProvidersFile, models, h, database)
 	}
-
-	if command := os.Getenv("MTT_PLUGIN_COMMAND"); command != "" {
-		parts := strings.Fields(command)
-		external, err := bridge.Start(ctx, bridge.Config{Harness: h, Registry: reg}, parts[0], parts[1:]...)
-		if err != nil {
-			log.Fatalf("mtt: %v", err)
-		}
-		defer external.Close()
-		bus.On("*", func(ctx context.Context, event atom.Event) {
-			external.Notify(event)
-		})
-		log.Printf("mtt: the bridge is connected to %s", command)
-	}
+	loadPlugins(ctx, bootstrap.PluginsFile, h, reg, bus)
 
 	server := &http.Server{
-		Addr: ":" + port,
+		Addr: ":" + strconv.Itoa(bootstrap.Port),
 		Handler: api.New(api.Config{
 			Token:     token,
 			Store:     database,
@@ -165,35 +163,105 @@ func main() {
 		_ = server.Shutdown(shutdown)
 	}()
 
-	log.Printf("mtt: the API is on port %s", port)
+	log.Printf("mtt: the API is on port %d", bootstrap.Port)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("mtt: %v", err)
 	}
 }
 
-func startInstance(ctx context.Context, manager *instances.Manager, database store.Store, defaultModel string) error {
-	instance, err := manager.Start(ctx, atom.InstanceSpec{
-		Workspace:       env("MTT_WORKSPACE", "."),
-		DefaultModel:    defaultModel,
-		AgentDepthLimit: envInt("MTT_AGENT_DEPTH_LIMIT", 2),
-		ProcessLimit:    envInt("MTT_PROCESS_LIMIT", 8),
-		CreatedAt:       time.Now(),
-	})
-	if err != nil {
-		return err
+func resolveToken(ctx context.Context, database store.Store, fromFile string) string {
+	if fromFile != "" {
+		return fromFile
 	}
-	return database.Instances().Save(ctx, instance.Spec())
+	if value, err := database.Settings().Get(ctx, "", "api_token"); err == nil && value != "" {
+		return value
+	}
+	token := newToken()
+	if err := database.Settings().Save(ctx, "", "api_token", token); err != nil {
+		log.Fatalf("mtt: %v", err)
+	}
+	fmt.Printf("mtt API token: %s\n", token)
+	log.Printf("mtt: the first start makes the API token. Do not lose it.")
+	return token
+}
+
+func globalProcessLimit(ctx context.Context, database store.Store) int {
+	if value, err := database.Settings().Get(ctx, "", "process_limit"); err == nil && value != "" {
+		if number, err := strconv.Atoi(value); err == nil && number > 0 {
+			return number
+		}
+	}
+	return 8
+}
+
+func loadProviders(ctx context.Context, path string, models *gateway.Gateway, h *harness.Harness, database store.Store) {
+	configs, err := provider.LoadFile(path)
+	switch {
+	case err == nil:
+		for _, config := range configs {
+			standard := provider.New(config.Spec)
+			standard.SetPrices(config.Prices)
+			standard.SetKeyResolver(func(ctx context.Context, instanceID string, name string) (string, error) {
+				return database.Secrets().ResolveKey(ctx, instanceID, name)
+			})
+			if cached, err := database.Providers().Models(ctx, config.Spec.Name); err == nil && len(cached) > 0 {
+				standard.SetModels(cached)
+			} else if len(config.Models) > 0 {
+				standard.SetModels(config.Models)
+			}
+			if err := models.Add(standard); err != nil {
+				log.Fatalf("mtt: %v", err)
+			}
+			h.Provider(standard)
+			if err := database.Providers().Save(ctx, config.Spec); err != nil {
+				log.Fatalf("mtt: %v", err)
+			}
+			refresh(ctx, models, database, config.Spec)
+			log.Printf("mtt: the provider %s is in use", config.Spec.Name)
+		}
+	case errors.Is(err, os.ErrNotExist):
+		log.Printf("mtt: the provider file %s is not there", path)
+	default:
+		log.Fatalf("mtt: %v", err)
+	}
+}
+
+func loadPlugins(ctx context.Context, path string, h *harness.Harness, reg *registry.Registry, bus *eventbus.Bus) {
+	entries, err := bridge.LoadFile(path)
+	switch {
+	case err == nil:
+		for _, entry := range entries {
+			if !entry.Enabled || entry.Command == "" {
+				continue
+			}
+			external, err := bridge.Start(ctx, bridge.Config{Harness: h, Registry: reg}, entry.Command, entry.Args...)
+			if err != nil {
+				log.Fatalf("mtt: the plugin %s: %v", entry.Name, err)
+			}
+			defer external.Close()
+			bus.On("*", func(ctx context.Context, event atom.Event) {
+				external.Notify(event)
+			})
+			log.Printf("mtt: the plugin %s is connected", entry.Name)
+		}
+	case errors.Is(err, os.ErrNotExist):
+	default:
+		log.Fatalf("mtt: %v", err)
+	}
 }
 
 func refresh(ctx context.Context, models *gateway.Gateway, database store.Store, spec atom.ProviderSpec) {
 	if spec.ModelListURL == "" {
 		return
 	}
-	if modelsRefreshed, err := models.Refresh(ctx, spec.Name); err == nil {
-		_ = database.Providers().SaveModels(ctx, spec.Name, modelsRefreshed)
-		log.Printf("mtt: the provider %s gives %d models", spec.Name, len(modelsRefreshed))
+	if refreshed, err := models.Refresh(ctx, spec.Name); err == nil {
+		_ = database.Providers().SaveModels(ctx, spec.Name, refreshed)
+		log.Printf("mtt: the provider %s gives %d models", spec.Name, len(refreshed))
 	} else {
 		log.Printf("mtt: the provider refresh is not complete: %v", err)
+	}
+	if spec.Interval <= 0 {
+		return
 	}
 	go func() {
 		ticker := time.NewTicker(spec.Interval)
@@ -218,52 +286,10 @@ func openStore(ctx context.Context, dsn string) store.Store {
 	return memorystore.New()
 }
 
-func env(key string, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+func newToken() string {
+	var data [32]byte
+	if _, err := rand.Read(data[:]); err != nil {
+		return "change-me"
 	}
-	return fallback
-}
-
-func envInt(key string, fallback int) int {
-	value, err := strconv.Atoi(os.Getenv(key))
-	if err != nil {
-		return fallback
-	}
-	return value
-}
-
-func loadDotEnv(path string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		key, value, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		if _, exists := os.LookupEnv(key); exists {
-			continue
-		}
-		os.Setenv(key, strings.Trim(value, `"'`))
-	}
-}
-
-func defaultModel(models *gateway.Gateway, providerName string) string {
-	for _, provider := range models.Providers() {
-		if provider.Name() != providerName {
-			continue
-		}
-		for _, model := range provider.Models() {
-			return model.ID
-		}
-	}
-	return ""
+	return hex.EncodeToString(data[:])
 }

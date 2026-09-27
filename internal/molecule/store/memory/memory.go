@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
@@ -22,6 +23,8 @@ type Store struct {
 	usage       []atom.UsageRecord
 	providers   map[string]atom.ProviderSpec
 	models      map[string][]atom.ModelInfo
+	secretKeys  map[string]atom.ProviderKey
+	settings    map[string]string
 }
 
 func New() *Store {
@@ -33,6 +36,8 @@ func New() *Store {
 		permissions: map[string]atom.PermissionDecision{},
 		providers:   map[string]atom.ProviderSpec{},
 		models:      map[string][]atom.ModelInfo{},
+		secretKeys:  map[string]atom.ProviderKey{},
+		settings:    map[string]string{},
 	}
 }
 
@@ -43,6 +48,8 @@ func (s *Store) Processes() store.ProcessStore      { return &processes{s} }
 func (s *Store) Permissions() store.PermissionStore { return &permissions{s} }
 func (s *Store) Usage() store.UsageStore            { return &usage{s} }
 func (s *Store) Providers() store.ProviderStore     { return &providers{s} }
+func (s *Store) Secrets() store.SecretStore         { return &secrets{s} }
+func (s *Store) Settings() store.SettingsStore      { return &settings{s} }
 func (s *Store) Close() error                       { return nil }
 
 type instances struct{ s *Store }
@@ -167,6 +174,18 @@ func (p *processes) Get(ctx context.Context, id string) (atom.ProcessRecord, err
 		return atom.ProcessRecord{}, errors.New("memory: the process is not in the store")
 	}
 	return record, nil
+}
+
+func (p *processes) CountRunning(ctx context.Context, instanceID string) (int, error) {
+	p.s.mu.RLock()
+	defer p.s.mu.RUnlock()
+	count := 0
+	for _, record := range p.s.processes {
+		if record.InstanceID == instanceID && record.Status == "running" {
+			count++
+		}
+	}
+	return count, nil
 }
 
 func (p *processes) List(ctx context.Context, session atom.SessionID) ([]atom.ProcessRecord, error) {
@@ -331,4 +350,107 @@ func (p *providers) Models(ctx context.Context, provider string) ([]atom.ModelIn
 	p.s.mu.RLock()
 	defer p.s.mu.RUnlock()
 	return append([]atom.ModelInfo(nil), p.s.models[provider]...), nil
+}
+
+type secrets struct{ s *Store }
+
+func keyOf(scope string, provider string) string {
+	return scope + "/" + provider
+}
+
+func (s *secrets) SaveProviderKey(ctx context.Context, provider string, key string) error {
+	s.s.mu.Lock()
+	defer s.s.mu.Unlock()
+	s.s.secretKeys[keyOf("", provider)] = atom.ProviderKey{Scope: "", Provider: provider, Key: key}
+	return nil
+}
+
+func (s *secrets) ProviderKey(ctx context.Context, provider string) (string, error) {
+	s.s.mu.RLock()
+	defer s.s.mu.RUnlock()
+	return s.s.secretKeys[keyOf("", provider)].Key, nil
+}
+
+func (s *secrets) SaveInstanceKey(ctx context.Context, instanceID string, provider string, key string) error {
+	s.s.mu.Lock()
+	defer s.s.mu.Unlock()
+	s.s.secretKeys[keyOf(instanceID, provider)] = atom.ProviderKey{Scope: instanceID, Provider: provider, Key: key}
+	return nil
+}
+
+func (s *secrets) InstanceKey(ctx context.Context, instanceID string, provider string) (string, error) {
+	s.s.mu.RLock()
+	defer s.s.mu.RUnlock()
+	return s.s.secretKeys[keyOf(instanceID, provider)].Key, nil
+}
+
+func (s *secrets) ResolveKey(ctx context.Context, instanceID string, provider string) (string, error) {
+	s.s.mu.RLock()
+	defer s.s.mu.RUnlock()
+	if key := s.s.secretKeys[keyOf(instanceID, provider)].Key; key != "" {
+		return key, nil
+	}
+	return s.s.secretKeys[keyOf("", provider)].Key, nil
+}
+
+func (s *secrets) DeleteProviderKey(ctx context.Context, provider string) error {
+	s.s.mu.Lock()
+	defer s.s.mu.Unlock()
+	delete(s.s.secretKeys, keyOf("", provider))
+	return nil
+}
+
+func (s *secrets) DeleteInstanceKey(ctx context.Context, instanceID string, provider string) error {
+	s.s.mu.Lock()
+	defer s.s.mu.Unlock()
+	delete(s.s.secretKeys, keyOf(instanceID, provider))
+	return nil
+}
+
+type settings struct{ s *Store }
+
+func settingOf(scope string, key string) string {
+	return scope + "/" + key
+}
+
+func (s *settings) Save(ctx context.Context, scope string, key string, value string) error {
+	s.s.mu.Lock()
+	defer s.s.mu.Unlock()
+	s.s.settings[settingOf(scope, key)] = value
+	return nil
+}
+
+func (s *settings) Get(ctx context.Context, scope string, key string) (string, error) {
+	s.s.mu.RLock()
+	defer s.s.mu.RUnlock()
+	return s.s.settings[settingOf(scope, key)], nil
+}
+
+func (s *settings) All(ctx context.Context, scope string) (map[string]string, error) {
+	s.s.mu.RLock()
+	defer s.s.mu.RUnlock()
+	result := map[string]string{}
+	prefix := scope + "/"
+	for compound, value := range s.s.settings {
+		if strings.HasPrefix(compound, prefix) {
+			result[strings.TrimPrefix(compound, prefix)] = value
+		}
+	}
+	return result, nil
+}
+
+func (s *settings) Delete(ctx context.Context, scope string, key string) error {
+	s.s.mu.Lock()
+	defer s.s.mu.Unlock()
+	delete(s.s.settings, settingOf(scope, key))
+	return nil
+}
+
+func (s *settings) Resolve(ctx context.Context, instanceID string, key string) (string, error) {
+	s.s.mu.RLock()
+	defer s.s.mu.RUnlock()
+	if value := s.s.settings[settingOf(instanceID, key)]; value != "" {
+		return value, nil
+	}
+	return s.s.settings[settingOf("", key)], nil
 }

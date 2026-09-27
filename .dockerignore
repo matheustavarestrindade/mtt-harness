@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+mtt
+bin
+dist
+*.md
+ste
+scripts

@@ -78,7 +78,7 @@ func TestStoreRoundTrip(t *testing.T) {
 		t.Fatalf("events = %d err = %v", len(events), err)
 	}
 
-	spec := atom.ProviderSpec{Name: "provider-" + id, APIURL: "http://x", ModelListURL: "http://x/models", Secret: "s", Interval: time.Hour}
+	spec := atom.ProviderSpec{Name: "provider-" + id, APIURL: "http://x", ModelListURL: "http://x/models", Interval: time.Hour}
 	if err := database.Providers().Save(ctx, spec); err != nil {
 		t.Fatal(err)
 	}

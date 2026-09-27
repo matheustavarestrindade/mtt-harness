@@ -11,7 +11,7 @@ import (
 )
 
 type PathGuard struct {
-	Workspace string
+	WorkspaceOf func(instanceID string) string
 }
 
 func (p *PathGuard) Name() string {
@@ -30,14 +30,25 @@ func (p *PathGuard) Setup(h *harness.Harness) error {
 		if err := json.Unmarshal(call.Input, &input); err != nil || input.Path == "" {
 			return atom.Verdict{Kind: atom.VerdictAllow}, nil
 		}
-		target := resolve(input.Path)
-		workspace := resolve(p.Workspace)
-		if target == workspace || strings.HasPrefix(target, workspace+string(filepath.Separator)) {
+		workspace := ""
+		if session, ok := harness.SessionFrom(ctx); ok && p.WorkspaceOf != nil {
+			workspace = p.WorkspaceOf(session.InstanceID)
+		}
+		if workspace == "" {
+			return atom.Verdict{Kind: atom.VerdictAllow}, nil
+		}
+		target := input.Path
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(workspace, target)
+		}
+		resolved := resolve(target)
+		root := resolve(workspace)
+		if resolved == root || strings.HasPrefix(resolved, root+string(filepath.Separator)) {
 			return atom.Verdict{Kind: atom.VerdictAllow}, nil
 		}
 		return atom.Verdict{
 			Kind:   atom.VerdictAsk,
-			Target: target,
+			Target: resolved,
 			Why:    "the path is not in the workspace",
 		}, nil
 	})

@@ -30,8 +30,13 @@ type ProviderSpec struct {
 	APIURL        string
 	ModelListURL  string
 	PriceTableURL string
-	Secret        string
 	Interval      time.Duration
+}
+
+type ProviderKey struct {
+	Scope    string
+	Provider string
+	Key      string
 }
 
 type Usage struct {
