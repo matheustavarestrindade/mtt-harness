@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
@@ -49,6 +51,7 @@ func TestAPIFlow(t *testing.T) {
 		Bus:       bus,
 		Broker:    broker,
 		Loop:      runner,
+		Queue:     loop.NewQueue(runner),
 		Gateway:   models,
 	}).Handler())
 	defer server.Close()
@@ -75,23 +78,23 @@ func TestAPIFlow(t *testing.T) {
 	}
 	decode(t, response, &session)
 
-	var answer struct {
-		Session string `json:"session"`
-		Message *struct {
-			Role    string `json:"Role"`
-			Content []struct {
-				Text string `json:"Text"`
-			} `json:"Content"`
-		} `json:"message"`
-	}
 	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "POST", map[string]any{"content": "hi"})
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(response.Body)
 		t.Fatalf("message status = %d: %s", response.StatusCode, body)
 	}
-	decode(t, response, &answer)
-	if answer.Message == nil || answer.Message.Content[0].Text != "hello" {
-		t.Fatalf("answer = %+v", answer)
+	var messages []atom.Message
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		response = request(t, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "GET", nil)
+		decode(t, response, &messages)
+		if len(messages) >= 2 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if len(messages) != 2 || messages[1].Content[0].Text != "hello" {
+		t.Fatalf("the messages = %+v", messages)
 	}
 
 	var statistics atom.Statistics
@@ -99,6 +102,27 @@ func TestAPIFlow(t *testing.T) {
 	decode(t, response, &statistics)
 	if statistics.Calls != 1 || statistics.Input != 10 {
 		t.Fatalf("statistics = %+v", statistics)
+	}
+
+	if _, _, err := sendAndWait(t, server.URL, string(session.ID), "again", 4); err != nil {
+		t.Fatal(err)
+	}
+	var reverted struct {
+		Status  string `json:"status"`
+		Removed int    `json:"removed"`
+	}
+	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/revert", "secret", "POST", map[string]any{"message_id": messages[0].ID})
+	decode(t, response, &reverted)
+	if reverted.Removed != 3 {
+		t.Fatalf("the revert = %+v", reverted)
+	}
+	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "GET", nil)
+	decode(t, response, &messages)
+	if len(messages) != 1 {
+		t.Fatalf("the messages after the revert = %d", len(messages))
+	}
+	if _, _, err := sendAndWait(t, server.URL, string(session.ID), "after the revert", 2); err != nil {
+		t.Fatal(err)
 	}
 
 	var modelList []atom.ModelInfo
@@ -178,4 +202,24 @@ func decode(t *testing.T, response *http.Response, value any) {
 	if err := json.NewDecoder(response.Body).Decode(value); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func sendAndWait(t *testing.T, url string, session string, content string, want int) ([]atom.Message, int, error) {
+	t.Helper()
+	response := request(t, url+"/sessions/"+session+"/messages", "secret", "POST", map[string]any{"content": content})
+	if response.StatusCode != http.StatusAccepted {
+		body, _ := io.ReadAll(response.Body)
+		t.Fatalf("message status = %d: %s", response.StatusCode, body)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		response = request(t, url+"/sessions/"+session+"/messages", "secret", "GET", nil)
+		var messages []atom.Message
+		decode(t, response, &messages)
+		if len(messages) >= want {
+			return messages, len(messages), nil
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return nil, 0, fmt.Errorf("the messages did not arrive")
 }

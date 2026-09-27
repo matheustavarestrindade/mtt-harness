@@ -26,6 +26,7 @@ type Server struct {
 	bus       *eventbus.Bus
 	broker    *permission.Broker
 	loop      *loop.Loop
+	queue     *loop.Queue
 	processes *processes.Manager
 	gateway   *gateway.Gateway
 }
@@ -37,6 +38,7 @@ type Config struct {
 	Bus       *eventbus.Bus
 	Broker    *permission.Broker
 	Loop      *loop.Loop
+	Queue     *loop.Queue
 	Processes *processes.Manager
 	Gateway   *gateway.Gateway
 }
@@ -49,6 +51,7 @@ func New(cfg Config) *Server {
 		bus:       cfg.Bus,
 		broker:    cfg.Broker,
 		loop:      cfg.Loop,
+		queue:     cfg.Queue,
 		processes: cfg.Processes,
 		gateway:   cfg.Gateway,
 	}
@@ -66,7 +69,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /instances/{id}/sessions", s.startSession)
 	mux.HandleFunc("GET /instances/{id}/statistics", s.instanceStatistics)
 	mux.HandleFunc("GET /sessions/{id}", s.getSession)
+	mux.HandleFunc("GET /sessions/{id}/messages", s.sessionMessages)
 	mux.HandleFunc("POST /sessions/{id}/messages", s.sendMessage)
+	mux.HandleFunc("POST /sessions/{id}/cancel", s.cancelMessage)
+	mux.HandleFunc("GET /sessions/{id}/status", s.sessionStatus)
+	mux.HandleFunc("POST /sessions/{id}/revert", s.revertSession)
 	mux.HandleFunc("GET /sessions/{id}/agents", s.sessionAgents)
 	mux.HandleFunc("GET /sessions/{id}/statistics", s.sessionStatistics)
 	mux.HandleFunc("GET /sessions/{id}/processes", s.sessionProcesses)
@@ -166,6 +173,9 @@ func (s *Server) getInstance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) stopInstance(w http.ResponseWriter, r *http.Request) {
+	if s.processes != nil {
+		s.processes.StopInstance(r.Context(), r.PathValue("id"))
+	}
 	if err := s.instances.Stop(r.Context(), r.PathValue("id")); err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
@@ -272,6 +282,18 @@ func (s *Server) sessionAgents(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, agents)
 }
 
+func (s *Server) sessionMessages(w http.ResponseWriter, r *http.Request) {
+	messages, err := s.store.Sessions().Messages(r.Context(), atom.SessionID(r.PathValue("id")))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if messages == nil {
+		messages = []atom.Message{}
+	}
+	writeJSON(w, http.StatusOK, messages)
+}
+
 func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	session, err := s.store.Sessions().Get(r.Context(), atom.SessionID(r.PathValue("id")))
 	if err != nil {
@@ -285,28 +307,67 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	message := atom.Message{
-		ID:        newID(),
-		SessionID: session.ID,
-		Role:      atom.RoleUser,
-		Content:   []atom.Content{{Type: atom.Text, Text: input.Content}},
-		CreatedAt: time.Now(),
-	}
-	if err := s.store.Sessions().Append(r.Context(), message); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := s.loop.Run(r.Context(), session); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	messages, err := s.store.Sessions().Messages(r.Context(), session.ID)
+	message, position, err := s.queue.Submit(r.Context(), session, input.Content)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	answer := lastAssistant(messages)
-	writeJSON(w, http.StatusOK, map[string]any{"session": session.ID, "message": answer})
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"status":   "queued",
+		"position": position,
+		"message":  message,
+	})
+}
+
+func (s *Server) cancelMessage(w http.ResponseWriter, r *http.Request) {
+	if !s.queue.Cancel(atom.SessionID(r.PathValue("id"))) {
+		writeError(w, http.StatusConflict, "the session does not run")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
+}
+
+func (s *Server) sessionStatus(w http.ResponseWriter, r *http.Request) {
+	running, queued := s.queue.Status(atom.SessionID(r.PathValue("id")))
+	writeJSON(w, http.StatusOK, map[string]any{"running": running, "queued": queued})
+}
+
+func (s *Server) revertSession(w http.ResponseWriter, r *http.Request) {
+	sessionID := atom.SessionID(r.PathValue("id"))
+	if _, err := s.store.Sessions().Get(r.Context(), sessionID); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	var input struct {
+		MessageID string `json:"message_id"`
+	}
+	if err := readJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	messages, err := s.store.Sessions().Messages(r.Context(), sessionID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	found := false
+	for _, message := range messages {
+		if message.ID == input.MessageID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		writeError(w, http.StatusNotFound, "the message is not in the session")
+		return
+	}
+	s.queue.Clear(sessionID)
+	removed, err := s.store.Sessions().DeleteAfter(r.Context(), sessionID, input.MessageID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "reverted", "removed": removed})
 }
 
 func lastAssistant(messages []atom.Message) *atom.Message {

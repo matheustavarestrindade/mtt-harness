@@ -88,6 +88,13 @@ func main() {
 		return memory.New(instanceID, database.Sessions())
 	}, database.Settings())
 	processManager := processes.New(supervisor, database, h, bus, instanceManager)
+	if specs, err := database.Instances().All(ctx); err == nil {
+		for _, spec := range specs {
+			if _, err := instanceManager.Start(ctx, spec); err != nil {
+				log.Printf("mtt: the instance %s: %v", spec.ID, err)
+			}
+		}
+	}
 	runner := loop.New(h, loop.Config{
 		Gateway:   models,
 		Registry:  reg,
@@ -113,6 +120,8 @@ func main() {
 		}
 		h.Tool(tool)
 	}
+
+	messageQueue := loop.NewQueue(runner)
 
 	host := plugins.New(h)
 	if err := host.Attach(&pathtools.PathGuard{
@@ -148,6 +157,7 @@ func main() {
 			Bus:       bus,
 			Broker:    broker,
 			Loop:      runner,
+			Queue:     messageQueue,
 			Processes: processManager,
 			Gateway:   models,
 		}).Handler(),

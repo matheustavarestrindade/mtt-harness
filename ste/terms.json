@@ -1367,6 +1367,34 @@
       ],
       "meaning": "the rules for the data between 2 programs",
       "source": "mtt-harness specification"
+    },
+    {
+      "term": "queue",
+      "category": "technical_noun",
+      "approved_forms": [
+        "queues"
+      ],
+      "meaning": "a list of items which wait for an operation",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "current run",
+      "category": "technical_noun",
+      "approved_forms": [
+        "current runs"
+      ],
+      "meaning": "the run of the harness at this time",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "revert",
+      "category": "technical_verb",
+      "approved_forms": [
+        "reverts",
+        "reverted"
+      ],
+      "meaning": "to go back to an earlier point in the conversation",
+      "source": "mtt-harness specification"
     }
   ]
 }

@@ -31,6 +31,7 @@ type Manager struct {
 	h          *harness.Harness
 	bus        *eventbus.Bus
 	limits     InstanceLimits
+	instances  map[string]string
 }
 
 func New(supervisor *process.Supervisor, database store.Store, h *harness.Harness, bus *eventbus.Bus, limits InstanceLimits) *Manager {
@@ -40,6 +41,7 @@ func New(supervisor *process.Supervisor, database store.Store, h *harness.Harnes
 		h:          h,
 		bus:        bus,
 		limits:     limits,
+		instances:  map[string]string{},
 	}
 }
 
@@ -66,8 +68,32 @@ func (m *Manager) Start(ctx context.Context, spec atom.ProcessSpec) (harness.Pro
 		StartedAt:  time.Now(),
 	}
 	_ = m.store.Processes().Save(ctx, record)
+	m.mu.Lock()
+	m.instances[proc.ID()] = session.InstanceID
+	m.mu.Unlock()
 	go m.observe(ctx, session, proc, spec)
 	return proc, nil
+}
+
+func (m *Manager) StopInstance(ctx context.Context, instanceID string) int {
+	m.mu.Lock()
+	var ids []string
+	for id, owner := range m.instances {
+		if owner == instanceID {
+			ids = append(ids, id)
+			delete(m.instances, id)
+		}
+	}
+	m.mu.Unlock()
+	count := 0
+	for _, id := range ids {
+		if proc, ok := m.supervisor.Get(id); ok {
+			if err := proc.Kill(atom.Signal("")); err == nil {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 func (m *Manager) Get(id string) (harness.Process, bool) {
@@ -122,6 +148,10 @@ func (m *Manager) observe(ctx context.Context, session atom.Session, proc harnes
 			if !ok {
 				return
 			}
+			event, err := harness.Run(ctx, m.h, atom.StageProcessOutput, event)
+			if err != nil {
+				continue
+			}
 			for _, watcher := range m.h.Watchers() {
 				if watcher.Match(event) {
 					current := watcher
@@ -129,6 +159,9 @@ func (m *Manager) observe(ctx context.Context, session atom.Session, proc harnes
 				}
 			}
 			if event.Stream == atom.StreamExit {
+				m.mu.Lock()
+				delete(m.instances, proc.ID())
+				m.mu.Unlock()
 				m.finish(ctx, session, proc, spec, event)
 				return
 			}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
@@ -15,6 +16,7 @@ type Test struct {
 	mu           sync.Mutex
 	script       [][]atom.ResponsePart
 	index        int
+	delay        time.Duration
 	Requests     []atom.Request
 }
 
@@ -53,7 +55,7 @@ func (t *Test) Stream(ctx context.Context, request atom.Request) (harness.Stream
 	}
 	parts := t.script[t.index]
 	t.index++
-	return &sliceStream{parts: parts}, nil
+	return &sliceStream{parts: parts, delay: t.delay}, nil
 }
 
 func (t *Test) Calls() int {
@@ -65,9 +67,24 @@ func (t *Test) Calls() int {
 type sliceStream struct {
 	parts []atom.ResponsePart
 	index int
+	delay time.Duration
+}
+
+func (t *Test) SetDelay(delay time.Duration) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.delay = delay
 }
 
 func (s *sliceStream) Recv(ctx context.Context) (atom.ResponsePart, error) {
+	if s.delay > 0 {
+		select {
+		case <-time.After(s.delay):
+			s.delay = 0
+		case <-ctx.Done():
+			return atom.ResponsePart{}, ctx.Err()
+		}
+	}
 	if s.index >= len(s.parts) {
 		return atom.ResponsePart{}, io.EOF
 	}

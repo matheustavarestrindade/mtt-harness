@@ -78,7 +78,22 @@ func (b *Bash) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, er
 			Content: []atom.Content{{Type: atom.Text, Text: fmt.Sprintf("process %s is started", proc.ID())}},
 		}, nil
 	}
-	status, err := proc.Wait()
+	type waitResult struct {
+		status atom.ExitStatus
+		err    error
+	}
+	waited := make(chan waitResult, 1)
+	go func() {
+		status, err := proc.Wait()
+		waited <- waitResult{status: status, err: err}
+	}()
+	var status atom.ExitStatus
+	select {
+	case result := <-waited:
+		status, err = result.status, result.err
+	case <-ctx.Done():
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "the wait is cancelled"}, nil
+	}
 	stdout, stderr, _ := b.manager.Output(proc.ID())
 	var builder strings.Builder
 	if len(stdout) > 0 {

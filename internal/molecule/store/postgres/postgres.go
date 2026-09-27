@@ -270,6 +270,16 @@ func (s *sessions) Append(ctx context.Context, message atom.Message) error {
 	return err
 }
 
+func (s *sessions) DeleteAfter(ctx context.Context, id atom.SessionID, messageID string) (int, error) {
+	tag, err := s.s.pool.Exec(ctx, `
+		DELETE FROM messages WHERE session_id = $1 AND seq > (SELECT seq FROM messages WHERE id = $2)`,
+		string(id), messageID)
+	if err != nil {
+		return 0, err
+	}
+	return int(tag.RowsAffected()), nil
+}
+
 func (s *sessions) Messages(ctx context.Context, id atom.SessionID) ([]atom.Message, error) {
 	rows, err := s.s.pool.Query(ctx, `
 		SELECT id, session_id, role, content, tool_calls, tool_call_id, usage, created_at

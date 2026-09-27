@@ -128,6 +128,25 @@ func (s *sessions) Append(ctx context.Context, message atom.Message) error {
 	return nil
 }
 
+func (s *sessions) DeleteAfter(ctx context.Context, id atom.SessionID, messageID string) (int, error) {
+	s.s.mu.Lock()
+	defer s.s.mu.Unlock()
+	list := s.s.messages[id]
+	index := -1
+	for position := range list {
+		if list[position].ID == messageID {
+			index = position
+			break
+		}
+	}
+	if index < 0 {
+		return 0, errors.New("memory: the message is not in the store")
+	}
+	removed := len(list) - index - 1
+	s.s.messages[id] = list[:index+1]
+	return removed, nil
+}
+
 func (s *sessions) Messages(ctx context.Context, id atom.SessionID) ([]atom.Message, error) {
 	s.s.mu.RLock()
 	defer s.s.mu.RUnlock()

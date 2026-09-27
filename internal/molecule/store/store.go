@@ -19,6 +19,7 @@ type SessionStore interface {
 	Agents(ctx context.Context, parent atom.SessionID) ([]atom.SessionID, error)
 	Append(ctx context.Context, message atom.Message) error
 	Messages(ctx context.Context, id atom.SessionID) ([]atom.Message, error)
+	DeleteAfter(ctx context.Context, id atom.SessionID, messageID string) (int, error)
 }
 
 type EventStore interface {

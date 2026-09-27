@@ -22,17 +22,23 @@ import (
 )
 
 type fakeTool struct {
-	name    string
-	run     func(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error)
-	check   func(ctx context.Context, call atom.ToolCall) atom.Verdict
-	counter *int64
-	delay   time.Duration
+	name        string
+	run         func(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error)
+	check       func(ctx context.Context, call atom.ToolCall) atom.Verdict
+	counter     *int64
+	delay       time.Duration
+	inputSchema string
 }
 
-func (f *fakeTool) Name() string             { return f.name }
-func (f *fakeTool) Description() string      { return "A test tool" }
-func (f *fakeTool) Categories() []string     { return []string{"test"} }
-func (f *fakeTool) InputSchema() atom.Schema { return atom.Schema{JSON: []byte(`{"type":"object"}`)} }
+func (f *fakeTool) Name() string         { return f.name }
+func (f *fakeTool) Description() string  { return "A test tool" }
+func (f *fakeTool) Categories() []string { return []string{"test"} }
+func (f *fakeTool) InputSchema() atom.Schema {
+	if f.inputSchema != "" {
+		return atom.Schema{JSON: []byte(f.inputSchema)}
+	}
+	return atom.Schema{JSON: []byte(`{"type":"object"}`)}
+}
 func (f *fakeTool) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
 	if f.check != nil {
 		return f.check(ctx, call)
@@ -341,3 +347,115 @@ func (a *agentTool) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResul
 }
 
 var _ = sync.Mutex{}
+
+func TestLoopRefusesUnsupportedMedia(t *testing.T) {
+	s := newStack(t, provider.Text("never"))
+	session := s.instance(t, 2)
+	message := atom.Message{
+		ID:        "user-image",
+		SessionID: session.ID,
+		Role:      atom.RoleUser,
+		Content:   []atom.Content{{Type: atom.Image, Data: []byte("x"), MIME: "image/png"}},
+		CreatedAt: time.Now(),
+	}
+	if err := s.database.Sessions().Append(context.Background(), message); err != nil {
+		t.Fatal(err)
+	}
+	err := s.loop.Run(context.Background(), session)
+	if err == nil || !strings.Contains(err.Error(), "media type") {
+		t.Fatalf("the media type check is absent: %v", err)
+	}
+}
+
+func TestLoopValidatesTheToolInput(t *testing.T) {
+	s := newStack(t,
+		provider.Call("strict", `{}`),
+		provider.Text("done"),
+	)
+	if err := s.registry.Add(&fakeTool{
+		name:        "strict",
+		inputSchema: `{"type":"object","properties":{"value":{"type":"string"}},"required":["value"]}`,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	session := s.instance(t, 2)
+	s.user(t, session, "run the strict tool")
+	if err := s.loop.Run(context.Background(), session); err != nil {
+		t.Fatal(err)
+	}
+	messages, _ := s.database.Sessions().Messages(context.Background(), session.ID)
+	found := false
+	for _, message := range messages {
+		if message.Role == atom.RoleTool && strings.Contains(message.Content[0].Text, "the field value is necessary") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the input validation is absent: %+v", messages)
+	}
+}
+
+func TestQueueRunsMessagesInSequence(t *testing.T) {
+	s := newStack(t, provider.Text("first"), provider.Text("second"))
+	session := s.instance(t, 2)
+	queue := loop.NewQueue(s.loop)
+	ctx := context.Background()
+	if _, position, err := queue.Submit(ctx, session, "one"); err != nil || position != 1 {
+		t.Fatalf("submit one = %d %v", position, err)
+	}
+	if _, position, err := queue.Submit(ctx, session, "two"); err != nil || position != 2 {
+		t.Fatalf("submit two = %d %v", position, err)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		messages, _ := s.database.Sessions().Messages(ctx, session.ID)
+		if len(messages) >= 4 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	messages, _ := s.database.Sessions().Messages(ctx, session.ID)
+	if len(messages) != 4 {
+		t.Fatalf("the messages = %d", len(messages))
+	}
+	if messages[1].Content[0].Text != "first" || messages[3].Content[0].Text != "second" {
+		t.Fatalf("the sequence is not correct: %q %q", messages[1].Content[0].Text, messages[3].Content[0].Text)
+	}
+	if s.provider.Calls() != 2 {
+		t.Fatalf("the model calls = %d", s.provider.Calls())
+	}
+}
+
+func TestQueueCancelStopsTheRun(t *testing.T) {
+	s := newStack(t, provider.Text("slow"))
+	s.provider.SetDelay(2 * time.Second)
+	session := s.instance(t, 2)
+	queue := loop.NewQueue(s.loop)
+	ctx := context.Background()
+	if _, _, err := queue.Submit(ctx, session, "one"); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if running, _ := queue.Status(session.ID); running {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if running, _ := queue.Status(session.ID); !running {
+		t.Fatal("the run did not start")
+	}
+	if !queue.Cancel(session.ID) {
+		t.Fatal("the run is not cancelled")
+	}
+	for time.Now().Before(deadline) {
+		if running, _ := queue.Status(session.ID); !running {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	messages, _ := s.database.Sessions().Messages(ctx, session.ID)
+	if len(messages) != 1 {
+		t.Fatalf("the messages = %d", len(messages))
+	}
+}

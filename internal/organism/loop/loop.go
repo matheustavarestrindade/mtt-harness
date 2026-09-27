@@ -17,6 +17,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/eventbus"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/permission"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/pipeline"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/schema"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/gateway"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/instances"
@@ -74,6 +75,9 @@ func (l *Loop) Run(ctx context.Context, session atom.Session) error {
 		}
 		modelID, info, provider, err := l.resolve(session)
 		if err != nil {
+			return err
+		}
+		if err := checkMediaTypes(info, messages); err != nil {
 			return err
 		}
 		request := atom.Request{
@@ -236,6 +240,9 @@ func (l *Loop) run(ctx context.Context, session atom.Session, call atom.ToolCall
 	tool, ok := l.cfg.Registry.Get(call.Name)
 	if !ok {
 		return failure(call, errors.New("loop: the tool is not in the registry"))
+	}
+	if err := schema.Validate(tool.InputSchema().JSON, call.Input); err != nil {
+		return failure(call, fmt.Errorf("loop: the input of %s is not correct: %w", call.Name, err))
 	}
 	if check := tool.Check(ctx, call); check.Kind != atom.VerdictAllow {
 		if !l.allow(ctx, session, call.Name, check) {
@@ -481,6 +488,27 @@ func removeTool(specs []atom.ToolSpec, name string) []atom.ToolSpec {
 		}
 	}
 	return out
+}
+
+func checkMediaTypes(info atom.ModelInfo, messages []atom.Message) error {
+	if len(info.Input) == 0 {
+		return nil
+	}
+	allowed := map[atom.MediaType]bool{}
+	for _, media := range info.Input {
+		allowed[media] = true
+	}
+	for _, message := range messages {
+		for _, item := range message.Content {
+			if item.Type == "" {
+				continue
+			}
+			if !allowed[item.Type] {
+				return fmt.Errorf("loop: the model %s does not accept the media type %s", info.ID, item.Type)
+			}
+		}
+	}
+	return nil
 }
 
 func failure(call atom.ToolCall, err error) atom.ToolResult {
