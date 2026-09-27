@@ -1,0 +1,1288 @@
+{
+  "format_version": "1",
+  "terms": [
+    {
+      "term": "harness",
+      "category": "technical_noun",
+      "approved_forms": [
+        "harnesses"
+      ],
+      "meaning": "the program in this specification",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "mtt-harness",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the name of the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "specification",
+      "category": "technical_noun",
+      "approved_forms": [
+        "specifications"
+      ],
+      "meaning": "a document that gives rules for a product",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "plugin",
+      "category": "technical_noun",
+      "approved_forms": [
+        "plugins"
+      ],
+      "meaning": "a unit of code that changes the harness at a stage",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "tool",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tools"
+      ],
+      "meaning": "a function that the model can start",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "tool call",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tool calls"
+      ],
+      "meaning": "one message from the model that starts a tool",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "tool result",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tool results"
+      ],
+      "meaning": "the output of one tool call",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "message",
+      "category": "technical_noun",
+      "approved_forms": [
+        "messages"
+      ],
+      "meaning": "one unit of data between the user, the model, and the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "model",
+      "category": "technical_noun",
+      "approved_forms": [
+        "models"
+      ],
+      "meaning": "an AI system that reads a request and gives a response",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "request",
+      "category": "technical_noun",
+      "approved_forms": [
+        "requests"
+      ],
+      "meaning": "the data that the harness sends to the model",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "response",
+      "category": "technical_noun",
+      "approved_forms": [
+        "responses"
+      ],
+      "meaning": "the data that the model sends to the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "session",
+      "category": "technical_noun",
+      "approved_forms": [
+        "sessions"
+      ],
+      "meaning": "the data from one set of messages with the model",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "turn",
+      "category": "technical_noun",
+      "approved_forms": [
+        "turns"
+      ],
+      "meaning": "one model call and the tool calls from that model call",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "event",
+      "category": "technical_noun",
+      "approved_forms": [
+        "events"
+      ],
+      "meaning": "a unit of information about a change in the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "process",
+      "category": "technical_noun",
+      "approved_forms": [
+        "processes"
+      ],
+      "meaning": "a child program that the harness starts",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "stage",
+      "category": "technical_noun",
+      "approved_forms": [
+        "stages"
+      ],
+      "meaning": "a point in the loop where the harness gives a value to plugins",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "boundary",
+      "category": "technical_noun",
+      "approved_forms": [
+        "boundaries"
+      ],
+      "meaning": "a group of stages with one purpose",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "middleware",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "a function that reads a stage value and gives a new value",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "pipeline",
+      "category": "technical_noun",
+      "approved_forms": [
+        "pipelines"
+      ],
+      "meaning": "the ordered chain of middleware for one stage",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "handler",
+      "category": "technical_noun",
+      "approved_forms": [
+        "handlers"
+      ],
+      "meaning": "a function that a plugin attaches to an event or stage",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "watcher",
+      "category": "technical_noun",
+      "approved_forms": [
+        "watchers"
+      ],
+      "meaning": "a function that reads process output events",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "adapter",
+      "category": "technical_noun",
+      "approved_forms": [
+        "adapters"
+      ],
+      "meaning": "code that connects the harness to an external system",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "provider",
+      "category": "technical_noun",
+      "approved_forms": [
+        "providers"
+      ],
+      "meaning": "code that connects the harness to one model service",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "registry",
+      "category": "technical_noun",
+      "approved_forms": [
+        "registries"
+      ],
+      "meaning": "the table of tools that the model can start",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "context",
+      "category": "technical_noun",
+      "approved_forms": [
+        "contexts"
+      ],
+      "meaning": "the data that the harness prepares for a model call",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "schema",
+      "category": "technical_noun",
+      "approved_forms": [
+        "schemas"
+      ],
+      "meaning": "a rule that gives the shape of data",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "content",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the data in a message",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "verdict",
+      "category": "technical_noun",
+      "approved_forms": [
+        "verdicts"
+      ],
+      "meaning": "the answer of a check: allow, ask, or deny",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "action",
+      "category": "technical_noun",
+      "approved_forms": [
+        "actions"
+      ],
+      "meaning": "one operation in the loop",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "plan",
+      "category": "technical_noun",
+      "approved_forms": [
+        "plans"
+      ],
+      "meaning": "the list of tool calls from a model message",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "goal",
+      "category": "technical_noun",
+      "approved_forms": [
+        "goals"
+      ],
+      "meaning": "a result that the design must give",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "requirement",
+      "category": "technical_noun",
+      "approved_forms": [
+        "requirements"
+      ],
+      "meaning": "a rule that the harness must obey",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "purpose",
+      "category": "technical_noun",
+      "approved_forms": [
+        "purposes"
+      ],
+      "meaning": "the reason for the program",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "definition",
+      "category": "technical_noun",
+      "approved_forms": [
+        "definitions"
+      ],
+      "meaning": "the meaning of a term",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "term",
+      "category": "technical_noun",
+      "approved_forms": [
+        "terms"
+      ],
+      "meaning": "a word with one meaning in this document",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "overview",
+      "category": "technical_noun",
+      "approved_forms": [
+        "overviews"
+      ],
+      "meaning": "a short description of a large subject",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "behavior",
+      "category": "technical_noun",
+      "approved_forms": [
+        "behaviors"
+      ],
+      "meaning": "the operation of the harness in one condition",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "version",
+      "category": "technical_noun",
+      "approved_forms": [
+        "versions"
+      ],
+      "meaning": "one level of a product at one time",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "milestone",
+      "category": "technical_noun",
+      "approved_forms": [
+        "milestones"
+      ],
+      "meaning": "a step in the plan of the work",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "roadmap",
+      "category": "technical_noun",
+      "approved_forms": [
+        "roadmaps"
+      ],
+      "meaning": "the plan of the work with time",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "layer",
+      "category": "technical_noun",
+      "approved_forms": [
+        "layers"
+      ],
+      "meaning": "one level of the code structure",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "unit",
+      "category": "technical_noun",
+      "approved_forms": [
+        "units"
+      ],
+      "meaning": "one small part of the code",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "subsystem",
+      "category": "technical_noun",
+      "approved_forms": [
+        "subsystems"
+      ],
+      "meaning": "a large part of the harness with one purpose",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "atom",
+      "category": "technical_noun",
+      "approved_forms": [
+        "atoms"
+      ],
+      "meaning": "a value or a small unit without a dependency",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "molecule",
+      "category": "technical_noun",
+      "approved_forms": [
+        "molecules"
+      ],
+      "meaning": "a small unit that does one job",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "organism",
+      "category": "technical_noun",
+      "approved_forms": [
+        "organisms"
+      ],
+      "meaning": "a full subsystem of the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "core",
+      "category": "technical_noun",
+      "approved_forms": [
+        "cores"
+      ],
+      "meaning": "the central part of the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "step",
+      "category": "technical_noun",
+      "approved_forms": [
+        "steps"
+      ],
+      "meaning": "one action in a sequence",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "chunk",
+      "category": "technical_noun",
+      "approved_forms": [
+        "chunks"
+      ],
+      "meaning": "a part of a data stream",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "event stream",
+      "category": "technical_noun",
+      "approved_forms": [
+        "event streams"
+      ],
+      "meaning": "the flow of events from the API",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "buffer",
+      "category": "technical_noun",
+      "approved_forms": [
+        "buffers"
+      ],
+      "meaning": "a memory area for output data",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "timeout",
+      "category": "technical_noun",
+      "approved_forms": [
+        "timeouts"
+      ],
+      "meaning": "a time limit for a process",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "token",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tokens"
+      ],
+      "meaning": "a unit of text for a model or a unit of permission",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "secret",
+      "category": "technical_noun",
+      "approved_forms": [
+        "secrets"
+      ],
+      "meaning": "private data that the harness must not show",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "policy",
+      "category": "technical_noun",
+      "approved_forms": [
+        "policies"
+      ],
+      "meaning": "a rule that a plugin uses for a decision",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "scope",
+      "category": "technical_noun",
+      "approved_forms": [
+        "scopes"
+      ],
+      "meaning": "the time range of a permission decision",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "status",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the condition of a process or a tool call",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "recall",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the operation that finds related messages",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "storage",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the operation that keeps data",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "default",
+      "category": "technical_noun",
+      "approved_forms": [
+        "defaults"
+      ],
+      "meaning": "the first selection when the user gives no other",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "database",
+      "category": "technical_noun",
+      "approved_forms": [
+        "databases"
+      ],
+      "meaning": "the Postgres data store of the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "table",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tables"
+      ],
+      "meaning": "one data structure in the database",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "column",
+      "category": "technical_noun",
+      "approved_forms": [
+        "columns"
+      ],
+      "meaning": "one field of a database table",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "transaction",
+      "category": "technical_noun",
+      "approved_forms": [
+        "transactions"
+      ],
+      "meaning": "a group of database writes with one result",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "event record",
+      "category": "technical_noun",
+      "approved_forms": [
+        "event records"
+      ],
+      "meaning": "the append-only database table of events",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "API",
+      "category": "technical_noun",
+      "approved_forms": [
+        "APIs"
+      ],
+      "meaning": "the headless interface of the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "HTTP",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the protocol for API commands",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "WebSocket",
+      "category": "technical_noun",
+      "approved_forms": [
+        "WebSockets"
+      ],
+      "meaning": "the protocol for the event stream",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "JSON-RPC",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the protocol for the plugin bridge",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "Postgres",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the database program",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "AI",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "artificial intelligence",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "Go",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the programming language of the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "code",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the instructions of the program",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "program",
+      "category": "technical_noun",
+      "approved_forms": [
+        "programs"
+      ],
+      "meaning": "a set of instructions for a computer",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "path",
+      "category": "technical_noun",
+      "approved_forms": [
+        "paths"
+      ],
+      "meaning": "a name for a file or a directory",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "directory",
+      "category": "technical_noun",
+      "approved_forms": [
+        "directories"
+      ],
+      "meaning": "a group of files",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "workspace",
+      "category": "technical_noun",
+      "approved_forms": [
+        "workspaces"
+      ],
+      "meaning": "the directory tree of the user project",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "symbolic link",
+      "category": "technical_noun",
+      "approved_forms": [
+        "symbolic links"
+      ],
+      "meaning": "a path that points to another path",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "command",
+      "category": "technical_noun",
+      "approved_forms": [
+        "commands"
+      ],
+      "meaning": "the text that starts a process",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "permission",
+      "category": "technical_noun",
+      "approved_forms": [
+        "permissions"
+      ],
+      "meaning": "the right to start a tool",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "bridge",
+      "category": "technical_noun",
+      "approved_forms": [
+        "bridges"
+      ],
+      "meaning": "the connection between the harness and an external plugin",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "path guard",
+      "category": "technical_noun",
+      "approved_forms": [
+        "path guards"
+      ],
+      "meaning": "the plugin that checks a path in a tool call",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "document",
+      "category": "technical_noun",
+      "approved_forms": [
+        "documents"
+      ],
+      "meaning": "a text file with information",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "section",
+      "category": "technical_noun",
+      "approved_forms": [
+        "sections"
+      ],
+      "meaning": "one part of a document",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "intercept",
+      "category": "technical_verb",
+      "approved_forms": [
+        "intercepts",
+        "intercepted"
+      ],
+      "meaning": "to read or change data at a stage",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "resolve",
+      "category": "technical_verb",
+      "approved_forms": [
+        "resolves",
+        "resolved"
+      ],
+      "meaning": "to change a path to its full form",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "run",
+      "category": "technical_verb",
+      "approved_forms": [
+        "runs"
+      ],
+      "meaning": "to start and continue a tool or a process",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "deny",
+      "category": "technical_verb",
+      "approved_forms": [
+        "denies",
+        "denied"
+      ],
+      "meaning": "to refuse a tool call",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "be",
+      "category": "technical_verb",
+      "approved_forms": [
+        "are"
+      ],
+      "meaning": "to exist or to have a quality",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "check",
+      "category": "technical_noun",
+      "approved_forms": [
+        "checks"
+      ],
+      "meaning": "the operation that examines a tool input",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "agent",
+      "category": "technical_noun",
+      "approved_forms": [
+        "agents"
+      ],
+      "meaning": "software that operates without a person",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "feature",
+      "category": "technical_noun",
+      "approved_forms": [
+        "features"
+      ],
+      "meaning": "a function of the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "user",
+      "category": "technical_noun",
+      "approved_forms": [
+        "users"
+      ],
+      "meaning": "a person who operates the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "meaning",
+      "category": "technical_noun",
+      "approved_forms": [
+        "meanings"
+      ],
+      "meaning": "the idea that a word or a message gives",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "value",
+      "category": "technical_noun",
+      "approved_forms": [
+        "values"
+      ],
+      "meaning": "data which a stage gives to a plugin",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "package",
+      "category": "technical_noun",
+      "approved_forms": [
+        "packages"
+      ],
+      "meaning": "a group of Go source files",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "rule",
+      "category": "technical_noun",
+      "approved_forms": [
+        "rules"
+      ],
+      "meaning": "a statement which tells what is correct",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "client",
+      "category": "technical_noun",
+      "approved_forms": [
+        "clients"
+      ],
+      "meaning": "a program which connects to the API",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "decision",
+      "category": "technical_noun",
+      "approved_forms": [
+        "decisions"
+      ],
+      "meaning": "the result of a permission request",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "vector",
+      "category": "technical_noun",
+      "approved_forms": [
+        "vectors"
+      ],
+      "meaning": "a list of numbers for a semantic operation",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "model call",
+      "category": "technical_noun",
+      "approved_forms": [
+        "model calls"
+      ],
+      "meaning": "one request to the model and the response",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "instance",
+      "category": "technical_noun",
+      "approved_forms": [
+        "instances"
+      ],
+      "meaning": "one workspace with sessions, messages, and processes",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "notification",
+      "category": "technical_noun",
+      "approved_forms": [
+        "notifications"
+      ],
+      "meaning": "a message about the status of a process",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "millisecond",
+      "category": "technical_noun",
+      "approved_forms": [
+        "milliseconds"
+      ],
+      "meaning": "a unit of time equal to 0.001 second",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "parent session",
+      "category": "technical_noun",
+      "approved_forms": [
+        "parent sessions"
+      ],
+      "meaning": "the session which starts an agent",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "child agent",
+      "category": "technical_noun",
+      "approved_forms": [
+        "child agents"
+      ],
+      "meaning": "an agent which a parent session starts",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "ID",
+      "category": "technical_noun",
+      "approved_forms": [
+        "IDs"
+      ],
+      "meaning": "a name for an object in the program",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "configuration",
+      "category": "technical_noun",
+      "approved_forms": [
+        "configurations"
+      ],
+      "meaning": "the settings of a program",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "model list",
+      "category": "technical_noun",
+      "approved_forms": [
+        "model lists"
+      ],
+      "meaning": "the models which an instance can use",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "media type",
+      "category": "technical_noun",
+      "approved_forms": [
+        "media types"
+      ],
+      "meaning": "a form of content, for example text, image, or audio",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "parameter",
+      "category": "technical_noun",
+      "approved_forms": [
+        "parameters"
+      ],
+      "meaning": "a value which changes the operation of a model call",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "content item",
+      "category": "technical_noun",
+      "approved_forms": [
+        "content items"
+      ],
+      "meaning": "one part of a message with one media type",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "image",
+      "category": "technical_noun",
+      "approved_forms": [
+        "images"
+      ],
+      "meaning": "a picture in a message",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "audio",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "sound in a message",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "file",
+      "category": "technical_noun",
+      "approved_forms": [
+        "files"
+      ],
+      "meaning": "data with a name on a disk",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "text",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "words in a message",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "tool group",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tool groups"
+      ],
+      "meaning": "the tools which the model can start in a session",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "category",
+      "category": "technical_noun",
+      "approved_forms": [
+        "categories"
+      ],
+      "meaning": "a group of tools with the same purpose",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "query",
+      "category": "technical_noun",
+      "approved_forms": [
+        "queries"
+      ],
+      "meaning": "the words which a tool uses to find data",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "description",
+      "category": "technical_noun",
+      "approved_forms": [
+        "descriptions"
+      ],
+      "meaning": "the text which tells the function of a tool",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "word",
+      "category": "technical_noun",
+      "approved_forms": [
+        "words"
+      ],
+      "meaning": "one unit of text between two spaces",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "search text",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the name, the description, and the categories of a tool",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "field",
+      "category": "technical_noun",
+      "approved_forms": [
+        "fields"
+      ],
+      "meaning": "one data item in an input or a table",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "module",
+      "category": "technical_noun",
+      "approved_forms": [
+        "modules"
+      ],
+      "meaning": "the group of Go packages with one name",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "project",
+      "category": "technical_noun",
+      "approved_forms": [
+        "projects"
+      ],
+      "meaning": "the work with a workspace directory",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "interface",
+      "category": "technical_noun",
+      "approved_forms": [
+        "interfaces"
+      ],
+      "meaning": "the name for a set of functions with one purpose",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "type",
+      "category": "technical_noun",
+      "approved_forms": [
+        "types"
+      ],
+      "meaning": "a name for a set of values",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "compiler",
+      "category": "technical_noun",
+      "approved_forms": [
+        "compilers"
+      ],
+      "meaning": "the program which changes source code to a program",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "usage",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the tokens and the cost of a model call",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "cost",
+      "category": "technical_noun",
+      "approved_forms": [
+        "costs"
+      ],
+      "meaning": "the quantity of money for a model call",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "price",
+      "category": "technical_noun",
+      "approved_forms": [
+        "prices"
+      ],
+      "meaning": "the cost for 1,000,000 tokens",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "cache",
+      "category": "technical_noun",
+      "approved_forms": [
+        "caches"
+      ],
+      "meaning": "a store of data for a faster operation",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "statistics",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the data about the operation of the harness",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "reasoning",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the operation of a model to think before the answer",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "currency",
+      "category": "technical_noun",
+      "approved_forms": [
+        "currencies"
+      ],
+      "meaning": "the money type, for example USD",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "endpoint",
+      "category": "technical_noun",
+      "approved_forms": [
+        "endpoints"
+      ],
+      "meaning": "a URL for one operation of a service",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "URL",
+      "category": "technical_noun",
+      "approved_forms": [
+        "URLs"
+      ],
+      "meaning": "the address of a resource",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "refresh",
+      "category": "technical_verb",
+      "approved_forms": [
+        "refreshes",
+        "refreshed"
+      ],
+      "meaning": "to get new data from a service",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "hour",
+      "category": "technical_noun",
+      "approved_forms": [
+        "hours"
+      ],
+      "meaning": "a unit of time equal to 3,600 seconds",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "implement",
+      "category": "technical_verb",
+      "approved_forms": [
+        "implements",
+        "implemented"
+      ],
+      "meaning": "to give the functions of an interface",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "limit",
+      "category": "technical_noun",
+      "approved_forms": [
+        "limits"
+      ],
+      "meaning": "the maximum value of a quantity",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "function",
+      "category": "technical_noun",
+      "approved_forms": [
+        "functions"
+      ],
+      "meaning": "a unit of code with a name and a result",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "environment",
+      "category": "technical_noun",
+      "approved_forms": [
+        "environments"
+      ],
+      "meaning": "the data around a program, for example the set variables",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "library",
+      "category": "technical_noun",
+      "approved_forms": [
+        "libraries"
+      ],
+      "meaning": "a group of functions for other programs",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "repository",
+      "category": "technical_noun",
+      "approved_forms": [
+        "repositories"
+      ],
+      "meaning": "the git data store of the project",
+      "source": "mtt-harness specification"
+    },
+    {
+      "term": "commit",
+      "category": "technical_noun",
+      "approved_forms": [
+        "commits"
+      ],
+      "meaning": "one group of changes in git",
+      "source": "mtt-harness specification"
+    }
+  ]
+}

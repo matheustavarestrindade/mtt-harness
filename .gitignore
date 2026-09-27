@@ -1,0 +1,21 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# binaries
+/mtt
+/bin/
+/dist/
+*.exe
+
+# test and coverage
+*.test
+coverage.out
+coverage.html
+
+# editor and system
+.DS_Store
+.idea/
+.vscode/
+*.swp

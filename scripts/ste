@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+# Wrapper for the ste100 ASD-STE100 checker on NixOS.
+# The uv-managed Python needs native libraries that only exist in the Nix store.
+libs=""
+for pattern in \
+  gcc-*-lib zlib-* zlib-ng-* xz-* bzip2-* expat-* openssl-* sqlite-* \
+  libffi-* ncurses-* readline-* libxml2-* libxslt-* icu-* libuv-*
+do
+  for dir in /nix/store/*${pattern}/lib; do
+    [ -d "$dir" ] && libs="${libs:+$libs:}$dir"
+  done
+done
+[ -n "$libs" ] && LD_LIBRARY_PATH="${libs}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH
+exec "$HOME/.local/bin/ste100" "$@"
