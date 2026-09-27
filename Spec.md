@@ -671,7 +671,8 @@ The initial API paths are:
 - `GET /sessions/{id}`: read a session.
 - `GET /sessions/{id}/messages`: read the messages of a session.
 - `POST /sessions/{id}/cancel`: stop the current run.
-- `GET /sessions/{id}/status`: read the status of the current run.
+- `DELETE /sessions/{id}/queue/{message_id}`: remove a message from the queue.
+- `GET /sessions/{id}/status`: read the status of the current run and the messages in the queue.
 - `POST /sessions/{id}/revert`: remove the messages after a message.
 - `POST /sessions/{id}/messages`: send a user message.
 - `GET /sessions/{id}/events`: send events through WebSocket.
@@ -707,16 +708,17 @@ Requirements:
 - R139: The API must give the sessions of an instance.
 - R140: The API must put a user message in the queue and must not wait for the current run.
 - R141: The API must stop the current run of a session.
-- R142: The API must give the status of the current run of a session.
-- R143: The API must remove the messages after a message.
-- R144: When the user reverts a session, the harness must stop the current run and empty the message queue of the session.
-- R145: The API must give the model list of an instance.
-- R146: The API must give the settings and change the settings.
-- R147: The API must give the statistics of a session.
-- R148: The API must give the statistics of an instance.
-- R149: The API must give the full statistics of the harness.
-- R150: The API must give the providers and the provider models.
-- R151: The API must let the user refresh the model data of a provider.
+- R142: The API must remove a message from the queue.
+- R143: The API must give the status of the current run and the messages in the queue.
+- R144: The API must remove the messages after a message.
+- R145: When the user reverts a session, the harness must stop the current run and empty the message queue of the session.
+- R146: The API must give the model list of an instance.
+- R147: The API must give the settings and change the settings.
+- R148: The API must give the statistics of a session.
+- R149: The API must give the statistics of an instance.
+- R150: The API must give the full statistics of the harness.
+- R151: The API must give the providers and the provider models.
+- R152: The API must let the user refresh the model data of a provider.
 
 ## 15. Atoms, Molecules, Organisms
 
@@ -857,11 +859,11 @@ The program in `cmd/mtt` reads the bootstrap file. Then the program attaches the
 
 ### 16.3 Rules
 
-- R152: The `atom` package must not use a package of the project.
-- R153: The `harness` package must use the `atom` package only.
-- R154: A molecule must be in the `internal/molecule` directory.
-- R155: An organism must be in the `internal/organism` directory.
-- R156: The program must attach the tools and the plugins in the `plugins` directory.
+- R153: The `atom` package must not use a package of the project.
+- R154: The `harness` package must use the `atom` package only.
+- R155: A molecule must be in the `internal/molecule` directory.
+- R156: An organism must be in the `internal/organism` directory.
+- R157: The program must attach the tools and the plugins in the `plugins` directory.
 
 ## 17. Interfaces
 
@@ -1007,9 +1009,9 @@ type ModelGateway interface {
 
 Requirements:
 
-- R157: The `harness` package must contain the `Harness`, `Plugin`, `Tool`, `Provider`, and `ProcessWatcher` interfaces.
-- R158: The `internal/molecule/store` package must contain the data interfaces.
-- R159: The Postgres adapter must use the data interfaces.
+- R158: The `harness` package must contain the `Harness`, `Plugin`, `Tool`, `Provider`, and `ProcessWatcher` interfaces.
+- R159: The `internal/molecule/store` package must contain the data interfaces.
+- R160: The Postgres adapter must use the data interfaces.
 
 ## 18. Protection
 

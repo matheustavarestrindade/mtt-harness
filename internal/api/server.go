@@ -72,6 +72,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /sessions/{id}/messages", s.sessionMessages)
 	mux.HandleFunc("POST /sessions/{id}/messages", s.sendMessage)
 	mux.HandleFunc("POST /sessions/{id}/cancel", s.cancelMessage)
+	mux.HandleFunc("DELETE /sessions/{id}/queue/{message_id}", s.cancelQueuedMessage)
 	mux.HandleFunc("GET /sessions/{id}/status", s.sessionStatus)
 	mux.HandleFunc("POST /sessions/{id}/revert", s.revertSession)
 	mux.HandleFunc("GET /sessions/{id}/agents", s.sessionAgents)
@@ -329,7 +330,19 @@ func (s *Server) cancelMessage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) sessionStatus(w http.ResponseWriter, r *http.Request) {
 	running, queued := s.queue.Status(atom.SessionID(r.PathValue("id")))
-	writeJSON(w, http.StatusOK, map[string]any{"running": running, "queued": queued})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"running":  running,
+		"queued":   len(queued),
+		"messages": queued,
+	})
+}
+
+func (s *Server) cancelQueuedMessage(w http.ResponseWriter, r *http.Request) {
+	if !s.queue.CancelMessage(atom.SessionID(r.PathValue("id")), r.PathValue("message_id")) {
+		writeError(w, http.StatusNotFound, "the message is not in the queue")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "removed"})
 }
 
 func (s *Server) revertSession(w http.ResponseWriter, r *http.Request) {

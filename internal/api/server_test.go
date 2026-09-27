@@ -31,7 +31,8 @@ func TestAPIFlow(t *testing.T) {
 	reg := registry.New()
 	broker := permission.NewBroker()
 	models := gateway.New()
-	if err := models.Add(provider.NewTest("test", provider.TextWithUsage("hello", atom.Usage{Input: 10, Output: 2}))); err != nil {
+	testProvider := provider.NewTest("test", provider.TextWithUsage("hello", atom.Usage{Input: 10, Output: 2}))
+	if err := models.Add(testProvider); err != nil {
 		t.Fatal(err)
 	}
 	instanceManager := instances.New(func(instanceID string) instances.SessionManager { return nil }, nil)
@@ -78,11 +79,31 @@ func TestAPIFlow(t *testing.T) {
 	}
 	decode(t, response, &session)
 
+	testProvider.SetDelay(300 * time.Millisecond)
 	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "POST", map[string]any{"content": "hi"})
 	if response.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(response.Body)
 		t.Fatalf("message status = %d: %s", response.StatusCode, body)
 	}
+	var queued struct {
+		Status  string `json:"status"`
+		Message struct {
+			ID string `json:"ID"`
+		} `json:"message"`
+	}
+	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "POST", map[string]any{"content": "cancel me"})
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("the second message status = %d", response.StatusCode)
+	}
+	decode(t, response, &queued)
+	if queued.Status != "queued" || queued.Message.ID == "" {
+		t.Fatalf("the second message = %+v", queued)
+	}
+	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/queue/"+queued.Message.ID, "secret", "DELETE", nil)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("the queue cancel status = %d", response.StatusCode)
+	}
+	testProvider.SetDelay(0)
 	var messages []atom.Message
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
@@ -95,6 +116,9 @@ func TestAPIFlow(t *testing.T) {
 	}
 	if len(messages) != 2 || messages[1].Content[0].Text != "hello" {
 		t.Fatalf("the messages = %+v", messages)
+	}
+	if messages[0].Content[0].Text != "hi" {
+		t.Fatalf("the removed message ran: %q", messages[0].Content[0].Text)
 	}
 
 	var statistics atom.Statistics

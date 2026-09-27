@@ -459,3 +459,47 @@ func TestQueueCancelStopsTheRun(t *testing.T) {
 		t.Fatalf("the messages = %d", len(messages))
 	}
 }
+
+func TestQueueCancelsAQueuedMessage(t *testing.T) {
+	s := newStack(t, provider.Text("first"), provider.Text("third"))
+	s.provider.SetDelay(200 * time.Millisecond)
+	session := s.instance(t, 2)
+	queue := loop.NewQueue(s.loop)
+	ctx := context.Background()
+	if _, _, err := queue.Submit(ctx, session, "one"); err != nil {
+		t.Fatal(err)
+	}
+	second, _, err := queue.Submit(ctx, session, "two")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := queue.Submit(ctx, session, "three"); err != nil {
+		t.Fatal(err)
+	}
+	if !queue.CancelMessage(session.ID, second.ID) {
+		t.Fatal("the queued message is not removed")
+	}
+	if queue.CancelMessage(session.ID, "not-there") {
+		t.Fatal("a message which is not in the queue is removed")
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		messages, _ := s.database.Sessions().Messages(ctx, session.ID)
+		if len(messages) >= 4 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	messages, _ := s.database.Sessions().Messages(ctx, session.ID)
+	if len(messages) != 4 {
+		t.Fatalf("the messages = %d", len(messages))
+	}
+	if messages[0].Content[0].Text != "one" || messages[2].Content[0].Text != "three" {
+		t.Fatalf("the removed message ran: %q %q", messages[0].Content[0].Text, messages[2].Content[0].Text)
+	}
+	for _, message := range messages {
+		if message.Content[0].Text == "two" {
+			t.Fatal("the removed message is in the store")
+		}
+	}
+}

@@ -94,14 +94,34 @@ func (q *Queue) Cancel(session atom.SessionID) bool {
 	return true
 }
 
-func (q *Queue) Status(session atom.SessionID) (bool, int) {
+func (q *Queue) CancelMessage(session atom.SessionID, messageID string) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	worker := q.workers[session]
 	if worker == nil {
-		return false, 0
+		return false
 	}
-	return worker.cancel != nil, len(worker.queue)
+	for index := range worker.queue {
+		if worker.queue[index].ID == messageID {
+			worker.queue = append(worker.queue[:index], worker.queue[index+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (q *Queue) Status(session atom.SessionID) (bool, []string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	worker := q.workers[session]
+	if worker == nil {
+		return false, nil
+	}
+	ids := make([]string, 0, len(worker.queue))
+	for _, message := range worker.queue {
+		ids = append(ids, message.ID)
+	}
+	return worker.cancel != nil, ids
 }
 
 func (q *Queue) Clear(session atom.SessionID) int {
