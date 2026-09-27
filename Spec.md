@@ -851,7 +851,7 @@ The packages have 3 groups:
 
 - `atom`: the atoms. The package does not use a package of the project.
 - `harness`: the plugin interface. The package uses `atom` only.
-- `internal`: the molecules, the organisms, the API, the bridge, and the tools. A plugin cannot use the `internal` packages. The Go compiler gives an error.
+- `internal`: the molecules, the organisms, the API, the MCP client, and the tools. A plugin cannot use the `internal` packages. The Go compiler gives an error.
 
 The bootstrap file gives the port, the database URL, the provider file, and the plugin file. The file `mtt.json` is local. The file `mtt.example.json` gives the keys.
 
@@ -1032,6 +1032,6 @@ The milestones are:
 - Milestone 1: tools and the permission system. Goal: tools run with checks.
 - Milestone 2: the Postgres database and instances. Goal: data continues after a start and the instances stay apart.
 - Milestone 3: processes and notifications. Goal: a process runs and sends notifications.
-- Milestone 4: the plugin system and the bridge. Goal: a plugin changes the loop.
+- Milestone 4: the plugin system and the MCP servers. Goal: a plugin changes the loop and an MCP server gives tools.
 - Milestone 5: agents. Goal: a child agent gives a result to the parent session.
 - Milestone 6: vector recall. Goal: the harness finds messages with an equivalent meaning.
