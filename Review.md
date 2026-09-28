@@ -27,6 +27,16 @@ The additional gaps are also addressed: durable bounded queues and interrupted-t
 
 Context budgeting uses a provider `TokenCounter` when available. Its fallback is a conservative text/media estimate, not provider billing usage. M6/vector recall remains deferred as agreed.
 
+## Channel-owned session queues
+
+The follow-up on PR #1 replaces the queue's shared mutex and worker wait group with an owning directory goroutine and one command-processing goroutine per session. `sessionCoordinator.run` is the single entry point for state transitions, with named handlers for submit, cancellation, revert, stop/resume, and shutdown.
+
+The model and database workers do not mutate coordinator state. They send results through completion channels. Public requests use cancellation-aware sends and single-slot reply channels. A status read returns one detached snapshot instead of reading running, pending, and error fields separately. Coordinator handlers execute neither I/O nor plugin callbacks.
+
+Shutdown fences admission and joins accepted operations, including a database commit that finishes after the requesting caller leaves. Idle coordinators remain available until queue shutdown. The loop's low-level execution guard and tool-group synchronization, the in-memory store's mutex, and Postgres transactions retain their distinct responsibilities.
+
+`internal/organism/loop/coordinator_concurrency_test.go` covers blocked persistence without blocking cancellation/status or unrelated sessions, abandoned replies, shutdown waiting for late commits, callback status queries, and instance stop overtaking an unfinished revert without reopening admission.
+
 Verification includes the container build, Postgres-backed regression suite, Go vet, race checks, and STE validation of `Spec.md`. A live container smoke test covered queue processing, instance isolation, statistics, stop/resume, revert, and conversation continuation. Restarting that container also preserved its instances, sessions, and statistics.
 
 ## Original confirmed findings

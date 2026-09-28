@@ -1,6 +1,18 @@
 {
   "format_version": "1",
   "terms": [
+    {"term":"coordinator","category":"technical_noun","approved_forms":["coordinators"],"meaning":"the single owner of a session queue or directory state","source":"mtt-harness concurrency model"},
+    {"term":"goroutine","category":"technical_noun","approved_forms":["goroutines"],"meaning":"a concurrent function execution managed by the Go runtime","source":"Go concurrency"},
+    {"term":"queue state","category":"technical_noun","approved_forms":[],"meaning":"the pending work, active turn, admission mode, and errors owned by a coordinator","source":"mtt-harness concurrency model"},
+    {"term":"inbox","category":"technical_noun","approved_forms":["inboxes"],"meaning":"the bounded channel through which a coordinator receives commands","source":"mtt-harness concurrency model"},
+    {"term":"channel","category":"technical_noun","approved_forms":["channels"],"meaning":"a Go communication primitive for sending typed values between goroutines","source":"Go concurrency"},
+    {"term":"caller","category":"technical_noun","approved_forms":["callers"],"meaning":"the function or request that invokes an operation","source":"mtt-harness runtime"},
+    {"term":"worker","category":"technical_noun","approved_forms":["workers"],"meaning":"a goroutine that executes work and reports its result to an owner","source":"mtt-harness concurrency model"},
+    {"term":"completion message","category":"technical_noun","approved_forms":["completion messages"],"meaning":"a worker result sent to its owning coordinator","source":"mtt-harness concurrency model"},
+    {"term":"plugin callback","category":"technical_noun","approved_forms":["plugin callbacks"],"meaning":"a plugin function invoked for a registered event or stage","source":"mtt-harness plugin model"},
+    {"term":"admission","category":"technical_noun","approved_forms":[],"meaning":"acceptance of a new operation by a runtime owner","source":"mtt-harness concurrency model"},
+    {"term":"mutex","category":"technical_noun","approved_forms":["mutexes"],"meaning":"a mutual exclusion primitive that protects shared memory","source":"Go concurrency"},
+    {"term":"map","category":"technical_noun","approved_forms":["maps"],"meaning":"a Go data structure that associates keys with values","source":"Go data structures"},
     {"term":"shell","category":"technical_noun","approved_forms":["shells"],"meaning":"the command interpreter used to execute process commands","source":"mtt-harness runtime"},
     {"term":"percentage","category":"technical_noun","approved_forms":["percentages"],"meaning":"a measured ratio multiplied by one hundred","source":"mtt-harness statistics"},
     {"term":"token estimate","category":"technical_noun","approved_forms":["token estimates"],"meaning":"a locally calculated approximation of request token usage","source":"mtt-harness context budgeting"},

@@ -47,6 +47,12 @@ func TestAPIFlow(test *testing.T) {
 		Engine:    permission.NewEngine(),
 		Instances: instanceManager,
 	})
+	messageQueue := loop.NewQueue(runner)
+	test.Cleanup(func() {
+		operationContext, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		testutil.RequireNoError(test, messageQueue.Close(operationContext))
+	})
 	server := httptest.NewServer(api.New(api.Config{
 		Token:     "secret",
 		Store:     database,
@@ -54,7 +60,7 @@ func TestAPIFlow(test *testing.T) {
 		Bus:       bus,
 		Broker:    broker,
 		Loop:      runner,
-		Queue:     loop.NewQueue(runner),
+		Queue:     messageQueue,
 		Gateway:   models,
 	}).Handler())
 	defer server.Close()

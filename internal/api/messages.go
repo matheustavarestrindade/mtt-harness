@@ -74,7 +74,11 @@ func (server *Server) sendMessage(responseWriter http.ResponseWriter, request *h
 }
 
 func (server *Server) cancelMessage(responseWriter http.ResponseWriter, request *http.Request) {
-	if !server.queue.Cancel(atom.SessionID(request.PathValue("id"))) {
+	cancelled, operationError := server.queue.Cancel(request.Context(), atom.SessionID(request.PathValue("id")))
+	if respondToError(responseWriter, http.StatusInternalServerError, operationError) {
+		return
+	}
+	if !cancelled {
 		writeError(responseWriter, http.StatusConflict, "the session does not run")
 		return
 	}
@@ -82,12 +86,15 @@ func (server *Server) cancelMessage(responseWriter http.ResponseWriter, request 
 }
 
 func (server *Server) sessionStatus(responseWriter http.ResponseWriter, request *http.Request) {
-	running, queued := server.queue.Status(atom.SessionID(request.PathValue("id")))
+	status, operationError := server.queue.Status(request.Context(), atom.SessionID(request.PathValue("id")))
+	if respondToError(responseWriter, http.StatusInternalServerError, operationError) {
+		return
+	}
 	writeJSON(responseWriter, http.StatusOK, map[string]any{
-		"running":  running,
-		"queued":   len(queued),
-		"messages": queued,
-		"error":    server.queue.LastError(atom.SessionID(request.PathValue("id"))),
+		"running":  status.Running,
+		"queued":   len(status.Messages),
+		"messages": status.Messages,
+		"error":    status.Error,
 	})
 }
 

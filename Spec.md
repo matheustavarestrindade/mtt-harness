@@ -134,6 +134,38 @@ The next program start reads the queue. A message which did not start can contin
 
 The event record keeps a tool result when the tool stops. The message record keeps the sequence from the tool plan.
 
+### 4.1 Session Coordinator
+
+The session coordinator keeps the queue state of one session. One goroutine runs the command loop of the coordinator. Only the command handlers of the coordinator change the queue state.
+
+```
+API requests -> queue directory -> session command inbox
+                                      |
+                               sessionCoordinator.run
+                                      |
+                           model and database workers
+                                      |
+                              completion messages
+```
+
+The command inbox has space for 32 commands. A response channel has space for one response. A caller can cancel a command request. The coordinator can send the response after the caller cancels the request.
+
+The coordinator starts a worker for a model call or a database operation. The worker sends a completion message to the coordinator. The coordinator does not wait for the worker in a command handler. Thus, the coordinator can examine a status request or a `cancelCurrent` command during a database operation.
+
+The mode of the coordinator is one of 5 values:
+
+- `accepting`: the coordinator can put new messages in the queue.
+- `reverting`: the coordinator cannot put new messages in the queue until the API completes the revert operation.
+- `stopped`: messages can stay in the database, but a new turn cannot start.
+- `failed`: the coordinator keeps an operation error and does not start a new turn.
+- `closing`: the coordinator stops new commands which can start work. The coordinator waits for the workers before it stops.
+
+The queue directory keeps the session coordinators. One goroutine changes the directory. A worker runs a database operation or a plugin callback. A command handler must not run a database operation or a plugin callback.
+
+The queue keeps a coordinator until the queue closes. The `Close` operation stops admission, cancels the active workers, and waits until the workers stop. A timeout of the caller does not stop the `Close` operation. The program must close the queue before it closes the database.
+
+Postgres transactions keep the database data correct. The memory store continues to use the mutex for the maps of the store. The session command loop does not replace the data interfaces or the permission checks.
+
 ## 5. Instances
 
 A user starts an instance with a workspace directory. The harness gives an ID to the instance. The instance start request gives:
@@ -895,6 +927,13 @@ mtt-harness/
       loop/loop.go             # the AgentLoop
       loop/queue.go            # the message queue
       loop/queue_lifecycle.go  # revert, recovery, and shutdown
+      loop/queue_commands.go   # directory requests and responses
+      loop/queue_directory.go  # session ownership and application lifecycle
+      loop/queue_recovery.go   # restoration and instance control workers
+      loop/session_coordinator.go # one command loop per session
+      loop/coordinator_commands.go # session requests and completions
+      loop/coordinator_operations.go # database workers
+      loop/coordinator_execution.go # model workers
       loop/requests.go         # request preparation and policy
       loop/responses.go        # model response collection
       loop/messages.go         # response and result persistence
@@ -1194,6 +1233,12 @@ Requirements:
 - R170: The event stream must use the sequence number from the database.
 - R171: The harness must keep the data of a stopped instance.
 - R172: The queue must give an error when the number of messages is at the queue limit.
+- R173: One goroutine must change the queue state of a session coordinator.
+- R174: The session coordinator must use commands and completion messages to control the workers.
+- R175: A command handler must not wait for a model call, a tool call, or a database operation.
+- R176: The coordinator must continue after a caller cancels a command request.
+- R177: The `Close` operation must wait until the queue workers stop. Then the program can close the database.
+- R178: A revert operation must not start work in a stopped coordinator.
 
 ## 18. Protection
 

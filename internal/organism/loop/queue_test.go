@@ -6,14 +6,13 @@ import (
 	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
-	"github.com/matheustavarestrindade/mtt-harness/internal/organism/loop"
 	"github.com/matheustavarestrindade/mtt-harness/internal/testutil"
 )
 
 func TestQueueRunsMessagesInSequence(test *testing.T) {
 	testStack := newStack(test, provider.Text("first"), provider.Text("second"))
 	session := testStack.instance(test, 2)
-	queue := loop.NewQueue(testStack.loop)
+	queue := newTestQueue(test, testStack.loop)
 	operationContext := context.Background()
 	if _, position, operationError := queue.Submit(operationContext, session, "one"); operationError != nil || position != 1 {
 		test.Fatalf("submit one = %d %v", position, operationError)
@@ -45,26 +44,31 @@ func TestQueueCancelStopsTheRun(test *testing.T) {
 	testStack := newStack(test, provider.Text("slow"))
 	testStack.provider.SetDelay(2 * time.Second)
 	session := testStack.instance(test, 2)
-	queue := loop.NewQueue(testStack.loop)
+	queue := newTestQueue(test, testStack.loop)
 	operationContext := context.Background()
 	if _, _, operationError := queue.Submit(operationContext, session, "one"); operationError != nil {
 		test.Fatal(operationError)
 	}
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if running, _ := queue.Status(session.ID); running {
+		// Running also includes the claim/persistence phase. Exercise cancellation
+		// of generation here, after the user message has actually been claimed.
+		if testStack.provider.Calls() > 0 {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if running, _ := queue.Status(session.ID); !running {
+	if testStack.provider.Calls() == 0 {
+		test.Fatal("the model call did not start")
+	}
+	if status, _ := queue.Status(operationContext, session.ID); !status.Running {
 		test.Fatal("the run did not start")
 	}
-	if !queue.Cancel(session.ID) {
+	if cancelled, operationError := queue.Cancel(operationContext, session.ID); operationError != nil || !cancelled {
 		test.Fatal("the run is not cancelled")
 	}
 	for time.Now().Before(deadline) {
-		if running, _ := queue.Status(session.ID); !running {
+		if status, _ := queue.Status(operationContext, session.ID); !status.Running {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -79,7 +83,7 @@ func TestQueueCancelsAQueuedMessage(test *testing.T) {
 	testStack := newStack(test, provider.Text("first"), provider.Text("third"))
 	testStack.provider.SetDelay(200 * time.Millisecond)
 	session := testStack.instance(test, 2)
-	queue := loop.NewQueue(testStack.loop)
+	queue := newTestQueue(test, testStack.loop)
 	operationContext := context.Background()
 	if _, _, operationError := queue.Submit(operationContext, session, "one"); operationError != nil {
 		test.Fatal(operationError)

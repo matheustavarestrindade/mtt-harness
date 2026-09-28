@@ -131,7 +131,7 @@ func TestCompleteToolStartsBeforeModelEOF(test *testing.T) {
 func TestRevertWaitsForOldWriterAndFencesNewSubmissions(test *testing.T) {
 	testStack := newStack(test, provider.Call("blocked", `{}`), provider.Text("new answer"))
 	session := testStack.instance(test, 2)
-	queue := loop.NewQueue(testStack.loop)
+	queue := newTestQueue(test, testStack.loop)
 	entered, cancelled, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	releaseTool := sync.OnceFunc(func() {
 		close(release)
@@ -187,7 +187,7 @@ func TestPendingMessagesSurviveQueueShutdown(test *testing.T) {
 	testStack := newStack(test, provider.Text("old"), provider.Text("restored"))
 	testStack.provider.SetDelay(time.Second)
 	session := testStack.instance(test, 2)
-	queue := loop.NewQueue(testStack.loop)
+	queue := newTestQueue(test, testStack.loop)
 	_, _, operationError := queue.Submit(context.Background(), session, "first")
 	testutil.RequireNoError(test, operationError)
 	deadline := time.Now().Add(time.Second)
@@ -205,7 +205,7 @@ func TestPendingMessagesSurviveQueueShutdown(test *testing.T) {
 		test.Fatalf("pending request lost: %+v", entries)
 	}
 	testStack.provider.SetDelay(0)
-	restored := loop.NewQueue(testStack.loop)
+	restored := newTestQueue(test, testStack.loop)
 	testutil.RequireNoError(test, restored.Restore(context.Background()))
 	deadline = time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
@@ -237,9 +237,9 @@ func TestRecoveryDoesNotReplayInterruptedTools(test *testing.T) {
 	testutil.RequireNoError(test, testStack.database.Queue().Enqueue(operationContext, interrupted, 128))
 	testutil.RequireNoError(test, testStack.database.Queue().Start(operationContext, interrupted.ID))
 	testutil.RequireNoError(test, testStack.database.Queue().Enqueue(operationContext, pending, 128))
-	queue := loop.NewQueue(testStack.loop)
+	queue := newTestQueue(test, testStack.loop)
 	testStack.harnessRuntime.On(atom.EventName("run.interrupted"), func(context.Context, atom.Event) {
-		queue.Status(session.ID)
+		queue.Status(operationContext, session.ID)
 	})
 	testutil.RequireNoError(test, queue.Restore(operationContext))
 	deadline := time.Now().Add(time.Second)

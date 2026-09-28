@@ -100,7 +100,9 @@ func (server *Server) resumeInstance(responseWriter http.ResponseWriter, request
 		return
 	}
 	if server.queue != nil {
-		server.queue.ResumeInstance(instance.ID())
+		if respondToError(responseWriter, http.StatusConflict, server.queue.ResumeInstance(request.Context(), instance.ID())) {
+			return
+		}
 	}
 	writeJSON(responseWriter, http.StatusOK, instance.Spec())
 }

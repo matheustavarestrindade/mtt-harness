@@ -39,8 +39,9 @@ func runApplication(configuration config.File) (operationError error) {
 		return nil
 	}
 	defer func() {
-		shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
+		// HTTP has its own shutdown deadline. Resource owners must finish before
+		// the deferred database close, even when an earlier caller stopped waiting.
+		shutdownContext := context.Background()
 		if messageQueue != nil {
 			operationError = errors.Join(operationError, messageQueue.Close(shutdownContext))
 		}

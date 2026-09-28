@@ -82,6 +82,9 @@ The compose service uses the test provider. For a real model API, run `MTT_TEST_
 
 ## Runtime Ownership and Recovery
 
+- Session queue state is channel-owned: `Queue.runDirectory` owns coordinator references and lifecycle gates; `sessionCoordinator.run` owns each session's pending list, active queued turn, admission mode, and terminal error. Send commands instead of accessing that state from other goroutines.
+- Coordinator handlers must not perform database/network I/O, run models/tools, wait for workers, or invoke plugin callbacks. Those operations run in workers and report completion through bounded channels. Replies have capacity one so abandoned callers do not block owners.
+- `Queue.Close` is irreversible once accepted and joins owners and their workers before storage closes. A caller deadline cancels its wait, not the shutdown. Keep memory-store mutexes and Postgres transactions for their separate data-ownership responsibilities.
 - The queue persists accepted messages and restores pending work at startup. Limits: 128 waiting messages per session and 4096 total waiting/running messages. Interrupted active turns are reported instead of replayed.
 - Instance stop preserves its configuration; `POST /instances/{id}/start` resumes it. Revert fences new submissions and waits for the old writer before deleting history.
 - Model IDs in instance model lists use `provider/model`; bare IDs are accepted only when unambiguous. Allowlists apply to sessions, agents, and request-stage overrides.
