@@ -16,7 +16,7 @@ func (Write) Name() string {
 }
 
 func (Write) Description() string {
-	return "Write a file in the workspace."
+	return "Create a file or replace all contents of an existing file with the supplied text. Relative paths resolve from the instance workspace. The parent directory must already exist."
 }
 
 func (Write) Categories() []string {
@@ -24,7 +24,21 @@ func (Write) Categories() []string {
 }
 
 func (Write) InputSchema() atom.Schema {
-	return schema(`{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}`)
+	return schema(`{
+		"type": "object",
+		"properties": {
+			"path": {
+				"type": "string",
+				"description": "Destination file path, relative to the instance workspace or absolute. The parent directory must exist. Symbolic links are resolved before workspace permission checks.",
+				"examples": ["src/main.go"]
+			},
+			"content": {
+				"type": "string",
+				"description": "Complete replacement text for the file, not a patch or appended text. An empty string creates or truncates the file to zero bytes."
+			}
+		},
+		"required": ["path", "content"]
+	}`)
 }
 
 func (Write) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {

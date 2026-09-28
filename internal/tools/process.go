@@ -23,7 +23,7 @@ func (processOutputTool *ProcessOutput) Name() string {
 }
 
 func (processOutputTool *ProcessOutput) Description() string {
-	return "Read the output of a running process."
+	return "Read a snapshot of retained stdout followed by stderr from a running or recently completed process in this instance. Output is limited to the last 256 KiB per stream; only the last 128 completed processes are retained. Repeated reads return the retained snapshot, not just new output."
 }
 
 func (processOutputTool *ProcessOutput) Categories() []string {
@@ -31,7 +31,16 @@ func (processOutputTool *ProcessOutput) Categories() []string {
 }
 
 func (processOutputTool *ProcessOutput) InputSchema() atom.Schema {
-	return schema(`{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}`)
+	return schema(`{
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "string",
+				"description": "Harness process ID returned by bash with wait=false, not the operating-system PID. The process must belong to this instance and its output must still be retained."
+			}
+		},
+		"required": ["id"]
+	}`)
 }
 
 func (processOutputTool *ProcessOutput) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
@@ -76,7 +85,7 @@ func (processKillTool *ProcessKill) Name() string {
 }
 
 func (processKillTool *ProcessKill) Description() string {
-	return "Stop a running process."
+	return "Signal a process in this instance by its harness process ID. The default force-stops it; interrupt requests an interrupt signal. On Unix, the signal applies to the whole process group. This tool requests the signal without waiting for termination; an already stopped process is a no-op."
 }
 
 func (processKillTool *ProcessKill) Categories() []string {
@@ -84,7 +93,21 @@ func (processKillTool *ProcessKill) Categories() []string {
 }
 
 func (processKillTool *ProcessKill) InputSchema() atom.Schema {
-	return schema(`{"type":"object","properties":{"id":{"type":"string"},"signal":{"type":"string"}},"required":["id"]}`)
+	return schema(`{
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "string",
+				"description": "Harness process ID returned by bash with wait=false, not the operating-system PID. The process must belong to this instance."
+			},
+			"signal": {
+				"type": "string",
+				"default": "kill",
+				"description": "Use interrupt to request an interrupt signal (SIGINT on Unix), or kill for a forced stop (SIGKILL on Unix). Omitted or empty uses kill. The implementation treats every value other than interrupt as a forced stop; do not pass arbitrary OS signal names."
+			}
+		},
+		"required": ["id"]
+	}`)
 }
 
 func (processKillTool *ProcessKill) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {

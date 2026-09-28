@@ -16,7 +16,7 @@ func (Read) Name() string {
 }
 
 func (Read) Description() string {
-	return "Read a file from the workspace."
+	return "Read an entire file and return its contents as text. Relative paths resolve from the instance workspace. This tool has no line-range or binary-media decoding options."
 }
 
 func (Read) Categories() []string {
@@ -24,7 +24,17 @@ func (Read) Categories() []string {
 }
 
 func (Read) InputSchema() atom.Schema {
-	return schema(`{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}`)
+	return schema(`{
+		"type": "object",
+		"properties": {
+			"path": {
+				"type": "string",
+				"description": "Path to an existing file, relative to the instance workspace or absolute. Symbolic links are resolved before workspace permission checks. The result contains the entire file as text.",
+				"examples": ["src/main.go"]
+			}
+		},
+		"required": ["path"]
+	}`)
 }
 
 func (Read) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {

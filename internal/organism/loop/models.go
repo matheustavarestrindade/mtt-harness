@@ -30,9 +30,11 @@ func (agentLoop *Loop) agentModelSchema(session atom.Session, specification atom
 		return specification, nil
 	}
 	var allowed []string
+	var defaultModel string
 	if agentLoop.configuration.Instances != nil {
 		if instance, found := agentLoop.configuration.Instances.Get(session.InstanceID); found {
 			allowed = instance.Spec().Models
+			defaultModel = instance.Spec().DefaultModel
 		}
 	}
 	var identifiers []string
@@ -51,7 +53,24 @@ func (agentLoop *Loop) agentModelSchema(session atom.Session, specification atom
 			descriptions = append(descriptions, description)
 		}
 	}
-	properties["model"] = map[string]any{"type": "string", "enum": identifiers, "description": strings.Join(descriptions, "; ")}
+	modelProperty, found := properties["model"].(map[string]any)
+	if !found {
+		modelProperty = map[string]any{"type": "string"}
+	}
+	// Add live choices to the tool's contract without discarding its instructions
+	// or other schema annotations when the session's model catalog changes.
+	description, _ := modelProperty["description"].(string)
+	if len(descriptions) > 0 {
+		description = strings.TrimSpace(description + " Available models: " + strings.Join(descriptions, "; ") + ".")
+	}
+	modelProperty["description"] = description
+	modelProperty["enum"] = identifiers
+	if defaultModel != "" {
+		if model, provider, operationError := agentLoop.configuration.Gateway.ResolveAllowed(defaultModel, allowed); operationError == nil {
+			modelProperty["default"] = provider.Name() + "/" + model.ID
+		}
+	}
+	properties["model"] = modelProperty
 	data, operationError := json.Marshal(schema)
 	if operationError != nil {
 		return specification, operationError

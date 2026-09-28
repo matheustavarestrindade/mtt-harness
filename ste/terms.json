@@ -1,6 +1,10 @@
 {
   "format_version": "1",
   "terms": [
+    {"term":"operating system","category":"technical_noun","approved_forms":["operating systems"],"meaning":"the system software that manages processes and supplies their PIDs","source":"mtt-harness process tools"},
+    {"term":"duration","category":"technical_noun","approved_forms":["durations"],"meaning":"the time length supplied as a tool parameter","source":"mtt-harness tool contracts"},
+    {"term":"string","category":"technical_noun","approved_forms":["strings"],"meaning":"a JSON or Go text value","source":"mtt-harness tool contracts"},
+    {"term":"PID","category":"technical_noun","approved_forms":["PIDs"],"meaning":"the operating system identifier for a process, distinct from the harness process ID","source":"mtt-harness process tools"},
     {"term":"coordinator","category":"technical_noun","approved_forms":["coordinators"],"meaning":"the single owner of a session queue or directory state","source":"mtt-harness concurrency model"},
     {"term":"goroutine","category":"technical_noun","approved_forms":["goroutines"],"meaning":"a concurrent function execution managed by the Go runtime","source":"Go concurrency"},
     {"term":"queue state","category":"technical_noun","approved_forms":[],"meaning":"the pending work, active turn, admission mode, and errors owned by a coordinator","source":"mtt-harness concurrency model"},

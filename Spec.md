@@ -597,6 +597,14 @@ Requirements:
 - R95: The harness must give the tool group and the `search_tool` tool in the model request.
 - R96: The harness must not give a tool to the model when the tool is not in the tool group.
 
+### 10.3 Tool Descriptions
+
+The tool description and input schema give the model information about the tool. The input schema must give the purpose of a parameter. A parameter for a duration must have a unit. An optional parameter must have a description of the default behavior. The description must give the meaning of special input data, such as `0` or an empty string.
+
+The tool description must tell the model about the behavior of the tool. For example, `write` replaces the full file content. The process tools use a harness process ID, not a PID from the operating system. The `agent` tool uses the instance default model when the input does not give a model ID.
+
+The model request must keep the parameter descriptions and defaults. A new model list must not replace the parameter descriptions of the `agent` tool. An MCP server gives the descriptions and schemas for the tools of the server. The harness must not add an incorrect unit to an external parameter.
+
 ## 11. Processes
 
 The harness can start a process and monitor it.
@@ -626,6 +634,14 @@ The tool call gives the notification policy for a process. The policy has the mo
 - `interval`: the harness sends one notification at the interval.
 
 The interval is a number of milliseconds. The default mode is `exit`. A notification is a message in the session. Thus, the model reads the notification on the next turn.
+
+The unit for the `timeout` and `interval` input of `bash` is milliseconds. For example, `timeout: 60000` gives a limit of 60 seconds.
+
+The default timeout is `0`. With `timeout: 0`, the harness does not stop the process automatically. The timeout applies when `wait` is `true` or `false`.
+
+The default value of `wait` is `true`. A value of `false` gives the process ID immediately. When the user cancels a tool call, the process continues. Use `process_kill` to stop the process.
+
+The `interval` parameter must be a minimum of 1 millisecond when `notify` is `interval`. The mode `exit` or `error` does not use the interval. The mode `interval` also sends a notification when the process stops.
 
 The process manager keeps the process after the initial turn stops. The process manager writes the exit status with an active database context. Output goes through `process.output` before the output buffer, watchers, and notifications.
 
@@ -1239,6 +1255,8 @@ Requirements:
 - R176: The coordinator must continue after a caller cancels a command request.
 - R177: The `Close` operation must wait until the queue workers stop. Then the program can close the database.
 - R178: A revert operation must not start work in a stopped coordinator.
+- R179: A tool input schema must give the parameter descriptions, units, defaults, and the meaning of special input data.
+- R180: A model request must keep the tool parameter descriptions when the harness changes the model list.
 
 ## 18. Protection
 

@@ -39,6 +39,14 @@ Rules:
 - Comments explain ownership, ordering, cancellation, and surprising decisions. Do not repeat the code in comments. Exported contracts and concurrency invariants need human-readable documentation.
 - Keep refactors separate from functional changes and verify behavior with fresh tests. Passing tests and the STE checker do not establish specification completeness.
 
+## Model-Facing Tool Contracts
+
+- Treat tool descriptions and JSON Schemas as instructions the model must be able to use without reading implementation code. Describe every input property's purpose, units, defaults, valid choices, and special values such as zero or an empty string where applicable.
+- State material behavior: path resolution, file replacement, output/retention limits, harness IDs versus OS PIDs, blocking/background behavior, and what cancellation actually stops.
+- Preserve descriptions and defaults when adding dynamic schema metadata such as the agent model list. Verify the definition sent in provider requests, not only the static tool declaration.
+- Built-in `bash.timeout` and `bash.interval` are milliseconds. A missing or zero timeout means no automatic process timeout; `wait` defaults to true, `notify` defaults to exit, and interval notifications need a positive interval.
+- MCP descriptions and schemas belong to their servers. Preserve that metadata; do not invent units or defaults for unknown external parameters.
+
 ## Commands
 
 ```sh

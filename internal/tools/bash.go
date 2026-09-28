@@ -25,7 +25,7 @@ func (bashTool *Bash) Name() string {
 }
 
 func (bashTool *Bash) Description() string {
-	return "Start a shell command. Read the output or monitor the process."
+	return "Run a command with sh -c in the instance workspace. By default, wait for exit and return retained stdout and stderr (last 256 KiB per stream). Set wait=false to return a process ID immediately for process_output or process_kill. timeout and interval are in milliseconds."
 }
 
 func (bashTool *Bash) Categories() []string {
@@ -33,7 +33,36 @@ func (bashTool *Bash) Categories() []string {
 }
 
 func (bashTool *Bash) InputSchema() atom.Schema {
-	return schema(`{"type":"object","properties":{"command":{"type":"string"},"wait":{"type":"boolean"},"notify":{"type":"string","enum":["exit","error","interval"]},"interval":{"type":"integer"},"timeout":{"type":"integer"}},"required":["command"]}`)
+	return schema(`{
+		"type": "object",
+		"properties": {
+			"command": {
+				"type": "string",
+				"description": "Shell command to execute with sh -c. The working directory is the instance workspace; use shell quoting and redirection as needed."
+			},
+			"wait": {
+				"type": "boolean",
+				"default": true,
+				"description": "Wait for process exit and return its retained output. Set false to return the process ID immediately. Cancelling the wait does not stop the process; use process_kill to stop it."
+			},
+			"notify": {
+				"type": "string",
+				"enum": ["exit", "error", "interval"],
+				"default": "exit",
+				"description": "Session notification policy: exit sends a notification when the process stops; error only reports an error exit; interval sends periodic updates and a final exit notification."
+			},
+			"interval": {
+				"type": "integer",
+				"description": "Notification interval in milliseconds (ms). Required and greater than zero when notify is interval; ignored for other modes. For example, 1000 means one second."
+			},
+			"timeout": {
+				"type": "integer",
+				"default": 0,
+				"description": "Maximum process runtime in milliseconds (ms). A positive value stops the process when elapsed; omitted or zero means no automatic timeout. Applies to both wait=true and wait=false. For example, 60000 means 60 seconds."
+			}
+		},
+		"required": ["command"]
+	}`)
 }
 
 func (bashTool *Bash) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
