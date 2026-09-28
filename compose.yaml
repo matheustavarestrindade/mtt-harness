@@ -16,6 +16,7 @@ services:
       retries: 30
 
   mtt:
+    init: true
     build: .
     user: "${MTT_UID:-1000}:${MTT_GID:-1000}"
     command:
@@ -37,17 +38,33 @@ services:
       timeout: 3s
       retries: 12
 
+  postgres-test:
+    profiles: ["test"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mtt
+      POSTGRES_PASSWORD: mtt
+      POSTGRES_DB: mtt_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mtt -d mtt_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
   test:
+    init: true
     profiles: ["test"]
     build:
       context: .
       target: builder
     environment:
       CGO_ENABLED: "0"
-      MTT_TEST_DATABASE_URL: postgres://${MTT_DB_USER:-mtt}:${MTT_DB_PASSWORD:-mtt}@postgres:5432/${MTT_DB_NAME:-mtt}?sslmode=disable
+      MTT_TEST_DATABASE_URL: postgres://mtt:mtt@postgres-test:5432/mtt_test?sslmode=disable
     command: ["go", "test", "./..."]
     depends_on:
-      postgres:
+      postgres-test:
         condition: service_healthy
 
 volumes:

@@ -14,14 +14,22 @@ type fakeTool struct {
 	categories []string
 }
 
-func (f fakeTool) Name() string             { return f.name }
-func (f fakeTool) Description() string      { return f.desc }
-func (f fakeTool) Categories() []string     { return f.categories }
-func (f fakeTool) InputSchema() atom.Schema { return atom.Schema{} }
-func (f fakeTool) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
+func (fakeTool fakeTool) Name() string {
+	return fakeTool.name
+}
+func (fakeTool fakeTool) Description() string {
+	return fakeTool.desc
+}
+func (fakeTool fakeTool) Categories() []string {
+	return fakeTool.categories
+}
+func (fakeTool fakeTool) InputSchema() atom.Schema {
+	return atom.Schema{}
+}
+func (fakeTool fakeTool) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
-func (f fakeTool) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+func (fakeTool fakeTool) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	return atom.ToolResult{}, nil
 }
 
@@ -33,36 +41,36 @@ func names(tools []harness.Tool) []string {
 	return list
 }
 
-func TestFind(t *testing.T) {
-	registry := New()
+func TestFind(test *testing.T) {
+	registry := New(harness.New())
 	_ = registry.Add(fakeTool{name: "read", desc: "Read a file", categories: []string{"file"}})
 	_ = registry.Add(fakeTool{name: "write", desc: "Write a file", categories: []string{"file"}})
 	_ = registry.Add(fakeTool{name: "bash", desc: "Start a command", categories: []string{"process"}})
 	_ = registry.Add(fakeTool{name: "agent", desc: "Start an agent", categories: []string{"agent"}})
 
-	got := names(registry.Find("file", "", 0))
-	if len(got) != 2 || got[0] != "read" || got[1] != "write" {
-		t.Fatalf("find by text = %v", got)
+	actual := names(registry.Find("file", "", 0))
+	if len(actual) != 2 || actual[0] != "read" || actual[1] != "write" {
+		test.Fatalf("find by text = %v", actual)
 	}
-	got = names(registry.Find("", "process", 0))
-	if len(got) != 1 || got[0] != "bash" {
-		t.Fatalf("find by category = %v", got)
+	actual = names(registry.Find("", "process", 0))
+	if len(actual) != 1 || actual[0] != "bash" {
+		test.Fatalf("find by category = %v", actual)
 	}
-	got = names(registry.Find("COMMAND", "", 0))
-	if len(got) != 1 || got[0] != "bash" {
-		t.Fatalf("find is not case-insensitive: %v", got)
+	actual = names(registry.Find("COMMAND", "", 0))
+	if len(actual) != 1 || actual[0] != "bash" {
+		test.Fatalf("find is not case-insensitive: %v", actual)
 	}
-	got = names(registry.Find("file", "", 1))
-	if len(got) != 1 {
-		t.Fatalf("limit = %v", got)
+	actual = names(registry.Find("file", "", 1))
+	if len(actual) != 1 {
+		test.Fatalf("limit = %v", actual)
 	}
-	got = names(registry.Find("nothing", "", 0))
-	if len(got) != 0 {
-		t.Fatalf("no match = %v", got)
+	actual = names(registry.Find("nothing", "", 0))
+	if len(actual) != 0 {
+		test.Fatalf("no match = %v", actual)
 	}
-	got = names(registry.Find("file", "", 0))
+	actual = names(registry.Find("file", "", 0))
 	again := names(registry.Find("file", "", 0))
-	if len(got) != len(again) || got[0] != again[0] || got[1] != again[1] {
-		t.Fatalf("find is not deterministic: %v %v", got, again)
+	if len(actual) != len(again) || actual[0] != again[0] || actual[1] != again[1] {
+		test.Fatalf("find is not deterministic: %v %v", actual, again)
 	}
 }

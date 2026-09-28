@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/processes"
 )
 
@@ -19,23 +20,52 @@ func NewBash(manager *processes.Manager) *Bash {
 	return &Bash{manager: manager}
 }
 
-func (b *Bash) Name() string {
+func (bashTool *Bash) Name() string {
 	return "bash"
 }
 
-func (b *Bash) Description() string {
-	return "Start a shell command. Read the output or monitor the process."
+func (bashTool *Bash) Description() string {
+	return "Run a command with sh -c in the instance workspace. By default, wait for exit and return retained stdout and stderr (last 256 KiB per stream). Set wait=false to return a process ID immediately for process_output or process_kill. timeout and interval are in milliseconds."
 }
 
-func (b *Bash) Categories() []string {
+func (bashTool *Bash) Categories() []string {
 	return []string{"process", "command"}
 }
 
-func (b *Bash) InputSchema() atom.Schema {
-	return schema(`{"type":"object","properties":{"command":{"type":"string"},"wait":{"type":"boolean"},"notify":{"type":"string","enum":["exit","error","interval"]},"interval":{"type":"integer"},"timeout":{"type":"integer"}},"required":["command"]}`)
+func (bashTool *Bash) InputSchema() atom.Schema {
+	return schema(`{
+		"type": "object",
+		"properties": {
+			"command": {
+				"type": "string",
+				"description": "Shell command to execute with sh -c. The working directory is the instance workspace; use shell quoting and redirection as needed."
+			},
+			"wait": {
+				"type": "boolean",
+				"default": true,
+				"description": "Wait for process exit and return its retained output. Set false to return the process ID immediately. Cancelling the wait does not stop the process; use process_kill to stop it."
+			},
+			"notify": {
+				"type": "string",
+				"enum": ["exit", "error", "interval"],
+				"default": "exit",
+				"description": "Session notification policy: exit sends a notification when the process stops; error only reports an error exit; interval sends periodic updates and a final exit notification."
+			},
+			"interval": {
+				"type": "integer",
+				"description": "Notification interval in milliseconds (ms). Required and greater than zero when notify is interval; ignored for other modes. For example, 1000 means one second."
+			},
+			"timeout": {
+				"type": "integer",
+				"default": 0,
+				"description": "Maximum process runtime in milliseconds (ms). A positive value stops the process when elapsed; omitted or zero means no automatic timeout. Applies to both wait=true and wait=false. For example, 60000 means 60 seconds."
+			}
+		},
+		"required": ["command"]
+	}`)
 }
 
-func (b *Bash) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
+func (bashTool *Bash) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
 
@@ -47,25 +77,30 @@ type bashInput struct {
 	Timeout  int    `json:"timeout"`
 }
 
-func (b *Bash) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+func (bashTool *Bash) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	var input bashInput
-	if err := json.Unmarshal(call.Input, &input); err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "bash: the input is not correct"}, err
+	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "bash: the input is not correct"}, operationError
 	}
-	spec := atom.ProcessSpec{
+	processSpec := atom.ProcessSpec{
 		Command: "sh",
 		Args:    []string{"-c", input.Command},
 		Notify:  atom.NotifyPolicy{Mode: atom.NotifyMode(input.Notify)},
 	}
+	workspace, found := harness.WorkspaceFrom(operationContext)
+	if !found {
+		return atom.ToolResult{}, fmt.Errorf("bash: no instance workspace")
+	}
+	processSpec.Cwd = workspace
 	if input.Interval > 0 {
-		spec.Notify.Interval = time.Duration(input.Interval) * time.Millisecond
+		processSpec.Notify.Interval = time.Duration(input.Interval) * time.Millisecond
 	}
 	if input.Timeout > 0 {
-		spec.Timeout = time.Duration(input.Timeout) * time.Millisecond
+		processSpec.Timeout = time.Duration(input.Timeout) * time.Millisecond
 	}
-	proc, err := b.manager.Start(ctx, spec)
-	if err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: err.Error()}, err
+	runningProcess, operationError := bashTool.manager.Start(operationContext, processSpec)
+	if operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
 	}
 	wait := true
 	if input.Wait != nil {
@@ -75,26 +110,26 @@ func (b *Bash) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, er
 		return atom.ToolResult{
 			CallID:  call.ID,
 			Status:  atom.StatusOK,
-			Content: []atom.Content{{Type: atom.Text, Text: fmt.Sprintf("process %s is started", proc.ID())}},
+			Content: []atom.Content{{Type: atom.Text, Text: fmt.Sprintf("process %s is started", runningProcess.ID())}},
 		}, nil
 	}
 	type waitResult struct {
-		status atom.ExitStatus
-		err    error
+		status         atom.ExitStatus
+		operationError error
 	}
 	waited := make(chan waitResult, 1)
 	go func() {
-		status, err := proc.Wait()
-		waited <- waitResult{status: status, err: err}
+		status, operationError := runningProcess.Wait()
+		waited <- waitResult{status: status, operationError: operationError}
 	}()
 	var status atom.ExitStatus
 	select {
 	case result := <-waited:
-		status, err = result.status, result.err
-	case <-ctx.Done():
+		status, operationError = result.status, result.operationError
+	case <-operationContext.Done():
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "the wait is cancelled"}, nil
 	}
-	stdout, stderr, _ := b.manager.Output(proc.ID())
+	stdout, stderr, _ := bashTool.manager.Output(runningProcess.ID())
 	var builder strings.Builder
 	if len(stdout) > 0 {
 		builder.Write(stdout)
@@ -110,7 +145,7 @@ func (b *Bash) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, er
 		Status:  atom.StatusOK,
 		Content: []atom.Content{{Type: atom.Text, Text: builder.String()}},
 	}
-	if err != nil || status.Code != 0 {
+	if operationError != nil || status.Code != 0 {
 		result.Status = atom.StatusError
 		result.Error = status.Error
 		if result.Error == "" {

@@ -13,7 +13,7 @@ func (Finish) Name() string {
 }
 
 func (Finish) Description() string {
-	return "Stop the agent and give the result."
+	return "Complete the current child agent task and return the supplied result to the parent agent call. Available only to child agents; use it for the final deliverable. Other tool calls in the same model response finish before the child turn ends."
 }
 
 func (Finish) Categories() []string {
@@ -21,14 +21,23 @@ func (Finish) Categories() []string {
 }
 
 func (Finish) InputSchema() atom.Schema {
-	return schema(`{"type":"object","properties":{"result":{"type":"string"}},"required":["result"]}`)
+	return schema(`{
+		"type": "object",
+		"properties": {
+			"result": {
+				"type": "string",
+				"description": "Final deliverable sent to the parent agent call. Include the requested findings, relevant paths, and any unresolved limitations; the parent receives this text, not the child's entire conversation."
+			}
+		},
+		"required": ["result"]
+	}`)
 }
 
-func (Finish) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
+func (Finish) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
 
-func (Finish) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+func (Finish) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	return atom.ToolResult{
 		CallID:  call.ID,
 		Status:  atom.StatusOK,

@@ -11,46 +11,47 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/eventbus"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/process"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store/memory"
+	"github.com/matheustavarestrindade/mtt-harness/internal/testutil"
 )
 
 type testWatcher struct {
 	events chan atom.ProcessEvent
 }
 
-func (w *testWatcher) Match(event atom.ProcessEvent) bool { return true }
+func (testWatcher *testWatcher) Match(event atom.ProcessEvent) bool {
+	return true
+}
 
-func (w *testWatcher) OnMatch(ctx context.Context, event atom.ProcessEvent) {
+func (testWatcher *testWatcher) OnMatch(operationContext context.Context, event atom.ProcessEvent) {
 	select {
-	case w.events <- event:
+	case testWatcher.events <- event:
 	default:
 	}
 }
 
-func TestManagerAppliesTheOutputStage(t *testing.T) {
+func TestManagerAppliesTheOutputStage(test *testing.T) {
 	database := memory.New()
-	bus := eventbus.New()
-	h := harness.New()
-	harness.Pipe(h, atom.StageProcessOutput, func(ctx context.Context, event atom.ProcessEvent) (atom.ProcessEvent, error) {
+	harnessRuntime := harness.New()
+	bus := eventbus.New(harnessRuntime)
+	harness.Pipe(harnessRuntime, atom.StageProcessOutput, func(operationContext context.Context, event atom.ProcessEvent) (atom.ProcessEvent, error) {
 		if event.Stream == atom.StreamStdout {
 			event.Data = []byte(strings.ToUpper(string(event.Data)))
 		}
 		return event, nil
 	})
 	watcher := &testWatcher{events: make(chan atom.ProcessEvent, 16)}
-	h.Watch(watcher)
+	harnessRuntime.Watch(watcher)
 	supervisor := process.New(4)
-	manager := New(supervisor, database, h, bus, nil)
+	manager := New(supervisor, database, harnessRuntime, bus, nil)
 	session := atom.Session{ID: "session-1", InstanceID: "instance-1", CreatedAt: time.Now()}
-	if err := database.Sessions().Save(context.Background(), session); err != nil {
-		t.Fatal(err)
-	}
-	ctx := harness.WithSession(context.Background(), session)
-	proc, err := manager.Start(ctx, atom.ProcessSpec{Command: "sh", Args: []string{"-c", "echo hello"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := proc.Wait(); err != nil {
-		t.Fatal(err)
+	testutil.RequireNoError(test, database.Sessions().Save(context.Background(), session))
+
+	operationContext := harness.WithSession(context.Background(), session)
+	runningProcess, operationError := manager.Start(operationContext, atom.ProcessSpec{Command: "sh", Args: []string{"-c", "echo hello"}})
+	testutil.RequireNoError(test, operationError)
+
+	if _, operationError := runningProcess.Wait(); operationError != nil {
+		test.Fatal(operationError)
 	}
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
@@ -63,30 +64,28 @@ func TestManagerAppliesTheOutputStage(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
-	t.Fatal("the transformed output did not arrive")
+	test.Fatal("the transformed output did not arrive")
 }
 
-func TestManagerSendsNotification(t *testing.T) {
+func TestManagerSendsNotification(test *testing.T) {
 	database := memory.New()
-	bus := eventbus.New()
-	h := harness.New()
+	harnessRuntime := harness.New()
+	bus := eventbus.New(harnessRuntime)
 	supervisor := process.New(4)
-	manager := New(supervisor, database, h, bus, nil)
+	manager := New(supervisor, database, harnessRuntime, bus, nil)
 	session := atom.Session{ID: "session-1", InstanceID: "instance-1", CreatedAt: time.Now()}
-	if err := database.Sessions().Save(context.Background(), session); err != nil {
-		t.Fatal(err)
-	}
-	ctx := harness.WithSession(context.Background(), session)
-	proc, err := manager.Start(ctx, atom.ProcessSpec{
+	testutil.RequireNoError(test, database.Sessions().Save(context.Background(), session))
+
+	operationContext := harness.WithSession(context.Background(), session)
+	runningProcess, operationError := manager.Start(operationContext, atom.ProcessSpec{
 		Command: "sh",
 		Args:    []string{"-c", "echo ready"},
 		Notify:  atom.NotifyPolicy{Mode: atom.NotifyExit},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := proc.Wait(); err != nil {
-		t.Fatal(err)
+	testutil.RequireNoError(test, operationError)
+
+	if _, operationError := runningProcess.Wait(); operationError != nil {
+		test.Fatal(operationError)
 	}
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
@@ -96,5 +95,5 @@ func TestManagerSendsNotification(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatal("the notification message did not arrive")
+	test.Fatal("the notification message did not arrive")
 }

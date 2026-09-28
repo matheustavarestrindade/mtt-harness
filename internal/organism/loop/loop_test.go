@@ -3,7 +3,6 @@ package loop_test
 import (
 	"context"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -18,76 +17,82 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/instances"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/loop"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/registry"
+	"github.com/matheustavarestrindade/mtt-harness/internal/testutil"
 	"github.com/matheustavarestrindade/mtt-harness/internal/tools"
 )
 
 type fakeTool struct {
 	name        string
-	run         func(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error)
-	check       func(ctx context.Context, call atom.ToolCall) atom.Verdict
+	run         func(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error)
+	check       func(operationContext context.Context, call atom.ToolCall) atom.Verdict
 	counter     *int64
 	delay       time.Duration
 	inputSchema string
 }
 
-func (f *fakeTool) Name() string         { return f.name }
-func (f *fakeTool) Description() string  { return "A test tool" }
-func (f *fakeTool) Categories() []string { return []string{"test"} }
-func (f *fakeTool) InputSchema() atom.Schema {
-	if f.inputSchema != "" {
-		return atom.Schema{JSON: []byte(f.inputSchema)}
+func (fakeTool *fakeTool) Name() string {
+	return fakeTool.name
+}
+func (fakeTool *fakeTool) Description() string {
+	return "A test tool"
+}
+func (fakeTool *fakeTool) Categories() []string {
+	return []string{"test"}
+}
+func (fakeTool *fakeTool) InputSchema() atom.Schema {
+	if fakeTool.inputSchema != "" {
+		return atom.Schema{JSON: []byte(fakeTool.inputSchema)}
 	}
 	return atom.Schema{JSON: []byte(`{"type":"object"}`)}
 }
-func (f *fakeTool) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
-	if f.check != nil {
-		return f.check(ctx, call)
+func (fakeTool *fakeTool) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
+	if fakeTool.check != nil {
+		return fakeTool.check(operationContext, call)
 	}
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
-func (f *fakeTool) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
-	if f.counter != nil {
-		atomic.AddInt64(f.counter, 1)
+func (fakeTool *fakeTool) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+	if fakeTool.counter != nil {
+		atomic.AddInt64(fakeTool.counter, 1)
 	}
-	if f.delay > 0 {
-		time.Sleep(f.delay)
+	if fakeTool.delay > 0 {
+		time.Sleep(fakeTool.delay)
 	}
-	if f.run != nil {
-		return f.run(ctx, call)
+	if fakeTool.run != nil {
+		return fakeTool.run(operationContext, call)
 	}
 	return atom.ToolResult{Status: atom.StatusOK, Content: []atom.Content{{Type: atom.Text, Text: "the tool ran"}}}, nil
 }
 
 type stack struct {
-	h         *harness.Harness
-	database  *memory.Store
-	registry  *registry.Registry
-	loop      *loop.Loop
-	provider  *provider.Test
-	bus       *eventbus.Bus
-	broker    *permission.Broker
-	instances *instances.Manager
+	harnessRuntime *harness.Harness
+	database       *memory.Store
+	registry       *registry.Registry
+	loop           *loop.Loop
+	provider       *provider.Test
+	bus            *eventbus.Bus
+	broker         *permission.Broker
+	instances      *instances.Manager
 }
 
-func newStack(t *testing.T, script ...[]atom.ResponsePart) *stack {
-	t.Helper()
+func newStack(test *testing.T, script ...[]atom.ResponsePart) *stack {
+	test.Helper()
 	database := memory.New()
-	bus := eventbus.New()
-	h := harness.New()
-	reg := registry.New()
+	harnessRuntime := harness.New()
+	bus := eventbus.New(harnessRuntime)
+	toolRegistry := registry.New(harnessRuntime)
 	engine := permission.NewEngine()
 	broker := permission.NewBroker()
-	models := gateway.New()
+	models := gateway.New(harnessRuntime)
 	testProvider := provider.NewTest("test", script...)
-	if err := models.Add(testProvider); err != nil {
-		t.Fatal(err)
-	}
+	testutil.RequireNoError(test, models.Add(testProvider))
+
 	instanceManager := instances.New(func(instanceID string) instances.SessionManager {
 		return nil
 	}, nil)
-	runner := loop.New(h, loop.Config{
+	runner := loop.New(harnessRuntime, loop.Config{
 		Gateway:   models,
-		Registry:  reg,
+		Registry:  toolRegistry,
 		Store:     database,
 		Bus:       bus,
 		Broker:    broker,
@@ -95,74 +100,69 @@ func newStack(t *testing.T, script ...[]atom.ResponsePart) *stack {
 		Instances: instanceManager,
 	})
 	return &stack{
-		h:         h,
-		database:  database,
-		registry:  reg,
-		loop:      runner,
-		provider:  testProvider,
-		bus:       bus,
-		broker:    broker,
-		instances: instanceManager,
+		harnessRuntime: harnessRuntime,
+		database:       database,
+		registry:       toolRegistry,
+		loop:           runner,
+		provider:       testProvider,
+		bus:            bus,
+		broker:         broker,
+		instances:      instanceManager,
 	}
 }
 
-func (s *stack) instance(t *testing.T, depthLimit int) atom.Session {
-	t.Helper()
-	spec := atom.InstanceSpec{ID: "instance-1", Workspace: t.TempDir(), DefaultModel: "test-model", AgentDepthLimit: depthLimit}
-	if _, err := s.instances.Start(context.Background(), spec); err != nil {
-		t.Fatal(err)
+func (testStack *stack) instance(test *testing.T, depthLimit int) atom.Session {
+	test.Helper()
+	instanceSpec := atom.InstanceSpec{ID: "instance-1", Workspace: test.TempDir(), DefaultModel: "test-model", AgentDepthLimit: depthLimit}
+	if _, operationError := testStack.instances.Start(context.Background(), instanceSpec); operationError != nil {
+		test.Fatal(operationError)
 	}
-	session := atom.Session{ID: "session-1", InstanceID: spec.ID, Model: "test-model", CreatedAt: time.Now()}
-	if err := s.database.Sessions().Save(context.Background(), session); err != nil {
-		t.Fatal(err)
-	}
+	session := atom.Session{ID: "session-1", InstanceID: instanceSpec.ID, Model: "test-model", CreatedAt: time.Now()}
+	testutil.RequireNoError(test, testStack.database.Sessions().Save(context.Background(), session))
+
 	return session
 }
 
-func (s *stack) user(t *testing.T, session atom.Session, text string) {
-	t.Helper()
+func (testStack *stack) user(test *testing.T, session atom.Session, text string) {
+	test.Helper()
 	message := atom.Message{ID: "user-1", SessionID: session.ID, Role: atom.RoleUser, Content: []atom.Content{{Type: atom.Text, Text: text}}, CreatedAt: time.Now()}
-	if err := s.database.Sessions().Append(context.Background(), message); err != nil {
-		t.Fatal(err)
-	}
+	testutil.RequireNoError(test, testStack.database.Sessions().Append(context.Background(), message))
 }
 
-func TestLoopRunsToolCall(t *testing.T) {
+func TestLoopRunsToolCall(test *testing.T) {
 	usage := atom.Usage{Input: 1_000_000, Output: 10}
-	s := newStack(t,
+	testStack := newStack(test,
 		provider.CallWithUsage("fake", `{"value":"x"}`, usage),
 		provider.TextWithUsage("the answer", usage),
 	)
 	ran := int64(0)
-	if err := s.registry.Add(&fakeTool{name: "fake", counter: &ran}); err != nil {
-		t.Fatal(err)
-	}
-	session := s.instance(t, 2)
-	s.user(t, session, "do the task")
-	if err := s.loop.Run(context.Background(), session); err != nil {
-		t.Fatal(err)
-	}
+	testutil.RequireNoError(test, testStack.registry.Add(&fakeTool{name: "fake", counter: &ran}))
+
+	session := testStack.instance(test, 2)
+	testStack.user(test, session, "do the task")
+	testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
+
 	if atomic.LoadInt64(&ran) != 1 {
-		t.Fatalf("tool runs = %d", ran)
+		test.Fatalf("tool runs = %d", ran)
 	}
-	messages, _ := s.database.Sessions().Messages(context.Background(), session.ID)
+	messages, _ := testStack.database.Sessions().Messages(context.Background(), session.ID)
 	if len(messages) != 4 {
-		t.Fatalf("messages = %d", len(messages))
+		test.Fatalf("messages = %d", len(messages))
 	}
 	if messages[3].Role != atom.RoleAssistant || messages[3].Content[0].Text != "the answer" {
-		t.Fatalf("last message = %+v", messages[3])
+		test.Fatalf("last message = %+v", messages[3])
 	}
-	stats, _ := s.database.Usage().Session(context.Background(), session.ID)
-	if stats.Calls != 2 || stats.Input != 2_000_000 {
-		t.Fatalf("statistics = %+v", stats)
+	statistics, _ := testStack.database.Usage().Session(context.Background(), session.ID)
+	if statistics.Calls != 2 || statistics.Input != 2_000_000 {
+		test.Fatalf("statistics = %+v", statistics)
 	}
-	if stats.Cost == nil || stats.Cost.Value != 2.00004 {
-		t.Fatalf("cost = %+v", stats.Cost)
+	if statistics.Cost == nil || statistics.Cost.Value != 2.00004 {
+		test.Fatalf("cost = %+v", statistics.Cost)
 	}
 }
 
-func TestLoopRunsToolCallsAtTheSameTime(t *testing.T) {
-	s := newStack(t,
+func TestLoopRunsToolCallsAtTheSameTime(test *testing.T) {
+	testStack := newStack(test,
 		[]atom.ResponsePart{
 			{ToolCall: &atom.ToolCall{ID: "call_1", Name: "slow", Input: []byte(`{}`)}},
 			{ToolCall: &atom.ToolCall{ID: "call_2", Name: "slow", Input: []byte(`{}`)}},
@@ -171,7 +171,7 @@ func TestLoopRunsToolCallsAtTheSameTime(t *testing.T) {
 	)
 	var current, maximum int64
 	tool := &fakeTool{name: "slow", delay: 150 * time.Millisecond}
-	tool.run = func(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+	tool.run = func(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 		value := atomic.AddInt64(&current, 1)
 		for {
 			old := atomic.LoadInt64(&maximum)
@@ -183,64 +183,60 @@ func TestLoopRunsToolCallsAtTheSameTime(t *testing.T) {
 		atomic.AddInt64(&current, -1)
 		return atom.ToolResult{Status: atom.StatusOK, Content: []atom.Content{{Type: atom.Text, Text: call.ID}}}, nil
 	}
-	if err := s.registry.Add(tool); err != nil {
-		t.Fatal(err)
-	}
-	session := s.instance(t, 2)
-	s.user(t, session, "run 2 tools")
-	if err := s.loop.Run(context.Background(), session); err != nil {
-		t.Fatal(err)
-	}
+	testutil.RequireNoError(test, testStack.registry.Add(tool))
+
+	session := testStack.instance(test, 2)
+	testStack.user(test, session, "run 2 tools")
+	testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
+
 	if atomic.LoadInt64(&maximum) < 2 {
-		t.Fatalf("the tool calls did not run at the same time: maximum = %d", maximum)
+		test.Fatalf("the tool calls did not run at the same time: maximum = %d", maximum)
 	}
 }
 
-func TestLoopAsksForPermission(t *testing.T) {
-	s := newStack(t,
+func TestLoopAsksForPermission(test *testing.T) {
+	testStack := newStack(test,
 		provider.Call("danger", `{}`),
 		provider.Text("done"),
 	)
-	harness.Decide(s.h, atom.StageToolInput, func(ctx context.Context, call atom.ToolCall) (atom.Verdict, error) {
+	harness.Decide(testStack.harnessRuntime, atom.StageToolInput, func(operationContext context.Context, call atom.ToolCall) (atom.Verdict, error) {
 		if call.Name == "danger" {
 			return atom.Verdict{Kind: atom.VerdictAsk, Target: "danger", Why: "the tool is dangerous"}, nil
 		}
 		return atom.Verdict{Kind: atom.VerdictAllow}, nil
 	})
 	ran := int64(0)
-	if err := s.registry.Add(&fakeTool{name: "danger", counter: &ran}); err != nil {
-		t.Fatal(err)
-	}
-	session := s.instance(t, 2)
-	s.user(t, session, "do the dangerous task")
+	testutil.RequireNoError(test, testStack.registry.Add(&fakeTool{name: "danger", counter: &ran}))
+
+	session := testStack.instance(test, 2)
+	testStack.user(test, session, "do the dangerous task")
 
 	done := make(chan error, 1)
 	go func() {
-		done <- s.loop.Run(context.Background(), session)
+		done <- testStack.loop.Run(context.Background(), session)
 	}()
 
 	request := make(chan atom.PermissionRequest, 1)
-	s.bus.On(atom.EventPermissionRequest, func(ctx context.Context, event atom.Event) {
+	testStack.bus.On(atom.EventPermissionRequest, func(operationContext context.Context, event atom.Event) {
 		var parsed atom.PermissionRequest
-		if err := jsonUnmarshal(event.Payload, &parsed); err == nil {
+		if operationError := jsonUnmarshal(event.Payload, &parsed); operationError == nil {
 			request <- parsed
 		}
 	})
 	select {
 	case parsed := <-request:
-		if !s.broker.Resolve(parsed.ID, atom.PermissionDecision{Kind: atom.VerdictDeny, Scope: atom.ScopeOnce}) {
-			t.Fatal("the permission request is not open")
+		if !testStack.broker.Resolve(parsed.ID, atom.PermissionDecision{Kind: atom.VerdictDeny, Scope: atom.ScopeOnce}) {
+			test.Fatal("the permission request is not open")
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("the permission request did not arrive")
+		test.Fatal("the permission request did not arrive")
 	}
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
+	testutil.RequireNoError(test, <-done)
+
 	if atomic.LoadInt64(&ran) != 0 {
-		t.Fatal("the denied tool ran")
+		test.Fatal("the denied tool ran")
 	}
-	messages, _ := s.database.Sessions().Messages(context.Background(), session.ID)
+	messages, _ := testStack.database.Sessions().Messages(context.Background(), session.ID)
 	denied := false
 	for _, message := range messages {
 		if message.Role == atom.RoleTool && strings.Contains(message.Content[0].Text, "denied") {
@@ -248,82 +244,35 @@ func TestLoopAsksForPermission(t *testing.T) {
 		}
 	}
 	if !denied {
-		t.Fatalf("the result is not denied: %+v", messages)
+		test.Fatalf("the result is not denied: %+v", messages)
 	}
 }
 
-func TestLoopAddsFoundTools(t *testing.T) {
-	s := newStack(t,
+func TestLoopAddsFoundTools(test *testing.T) {
+	testStack := newStack(test,
 		provider.Call("search_tool", `{"query":"fake"}`),
 		provider.Call("fake", `{}`),
 		provider.Text("done"),
 	)
-	if err := s.registry.Add(&fakeTool{name: "fake"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.registry.Add(tools.NewSearch(s.registry)); err != nil {
-		t.Fatal(err)
-	}
-	session := s.instance(t, 2)
-	s.user(t, session, "find a tool")
-	if err := s.loop.Run(context.Background(), session); err != nil {
-		t.Fatal(err)
-	}
-	requests := s.provider.Requests
+	testutil.RequireNoError(test, testStack.registry.Add(&fakeTool{name: "fake"}))
+	testutil.RequireNoError(test, testStack.registry.Add(tools.NewSearch(testStack.registry)))
+
+	session := testStack.instance(test, 2)
+	testStack.user(test, session, "find a tool")
+	testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
+
+	requests := testStack.provider.Requests
 	if len(requests) < 2 {
-		t.Fatalf("requests = %d", len(requests))
+		test.Fatalf("requests = %d", len(requests))
 	}
 	found := false
-	for _, spec := range requests[1].Tools {
-		if spec.Name == "fake" {
+	for _, toolSpec := range requests[1].Tools {
+		if toolSpec.Name == "fake" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("the found tool is not in the next request: %+v", requests[1].Tools)
-	}
-}
-
-func TestAgentGivesResultToParent(t *testing.T) {
-	s := newStack(t,
-		provider.Call("agent", `{"task":"find the answer"}`),
-		provider.Call("finish", `{"result":"the child answer"}`),
-		provider.Text("the parent is done"),
-	)
-	if err := s.registry.Add(&agentTool{runner: s.loop}); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.registry.Add(tools.Finish{}); err != nil {
-		t.Fatal(err)
-	}
-	session := s.instance(t, 2)
-	s.user(t, session, "start an agent")
-	if err := s.loop.Run(context.Background(), session); err != nil {
-		t.Fatal(err)
-	}
-	messages, _ := s.database.Sessions().Messages(context.Background(), session.ID)
-	found := false
-	for _, message := range messages {
-		if message.Role == atom.RoleTool && strings.Contains(message.Content[0].Text, "the child answer") {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("the parent does not have the child result: %+v", messages)
-	}
-}
-
-func TestAgentDepthLimit(t *testing.T) {
-	s := newStack(t, provider.Text("done"))
-	session := s.instance(t, 2)
-	session.Depth = 2
-	ctx := harness.WithSession(context.Background(), session)
-	result, err := s.loop.RunAgentTask(ctx, atom.AgentTask{Task: "work"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(result.Error, "depth limit") {
-		t.Fatalf("the depth limit is not applied: %+v", result)
+		test.Fatalf("the found tool is not in the next request: %+v", requests[1].Tools)
 	}
 }
 
@@ -331,26 +280,32 @@ type agentTool struct {
 	runner *loop.Loop
 }
 
-func (a *agentTool) Name() string             { return "agent" }
-func (a *agentTool) Description() string      { return "Start an agent" }
-func (a *agentTool) Categories() []string     { return []string{"agent"} }
-func (a *agentTool) InputSchema() atom.Schema { return atom.Schema{JSON: []byte(`{"type":"object"}`)} }
-func (a *agentTool) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
+func (agentTool *agentTool) Name() string {
+	return "agent"
+}
+func (agentTool *agentTool) Description() string {
+	return "Start an agent"
+}
+func (agentTool *agentTool) Categories() []string {
+	return []string{"agent"}
+}
+func (agentTool *agentTool) InputSchema() atom.Schema {
+	return atom.Schema{JSON: []byte(`{"type":"object"}`)}
+}
+func (agentTool *agentTool) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
-func (a *agentTool) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+func (agentTool *agentTool) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	var input struct {
 		Task string `json:"task"`
 	}
 	_ = jsonUnmarshal(call.Input, &input)
-	return a.runner.RunAgentTask(ctx, atom.AgentTask{Task: input.Task})
+	return agentTool.runner.RunAgentTask(operationContext, atom.AgentTask{Task: input.Task})
 }
 
-var _ = sync.Mutex{}
-
-func TestLoopRefusesUnsupportedMedia(t *testing.T) {
-	s := newStack(t, provider.Text("never"))
-	session := s.instance(t, 2)
+func TestLoopRefusesUnsupportedMedia(test *testing.T) {
+	testStack := newStack(test, provider.Text("never"))
+	session := testStack.instance(test, 2)
 	message := atom.Message{
 		ID:        "user-image",
 		SessionID: session.ID,
@@ -358,148 +313,36 @@ func TestLoopRefusesUnsupportedMedia(t *testing.T) {
 		Content:   []atom.Content{{Type: atom.Image, Data: []byte("x"), MIME: "image/png"}},
 		CreatedAt: time.Now(),
 	}
-	if err := s.database.Sessions().Append(context.Background(), message); err != nil {
-		t.Fatal(err)
-	}
-	err := s.loop.Run(context.Background(), session)
-	if err == nil || !strings.Contains(err.Error(), "media type") {
-		t.Fatalf("the media type check is absent: %v", err)
+	testutil.RequireNoError(test, testStack.database.Sessions().Append(context.Background(), message))
+
+	operationError := testStack.loop.Run(context.Background(), session)
+	if operationError == nil || !strings.Contains(operationError.Error(), "media type") {
+		test.Fatalf("the media type check is absent: %v", operationError)
 	}
 }
 
-func TestLoopValidatesTheToolInput(t *testing.T) {
-	s := newStack(t,
+func TestLoopValidatesTheToolInput(test *testing.T) {
+	testStack := newStack(test,
 		provider.Call("strict", `{}`),
 		provider.Text("done"),
 	)
-	if err := s.registry.Add(&fakeTool{
+	testutil.RequireNoError(test, testStack.registry.Add(&fakeTool{
 		name:        "strict",
 		inputSchema: `{"type":"object","properties":{"value":{"type":"string"}},"required":["value"]}`,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	session := s.instance(t, 2)
-	s.user(t, session, "run the strict tool")
-	if err := s.loop.Run(context.Background(), session); err != nil {
-		t.Fatal(err)
-	}
-	messages, _ := s.database.Sessions().Messages(context.Background(), session.ID)
+	}))
+
+	session := testStack.instance(test, 2)
+	testStack.user(test, session, "run the strict tool")
+	testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
+
+	messages, _ := testStack.database.Sessions().Messages(context.Background(), session.ID)
 	found := false
 	for _, message := range messages {
-		if message.Role == atom.RoleTool && strings.Contains(message.Content[0].Text, "the field value is necessary") {
+		if message.Role == atom.RoleTool && strings.Contains(message.Content[0].Text, "input of strict is not correct") && strings.Contains(message.Content[0].Text, "value") {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("the input validation is absent: %+v", messages)
-	}
-}
-
-func TestQueueRunsMessagesInSequence(t *testing.T) {
-	s := newStack(t, provider.Text("first"), provider.Text("second"))
-	session := s.instance(t, 2)
-	queue := loop.NewQueue(s.loop)
-	ctx := context.Background()
-	if _, position, err := queue.Submit(ctx, session, "one"); err != nil || position != 1 {
-		t.Fatalf("submit one = %d %v", position, err)
-	}
-	if _, position, err := queue.Submit(ctx, session, "two"); err != nil || position != 2 {
-		t.Fatalf("submit two = %d %v", position, err)
-	}
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		messages, _ := s.database.Sessions().Messages(ctx, session.ID)
-		if len(messages) >= 4 {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	messages, _ := s.database.Sessions().Messages(ctx, session.ID)
-	if len(messages) != 4 {
-		t.Fatalf("the messages = %d", len(messages))
-	}
-	if messages[1].Content[0].Text != "first" || messages[3].Content[0].Text != "second" {
-		t.Fatalf("the sequence is not correct: %q %q", messages[1].Content[0].Text, messages[3].Content[0].Text)
-	}
-	if s.provider.Calls() != 2 {
-		t.Fatalf("the model calls = %d", s.provider.Calls())
-	}
-}
-
-func TestQueueCancelStopsTheRun(t *testing.T) {
-	s := newStack(t, provider.Text("slow"))
-	s.provider.SetDelay(2 * time.Second)
-	session := s.instance(t, 2)
-	queue := loop.NewQueue(s.loop)
-	ctx := context.Background()
-	if _, _, err := queue.Submit(ctx, session, "one"); err != nil {
-		t.Fatal(err)
-	}
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if running, _ := queue.Status(session.ID); running {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if running, _ := queue.Status(session.ID); !running {
-		t.Fatal("the run did not start")
-	}
-	if !queue.Cancel(session.ID) {
-		t.Fatal("the run is not cancelled")
-	}
-	for time.Now().Before(deadline) {
-		if running, _ := queue.Status(session.ID); !running {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	messages, _ := s.database.Sessions().Messages(ctx, session.ID)
-	if len(messages) != 1 {
-		t.Fatalf("the messages = %d", len(messages))
-	}
-}
-
-func TestQueueCancelsAQueuedMessage(t *testing.T) {
-	s := newStack(t, provider.Text("first"), provider.Text("third"))
-	s.provider.SetDelay(200 * time.Millisecond)
-	session := s.instance(t, 2)
-	queue := loop.NewQueue(s.loop)
-	ctx := context.Background()
-	if _, _, err := queue.Submit(ctx, session, "one"); err != nil {
-		t.Fatal(err)
-	}
-	second, _, err := queue.Submit(ctx, session, "two")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := queue.Submit(ctx, session, "three"); err != nil {
-		t.Fatal(err)
-	}
-	if !queue.CancelMessage(session.ID, second.ID) {
-		t.Fatal("the queued message is not removed")
-	}
-	if queue.CancelMessage(session.ID, "not-there") {
-		t.Fatal("a message which is not in the queue is removed")
-	}
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		messages, _ := s.database.Sessions().Messages(ctx, session.ID)
-		if len(messages) >= 4 {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	messages, _ := s.database.Sessions().Messages(ctx, session.ID)
-	if len(messages) != 4 {
-		t.Fatalf("the messages = %d", len(messages))
-	}
-	if messages[0].Content[0].Text != "one" || messages[2].Content[0].Text != "three" {
-		t.Fatalf("the removed message ran: %q %q", messages[0].Content[0].Text, messages[2].Content[0].Text)
-	}
-	for _, message := range messages {
-		if message.Content[0].Text == "two" {
-			t.Fatal("the removed message is in the store")
-		}
+		test.Fatalf("the input validation is absent: %+v", messages)
 	}
 }

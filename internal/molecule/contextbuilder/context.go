@@ -11,10 +11,10 @@ type Builder struct {
 	store store.SessionStore
 }
 
-func New(s store.SessionStore) *Builder {
-	return &Builder{store: s}
+func New(sessionStore store.SessionStore) *Builder {
+	return &Builder{store: sessionStore}
 }
 
-func (b *Builder) Build(ctx context.Context, session atom.SessionID) ([]atom.Message, error) {
-	return b.store.Messages(ctx, session)
+func (builder *Builder) Build(operationContext context.Context, session atom.SessionID) ([]atom.Message, error) {
+	return builder.store.Messages(operationContext, session)
 }

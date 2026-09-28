@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -45,8 +46,8 @@ type CallResult struct {
 }
 
 type Transport interface {
-	Send(ctx context.Context, data []byte) error
-	Receive(ctx context.Context) ([]byte, error)
+	Send(operationContext context.Context, data []byte) error
+	Receive(operationContext context.Context) ([]byte, error)
 	Close() error
 }
 
@@ -54,201 +55,304 @@ type Client struct {
 	name      string
 	transport Transport
 	timeout   time.Duration
-	mu        sync.Mutex
+	mutex     sync.Mutex
 	next      int64
 	pending   map[int64]chan rpcMessage
 	closed    bool
-	onChanged func(ctx context.Context)
+	onChanged func(operationContext context.Context)
+	changes   chan struct{}
+	lifecycle context.Context
+	cancel    context.CancelFunc
 }
 
-func Start(ctx context.Context, spec ServerSpec, timeout time.Duration) (*Client, error) {
+func Start(operationContext context.Context, serverSpec ServerSpec, timeout time.Duration) (*Client, error) {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
 	var transport Transport
-	var err error
+	var operationError error
 	switch {
-	case spec.Command != "":
-		transport, err = startStdio(spec)
-	case spec.URL != "":
-		transport, err = startHTTP(spec)
+	case serverSpec.Command != "":
+		transport, operationError = startStdio(serverSpec)
+	case serverSpec.URL != "":
+		transport, operationError = startHTTP(serverSpec)
 	default:
 		return nil, errors.New("mcp: the server data has no command and no URL")
 	}
-	if err != nil {
-		return nil, err
+	if operationError != nil {
+		return nil, operationError
 	}
+	lifecycle, stop := context.WithCancel(context.Background())
 	client := &Client{
-		name:      spec.Name,
+		name:      serverSpec.Name,
 		transport: transport,
 		timeout:   timeout,
 		pending:   map[int64]chan rpcMessage{},
+		changes:   make(chan struct{}, 1), lifecycle: lifecycle, cancel: stop,
 	}
 	go client.read()
-	initContext, cancel := context.WithTimeout(ctx, timeout)
+	go client.dispatchChanges()
+	initContext, cancel := context.WithTimeout(operationContext, timeout)
 	defer cancel()
-	if _, err := client.call(initContext, "initialize", map[string]any{
+	initialization, operationError := client.call(initContext, "initialize", map[string]any{
 		"protocolVersion": ProtocolVersion,
 		"capabilities":    map[string]any{},
 		"clientInfo":      map[string]any{"name": "mtt-harness", "version": "0.1.0"},
-	}); err != nil {
-		_ = transport.Close()
-		return nil, fmt.Errorf("mcp: the initialize of the server %s: %w", spec.Name, err)
+	})
+	if operationError != nil {
+		_ = client.Close()
+		return nil, fmt.Errorf("mcp: the initialize of the server %s: %w", serverSpec.Name, operationError)
 	}
-	if err := client.notify(ctx, "notifications/initialized", nil); err != nil {
-		_ = transport.Close()
-		return nil, err
+	var initialized struct {
+		Version      string `json:"protocolVersion"`
+		Capabilities struct {
+			Tools struct {
+				ListChanged bool `json:"listChanged"`
+			} `json:"tools"`
+		} `json:"capabilities"`
+	}
+	if operationError := json.Unmarshal(initialization, &initialized); operationError != nil {
+		client.Close()
+		return nil, operationError
+	}
+	if initialized.Version != ProtocolVersion && initialized.Version != "2025-03-26" && initialized.Version != "2024-11-05" {
+		client.Close()
+		return nil, fmt.Errorf("MCP server selected unsupported protocol %q", initialized.Version)
+	}
+	if remote, supported := transport.(*httpTransport); supported {
+		remote.SetProtocolVersion(initialized.Version)
+	}
+	if operationError := client.notify(operationContext, "notifications/initialized", nil); operationError != nil {
+		_ = client.Close()
+		return nil, operationError
+	}
+	if remote, supported := transport.(*httpTransport); supported && initialized.Capabilities.Tools.ListChanged {
+		remote.StartNotifications()
 	}
 	return client, nil
 }
 
-func (c *Client) Name() string {
-	return c.name
+func (client *Client) Name() string {
+	return client.name
 }
 
-func (c *Client) OnToolsChanged(handler func(ctx context.Context)) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.onChanged = handler
+func (client *Client) OnToolsChanged(handler func(operationContext context.Context)) {
+	client.mutex.Lock()
+	defer client.mutex.Unlock()
+	client.onChanged = handler
 }
 
-func (c *Client) call(ctx context.Context, method string, params any) (json.RawMessage, error) {
-	c.mu.Lock()
-	if c.closed {
-		c.mu.Unlock()
+func (client *Client) call(operationContext context.Context, method string, params any) (json.RawMessage, error) {
+	operationContext, cancel := context.WithTimeout(operationContext, client.timeout)
+	defer cancel()
+	stop := context.AfterFunc(client.lifecycle, cancel)
+	defer stop()
+	parameters, operationError := encodeParameters(params)
+	if operationError != nil {
+		return nil, operationError
+	}
+	client.mutex.Lock()
+	if client.closed {
+		client.mutex.Unlock()
 		return nil, errors.New("mcp: the connection is closed")
 	}
-	c.next++
-	id := c.next
+	client.next++
+	identifier := client.next
 	channel := make(chan rpcMessage, 1)
-	c.pending[id] = channel
-	c.mu.Unlock()
-	data, err := json.Marshal(rpcMessage{JSONRPC: "2.0", ID: &id, Method: method, Params: rawJSON(params)})
-	if err != nil {
-		c.discard(id)
-		return nil, err
+	client.pending[identifier] = channel
+	client.mutex.Unlock()
+	data, operationError := json.Marshal(rpcMessage{JSONRPC: "2.0", ID: &identifier, Method: method, Params: parameters})
+	if operationError != nil {
+		client.discard(identifier)
+		return nil, operationError
 	}
-	if err := c.transport.Send(ctx, data); err != nil {
-		c.discard(id)
-		return nil, err
+	if operationError := client.transport.Send(operationContext, data); operationError != nil {
+		client.discard(identifier)
+		return nil, operationError
 	}
-	timer := time.NewTimer(c.timeout)
-	defer timer.Stop()
 	select {
-	case message, ok := <-channel:
-		if !ok {
+	case message, found := <-channel:
+		if !found {
 			return nil, errors.New("mcp: the connection is closed")
 		}
 		if message.Error != nil {
 			return nil, fmt.Errorf("mcp: %s", message.Error.Message)
 		}
 		return message.Result, nil
-	case <-timer.C:
-		c.discard(id)
-		return nil, errors.New("mcp: the request timeout elapsed")
-	case <-ctx.Done():
-		c.discard(id)
-		return nil, ctx.Err()
+	case <-operationContext.Done():
+		client.discard(identifier)
+		return nil, operationContext.Err()
 	}
 }
 
-func (c *Client) notify(ctx context.Context, method string, params any) error {
-	data, err := json.Marshal(rpcMessage{JSONRPC: "2.0", Method: method, Params: rawJSON(params)})
-	if err != nil {
-		return err
+func (client *Client) notify(operationContext context.Context, method string, params any) error {
+	operationContext, cancel := context.WithTimeout(operationContext, client.timeout)
+	defer cancel()
+	parameters, operationError := encodeParameters(params)
+	if operationError != nil {
+		return operationError
 	}
-	return c.transport.Send(ctx, data)
+	data, operationError := json.Marshal(rpcMessage{JSONRPC: "2.0", Method: method, Params: parameters})
+	if operationError != nil {
+		return operationError
+	}
+	return client.transport.Send(operationContext, data)
 }
 
-func (c *Client) discard(id int64) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	delete(c.pending, id)
+func (client *Client) discard(identifier int64) {
+	client.mutex.Lock()
+	defer client.mutex.Unlock()
+	delete(client.pending, identifier)
 }
 
-func (c *Client) read() {
+func (client *Client) read() {
 	for {
-		data, err := c.transport.Receive(context.Background())
-		if err != nil {
-			c.fail()
+		data, operationError := client.transport.Receive(client.lifecycle)
+		if operationError != nil {
+			client.fail()
 			return
 		}
 		var message rpcMessage
-		if err := json.Unmarshal(data, &message); err != nil {
+		if operationError := json.Unmarshal(data, &message); operationError != nil {
 			continue
 		}
 		if message.ID == nil {
-			c.mu.Lock()
-			handler := c.onChanged
-			c.mu.Unlock()
-			if message.Method == "notifications/tools/list_changed" && handler != nil {
-				handler(context.Background())
+			if message.Method == "notifications/tools/list_changed" {
+				select {
+				case client.changes <- struct{}{}:
+				default:
+				}
 			}
 			continue
 		}
-		c.mu.Lock()
-		channel, ok := c.pending[*message.ID]
-		if ok {
-			delete(c.pending, *message.ID)
+		if message.Method != "" {
+			go client.answerRequest(message)
+			continue
 		}
-		c.mu.Unlock()
-		if ok {
+		client.mutex.Lock()
+		channel, found := client.pending[*message.ID]
+		if found {
+			delete(client.pending, *message.ID)
+		}
+		client.mutex.Unlock()
+		if found {
 			channel <- message
 		}
 	}
 }
 
-func (c *Client) fail() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.closed = true
-	for id, channel := range c.pending {
+func (client *Client) fail() {
+	client.mutex.Lock()
+	defer client.mutex.Unlock()
+	client.closed = true
+	client.cancel()
+	for identifier, channel := range client.pending {
 		close(channel)
-		delete(c.pending, id)
+		delete(client.pending, identifier)
 	}
 }
 
-func (c *Client) Close() error {
-	c.fail()
-	return c.transport.Close()
+func (client *Client) Close() error {
+	client.fail()
+	return client.transport.Close()
 }
 
-func (c *Client) ListTools(ctx context.Context) ([]ToolSpec, error) {
-	result, err := c.call(ctx, "tools/list", map[string]any{})
-	if err != nil {
-		return nil, err
+func (client *Client) ListTools(operationContext context.Context) ([]ToolSpec, error) {
+	operationContext, cancel := context.WithTimeout(operationContext, client.timeout)
+	defer cancel()
+	var tools []ToolSpec
+	cursor := ""
+	seen := map[string]bool{}
+	for {
+		parameters := map[string]any{}
+		if cursor != "" {
+			parameters["cursor"] = cursor
+		}
+		result, operationError := client.call(operationContext, "tools/list", parameters)
+		if operationError != nil {
+			return nil, operationError
+		}
+		var page struct {
+			Tools      []ToolSpec `json:"tools"`
+			NextCursor string     `json:"nextCursor"`
+		}
+		if operationError := json.Unmarshal(result, &page); operationError != nil {
+			return nil, operationError
+		}
+		tools = append(tools, page.Tools...)
+		if len(tools) > 10000 {
+			return nil, fmt.Errorf("MCP tool catalog exceeds 10000 tools")
+		}
+		if page.NextCursor == "" {
+			return tools, nil
+		}
+		if seen[page.NextCursor] {
+			return nil, fmt.Errorf("MCP pagination repeats a cursor")
+		}
+		cursor = page.NextCursor
+		seen[cursor] = true
 	}
-	var parsed struct {
-		Tools []ToolSpec `json:"tools"`
-	}
-	if err := json.Unmarshal(result, &parsed); err != nil {
-		return nil, err
-	}
-	return parsed.Tools, nil
 }
 
-func (c *Client) CallTool(ctx context.Context, name string, arguments json.RawMessage) (CallResult, error) {
+func (client *Client) CallTool(operationContext context.Context, name string, arguments json.RawMessage) (CallResult, error) {
 	if len(arguments) == 0 {
 		arguments = json.RawMessage("{}")
 	}
-	result, err := c.call(ctx, "tools/call", map[string]any{"name": name, "arguments": arguments})
-	if err != nil {
-		return CallResult{}, err
+	result, operationError := client.call(operationContext, "tools/call", map[string]any{"name": name, "arguments": arguments})
+	if operationError != nil {
+		return CallResult{}, operationError
 	}
 	var parsed struct {
 		Content []Content `json:"content"`
 		IsError bool      `json:"isError"`
 	}
-	if err := json.Unmarshal(result, &parsed); err != nil {
-		return CallResult{}, err
+	if operationError := json.Unmarshal(result, &parsed); operationError != nil {
+		return CallResult{}, operationError
 	}
 	return CallResult{Content: parsed.Content, IsError: parsed.IsError}, nil
 }
 
-func rawJSON(value any) json.RawMessage {
-	if value == nil {
-		return nil
+func (client *Client) ReportError(operationError error) {
+	log.Printf("mcp[%s]: %v", client.name, operationError)
+}
+
+func encodeParameters(parameters any) (json.RawMessage, error) {
+	if parameters == nil {
+		return nil, nil
 	}
-	data, _ := json.Marshal(value)
-	return data
+	return json.Marshal(parameters)
+}
+
+func (client *Client) dispatchChanges() {
+	for {
+		select {
+		case <-client.lifecycle.Done():
+			return
+		case <-client.changes:
+			client.mutex.Lock()
+			handler := client.onChanged
+			client.mutex.Unlock()
+			if handler != nil {
+				handler(client.lifecycle)
+			}
+		}
+	}
+}
+
+func (client *Client) answerRequest(request rpcMessage) {
+	response := rpcMessage{JSONRPC: "2.0", ID: request.ID, Result: json.RawMessage(`{}`)}
+	if request.Method != "ping" {
+		response.Result = nil
+		response.Error = &rpcError{Code: -32601, Message: "method not supported"}
+	}
+	data, operationError := json.Marshal(response)
+	if operationError != nil {
+		client.ReportError(operationError)
+		return
+	}
+	operationContext, cancel := context.WithTimeout(client.lifecycle, client.timeout)
+	defer cancel()
+	if operationError := client.transport.Send(operationContext, data); operationError != nil {
+		client.ReportError(operationError)
+	}
 }

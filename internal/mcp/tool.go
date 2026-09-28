@@ -13,43 +13,43 @@ type Tool struct {
 	Spec   ToolSpec
 }
 
-func (t *Tool) Name() string {
-	return "mcp__" + t.Server + "__" + t.Spec.Name
+func (tool *Tool) Name() string {
+	return "mcp__" + tool.Server + "__" + tool.Spec.Name
 }
 
-func (t *Tool) Description() string {
-	if t.Spec.Description == "" {
-		return "The MCP tool " + t.Spec.Name + " of the server " + t.Server + "."
+func (tool *Tool) Description() string {
+	if tool.Spec.Description == "" {
+		return "The MCP tool " + tool.Spec.Name + " of the server " + tool.Server + "."
 	}
-	return t.Spec.Description
+	return tool.Spec.Description
 }
 
-func (t *Tool) Categories() []string {
-	return []string{"mcp", t.Server}
+func (tool *Tool) Categories() []string {
+	return []string{"mcp", tool.Server}
 }
 
-func (t *Tool) InputSchema() atom.Schema {
-	if len(t.Spec.InputSchema) == 0 {
+func (tool *Tool) InputSchema() atom.Schema {
+	if len(tool.Spec.InputSchema) == 0 {
 		return atom.Schema{JSON: []byte(`{"type":"object"}`)}
 	}
-	return atom.Schema{JSON: t.Spec.InputSchema}
+	return atom.Schema{JSON: tool.Spec.InputSchema}
 }
 
-func (t *Tool) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
+func (tool *Tool) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
 
-func (t *Tool) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
-	result, err := t.Client.CallTool(ctx, t.Spec.Name, call.Input)
-	if err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: err.Error()}, nil
+func (tool *Tool) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+	result, operationError := tool.Client.CallTool(operationContext, tool.Spec.Name, call.Input)
+	if operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, nil
 	}
 	toolResult := atom.ToolResult{CallID: call.ID, Status: atom.StatusOK}
 	for _, item := range result.Content {
 		switch item.Type {
 		case "image", "audio":
-			data, err := base64.StdEncoding.DecodeString(item.Data)
-			if err != nil {
+			data, operationError := base64.StdEncoding.DecodeString(item.Data)
+			if operationError != nil {
 				continue
 			}
 			media := atom.Image

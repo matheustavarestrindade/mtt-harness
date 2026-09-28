@@ -1,109 +1,44 @@
 package schema
 
 import (
+	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"strings"
+	"io"
+
+	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 
-type definition struct {
-	Type       string                `json:"type"`
-	Required   []string              `json:"required"`
-	Properties map[string]definition `json:"properties"`
-	Items      *definition           `json:"items"`
-}
-
+// Validate implements JSON Schema rather than silently ignoring unsupported
+// keywords. References inside the supplied schema work; remote references must
+// be bundled by the tool owner and cannot trigger network or file reads here.
 func Validate(raw []byte, input json.RawMessage) error {
 	if len(raw) == 0 {
-		return nil
+		raw = []byte(`{"type":"object"}`)
 	}
-	var definition definition
-	if err := json.Unmarshal(raw, &definition); err != nil {
-		return nil
+	compiler := jsonschema.NewCompiler()
+	compiler.LoadURL = func(url string) (io.ReadCloser, error) {
+		return nil, fmt.Errorf("external schema reference %q is not bundled", url)
 	}
-	if definition.Type != "object" {
-		return nil
+	if operationError := compiler.AddResource("https://mtt.invalid/tool.json", bytes.NewReader(raw)); operationError != nil {
+		return fmt.Errorf("invalid tool schema: %w", operationError)
 	}
-	data := input
-	if len(data) == 0 {
-		data = json.RawMessage("{}")
+	compiled, operationError := compiler.Compile("https://mtt.invalid/tool.json")
+	if operationError != nil {
+		return fmt.Errorf("invalid tool schema: %w", operationError)
 	}
-	var value map[string]json.RawMessage
-	if err := json.Unmarshal(data, &value); err != nil {
-		return errors.New("the input is not a JSON object")
+	if len(input) == 0 {
+		input = json.RawMessage(`{}`)
 	}
-	return validateObject(definition, value, "")
-}
-
-func validateObject(definition definition, value map[string]json.RawMessage, path string) error {
-	for _, name := range definition.Required {
-		if _, ok := value[name]; !ok {
-			return fmt.Errorf("the field %s is necessary", fieldPath(path, name))
-		}
+	decoder := json.NewDecoder(bytes.NewReader(input))
+	decoder.UseNumber()
+	var value any
+	if operationError := decoder.Decode(&value); operationError != nil {
+		return operationError
 	}
-	for name, item := range value {
-		property, ok := definition.Properties[name]
-		if !ok || property.Type == "" {
-			continue
-		}
-		if err := validateValue(property, item, fieldPath(path, name)); err != nil {
-			return err
-		}
+	var extra any
+	if operationError := decoder.Decode(&extra); operationError != io.EOF {
+		return fmt.Errorf("tool input must contain one JSON value")
 	}
-	return nil
-}
-
-func validateValue(definition definition, data json.RawMessage, path string) error {
-	switch definition.Type {
-	case "string":
-		var value string
-		if err := json.Unmarshal(data, &value); err != nil {
-			return fmt.Errorf("the field %s is not a string", path)
-		}
-	case "integer":
-		var value int64
-		if err := json.Unmarshal(data, &value); err != nil {
-			return fmt.Errorf("the field %s is not an integer", path)
-		}
-	case "number":
-		var value float64
-		if err := json.Unmarshal(data, &value); err != nil {
-			return fmt.Errorf("the field %s is not a number", path)
-		}
-	case "boolean":
-		var value bool
-		if err := json.Unmarshal(data, &value); err != nil {
-			return fmt.Errorf("the field %s is not a boolean", path)
-		}
-	case "object":
-		var value map[string]json.RawMessage
-		if err := json.Unmarshal(data, &value); err != nil {
-			return fmt.Errorf("the field %s is not an object", path)
-		}
-		return validateObject(definition, value, path)
-	case "array":
-		var value []json.RawMessage
-		if err := json.Unmarshal(data, &value); err != nil {
-			return fmt.Errorf("the field %s is not an array", path)
-		}
-		if definition.Items != nil {
-			for index, item := range value {
-				if err := validateValue(*definition.Items, item, fmt.Sprintf("%s[%d]", path, index)); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func fieldPath(path string, name string) string {
-	if path == "" {
-		return name
-	}
-	if strings.HasSuffix(path, "]") {
-		return path + "." + name
-	}
-	return path + "." + name
+	return compiled.Validate(value)
 }

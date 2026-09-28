@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
 type Write struct{}
@@ -15,7 +16,7 @@ func (Write) Name() string {
 }
 
 func (Write) Description() string {
-	return "Write a file in the workspace."
+	return "Create a file or replace all contents of an existing file with the supplied text. Relative paths resolve from the instance workspace. The parent directory must already exist."
 }
 
 func (Write) Categories() []string {
@@ -23,23 +24,44 @@ func (Write) Categories() []string {
 }
 
 func (Write) InputSchema() atom.Schema {
-	return schema(`{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}`)
+	return schema(`{
+		"type": "object",
+		"properties": {
+			"path": {
+				"type": "string",
+				"description": "Destination file path, relative to the instance workspace or absolute. The parent directory must exist. Symbolic links are resolved before workspace permission checks.",
+				"examples": ["src/main.go"]
+			},
+			"content": {
+				"type": "string",
+				"description": "Complete replacement text for the file, not a patch or appended text. An empty string creates or truncates the file to zero bytes."
+			}
+		},
+		"required": ["path", "content"]
+	}`)
 }
 
-func (Write) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
+func (Write) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
 
-func (Write) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+func (Write) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	var input struct {
 		Path    string `json:"path"`
 		Content string `json:"content"`
 	}
-	if err := json.Unmarshal(call.Input, &input); err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "write: the input is not correct"}, err
+	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "write: the input is not correct"}, operationError
 	}
-	if err := os.WriteFile(input.Path, []byte(input.Content), 0o644); err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: err.Error()}, err
+	if operationError := operationContext.Err(); operationError != nil {
+		return atom.ToolResult{}, operationError
+	}
+	path, operationError := harness.WorkspacePath(operationContext, input.Path)
+	if operationError != nil {
+		return atom.ToolResult{}, operationError
+	}
+	if operationError := os.WriteFile(path, []byte(input.Content), 0o644); operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
 	}
 	return atom.ToolResult{
 		CallID:  call.ID,

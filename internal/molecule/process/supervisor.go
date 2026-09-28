@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"io"
+	"fmt"
 	"os"
 	"os/exec"
 	"sync"
@@ -16,251 +16,143 @@ import (
 )
 
 const outputLimit = 256 * 1024
-
-type Handle struct {
-	id     string
-	cmd    *exec.Cmd
-	stdin  io.WriteCloser
-	mu     sync.Mutex
-	subs   []chan atom.ProcessEvent
-	stdout []byte
-	stderr []byte
-	done   chan struct{}
-	exit   atom.ExitStatus
-	err    error
-}
-
-func (h *Handle) ID() string { return h.id }
-
-func (h *Handle) PID() int {
-	if h.cmd.Process == nil {
-		return 0
-	}
-	return h.cmd.Process.Pid
-}
-
-func (h *Handle) Write(data []byte) error {
-	if h.stdin == nil {
-		return errors.New("process: the input of the process is not open")
-	}
-	_, err := h.stdin.Write(data)
-	return err
-}
-
-func (h *Handle) Kill(signal atom.Signal) error {
-	if h.cmd.Process == nil {
-		return errors.New("process: the process is not started")
-	}
-	if signal == atom.Signal("interrupt") {
-		return h.cmd.Process.Signal(os.Interrupt)
-	}
-	return h.cmd.Process.Kill()
-}
-
-func (h *Handle) Wait() (atom.ExitStatus, error) {
-	<-h.done
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.exit, h.err
-}
-
-func (h *Handle) Events() <-chan atom.ProcessEvent {
-	return h.Subscribe()
-}
-
-func (h *Handle) Subscribe() <-chan atom.ProcessEvent {
-	channel := make(chan atom.ProcessEvent, 256)
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.subs = append(h.subs, channel)
-	return channel
-}
-
-func (h *Handle) Output() ([]byte, []byte) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return append([]byte(nil), h.stdout...), append([]byte(nil), h.stderr...)
-}
-
-func (h *Handle) publish(event atom.ProcessEvent) {
-	h.mu.Lock()
-	subs := append([]chan atom.ProcessEvent(nil), h.subs...)
-	h.mu.Unlock()
-	for _, channel := range subs {
-		select {
-		case channel <- event:
-		default:
-		}
-	}
-}
-
-func (h *Handle) read(stream atom.StreamName, reader io.Reader) {
-	buffer := make([]byte, 4096)
-	for {
-		n, err := reader.Read(buffer)
-		if n > 0 {
-			data := append([]byte(nil), buffer[:n]...)
-			h.append(stream, data)
-			h.publish(atom.ProcessEvent{
-				ProcessID: h.id,
-				Stream:    stream,
-				Data:      data,
-				At:        time.Now(),
-			})
-		}
-		if err != nil {
-			return
-		}
-	}
-}
-
-func (h *Handle) append(stream atom.StreamName, data []byte) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if stream == atom.StreamStderr {
-		h.stderr = appendCapped(h.stderr, data)
-		return
-	}
-	h.stdout = appendCapped(h.stdout, data)
-}
-
-func appendCapped(buffer []byte, data []byte) []byte {
-	buffer = append(buffer, data...)
-	if len(buffer) > outputLimit {
-		buffer = buffer[len(buffer)-outputLimit:]
-	}
-	return buffer
-}
-
-func (h *Handle) wait() {
-	err := h.cmd.Wait()
-	status := atom.ExitStatus{}
-	if err != nil {
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			status.Code = exitError.ExitCode()
-		}
-		status.Error = err.Error()
-	}
-	h.mu.Lock()
-	h.exit = status
-	h.err = err
-	h.mu.Unlock()
-	close(h.done)
-	h.publish(atom.ProcessEvent{
-		ProcessID: h.id,
-		Stream:    atom.StreamExit,
-		Error:     status.Error,
-		At:        time.Now(),
-	})
-	h.mu.Lock()
-	for _, channel := range h.subs {
-		close(channel)
-	}
-	h.subs = nil
-	h.mu.Unlock()
-	if h.stdin != nil {
-		_ = h.stdin.Close()
-	}
-}
+const retainedProcessLimit = 128
 
 type Supervisor struct {
-	mu    sync.RWMutex
-	procs map[string]*Handle
-	limit int
+	mutex              sync.RWMutex
+	runningProcesses   map[string]*Handle
+	completedProcesses map[string]*Handle
+	completionOrder    []string
+	limit              int
+	closed             bool
 }
 
 func New(limit int) *Supervisor {
-	return &Supervisor{
-		procs: map[string]*Handle{},
-		limit: limit,
-	}
+	return &Supervisor{runningProcesses: map[string]*Handle{}, completedProcesses: map[string]*Handle{}, limit: limit}
 }
 
-func (s *Supervisor) Start(ctx context.Context, spec atom.ProcessSpec) (harness.Process, error) {
-	if spec.Command == "" {
-		return nil, errors.New("process: the command is necessary")
+func (processSupervisor *Supervisor) Start(operationContext context.Context, processSpec atom.ProcessSpec) (harness.Process, error) {
+	return processSupervisor.StartWithTransform(operationContext, processSpec, nil)
+}
+
+func (processSupervisor *Supervisor) StartWithTransform(operationContext context.Context, processSpec atom.ProcessSpec, transform func(atom.ProcessEvent) (atom.ProcessEvent, error)) (harness.Process, error) {
+	if processSpec.Command == "" {
+		return nil, fmt.Errorf("process command is required")
 	}
-	s.mu.Lock()
-	if s.limit > 0 && len(s.procs) >= s.limit {
-		s.mu.Unlock()
-		return nil, errors.New("process: the process limit is reached")
+	if operationError := operationContext.Err(); operationError != nil {
+		return nil, operationError
 	}
-	s.mu.Unlock()
-	command := exec.Command(spec.Command, spec.Args...)
-	command.Dir = spec.Cwd
-	command.Env = append(os.Environ(), spec.Env...)
-	stdin, err := command.StdinPipe()
-	if err != nil {
-		return nil, err
+	command := exec.Command(processSpec.Command, processSpec.Args...)
+	command.Dir, command.Env = processSpec.Cwd, append(os.Environ(), processSpec.Env...)
+	prepareCommand(command)
+	stdin, operationError := command.StdinPipe()
+	if operationError != nil {
+		return nil, operationError
 	}
-	stdout, err := command.StdoutPipe()
-	if err != nil {
-		return nil, err
+	var identifierBytes [16]byte
+	if _, operationError := rand.Read(identifierBytes[:]); operationError != nil {
+		stdin.Close()
+		return nil, operationError
 	}
-	stderr, err := command.StderrPipe()
-	if err != nil {
-		return nil, err
+	handle := &Handle{identifier: hex.EncodeToString(identifierBytes[:]), command: command, stdin: stdin, done: make(chan struct{}), subscribers: map[uint64]chan atom.ProcessEvent{}}
+	handle.transform = transform
+	handle.startEvent = atom.ProcessEvent{ProcessID: handle.identifier, Stream: atom.StreamStart, At: time.Now()}
+	if transform != nil {
+		handle.startEvent, operationError = transform(handle.startEvent)
+		if operationError != nil {
+			stdin.Close()
+			return nil, operationError
+		}
 	}
-	handle := &Handle{
-		id:    newID(),
-		cmd:   command,
-		stdin: stdin,
-		done:  make(chan struct{}),
+	command.Stdout, command.Stderr = outputWriter{handle, atom.StreamStdout}, outputWriter{handle, atom.StreamStderr}
+	processSupervisor.mutex.Lock()
+	defer processSupervisor.mutex.Unlock()
+	if operationError := operationContext.Err(); operationError != nil {
+		stdin.Close()
+		return nil, operationError
 	}
-	if err := command.Start(); err != nil {
-		return nil, err
+	if processSupervisor.closed {
+		stdin.Close()
+		return nil, fmt.Errorf("process supervisor is closed")
 	}
-	go handle.read(atom.StreamStdout, stdout)
-	go handle.read(atom.StreamStderr, stderr)
-	go handle.wait()
-	s.mu.Lock()
-	s.procs[handle.id] = handle
-	s.mu.Unlock()
-	handle.publish(atom.ProcessEvent{
-		ProcessID: handle.id,
-		Stream:    atom.StreamStart,
-		At:        time.Now(),
-	})
-	if spec.Timeout > 0 {
+	active := 0
+	for _, process := range processSupervisor.runningProcesses {
+		if process.Running() {
+			active++
+		}
+	}
+	if processSupervisor.limit > 0 && active >= processSupervisor.limit {
+		stdin.Close()
+		return nil, fmt.Errorf("process limit reached")
+	}
+	if operationError := command.Start(); operationError != nil {
+		stdin.Close()
+		return nil, operationError
+	}
+	processSupervisor.runningProcesses[handle.identifier] = handle
+	go func() {
+		handle.wait()
+		processSupervisor.retain(handle)
+	}()
+	if processSpec.Timeout > 0 {
 		go func() {
+			timer := time.NewTimer(processSpec.Timeout)
+			defer timer.Stop()
 			select {
 			case <-handle.done:
-			case <-time.After(spec.Timeout):
-				_ = command.Process.Kill()
+			case <-timer.C:
+				_ = handle.Kill("")
 			}
 		}()
 	}
-	go func() {
-		<-handle.done
-		s.mu.Lock()
-		delete(s.procs, handle.id)
-		s.mu.Unlock()
-	}()
 	return handle, nil
 }
 
-func (s *Supervisor) Get(id string) (harness.Process, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	handle, ok := s.procs[id]
-	return handle, ok
+func (processSupervisor *Supervisor) retain(handle *Handle) {
+	processSupervisor.mutex.Lock()
+	defer processSupervisor.mutex.Unlock()
+	delete(processSupervisor.runningProcesses, handle.identifier)
+	processSupervisor.completedProcesses[handle.identifier] = handle
+	processSupervisor.completionOrder = append(processSupervisor.completionOrder, handle.identifier)
+	if len(processSupervisor.completionOrder) > retainedProcessLimit {
+		delete(processSupervisor.completedProcesses, processSupervisor.completionOrder[0])
+		processSupervisor.completionOrder = processSupervisor.completionOrder[1:]
+	}
 }
 
-func (s *Supervisor) All() []harness.Process {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	list := make([]harness.Process, 0, len(s.procs))
-	for _, handle := range s.procs {
-		list = append(list, handle)
+func (processSupervisor *Supervisor) Get(identifier string) (harness.Process, bool) {
+	processSupervisor.mutex.RLock()
+	defer processSupervisor.mutex.RUnlock()
+	if handle, found := processSupervisor.runningProcesses[identifier]; found {
+		return handle, true
 	}
-	return list
+	handle, found := processSupervisor.completedProcesses[identifier]
+	return handle, found
 }
 
-func newID() string {
-	var data [16]byte
-	if _, err := rand.Read(data[:]); err != nil {
-		return "unknown"
+func (processSupervisor *Supervisor) All() []harness.Process {
+	processSupervisor.mutex.RLock()
+	defer processSupervisor.mutex.RUnlock()
+	var processes []harness.Process
+	for _, handle := range processSupervisor.runningProcesses {
+		processes = append(processes, handle)
 	}
-	return hex.EncodeToString(data[:])
+	return processes
+}
+
+func (processSupervisor *Supervisor) Close(operationContext context.Context) error {
+	processSupervisor.mutex.Lock()
+	processSupervisor.closed = true
+	processSupervisor.mutex.Unlock()
+	var failures []error
+	for _, runningProcess := range processSupervisor.All() {
+		failures = append(failures, runningProcess.Kill(""))
+		handle := runningProcess.(*Handle)
+		select {
+		case <-handle.done:
+		case <-operationContext.Done():
+			return errors.Join(append(failures, operationContext.Err())...)
+		}
+	}
+	return errors.Join(failures...)
 }

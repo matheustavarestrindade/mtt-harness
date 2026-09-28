@@ -18,35 +18,47 @@ func NewProcessOutput(manager *processes.Manager) *ProcessOutput {
 	return &ProcessOutput{manager: manager}
 }
 
-func (p *ProcessOutput) Name() string {
+func (processOutputTool *ProcessOutput) Name() string {
 	return "process_output"
 }
 
-func (p *ProcessOutput) Description() string {
-	return "Read the output of a running process."
+func (processOutputTool *ProcessOutput) Description() string {
+	return "Read a snapshot of retained stdout followed by stderr from a running or recently completed process in this instance. Output is limited to the last 256 KiB per stream; only the last 128 completed processes are retained. Repeated reads return the retained snapshot, not just new output."
 }
 
-func (p *ProcessOutput) Categories() []string {
+func (processOutputTool *ProcessOutput) Categories() []string {
 	return []string{"process"}
 }
 
-func (p *ProcessOutput) InputSchema() atom.Schema {
-	return schema(`{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}`)
+func (processOutputTool *ProcessOutput) InputSchema() atom.Schema {
+	return schema(`{
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "string",
+				"description": "Harness process ID returned by bash with wait=false, not the operating-system PID. The process must belong to this instance and its output must still be retained."
+			}
+		},
+		"required": ["id"]
+	}`)
 }
 
-func (p *ProcessOutput) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
+func (processOutputTool *ProcessOutput) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
 
-func (p *ProcessOutput) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+func (processOutputTool *ProcessOutput) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	var input struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(call.Input, &input); err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "process_output: the input is not correct"}, err
+	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "process_output: the input is not correct"}, operationError
 	}
-	stdout, stderr, ok := p.manager.Output(input.ID)
-	if !ok {
+	if operationError := processOutputTool.manager.CheckOwner(operationContext, input.ID); operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusDenied, Error: operationError.Error()}, operationError
+	}
+	stdout, stderr, found := processOutputTool.manager.Output(input.ID)
+	if !found {
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "process_output: the process is not in the manager"}, nil
 	}
 	text := string(stdout)
@@ -68,40 +80,57 @@ func NewProcessKill(manager *processes.Manager) *ProcessKill {
 	return &ProcessKill{manager: manager}
 }
 
-func (p *ProcessKill) Name() string {
+func (processKillTool *ProcessKill) Name() string {
 	return "process_kill"
 }
 
-func (p *ProcessKill) Description() string {
-	return "Stop a running process."
+func (processKillTool *ProcessKill) Description() string {
+	return "Signal a process in this instance by its harness process ID. The default force-stops it; interrupt requests an interrupt signal. On Unix, the signal applies to the whole process group. This tool requests the signal without waiting for termination; an already stopped process is a no-op."
 }
 
-func (p *ProcessKill) Categories() []string {
+func (processKillTool *ProcessKill) Categories() []string {
 	return []string{"process"}
 }
 
-func (p *ProcessKill) InputSchema() atom.Schema {
-	return schema(`{"type":"object","properties":{"id":{"type":"string"},"signal":{"type":"string"}},"required":["id"]}`)
+func (processKillTool *ProcessKill) InputSchema() atom.Schema {
+	return schema(`{
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "string",
+				"description": "Harness process ID returned by bash with wait=false, not the operating-system PID. The process must belong to this instance."
+			},
+			"signal": {
+				"type": "string",
+				"default": "kill",
+				"description": "Use interrupt to request an interrupt signal (SIGINT on Unix), or kill for a forced stop (SIGKILL on Unix). Omitted or empty uses kill. The implementation treats every value other than interrupt as a forced stop; do not pass arbitrary OS signal names."
+			}
+		},
+		"required": ["id"]
+	}`)
 }
 
-func (p *ProcessKill) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
+func (processKillTool *ProcessKill) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
 
-func (p *ProcessKill) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+func (processKillTool *ProcessKill) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	var input struct {
 		ID     string `json:"id"`
 		Signal string `json:"signal"`
 	}
-	if err := json.Unmarshal(call.Input, &input); err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "process_kill: the input is not correct"}, err
+	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "process_kill: the input is not correct"}, operationError
 	}
-	proc, ok := p.manager.Get(input.ID)
-	if !ok {
+	if operationError := processKillTool.manager.CheckOwner(operationContext, input.ID); operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusDenied, Error: operationError.Error()}, operationError
+	}
+	runningProcess, found := processKillTool.manager.Get(input.ID)
+	if !found {
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "process_kill: the process is not in the manager"}, nil
 	}
-	if err := proc.Kill(atom.Signal(input.Signal)); err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: err.Error()}, err
+	if operationError := runningProcess.Kill(atom.Signal(input.Signal)); operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
 	}
 	return atom.ToolResult{
 		CallID:  call.ID,

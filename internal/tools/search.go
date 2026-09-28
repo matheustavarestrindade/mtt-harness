@@ -12,52 +12,73 @@ type Search struct {
 	registry *registry.Registry
 }
 
-func NewSearch(reg *registry.Registry) *Search {
-	return &Search{registry: reg}
+func NewSearch(toolRegistry *registry.Registry) *Search {
+	return &Search{registry: toolRegistry}
 }
 
-func (s *Search) Name() string {
+func (searchTool *Search) Name() string {
 	return "search_tool"
 }
 
-func (s *Search) Description() string {
-	return "Find tools by a category or text."
+func (searchTool *Search) Description() string {
+	return "Discover tools with deterministic text/category matching. Returns names, descriptions, categories, and input schemas. Matching tools are added to this session's tool group for subsequent model requests; search again when needed."
 }
 
-func (s *Search) Categories() []string {
+func (searchTool *Search) Categories() []string {
 	return []string{"system"}
 }
 
-func (s *Search) InputSchema() atom.Schema {
-	return schema(`{"type":"object","properties":{"query":{"type":"string"},"category":{"type":"string"},"limit":{"type":"integer"}}}`)
+func (searchTool *Search) InputSchema() atom.Schema {
+	return schema(`{
+		"type": "object",
+		"properties": {
+			"query": {
+				"type": "string",
+				"default": "",
+				"description": "Case-insensitive words to match against tool names, descriptions, and categories. Every word must appear. This is plain substring matching, not semantic search. Omit to search by category only; no query and no category returns no results.",
+				"examples": ["file", "process output"]
+			},
+			"category": {
+				"type": "string",
+				"default": "",
+				"description": "Optional exact category filter, ignoring case. When both category and query are set, tools must satisfy both. Omit or use an empty string for no category filter.",
+				"examples": ["file", "process", "command", "agent", "system", "mcp"]
+			},
+			"limit": {
+				"type": "integer",
+				"default": 10,
+				"description": "Maximum number of returned tools. Defaults to 10 when omitted or non-positive. Values above 50 are capped at 50."
+			}
+		}
+	}`)
 }
 
-func (s *Search) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
+func (searchTool *Search) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
 
-func (s *Search) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+func (searchTool *Search) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	var input struct {
 		Query    string `json:"query"`
 		Category string `json:"category"`
 		Limit    int    `json:"limit"`
 	}
-	if err := json.Unmarshal(call.Input, &input); err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "search_tool: the input is not correct"}, err
+	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "search_tool: the input is not correct"}, operationError
 	}
-	found := s.registry.Find(input.Query, input.Category, input.Limit)
-	specs := make([]atom.ToolSpec, 0, len(found))
+	found := searchTool.registry.Find(input.Query, input.Category, input.Limit)
+	specifications := make([]atom.ToolSpec, 0, len(found))
 	for _, item := range found {
-		specs = append(specs, atom.ToolSpec{
+		specifications = append(specifications, atom.ToolSpec{
 			Name:        item.Name(),
 			Description: item.Description(),
 			Categories:  item.Categories(),
 			InputSchema: item.InputSchema(),
 		})
 	}
-	data, err := json.Marshal(specs)
-	if err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: err.Error()}, err
+	data, operationError := json.Marshal(specifications)
+	if operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
 	}
 	return atom.ToolResult{
 		CallID:  call.ID,

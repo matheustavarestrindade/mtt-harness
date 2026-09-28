@@ -1,11 +1,11 @@
 package atom
 
-type Stage[T any] struct {
+type Stage[Value any] struct {
 	Name string
 }
 
-func NewStage[T any](name string) Stage[T] {
-	return Stage[T]{Name: name}
+func NewStage[Value any](name string) Stage[Value] {
+	return Stage[Value]{Name: name}
 }
 
 var (

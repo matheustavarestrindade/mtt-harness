@@ -22,28 +22,36 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/instances"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/loop"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/registry"
+	"github.com/matheustavarestrindade/mtt-harness/internal/testutil"
 )
 
-func TestAPIFlow(t *testing.T) {
+func TestAPIFlow(test *testing.T) {
 	database := memory.New()
-	bus := eventbus.New()
-	h := harness.New()
-	reg := registry.New()
+	harnessRuntime := harness.New()
+	bus := eventbus.New(harnessRuntime)
+	toolRegistry := registry.New(harnessRuntime)
 	broker := permission.NewBroker()
-	models := gateway.New()
+	models := gateway.New(harnessRuntime)
 	testProvider := provider.NewTest("test", provider.TextWithUsage("hello", atom.Usage{Input: 10, Output: 2}))
-	if err := models.Add(testProvider); err != nil {
-		t.Fatal(err)
-	}
-	instanceManager := instances.New(func(instanceID string) instances.SessionManager { return nil }, nil)
-	runner := loop.New(h, loop.Config{
+	testutil.RequireNoError(test, models.Add(testProvider))
+
+	instanceManager := instances.New(func(instanceID string) instances.SessionManager {
+		return nil
+	}, nil)
+	runner := loop.New(harnessRuntime, loop.Config{
 		Gateway:   models,
-		Registry:  reg,
+		Registry:  toolRegistry,
 		Store:     database,
 		Bus:       bus,
 		Broker:    broker,
 		Engine:    permission.NewEngine(),
 		Instances: instanceManager,
+	})
+	messageQueue := loop.NewQueue(runner)
+	test.Cleanup(func() {
+		operationContext, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		testutil.RequireNoError(test, messageQueue.Close(operationContext))
 	})
 	server := httptest.NewServer(api.New(api.Config{
 		Token:     "secret",
@@ -52,38 +60,38 @@ func TestAPIFlow(t *testing.T) {
 		Bus:       bus,
 		Broker:    broker,
 		Loop:      runner,
-		Queue:     loop.NewQueue(runner),
+		Queue:     messageQueue,
 		Gateway:   models,
 	}).Handler())
 	defer server.Close()
 
-	response := request(t, server.URL+"/instances", "", "GET", nil)
+	response := request(test, server.URL+"/instances", "", "GET", nil)
 	if response.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("status without token = %d", response.StatusCode)
+		test.Fatalf("status without token = %d", response.StatusCode)
 	}
 
 	var instance atom.InstanceSpec
-	response = request(t, server.URL+"/instances", "secret", "POST", map[string]any{
-		"workspace":     t.TempDir(),
+	response = request(test, server.URL+"/instances", "secret", "POST", map[string]any{
+		"workspace":     test.TempDir(),
 		"default_model": "test-model",
 	})
 	if response.StatusCode != http.StatusCreated {
-		t.Fatalf("instance status = %d", response.StatusCode)
+		test.Fatalf("instance status = %d", response.StatusCode)
 	}
-	decode(t, response, &instance)
+	decode(test, response, &instance)
 
 	var session atom.Session
-	response = request(t, server.URL+"/instances/"+instance.ID+"/sessions", "secret", "POST", nil)
+	response = request(test, server.URL+"/instances/"+instance.ID+"/sessions", "secret", "POST", nil)
 	if response.StatusCode != http.StatusCreated {
-		t.Fatalf("session status = %d", response.StatusCode)
+		test.Fatalf("session status = %d", response.StatusCode)
 	}
-	decode(t, response, &session)
+	decode(test, response, &session)
 
 	testProvider.SetDelay(300 * time.Millisecond)
-	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "POST", map[string]any{"content": "hi"})
+	response = request(test, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "POST", map[string]any{"content": "hi"})
 	if response.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(response.Body)
-		t.Fatalf("message status = %d: %s", response.StatusCode, body)
+		test.Fatalf("message status = %d: %s", response.StatusCode, body)
 	}
 	var queued struct {
 		Status  string `json:"status"`
@@ -91,156 +99,149 @@ func TestAPIFlow(t *testing.T) {
 			ID string `json:"ID"`
 		} `json:"message"`
 	}
-	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "POST", map[string]any{"content": "cancel me"})
+	response = request(test, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "POST", map[string]any{"content": "cancel me"})
 	if response.StatusCode != http.StatusAccepted {
-		t.Fatalf("the second message status = %d", response.StatusCode)
+		test.Fatalf("the second message status = %d", response.StatusCode)
 	}
-	decode(t, response, &queued)
+	decode(test, response, &queued)
 	if queued.Status != "queued" || queued.Message.ID == "" {
-		t.Fatalf("the second message = %+v", queued)
+		test.Fatalf("the second message = %+v", queued)
 	}
-	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/queue/"+queued.Message.ID, "secret", "DELETE", nil)
+	response = request(test, server.URL+"/sessions/"+string(session.ID)+"/queue/"+queued.Message.ID, "secret", "DELETE", nil)
 	if response.StatusCode != http.StatusOK {
-		t.Fatalf("the queue cancel status = %d", response.StatusCode)
+		test.Fatalf("the queue cancel status = %d", response.StatusCode)
 	}
 	testProvider.SetDelay(0)
 	var messages []atom.Message
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		response = request(t, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "GET", nil)
-		decode(t, response, &messages)
+		response = request(test, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "GET", nil)
+		decode(test, response, &messages)
 		if len(messages) >= 2 {
 			break
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	if len(messages) != 2 || messages[1].Content[0].Text != "hello" {
-		t.Fatalf("the messages = %+v", messages)
+		test.Fatalf("the messages = %+v", messages)
 	}
 	if messages[0].Content[0].Text != "hi" {
-		t.Fatalf("the removed message ran: %q", messages[0].Content[0].Text)
+		test.Fatalf("the removed message ran: %q", messages[0].Content[0].Text)
 	}
 
 	var statistics atom.Statistics
-	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/statistics", "secret", "GET", nil)
-	decode(t, response, &statistics)
+	response = request(test, server.URL+"/sessions/"+string(session.ID)+"/statistics", "secret", "GET", nil)
+	decode(test, response, &statistics)
 	if statistics.Calls != 1 || statistics.Input != 10 {
-		t.Fatalf("statistics = %+v", statistics)
+		test.Fatalf("statistics = %+v", statistics)
 	}
 
-	if _, _, err := sendAndWait(t, server.URL, string(session.ID), "again", 4); err != nil {
-		t.Fatal(err)
+	if _, _, operationError := sendAndWait(test, server.URL, string(session.ID), "again", 4); operationError != nil {
+		test.Fatal(operationError)
 	}
 	var reverted struct {
 		Status  string `json:"status"`
 		Removed int    `json:"removed"`
 	}
-	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/revert", "secret", "POST", map[string]any{"message_id": messages[0].ID})
-	decode(t, response, &reverted)
+	response = request(test, server.URL+"/sessions/"+string(session.ID)+"/revert", "secret", "POST", map[string]any{"message_id": messages[0].ID})
+	decode(test, response, &reverted)
 	if reverted.Removed != 3 {
-		t.Fatalf("the revert = %+v", reverted)
+		test.Fatalf("the revert = %+v", reverted)
 	}
-	response = request(t, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "GET", nil)
-	decode(t, response, &messages)
+	response = request(test, server.URL+"/sessions/"+string(session.ID)+"/messages", "secret", "GET", nil)
+	decode(test, response, &messages)
 	if len(messages) != 1 {
-		t.Fatalf("the messages after the revert = %d", len(messages))
+		test.Fatalf("the messages after the revert = %d", len(messages))
 	}
-	if _, _, err := sendAndWait(t, server.URL, string(session.ID), "after the revert", 2); err != nil {
-		t.Fatal(err)
+	if _, _, operationError := sendAndWait(test, server.URL, string(session.ID), "after the revert", 2); operationError != nil {
+		test.Fatal(operationError)
 	}
 
 	var modelList []atom.ModelInfo
-	response = request(t, server.URL+"/instances/"+instance.ID+"/models", "secret", "GET", nil)
-	decode(t, response, &modelList)
-	if len(modelList) != 1 || modelList[0].ID != "test-model" {
-		t.Fatalf("models = %+v", modelList)
+	response = request(test, server.URL+"/instances/"+instance.ID+"/models", "secret", "GET", nil)
+	decode(test, response, &modelList)
+	if len(modelList) != 1 || modelList[0].ID != "test/test-model" {
+		test.Fatalf("models = %+v", modelList)
 	}
 
-	response = request(t, server.URL+"/settings/agent_depth_limit", "secret", "PUT", map[string]any{"value": "5"})
+	response = request(test, server.URL+"/settings/agent_depth_limit", "secret", "PUT", map[string]any{"value": "5"})
 	if response.StatusCode != http.StatusOK {
-		t.Fatalf("global setting status = %d", response.StatusCode)
+		test.Fatalf("global setting status = %d", response.StatusCode)
 	}
 	var settings map[string]string
-	response = request(t, server.URL+"/settings", "secret", "GET", nil)
-	decode(t, response, &settings)
+	response = request(test, server.URL+"/settings", "secret", "GET", nil)
+	decode(test, response, &settings)
 	if settings["agent_depth_limit"] != "5" {
-		t.Fatalf("global settings = %+v", settings)
+		test.Fatalf("global settings = %+v", settings)
 	}
-	response = request(t, server.URL+"/instances/"+instance.ID+"/settings/process_limit", "secret", "PUT", map[string]any{"value": "3"})
+	response = request(test, server.URL+"/instances/"+instance.ID+"/settings/process_limit", "secret", "PUT", map[string]any{"value": "3"})
 	if response.StatusCode != http.StatusOK {
-		t.Fatalf("instance setting status = %d", response.StatusCode)
+		test.Fatalf("instance setting status = %d", response.StatusCode)
 	}
-	response = request(t, server.URL+"/instances/"+instance.ID+"/settings", "secret", "GET", nil)
-	decode(t, response, &settings)
+	response = request(test, server.URL+"/instances/"+instance.ID+"/settings", "secret", "GET", nil)
+	decode(test, response, &settings)
 	if settings["process_limit"] != "3" {
-		t.Fatalf("instance settings = %+v", settings)
+		test.Fatalf("instance settings = %+v", settings)
 	}
-	response = request(t, server.URL+"/providers/openai/key", "secret", "PUT", map[string]any{"key": "sk-test"})
+	response = request(test, server.URL+"/providers/openai/key", "secret", "PUT", map[string]any{"key": "sk-test"})
 	if response.StatusCode != http.StatusOK {
-		t.Fatalf("provider key status = %d", response.StatusCode)
+		test.Fatalf("provider key status = %d", response.StatusCode)
 	}
-	response = request(t, server.URL+"/instances/"+instance.ID+"/providers/openai/key", "secret", "PUT", map[string]any{"key": "sk-instance"})
+	response = request(test, server.URL+"/instances/"+instance.ID+"/providers/openai/key", "secret", "PUT", map[string]any{"key": "sk-instance"})
 	if response.StatusCode != http.StatusOK {
-		t.Fatalf("instance key status = %d", response.StatusCode)
+		test.Fatalf("instance key status = %d", response.StatusCode)
 	}
-	key, err := database.Secrets().ResolveKey(context.Background(), instance.ID, "openai")
-	if err != nil || key != "sk-instance" {
-		t.Fatalf("resolved key = %q err = %v", key, err)
+	key, operationError := database.Secrets().ResolveKey(context.Background(), instance.ID, "openai")
+	if operationError != nil || key != "sk-instance" {
+		test.Fatalf("resolved key = %q err = %v", key, operationError)
 	}
-	key, err = database.Secrets().ResolveKey(context.Background(), "other", "openai")
-	if err != nil || key != "sk-test" {
-		t.Fatalf("global key = %q err = %v", key, err)
+	key, operationError = database.Secrets().ResolveKey(context.Background(), "other", "openai")
+	if operationError != nil || key != "sk-test" {
+		test.Fatalf("global key = %q err = %v", key, operationError)
 	}
 }
 
-func request(t *testing.T, url string, token string, method string, body any) *http.Response {
-	t.Helper()
-	var reader *bytes.Reader
+func request(test *testing.T, url string, token string, method string, body any) *http.Response {
+	test.Helper()
+	reader := bytes.NewReader(nil)
 	if body != nil {
-		data, err := json.Marshal(body)
-		if err != nil {
-			t.Fatal(err)
-		}
+		data, operationError := json.Marshal(body)
+		testutil.RequireNoError(test, operationError)
+
 		reader = bytes.NewReader(data)
-	} else {
-		reader = bytes.NewReader(nil)
 	}
-	req, err := http.NewRequest(method, url, reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	request, operationError := http.NewRequest(method, url, reader)
+	testutil.RequireNoError(test, operationError)
+
 	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
+		request.Header.Set("Authorization", "Bearer "+token)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	response, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
+	request.Header.Set("Content-Type", "application/json")
+	response, operationError := http.DefaultClient.Do(request)
+	testutil.RequireNoError(test, operationError)
+
 	return response
 }
 
-func decode(t *testing.T, response *http.Response, value any) {
-	t.Helper()
+func decode(test *testing.T, response *http.Response, value any) {
+	test.Helper()
 	defer response.Body.Close()
-	if err := json.NewDecoder(response.Body).Decode(value); err != nil {
-		t.Fatal(err)
-	}
+	testutil.RequireNoError(test, json.NewDecoder(response.Body).Decode(value))
 }
 
-func sendAndWait(t *testing.T, url string, session string, content string, want int) ([]atom.Message, int, error) {
-	t.Helper()
-	response := request(t, url+"/sessions/"+session+"/messages", "secret", "POST", map[string]any{"content": content})
+func sendAndWait(test *testing.T, url string, session string, content string, expected int) ([]atom.Message, int, error) {
+	test.Helper()
+	response := request(test, url+"/sessions/"+session+"/messages", "secret", "POST", map[string]any{"content": content})
 	if response.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(response.Body)
-		t.Fatalf("message status = %d: %s", response.StatusCode, body)
+		test.Fatalf("message status = %d: %s", response.StatusCode, body)
 	}
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		response = request(t, url+"/sessions/"+session+"/messages", "secret", "GET", nil)
+		response = request(test, url+"/sessions/"+session+"/messages", "secret", "GET", nil)
 		var messages []atom.Message
-		decode(t, response, &messages)
-		if len(messages) >= want {
+		decode(test, response, &messages)
+		if len(messages) >= expected {
 			return messages, len(messages), nil
 		}
 		time.Sleep(20 * time.Millisecond)

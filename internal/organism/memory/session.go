@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
@@ -19,39 +20,54 @@ func New(instanceID string, sessions store.SessionStore) *Memory {
 	return &Memory{instanceID: instanceID, sessions: sessions}
 }
 
-func (m *Memory) Start(ctx context.Context, parent atom.SessionID) (atom.SessionID, error) {
-	id := atom.SessionID(newID())
+func (sessionMemory *Memory) Start(operationContext context.Context, parent atom.SessionID) (atom.SessionID, error) {
+	sessionID := atom.SessionID(newID())
 	depth := 0
 	if parent != "" {
-		if session, err := m.sessions.Get(ctx, parent); err == nil {
-			depth = session.Depth + 1
+		session, operationError := sessionMemory.sessions.Get(operationContext, parent)
+		if operationError != nil {
+			return "", operationError
 		}
+		if session.InstanceID != sessionMemory.instanceID {
+			return "", fmt.Errorf("parent session belongs to another instance")
+		}
+		depth = session.Depth + 1
 	}
 	session := atom.Session{
-		ID:         id,
-		InstanceID: m.instanceID,
+		ID:         sessionID,
+		InstanceID: sessionMemory.instanceID,
 		Parent:     parent,
 		Depth:      depth,
 		CreatedAt:  time.Now(),
 	}
-	if err := m.sessions.Save(ctx, session); err != nil {
-		return "", err
+	if operationError := sessionMemory.sessions.Save(operationContext, session); operationError != nil {
+		return "", operationError
 	}
-	return id, nil
+	return sessionID, nil
 }
 
-func (m *Memory) Get(ctx context.Context, id atom.SessionID) (atom.Session, bool) {
-	session, err := m.sessions.Get(ctx, id)
-	return session, err == nil
+func (sessionMemory *Memory) Get(operationContext context.Context, sessionID atom.SessionID) (atom.Session, bool) {
+	session, operationError := sessionMemory.sessions.Get(operationContext, sessionID)
+	return session, operationError == nil && session.InstanceID == sessionMemory.instanceID
 }
 
-func (m *Memory) Agents(ctx context.Context, parent atom.SessionID) ([]atom.SessionID, error) {
-	return m.sessions.Agents(ctx, parent)
+func (sessionMemory *Memory) Agents(operationContext context.Context, parent atom.SessionID) ([]atom.SessionID, error) {
+	sessions, operationError := sessionMemory.sessions.List(operationContext, sessionMemory.instanceID)
+	if operationError != nil {
+		return nil, operationError
+	}
+	var identifiers []atom.SessionID
+	for _, session := range sessions {
+		if session.Parent == parent {
+			identifiers = append(identifiers, session.ID)
+		}
+	}
+	return identifiers, nil
 }
 
 func newID() string {
 	var data [16]byte
-	if _, err := rand.Read(data[:]); err != nil {
+	if _, operationError := rand.Read(data[:]); operationError != nil {
 		return "unknown"
 	}
 	return hex.EncodeToString(data[:])

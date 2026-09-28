@@ -3,138 +3,117 @@ package loop
 import (
 	"context"
 	"errors"
-	"log"
-	"sync"
+	"fmt"
 	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
 
+var ErrSessionBusy = errors.New("session is being reverted or stopped")
+var ErrInstanceStopped = errors.New("instance is stopped")
+var ErrQueueClosed = errors.New("message queue is closed")
+var ErrInvalidContent = errors.New("invalid message content")
+
+const pendingMessageLimit = 128
+const commandBufferSize = 32
+
+// Queue is a request/reply facade. Its directory and each session have one
+// owning goroutine. Neither owner executes database operations or model work.
+// Close joins their workers before the caller closes the database.
 type Queue struct {
-	loop    *Loop
-	mu      sync.Mutex
-	workers map[atom.SessionID]*sessionWorker
+	loop      *Loop
+	commands  chan queueCommand
+	completed chan directoryCompletion
+	done      chan struct{}
 }
 
-type sessionWorker struct {
-	queue   []atom.Message
-	running bool
-	cancel  context.CancelFunc
+// QueueStatus is a detached snapshot, including any terminal operation error.
+type QueueStatus struct {
+	Running  bool
+	Messages []string
+	Error    string
 }
 
-func NewQueue(l *Loop) *Queue {
-	return &Queue{loop: l, workers: map[atom.SessionID]*sessionWorker{}}
+func NewQueue(agentLoop *Loop) *Queue {
+	messageQueue := &Queue{loop: agentLoop, commands: make(chan queueCommand, commandBufferSize), completed: make(chan directoryCompletion, commandBufferSize), done: make(chan struct{})}
+	go messageQueue.runDirectory()
+	return messageQueue
 }
 
-func (q *Queue) Submit(ctx context.Context, session atom.Session, content string) (atom.Message, int, error) {
-	message := atom.Message{
-		ID:        newID(),
-		SessionID: session.ID,
-		Role:      atom.RoleUser,
-		Content:   []atom.Content{{Type: atom.Text, Text: content}},
-		CreatedAt: time.Now(),
-	}
-	q.mu.Lock()
-	worker, ok := q.workers[session.ID]
-	if !ok {
-		worker = &sessionWorker{}
-		q.workers[session.ID] = worker
-	}
-	worker.queue = append(worker.queue, message)
-	position := len(worker.queue)
-	start := !worker.running
-	if start {
-		worker.running = true
-	}
-	q.mu.Unlock()
-	if start {
-		go q.work(session)
-	}
-	return message, position, nil
+func (messageQueue *Queue) Submit(operationContext context.Context, session atom.Session, content string) (atom.Message, int, error) {
+	return messageQueue.SubmitContent(operationContext, session, []atom.Content{{Type: atom.Text, Text: content}})
 }
 
-func (q *Queue) work(session atom.Session) {
-	for {
-		q.mu.Lock()
-		worker := q.workers[session.ID]
-		if worker == nil || len(worker.queue) == 0 {
-			if worker != nil {
-				worker.running = false
+func (messageQueue *Queue) SubmitContent(operationContext context.Context, session atom.Session, content []atom.Content) (atom.Message, int, error) {
+	if operationError := validateMessageContent(content); operationError != nil {
+		return atom.Message{}, 0, operationError
+	}
+	// Ownership transfers through the inbox. Callers cannot mutate queued media.
+	ownedContent := append([]atom.Content(nil), content...)
+	for index := range ownedContent {
+		ownedContent[index].Data = append([]byte(nil), content[index].Data...)
+	}
+	message := atom.Message{ID: newID(), SessionID: session.ID, Role: atom.RoleUser, Content: ownedContent, CreatedAt: time.Now()}
+	coordinator, operationError := messageQueue.coordinator(operationContext, session, true)
+	if operationError != nil {
+		return atom.Message{}, 0, operationError
+	}
+	response, operationError := coordinator.ask(operationContext, sessionCommand{kind: submitMessage, message: message})
+	message.Content = append([]atom.Content(nil), message.Content...)
+	for index := range message.Content {
+		message.Content[index].Data = append([]byte(nil), message.Content[index].Data...)
+	}
+	return message, response.position, operationError
+}
+
+func (messageQueue *Queue) Cancel(operationContext context.Context, sessionID atom.SessionID) (bool, error) {
+	coordinator, operationError := messageQueue.coordinator(operationContext, atom.Session{ID: sessionID}, false)
+	if operationError != nil {
+		return false, operationError
+	}
+	if coordinator == nil {
+		return messageQueue.loop.CancelRun(sessionID), nil
+	}
+	response, operationError := coordinator.ask(operationContext, sessionCommand{kind: cancelCurrent})
+	return response.cancelled, operationError
+}
+
+func (messageQueue *Queue) CancelMessage(operationContext context.Context, sessionID atom.SessionID, messageID string) (bool, error) {
+	session, operationError := messageQueue.loop.configuration.Store.Sessions().Get(operationContext, sessionID)
+	if operationError != nil {
+		return false, operationError
+	}
+	coordinator, operationError := messageQueue.coordinator(operationContext, session, true)
+	if operationError != nil {
+		return false, operationError
+	}
+	response, operationError := coordinator.ask(operationContext, sessionCommand{kind: cancelPending, messageID: messageID})
+	return response.cancelled, operationError
+}
+
+func (messageQueue *Queue) Status(operationContext context.Context, sessionID atom.SessionID) (QueueStatus, error) {
+	coordinator, operationError := messageQueue.coordinator(operationContext, atom.Session{ID: sessionID}, false)
+	if operationError != nil || coordinator == nil {
+		return QueueStatus{}, operationError
+	}
+	response, operationError := coordinator.ask(operationContext, sessionCommand{kind: readStatus})
+	return response.status, operationError
+}
+
+func validateMessageContent(content []atom.Content) error {
+	if len(content) == 0 {
+		return fmt.Errorf("%w: content is required", ErrInvalidContent)
+	}
+	for _, item := range content {
+		switch item.Type {
+		case atom.Text:
+		case atom.Image, atom.Audio, atom.File:
+			if len(item.Data) == 0 && item.URL == "" {
+				return fmt.Errorf("%w: media requires data or a URL", ErrInvalidContent)
 			}
-			q.mu.Unlock()
-			return
-		}
-		message := worker.queue[0]
-		worker.queue = worker.queue[1:]
-		ctx, cancel := context.WithCancel(context.Background())
-		worker.cancel = cancel
-		q.mu.Unlock()
-		err := q.loop.cfg.Store.Sessions().Append(ctx, message)
-		if err == nil {
-			err = q.loop.Run(ctx, session)
-		}
-		cancel()
-		q.mu.Lock()
-		worker.cancel = nil
-		q.mu.Unlock()
-		if err != nil && !errors.Is(err, context.Canceled) {
-			log.Printf("mtt: the run of the session %s: %v", session.ID, err)
+		default:
+			return fmt.Errorf("%w: unknown media type %q", ErrInvalidContent, item.Type)
 		}
 	}
-}
-
-func (q *Queue) Cancel(session atom.SessionID) bool {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	worker := q.workers[session]
-	if worker == nil || worker.cancel == nil {
-		return false
-	}
-	worker.cancel()
-	return true
-}
-
-func (q *Queue) CancelMessage(session atom.SessionID, messageID string) bool {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	worker := q.workers[session]
-	if worker == nil {
-		return false
-	}
-	for index := range worker.queue {
-		if worker.queue[index].ID == messageID {
-			worker.queue = append(worker.queue[:index], worker.queue[index+1:]...)
-			return true
-		}
-	}
-	return false
-}
-
-func (q *Queue) Status(session atom.SessionID) (bool, []string) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	worker := q.workers[session]
-	if worker == nil {
-		return false, nil
-	}
-	ids := make([]string, 0, len(worker.queue))
-	for _, message := range worker.queue {
-		ids = append(ids, message.ID)
-	}
-	return worker.cancel != nil, ids
-}
-
-func (q *Queue) Clear(session atom.SessionID) int {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	worker := q.workers[session]
-	if worker == nil {
-		return 0
-	}
-	count := len(worker.queue)
-	worker.queue = nil
-	if worker.cancel != nil {
-		worker.cancel()
-	}
-	return count
+	return nil
 }

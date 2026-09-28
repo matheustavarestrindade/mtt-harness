@@ -3,87 +3,94 @@ package gateway
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
-type Gateway struct {
-	mu        sync.RWMutex
-	providers map[string]harness.Provider
-	models    map[string]harness.Provider
+// Gateway resolves models directly from the authoritative plugin catalog.
+// Qualified IDs use provider/model; bare IDs work only when unambiguous.
+type Gateway struct{ harnessRuntime *harness.Harness }
+
+func New(harnessRuntime *harness.Harness) *Gateway {
+	return &Gateway{harnessRuntime: harnessRuntime}
 }
 
-func New() *Gateway {
-	return &Gateway{
-		providers: map[string]harness.Provider{},
-		models:    map[string]harness.Provider{},
+func (modelGateway *Gateway) Add(provider harness.Provider) error {
+	if provider.Name() == "" {
+		return fmt.Errorf("provider name is required")
 	}
-}
-
-func (g *Gateway) Add(provider harness.Provider) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if _, exists := g.providers[provider.Name()]; exists {
-		return fmt.Errorf("gateway: the provider %q is in the gateway", provider.Name())
+	if _, found := modelGateway.Provider(provider.Name()); found {
+		return fmt.Errorf("provider %q is already registered", provider.Name())
 	}
-	g.providers[provider.Name()] = provider
-	for _, model := range provider.Models() {
-		g.models[model.ID] = provider
-	}
+	modelGateway.harnessRuntime.Provider(provider)
 	return nil
 }
 
-func (g *Gateway) Provider(name string) (harness.Provider, bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	provider, ok := g.providers[name]
-	return provider, ok
+func (modelGateway *Gateway) Provider(name string) (harness.Provider, bool) {
+	return modelGateway.harnessRuntime.ProviderByName(name)
+}
+func (modelGateway *Gateway) Providers() []harness.Provider {
+	return modelGateway.harnessRuntime.Providers()
 }
 
-func (g *Gateway) Providers() []harness.Provider {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	list := make([]harness.Provider, 0, len(g.providers))
-	for _, provider := range g.providers {
-		list = append(list, provider)
+func (modelGateway *Gateway) Refresh(operationContext context.Context, name string) ([]atom.ModelInfo, error) {
+	provider, found := modelGateway.Provider(name)
+	if !found {
+		return nil, fmt.Errorf("provider %q is not registered", name)
 	}
-	return list
+	refresher, supported := provider.(harness.Refresher)
+	if !supported {
+		return nil, fmt.Errorf("provider %q does not support refresh", name)
+	}
+	return refresher.Refresh(operationContext)
 }
 
-func (g *Gateway) Refresh(ctx context.Context, name string) ([]atom.ModelInfo, error) {
-	provider, ok := g.Provider(name)
-	if !ok {
-		return nil, fmt.Errorf("gateway: the provider %q is not in the gateway", name)
-	}
-	refresher, ok := provider.(harness.Refresher)
-	if !ok {
-		return nil, fmt.Errorf("gateway: the provider %q cannot refresh the models", name)
-	}
-	models, err := refresher.Refresh(ctx)
-	if err != nil {
-		return nil, err
-	}
-	g.mu.Lock()
-	for _, model := range models {
-		g.models[model.ID] = provider
-	}
-	g.mu.Unlock()
-	return models, nil
-}
-
-func (g *Gateway) Model(id string) (atom.ModelInfo, harness.Provider, bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	provider, ok := g.models[id]
-	if !ok {
-		return atom.ModelInfo{}, nil, false
-	}
-	for _, model := range provider.Models() {
-		if model.ID == id {
-			return model, provider, true
+func (modelGateway *Gateway) Resolve(identifier string) (atom.ModelInfo, harness.Provider, error) {
+	for _, provider := range modelGateway.Providers() {
+		for _, model := range provider.Models() {
+			if identifier == provider.Name()+"/"+model.ID {
+				return model, provider, nil
+			}
 		}
 	}
-	return atom.ModelInfo{}, nil, false
+	var selected atom.ModelInfo
+	var selectedProvider harness.Provider
+	for _, provider := range modelGateway.Providers() {
+		for _, model := range provider.Models() {
+			if identifier != model.ID {
+				continue
+			}
+			if selectedProvider != nil {
+				return atom.ModelInfo{}, nil, fmt.Errorf("model %q is ambiguous; use provider/model", identifier)
+			}
+			selected, selectedProvider = model, provider
+		}
+	}
+	if selectedProvider == nil {
+		return atom.ModelInfo{}, nil, fmt.Errorf("model %q is not registered", identifier)
+	}
+	return selected, selectedProvider, nil
+}
+
+func (modelGateway *Gateway) Model(identifier string) (atom.ModelInfo, harness.Provider, bool) {
+	model, provider, operationError := modelGateway.Resolve(identifier)
+	return model, provider, operationError == nil
+}
+
+func (modelGateway *Gateway) ResolveAllowed(identifier string, allowed []string) (atom.ModelInfo, harness.Provider, error) {
+	model, provider, operationError := modelGateway.Resolve(identifier)
+	if operationError != nil {
+		return atom.ModelInfo{}, nil, operationError
+	}
+	if len(allowed) == 0 {
+		return model, provider, nil
+	}
+	for _, candidate := range allowed {
+		allowedModel, allowedProvider, operationError := modelGateway.Resolve(candidate)
+		if operationError == nil && allowedModel.ID == model.ID && allowedProvider.Name() == provider.Name() {
+			return model, provider, nil
+		}
+	}
+	return atom.ModelInfo{}, nil, fmt.Errorf("model %q is not allowed for this instance", identifier)
 }

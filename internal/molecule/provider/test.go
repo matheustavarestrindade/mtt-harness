@@ -13,7 +13,7 @@ import (
 type Test struct {
 	providerName string
 	model        atom.ModelInfo
-	mu           sync.Mutex
+	mutex        sync.Mutex
 	script       [][]atom.ResponsePart
 	index        int
 	delay        time.Duration
@@ -38,30 +38,30 @@ func NewTest(name string, script ...[]atom.ResponsePart) *Test {
 	}
 }
 
-func (t *Test) Name() string {
-	return t.providerName
+func (testProvider *Test) Name() string {
+	return testProvider.providerName
 }
 
-func (t *Test) Models() []atom.ModelInfo {
-	return []atom.ModelInfo{t.model}
+func (testProvider *Test) Models() []atom.ModelInfo {
+	return []atom.ModelInfo{testProvider.model}
 }
 
-func (t *Test) Stream(ctx context.Context, request atom.Request) (harness.Stream, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.Requests = append(t.Requests, request)
-	if t.index >= len(t.script) {
+func (testProvider *Test) Stream(operationContext context.Context, request atom.Request) (harness.Stream, error) {
+	testProvider.mutex.Lock()
+	defer testProvider.mutex.Unlock()
+	testProvider.Requests = append(testProvider.Requests, request)
+	if testProvider.index >= len(testProvider.script) {
 		return &sliceStream{parts: Text("done")}, nil
 	}
-	parts := t.script[t.index]
-	t.index++
-	return &sliceStream{parts: parts, delay: t.delay}, nil
+	parts := testProvider.script[testProvider.index]
+	testProvider.index++
+	return &sliceStream{parts: parts, delay: testProvider.delay}, nil
 }
 
-func (t *Test) Calls() int {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return t.index
+func (testProvider *Test) Calls() int {
+	testProvider.mutex.Lock()
+	defer testProvider.mutex.Unlock()
+	return testProvider.index
 }
 
 type sliceStream struct {
@@ -70,26 +70,26 @@ type sliceStream struct {
 	delay time.Duration
 }
 
-func (t *Test) SetDelay(delay time.Duration) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.delay = delay
+func (testProvider *Test) SetDelay(delay time.Duration) {
+	testProvider.mutex.Lock()
+	defer testProvider.mutex.Unlock()
+	testProvider.delay = delay
 }
 
-func (s *sliceStream) Recv(ctx context.Context) (atom.ResponsePart, error) {
-	if s.delay > 0 {
+func (responseStream *sliceStream) Recv(operationContext context.Context) (atom.ResponsePart, error) {
+	if responseStream.delay > 0 {
 		select {
-		case <-time.After(s.delay):
-			s.delay = 0
-		case <-ctx.Done():
-			return atom.ResponsePart{}, ctx.Err()
+		case <-time.After(responseStream.delay):
+			responseStream.delay = 0
+		case <-operationContext.Done():
+			return atom.ResponsePart{}, operationContext.Err()
 		}
 	}
-	if s.index >= len(s.parts) {
+	if responseStream.index >= len(responseStream.parts) {
 		return atom.ResponsePart{}, io.EOF
 	}
-	part := s.parts[s.index]
-	s.index++
+	part := responseStream.parts[responseStream.index]
+	responseStream.index++
 	return part, nil
 }
 

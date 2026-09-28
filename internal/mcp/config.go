@@ -20,13 +20,13 @@ type fileConfig struct {
 }
 
 func LoadFile(path string) ([]ServerSpec, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
+	data, operationError := os.ReadFile(path)
+	if operationError != nil {
+		return nil, operationError
 	}
 	var file fileConfig
-	if err := json.Unmarshal(data, &file); err != nil {
-		return nil, err
+	if operationError := json.Unmarshal(data, &file); operationError != nil {
+		return nil, operationError
 	}
 	return file.Servers, nil
 }

@@ -17,10 +17,11 @@ type Verdict struct {
 }
 
 type PermissionRequest struct {
-	ID        string
-	SessionID SessionID
-	Target    string
-	Why       string
+	ID         string
+	InstanceID string
+	SessionID  SessionID
+	Target     string
+	Why        string
 }
 
 type Scope string
@@ -32,8 +33,11 @@ const (
 )
 
 type PermissionDecision struct {
-	RequestID string
-	Kind      VerdictKind
-	Scope     Scope
-	CreatedAt time.Time
+	RequestID  string
+	InstanceID string
+	SessionID  SessionID
+	Target     string
+	Kind       VerdictKind
+	Scope      Scope
+	CreatedAt  time.Time
 }
