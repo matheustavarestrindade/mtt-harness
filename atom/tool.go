@@ -40,9 +40,9 @@ type ToolResult struct {
 	Duration time.Duration
 }
 
-func (r ToolResult) Text() string {
+func (toolResult ToolResult) Text() string {
 	var builder []byte
-	for _, item := range r.Content {
+	for _, item := range toolResult.Content {
 		if item.Type != Text {
 			continue
 		}
@@ -51,11 +51,11 @@ func (r ToolResult) Text() string {
 		}
 		builder = append(builder, item.Text...)
 	}
-	if r.Error != "" {
+	if toolResult.Error != "" {
 		if len(builder) > 0 {
 			builder = append(builder, '\n')
 		}
-		builder = append(builder, r.Error...)
+		builder = append(builder, toolResult.Error...)
 	}
 	return string(builder)
 }

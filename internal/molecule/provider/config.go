@@ -47,26 +47,32 @@ type fileConfig struct {
 }
 
 func LoadFile(path string) ([]Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
+	data, operationError := os.ReadFile(path)
+	if operationError != nil {
+		return nil, operationError
 	}
 	var file fileConfig
-	if err := json.Unmarshal(data, &file); err != nil {
-		return nil, err
+	if operationError := json.Unmarshal(data, &file); operationError != nil {
+		return nil, operationError
 	}
 	var configs []Config
 	for _, entry := range file.Providers {
+		if entry.RefreshHours < 0 {
+			return nil, errors.New("provider refresh interval cannot be negative")
+		}
+		if entry.RefreshHours == 0 {
+			entry.RefreshHours = 24
+		}
 		if entry.Name == "" {
 			return nil, errors.New("provider: a provider in the file has no name")
 		}
 		prices := map[string]atom.Prices{}
-		for id, price := range entry.Prices {
+		for identifier, price := range entry.Prices {
 			currency := price.Currency
 			if currency == "" {
 				currency = "USD"
 			}
-			prices[id] = atom.Prices{
+			prices[identifier] = atom.Prices{
 				Currency:   currency,
 				Input:      price.Input,
 				Output:     price.Output,
@@ -88,7 +94,7 @@ func LoadFile(path string) ([]Config, error) {
 			for _, media := range model.Output {
 				info.Output = append(info.Output, atom.MediaType(media))
 			}
-			if price, ok := prices[model.ID]; ok {
+			if price, found := prices[model.ID]; found {
 				info.Prices = &price
 			}
 			models = append(models, info)

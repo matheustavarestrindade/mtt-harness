@@ -4,10 +4,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/matheustavarestrindade/mtt-harness/internal/testutil"
 )
 
-func TestLoadFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "providers.json")
+func TestLoadFile(test *testing.T) {
+	path := filepath.Join(test.TempDir(), "providers.json")
 	data := `{
 		"providers": [
 			{
@@ -21,28 +23,26 @@ func TestLoadFile(t *testing.T) {
 			}
 		]
 	}`
-	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("MTT_TEST_PROVIDER_KEY", "secret-value")
-	configs, err := LoadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testutil.RequireNoError(test, os.WriteFile(path, []byte(data), 0o644))
+
+	test.Setenv("MTT_TEST_PROVIDER_KEY", "secret-value")
+	configs, operationError := LoadFile(path)
+	testutil.RequireNoError(test, operationError)
+
 	if len(configs) != 1 {
-		t.Fatalf("configs = %d", len(configs))
+		test.Fatalf("configs = %d", len(configs))
 	}
-	config := configs[0]
-	if config.Spec.Name != "example" {
-		t.Fatalf("spec = %+v", config.Spec)
+	configuration := configs[0]
+	if configuration.Spec.Name != "example" {
+		test.Fatalf("spec = %+v", configuration.Spec)
 	}
-	if config.Spec.Interval.Hours() != 12 {
-		t.Fatalf("interval = %v", config.Spec.Interval)
+	if configuration.Spec.Interval.Hours() != 12 {
+		test.Fatalf("interval = %v", configuration.Spec.Interval)
 	}
-	if len(config.Models) != 1 || config.Models[0].Prices == nil || config.Models[0].Prices.Input != 2 {
-		t.Fatalf("models = %+v", config.Models)
+	if len(configuration.Models) != 1 || configuration.Models[0].Prices == nil || configuration.Models[0].Prices.Input != 2 {
+		test.Fatalf("models = %+v", configuration.Models)
 	}
-	if len(config.Models[0].Input) != 2 || config.Models[0].Input[1] != "image" {
-		t.Fatalf("input media = %+v", config.Models[0].Input)
+	if len(configuration.Models[0].Input) != 2 || configuration.Models[0].Input[1] != "image" {
+		test.Fatalf("input media = %+v", configuration.Models[0].Input)
 	}
 }

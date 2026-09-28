@@ -5,6 +5,7 @@ go 1.26
 require (
 	github.com/coder/websocket v1.8.15
 	github.com/jackc/pgx/v5 v5.7.6
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 )
 
 require (

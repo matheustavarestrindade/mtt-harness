@@ -24,11 +24,11 @@ func (Finish) InputSchema() atom.Schema {
 	return schema(`{"type":"object","properties":{"result":{"type":"string"}},"required":["result"]}`)
 }
 
-func (Finish) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
+func (Finish) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
 
-func (Finish) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+func (Finish) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	return atom.ToolResult{
 		CallID:  call.ID,
 		Status:  atom.StatusOK,

@@ -10,8 +10,11 @@ const (
 )
 
 type Content struct {
-	Type MediaType
-	Text string
-	Data []byte
-	MIME string
+	Type     MediaType
+	Text     string
+	Data     []byte
+	MIME     string
+	URL      string
+	Filename string
+	AudioID  string
 }

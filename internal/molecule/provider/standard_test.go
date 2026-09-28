@@ -12,22 +12,23 @@ import (
 	"testing"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/testutil"
 )
 
-func TestStandardStreamsParts(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
+func TestStandardStreamsParts(test *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
 		case "/chat/completions":
-			if r.Header.Get("Authorization") != "Bearer key" {
-				t.Errorf("the authorization header = %q", r.Header.Get("Authorization"))
+			if request.Header.Get("Authorization") != "Bearer key" {
+				test.Errorf("the authorization header = %q", request.Header.Get("Authorization"))
 			}
 			var payload map[string]any
-			_ = json.NewDecoder(r.Body).Decode(&payload)
+			_ = json.NewDecoder(request.Body).Decode(&payload)
 			if payload["model"] != "m1" {
-				t.Errorf("the model = %v", payload["model"])
+				test.Errorf("the model = %v", payload["model"])
 			}
-			w.Header().Set("Content-Type", "text/event-stream")
-			flusher := w.(http.Flusher)
+			responseWriter.Header().Set("Content-Type", "text/event-stream")
+			flusher := responseWriter.(http.Flusher)
 			lines := []string{
 				`data: {"choices":[{"delta":{"content":"Hel"}}]}`,
 				`data: {"choices":[{"delta":{"content":"lo"}}]}`,
@@ -38,15 +39,15 @@ func TestStandardStreamsParts(t *testing.T) {
 				`data: [DONE]`,
 			}
 			for _, line := range lines {
-				fmt.Fprintf(w, "%s\n\n", line)
+				fmt.Fprintf(responseWriter, "%s\n\n", line)
 				flusher.Flush()
 			}
 		case "/models":
-			_ = json.NewEncoder(w).Encode(map[string]any{
+			_ = json.NewEncoder(responseWriter).Encode(map[string]any{
 				"data": []map[string]any{{"id": "m1"}, {"id": "m2"}},
 			})
 		default:
-			http.NotFound(w, r)
+			http.NotFound(responseWriter, request)
 		}
 	}))
 	defer server.Close()
@@ -56,30 +57,28 @@ func TestStandardStreamsParts(t *testing.T) {
 		APIURL:       server.URL,
 		ModelListURL: server.URL + "/models",
 	})
-	provider.SetKeyResolver(func(ctx context.Context, instanceID string, name string) (string, error) {
+	provider.SetKeyResolver(func(operationContext context.Context, instanceID string, name string) (string, error) {
 		return "key", nil
 	})
-	stream, err := provider.Stream(context.Background(), atom.Request{
+	stream, operationError := provider.Stream(context.Background(), atom.Request{
 		Model: "m1",
 		Messages: []atom.Message{{
 			Role:    atom.RoleUser,
 			Content: []atom.Content{{Type: atom.Text, Text: "hi"}},
 		}},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	testutil.RequireNoError(test, operationError)
+
 	var text string
 	var calls []atom.ToolCall
 	var usage *atom.Usage
 	for {
-		part, err := stream.Recv(context.Background())
-		if err == io.EOF {
+		part, operationError := stream.Recv(context.Background())
+		if operationError == io.EOF {
 			break
 		}
-		if err != nil {
-			t.Fatal(err)
-		}
+		testutil.RequireNoError(test, operationError)
+
 		text += part.Text
 		if part.ToolCall != nil {
 			calls = append(calls, *part.ToolCall)
@@ -89,28 +88,26 @@ func TestStandardStreamsParts(t *testing.T) {
 		}
 	}
 	if text != "Hello" {
-		t.Fatalf("text = %q", text)
+		test.Fatalf("text = %q", text)
 	}
 	if len(calls) != 1 || calls[0].Name != "read" || string(calls[0].Input) != `{"path":"x"}` {
-		t.Fatalf("calls = %+v", calls)
+		test.Fatalf("calls = %+v", calls)
 	}
 	if usage == nil || usage.Input != 8 || usage.CacheRead != 2 || usage.Output != 5 {
-		t.Fatalf("usage = %+v", usage)
+		test.Fatalf("usage = %+v", usage)
 	}
 
-	priceFile := filepath.Join(t.TempDir(), "prices.json")
-	if err := os.WriteFile(priceFile, []byte(`{"m1":{"currency":"USD","input":1.5,"output":3,"cache_read":0.5,"cache_write":0}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	provider.spec.PriceTableURL = priceFile
-	models, err := provider.Refresh(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	priceFile := filepath.Join(test.TempDir(), "prices.json")
+	testutil.RequireNoError(test, os.WriteFile(priceFile, []byte(`{"m1":{"currency":"USD","input":1.5,"output":3,"cache_read":0.5,"cache_write":0}}`), 0o644))
+
+	provider.providerSpec.PriceTableURL = priceFile
+	models, operationError := provider.Refresh(context.Background())
+	testutil.RequireNoError(test, operationError)
+
 	if len(models) != 2 {
-		t.Fatalf("models = %+v", models)
+		test.Fatalf("models = %+v", models)
 	}
 	if models[0].Prices == nil || models[0].Prices.Input != 1.5 {
-		t.Fatalf("prices = %+v", models[0].Prices)
+		test.Fatalf("prices = %+v", models[0].Prices)
 	}
 }

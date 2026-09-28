@@ -12,52 +12,52 @@ type Search struct {
 	registry *registry.Registry
 }
 
-func NewSearch(reg *registry.Registry) *Search {
-	return &Search{registry: reg}
+func NewSearch(toolRegistry *registry.Registry) *Search {
+	return &Search{registry: toolRegistry}
 }
 
-func (s *Search) Name() string {
+func (searchTool *Search) Name() string {
 	return "search_tool"
 }
 
-func (s *Search) Description() string {
+func (searchTool *Search) Description() string {
 	return "Find tools by a category or text."
 }
 
-func (s *Search) Categories() []string {
+func (searchTool *Search) Categories() []string {
 	return []string{"system"}
 }
 
-func (s *Search) InputSchema() atom.Schema {
+func (searchTool *Search) InputSchema() atom.Schema {
 	return schema(`{"type":"object","properties":{"query":{"type":"string"},"category":{"type":"string"},"limit":{"type":"integer"}}}`)
 }
 
-func (s *Search) Check(ctx context.Context, call atom.ToolCall) atom.Verdict {
+func (searchTool *Search) Check(operationContext context.Context, call atom.ToolCall) atom.Verdict {
 	return atom.Verdict{Kind: atom.VerdictAllow}
 }
 
-func (s *Search) Run(ctx context.Context, call atom.ToolCall) (atom.ToolResult, error) {
+func (searchTool *Search) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	var input struct {
 		Query    string `json:"query"`
 		Category string `json:"category"`
 		Limit    int    `json:"limit"`
 	}
-	if err := json.Unmarshal(call.Input, &input); err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "search_tool: the input is not correct"}, err
+	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "search_tool: the input is not correct"}, operationError
 	}
-	found := s.registry.Find(input.Query, input.Category, input.Limit)
-	specs := make([]atom.ToolSpec, 0, len(found))
+	found := searchTool.registry.Find(input.Query, input.Category, input.Limit)
+	specifications := make([]atom.ToolSpec, 0, len(found))
 	for _, item := range found {
-		specs = append(specs, atom.ToolSpec{
+		specifications = append(specifications, atom.ToolSpec{
 			Name:        item.Name(),
 			Description: item.Description(),
 			Categories:  item.Categories(),
 			InputSchema: item.InputSchema(),
 		})
 	}
-	data, err := json.Marshal(specs)
-	if err != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: err.Error()}, err
+	data, operationError := json.Marshal(specifications)
+	if operationError != nil {
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
 	}
 	return atom.ToolResult{
 		CallID:  call.ID,

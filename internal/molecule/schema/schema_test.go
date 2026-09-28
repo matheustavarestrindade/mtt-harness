@@ -12,11 +12,11 @@ const example = `{
 	"required": ["path"]
 }`
 
-func TestValidate(t *testing.T) {
+func TestValidate(test *testing.T) {
 	cases := []struct {
 		name  string
 		input string
-		ok    bool
+		found bool
 	}{
 		{"correct", `{"path": "/tmp", "limit": 3, "tags": ["a", "b"]}`, true},
 		{"extra field", `{"path": "/tmp", "other": true}`, true},
@@ -28,15 +28,18 @@ func TestValidate(t *testing.T) {
 		{"empty input", ``, false},
 	}
 	for _, item := range cases {
-		err := Validate([]byte(example), []byte(item.input))
-		if item.ok && err != nil {
-			t.Fatalf("%s: %v", item.name, err)
+		operationError := Validate([]byte(example), []byte(item.input))
+		if item.found && operationError != nil {
+			test.Fatalf("%s: %v", item.name, operationError)
 		}
-		if !item.ok && err == nil {
-			t.Fatalf("%s: the error is absent", item.name)
+		if !item.found && operationError == nil {
+			test.Fatalf("%s: the error is absent", item.name)
 		}
 	}
-	if err := Validate(nil, []byte(`anything`)); err != nil {
-		t.Fatalf("empty schema: %v", err)
+	if operationError := Validate(nil, []byte(`{}`)); operationError != nil {
+		test.Fatalf("empty schema: %v", operationError)
+	}
+	if operationError := Validate(nil, []byte(`anything`)); operationError == nil {
+		test.Fatal("an absent schema must not admit invalid JSON")
 	}
 }

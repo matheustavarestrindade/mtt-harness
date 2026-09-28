@@ -1,6 +1,9 @@
 package atom
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Prices struct {
 	Currency   string
@@ -67,12 +70,21 @@ type Statistics struct {
 	Costs      []Cost
 }
 
-func (s Statistics) CacheHitRate() float64 {
-	full := s.Input + s.CacheRead + s.CacheWrite
+func (statistics Statistics) CacheHitRate() float64 {
+	full := statistics.Input + statistics.CacheRead + statistics.CacheWrite
 	if full == 0 {
 		return 0
 	}
-	return float64(s.CacheRead) / float64(full)
+	return float64(statistics.CacheRead) / float64(full)
+}
+
+func (statistics Statistics) MarshalJSON() ([]byte, error) {
+	type fields Statistics
+	return json.Marshal(struct {
+		fields
+		CacheHitRate       float64
+		CacheHitPercentage float64
+	}{fields: fields(statistics), CacheHitRate: statistics.CacheHitRate(), CacheHitPercentage: statistics.CacheHitRate() * 100})
 }
 
 type Request struct {
@@ -83,7 +95,9 @@ type Request struct {
 }
 
 type ResponsePart struct {
-	Text     string
-	ToolCall *ToolCall
-	Usage    *Usage
+	Text      string
+	Content   []Content
+	ToolIndex *int
+	ToolCall  *ToolCall
+	Usage     *Usage
 }

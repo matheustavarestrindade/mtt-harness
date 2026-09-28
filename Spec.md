@@ -85,8 +85,8 @@ The basic loop is:
 ```
 run(instance, session):
     repeat
-        ctx     = build_context(session)
-        request = pipe("model.request", ctx)
+        context = build_context(session)
+        request = pipe("model.request", context)
         stream  = model.stream(request)               # boundary 2
 
         tasks = []
@@ -123,6 +123,17 @@ Requirements:
 
 The messages of a session wait in a queue. The harness runs one message at a time. Thus, the user can send a new message while the harness runs a message.
 
+The database keeps a message in the queue before the API gives status `202`. The queue has the limits:
+
+```
+waiting messages per session: 128
+waiting and running messages for the harness: 4096
+```
+
+The next program start reads the queue. A message which did not start can continue. The harness writes `run.interrupted` for a turn which cannot continue after the program stops. The harness does not run the tool plan of the turn again.
+
+The event record keeps a tool result when the tool stops. The message record keeps the sequence from the tool plan.
+
 ## 5. Instances
 
 A user starts an instance with a workspace directory. The harness gives an ID to the instance. The instance start request gives:
@@ -136,6 +147,8 @@ The model list gives the models for the sessions. A model list entry has an ID a
 The harness is one program. Many instances can run at the same time. The sessions, messages, tool calls, events, and processes of an instance stay in the instance. The harness must not mix the data of 2 instances.
 
 An instance can stop and start again with the same data.
+
+The database keeps a stopped instance and the sessions of the instance. The API can start the same instance again. A stopped instance must not start a model call or a process. File tools and shell commands must use the workspace of the instance.
 
 Requirements:
 
@@ -160,6 +173,8 @@ The settings are:
 
 The initial start makes the `api_token` when the token is not in the bootstrap file. The harness shows the token one time. The user can change the token.
 
+A token change applies to the next API request. The `api_token` setting is for the harness only. A new instance setting must replace a value from the instance start request.
+
 The API gives the settings and changes the settings.
 
 Requirements:
@@ -179,7 +194,7 @@ The Go interface of a provider is:
 type Provider interface {
     Name() string
     Models() []ModelInfo
-    Stream(ctx context.Context, request Request) (Stream, error)
+    Stream(operationContext context.Context, request Request) (Stream, error)
 }
 
 type ModelInfo struct {
@@ -236,6 +251,8 @@ Requirements:
 
 ### 6.1 Usage and Cost
 
+The model ID can be `provider/model`. An ID without the provider is correct only when one provider has the ID. The instance model list and the agent tool use the full ID. The harness examines the model list after a plugin changes the model request.
+
 The model can give the prices of the tokens. The prices are for 1,000,000 tokens. A model call gives the usage. The usage has:
 
 - The input tokens.
@@ -280,6 +297,7 @@ type Statistics struct {
     Output     int
     Reasoning  int
     Cost       *Cost
+    Costs      []Cost
 }
 ```
 
@@ -293,6 +311,8 @@ Requirements:
 - R38: The cache hit rate must be the cache read tokens divided by the full input tokens.
 - R39: The statistics must have the input tokens, the output tokens, the cache read tokens, the cache write tokens, the cache hit rate, and the cost.
 - R40: The statistics for different currencies must stay apart.
+
+The API gives `CacheHitRate` and `CacheHitPercentage`. The percentage is the rate multiplied by 100. The harness must use the prices from the provider configuration before prices from the database.
 
 ### 6.2 Provider Data
 
@@ -322,7 +342,7 @@ A provider can use the `Refresher` interface:
 
 ```go
 type Refresher interface {
-    Refresh(ctx context.Context) ([]atom.ModelInfo, error)
+    Refresh(operationContext context.Context) ([]atom.ModelInfo, error)
 }
 ```
 
@@ -344,6 +364,18 @@ Requirements:
 - R52: An instance must select the model list from the models of the providers.
 - R53: The `Refresher` interface must give the model list and the prices from the API.
 - R54: The standard adapter must implement `Refresher` when the provider data has a model list URL.
+
+### 6.3 Context Limit
+
+The context limit is `ModelInfo.ContextMax`. The harness keeps the system messages and the last turn. When the context is too large, the harness removes the initial turn from the request. A turn includes the tool calls and the tool results. The database keeps the full message history.
+
+If the last turn is too large, the harness gives an error. The harness does not send the request. A provider can implement `TokenCounter` for the token count. The default token estimate uses text bytes and a media allowance. The estimate is not the usage. The provider response gives the usage.
+
+```go
+type TokenCounter interface {
+    CountTokens(operationContext context.Context, request atom.Request) (int, error)
+}
+```
 
 ## 7. Stages
 
@@ -393,20 +425,20 @@ A plugin is a Go package. A plugin gives a name and a `Setup` function. The `Set
 type Plugin interface {
     Name() string
     Version() string
-    Setup(h *Harness) error
+    Setup(harnessRuntime *Harness) error
 }
 ```
 
 The harness object gives 6 operations:
 
 ```go
-func (h *Harness) On(event EventName, handler Handler) Unsubscribe
-func (h *Harness) Tool(tool Tool) Unsubscribe
-func (h *Harness) Provider(provider Provider) Unsubscribe
-func (h *Harness) Watch(watcher ProcessWatcher) Unsubscribe
+func (harnessRuntime *Harness) On(event EventName, handler Handler) Unsubscribe
+func (harnessRuntime *Harness) Tool(tool Tool) Unsubscribe
+func (harnessRuntime *Harness) Provider(provider Provider) Unsubscribe
+func (harnessRuntime *Harness) Watch(watcher ProcessWatcher) Unsubscribe
 
-func Pipe[T any](h *Harness, stage Stage[T], fn Middleware[T]) Unsubscribe
-func Decide[T any](h *Harness, stage Stage[T], fn Decision[T]) Unsubscribe
+func Pipe[Value any](harnessRuntime *Harness, stage Stage[Value], middleware Middleware[Value]) Unsubscribe
+func Decide[Value any](harnessRuntime *Harness, stage Stage[Value], decision Decision[Value]) Unsubscribe
 ```
 
 The Go compiler does not let a method have a type parameter. Thus, `Pipe` and `Decide` are functions.
@@ -420,7 +452,7 @@ The name of an MCP tool is `mcp__{server}__{tool}`. Thus, 2 servers can have a t
 
 Requirements:
 
-- R58: A plugin must not use the internal packages of the harness.
+- R58: One registry must keep the tools of the harness and the plugins.
 - R59: The harness must read the MCP servers from the MCP file.
 - R60: The harness must start an MCP server that has a program.
 - R61: The harness must connect to an MCP server that has a URL.
@@ -431,9 +463,9 @@ Requirements:
 - R66: The harness must stop the pipeline when a handler gives an error.
 - R67: A plugin must attach a tool, a watcher, or a stage handler before the loop starts.
 
-- R68: The harness must run handlers in the sequence that the plugin attaches them.
-- R69: The harness must stop the pipeline when a handler gives an error.
-- R70: A plugin must attach a tool, a watcher, or a stage handler before the loop starts.
+- R68: The event bus must send an event to the handlers of the harness and the plugins.
+- R69: The model gateway must use the providers from the plugins.
+- R70: The harness must keep the other handlers when it removes a handler.
 
 ## 10. Tools
 
@@ -445,8 +477,8 @@ type Tool interface {
     Description() string
     Categories() []string
     InputSchema() Schema
-    Check(ctx context.Context, call ToolCall) Verdict
-    Run(ctx context.Context, call ToolCall) (ToolResult, error)
+    Check(operationContext context.Context, call ToolCall) Verdict
+    Run(operationContext context.Context, call ToolCall) (ToolResult, error)
 }
 ```
 
@@ -484,6 +516,10 @@ Requirements:
 - R77: A tool must not start a process without a check.
 - R78: The harness must keep the sequence of the tool results.
 - R79: The harness must examine the input of the tool call against the input schema of the tool before the `Check` function.
+
+The schema check uses JSON Schema. An incorrect schema must give an error. A schema reference must be in the schema document. The check must not read an external file or URL for a schema reference.
+
+A verdict of `deny` must stop a tool before the harness reads a permission decision from the cache. The scope `once` is for one permission request. The scope `session` is for one session in one instance. The scope `always` is for one instance and continues after a program start.
 
 ### 10.2 Find Tools
 
@@ -545,7 +581,7 @@ type Process interface {
 
 type ProcessWatcher interface {
     Match(event ProcessEvent) bool
-    OnMatch(ctx context.Context, event ProcessEvent)
+    OnMatch(operationContext context.Context, event ProcessEvent)
 }
 ```
 
@@ -558,6 +594,10 @@ The tool call gives the notification policy for a process. The policy has the mo
 - `interval`: the harness sends one notification at the interval.
 
 The interval is a number of milliseconds. The default mode is `exit`. A notification is a message in the session. Thus, the model reads the notification on the next turn.
+
+The process manager keeps the process after the initial turn stops. The process manager writes the exit status with an active database context. Output goes through `process.output` before the output buffer, watchers, and notifications.
+
+The output buffer has a limit of 256 KiB for standard output and 256 KiB for standard error. The process supervisor keeps the last 128 completed processes. A client can read the output after a process stops. On Unix, a stop signal applies to the process group.
 
 Requirements:
 
@@ -665,6 +705,7 @@ The initial API paths are:
 - `GET /instances`: read the instances.
 - `GET /instances/{id}`: read an instance.
 - `DELETE /instances/{id}`: stop an instance.
+- `POST /instances/{id}/start`: start a stopped instance.
 - `POST /instances/{id}/sessions`: start a session.
 - `GET /instances/{id}/sessions`: read the sessions of an instance.
 - `GET /instances/{id}/models`: read the model list of an instance.
@@ -697,6 +738,17 @@ The initial API paths are:
 - `GET /instances/{id}/statistics`: read the statistics of an instance.
 - `GET /statistics`: read the full statistics of the harness.
 - `GET /health`: give the status of the harness.
+
+The message input can have text or content items:
+
+```json
+{"content":"hello"}
+{"content":[{"type":"image","mime":"image/png","data":"BASE64"}]}
+```
+
+The event path accepts `?since=N`. The database gives the sequence number. The API sends the events after the sequence number, then the new events. A slow client must not stop the loop.
+
+When the user reverts a session, the API stops the current run. The API must wait until the current run stops. Then the API removes the messages after the given message. The API must not accept a new message while it removes messages. The usage record keeps the cost.
 
 Requirements:
 
@@ -751,7 +803,6 @@ The code has 3 layers.
 - `InstanceManager`
 - `ProcessManager`
 - `SessionMemory`
-- `PermissionSystem`
 - `ModelGateway`
 
 The layer rules are:
@@ -773,7 +824,17 @@ mtt-harness/
   mtt.example.json             # the example bootstrap file
   providers.json               # the provider data
   mcp.example.json             # the example MCP server file
-  cmd/mtt/main.go              # start the API
+  cmd/mtt/
+    main.go                     # the entry point
+    application.go              # runtime wiring and API lifecycle
+    options.go                  # command-line arguments
+    startup_errors.go           # required startup operations
+    authentication.go           # API token setup
+    storage.go                  # stores, instance restore, process limit
+    providers.go                # provider loading and refresh
+    mcp.go                      # MCP loading and tool registration
+    tools.go                    # built-in tool registration
+    plugins.go                  # plugin registration
   atom/                        # atoms: values only
     message.go
     content.go
@@ -786,39 +847,84 @@ mtt-harness/
     stage.go
   harness/                     # the plugin interface
     harness.go                 # the Harness object
+    events.go                  # event subscriptions
+    pipeline.go                # middleware and decisions
     context.go                 # the session in the context
+    workspace.go               # shared workspace path resolution
     plugin.go                  # the Plugin interface
     tool.go                    # the Tool interface
     provider.go                # the Provider interface
     process.go                 # the Process interface
   internal/
     config/config.go           # the bootstrap file
+    operation/errors.go        # contextual runtime errors
+    testutil/assertions.go     # shared test assertions
     molecule/
       schema/schema.go         # the input schema check
       pipeline/pipeline.go     # the middleware chain
       contextbuilder/context.go
       provider/standard.go     # the standard adapter
+      provider/request.go      # HTTP requests and content encoding
+      provider/content.go      # text and media encoding
+      provider/stream.go       # streamed response decoding
+      provider/models.go       # model refresh
+      provider/prices.go       # price tables
       provider/config.go       # the provider file
       provider/test.go         # the test provider
       store/store.go           # the data interfaces
       store/memory/memory.go   # the memory store
       store/postgres/postgres.go
+      store/{memory,postgres}/
+        instances.go           # instance records
+        sessions.go            # session and message records
+        queue.go               # durable pending messages
+        events.go              # event records
+        processes.go           # process records
+        permissions.go         # permission decisions
+        usage.go               # statistics
+        providers.go           # provider and model records
+        secrets.go             # provider keys
+        settings.go            # harness and instance settings
       process/supervisor.go
+      process/handle.go        # process IO and completion
+      process/group_unix.go    # process-group signals
       permission/engine.go
       permission/broker.go     # the permission broker
       eventbus/eventbus.go
     organism/
-      loop/loop.go
-      loop/queue.go            # the message queue             # the AgentLoop
+      loop/loop.go             # the AgentLoop
+      loop/queue.go            # the message queue
+      loop/queue_lifecycle.go  # revert, recovery, and shutdown
+      loop/requests.go         # request preparation and policy
+      loop/responses.go        # model response collection
+      loop/messages.go         # response and result persistence
+      loop/models.go          # model selection and media checks
+      loop/tools.go            # tool execution and discovery
+      loop/agents.go           # child agents and completion
+      loop/permissions.go      # permission decisions
+      loop/usage.go            # model cost calculation
+      loop/events.go           # loop events
       registry/registry.go     # the ToolRegistry
       plugins/host.go          # the PluginHost
       instances/manager.go     # the InstanceManager
       processes/manager.go     # the ProcessManager
+      processes/observer.go    # completion and output observers
+      processes/notifications.go
       memory/session.go        # the SessionMemory
-      permissions/system.go    # the PermissionSystem
       gateway/gateway.go       # the ModelGateway
     api/
-      server.go                # the HTTP handlers
+      server.go                # server wiring and routes
+      authentication.go        # request authentication
+      instances.go             # workspace instances
+      sessions.go              # sessions and child agents
+      messages.go              # queue, cancellation, and revert
+      responses.go             # JSON and HTTP error helpers
+      settings.go              # harness and instance settings
+      provider_keys.go         # provider secrets
+      providers.go             # provider model lists and refresh
+      permissions.go           # permission responses
+      statistics.go            # usage and cost
+      processes.go             # session process lists
       websocket.go             # the event and output streams
     mcp/
       client.go                # the MCP client
@@ -838,6 +944,7 @@ mtt-harness/
   plugins/
     pathtools/pathtools.go     # a plugin in the same module
   scripts/ste
+  internal/architecture/layers_test.go
   ste/terms.json
   Spec.md
   AGENTS.md
@@ -851,9 +958,9 @@ The packages have 3 groups:
 
 - `atom`: the atoms. The package does not use a package of the project.
 - `harness`: the plugin interface. The package uses `atom` only.
-- `internal`: the molecules, the organisms, the API, the MCP client, and the tools. A plugin cannot use the `internal` packages. The Go compiler gives an error.
+- `internal`: the molecules, the organisms, the API, the MCP client, and the tools. A plugin must not use the internal packages. The architecture test examines the imports of a plugin in the module.
 
-The bootstrap file gives the port, the database URL, the provider file, and the plugin file. The file `mtt.json` is local. The file `mtt.example.json` gives the keys.
+The bootstrap file gives the port, the database URL, the provider file, and the MCP file. The file `mtt.json` is local. The file `mtt.example.json` gives the keys.
 
 The program in `cmd/mtt` reads the bootstrap file. Then the program attaches the tools, the providers, and the MCP servers. Then the program starts the API.
 
@@ -864,6 +971,25 @@ The program in `cmd/mtt` reads the bootstrap file. Then the program attaches the
 - R155: A molecule must be in the `internal/molecule` directory.
 - R156: An organism must be in the `internal/organism` directory.
 - R157: The program must attach the tools and the plugins in the `plugins` directory.
+
+### 16.4 Code
+
+The Go code must use the full name of a variable. The name must give the purpose of the variable. For example:
+
+```go
+harnessRuntime := harness.New()
+toolRegistry := registry.New()
+```
+
+The function must stop when the input is not correct or an operation gives an error. The error check must come before the primary operation.
+
+An error helper must contain the error check for a group of functions. The start of the program can stop when an operation gives an error. A tool must give an error to the loop. A tool error must not stop the program.
+
+The file `cmd/mtt/main.go` must start the program only. The code for configuration, the database, the providers, and MCP must be in different files. A file must have one purpose.
+
+One registry must control one function of the harness. The code must not have 2 registries for the same purpose.
+
+The behavior must stay the same after a change to the code structure. The test must examine the behavior after a change to the code structure.
 
 ## 17. Interfaces
 
@@ -876,19 +1002,19 @@ The `harness` package gives the `Harness` object and the function types:
 ```go
 type Harness struct { /* ... */ }
 
-func (h *Harness) On(event atom.EventName, handler Handler) Unsubscribe
-func (h *Harness) Tool(tool Tool) Unsubscribe
-func (h *Harness) Provider(provider Provider) Unsubscribe
-func (h *Harness) Watch(watcher ProcessWatcher) Unsubscribe
+func (harnessRuntime *Harness) On(event atom.EventName, handler Handler) Unsubscribe
+func (harnessRuntime *Harness) Tool(tool Tool) Unsubscribe
+func (harnessRuntime *Harness) Provider(provider Provider) Unsubscribe
+func (harnessRuntime *Harness) Watch(watcher ProcessWatcher) Unsubscribe
 
-func Pipe[T any](h *Harness, stage atom.Stage[T], fn Middleware[T]) Unsubscribe
-func Decide[T any](h *Harness, stage atom.Stage[T], fn Decision[T]) Unsubscribe
+func Pipe[Value any](harnessRuntime *Harness, stage atom.Stage[Value], middleware Middleware[Value]) Unsubscribe
+func Decide[Value any](harnessRuntime *Harness, stage atom.Stage[Value], decision Decision[Value]) Unsubscribe
 
 type Unsubscribe func()
 
-type Handler func(ctx context.Context, event atom.Event)
-type Middleware[T any] func(ctx context.Context, value T) (T, error)
-type Decision[T any] func(ctx context.Context, value T) (atom.Verdict, error)
+type Handler func(operationContext context.Context, event atom.Event)
+type Middleware[Value any] func(operationContext context.Context, value Value) (Value, error)
+type Decision[Value any] func(operationContext context.Context, value Value) (atom.Verdict, error)
 ```
 
 ### 17.2 Molecules
@@ -897,20 +1023,21 @@ The interfaces for the molecules are:
 
 ```go
 type ContextBuilder interface {
-    Build(ctx context.Context, session atom.SessionID) ([]atom.Message, error)
+    Build(operationContext context.Context, session atom.SessionID) ([]atom.Message, error)
 }
 
 type EventBus interface {
-    Send(event atom.Event)
+    Send(operationContext context.Context, event atom.Event) error
     On(name atom.EventName, handler Handler) Unsubscribe
 }
 
 type PermissionEngine interface {
-    Ask(ctx context.Context, request atom.PermissionRequest) (atom.PermissionDecision, error)
+    Cached(operationContext context.Context, session atom.Session, target string) (atom.PermissionDecision, bool, error)
+    Remember(operationContext context.Context, session atom.Session, target string, decision atom.PermissionDecision) error
 }
 
 type ProcessSupervisor interface {
-    Start(ctx context.Context, spec atom.ProcessSpec) (Process, error)
+    Start(operationContext context.Context, processSpec atom.ProcessSpec) (Process, error)
     Get(id string) (Process, bool)
     All() []Process
 }
@@ -922,50 +1049,82 @@ The interfaces for the database are:
 
 ```go
 type InstanceStore interface {
-    Save(ctx context.Context, spec atom.InstanceSpec) error
-    Get(ctx context.Context, id string) (atom.InstanceSpec, error)
-    All(ctx context.Context) ([]atom.InstanceSpec, error)
-    Delete(ctx context.Context, id string) error
+    Save(operationContext context.Context, instanceSpec atom.InstanceSpec) error
+    Get(operationContext context.Context, instanceID string) (atom.InstanceSpec, error)
+    All(operationContext context.Context) ([]atom.InstanceSpec, error)
+    Delete(operationContext context.Context, instanceID string) error
 }
 
 type SessionStore interface {
-    Save(ctx context.Context, session atom.Session) error
-    Get(ctx context.Context, id atom.SessionID) (atom.Session, error)
-    Agents(ctx context.Context, parent atom.SessionID) ([]atom.SessionID, error)
-    Append(ctx context.Context, message atom.Message) error
-    Messages(ctx context.Context, id atom.SessionID) ([]atom.Message, error)
+    Save(operationContext context.Context, session atom.Session) error
+    Get(operationContext context.Context, sessionID atom.SessionID) (atom.Session, error)
+    Agents(operationContext context.Context, parent atom.SessionID) ([]atom.SessionID, error)
+    List(operationContext context.Context, instanceID string) ([]atom.Session, error)
+    Append(operationContext context.Context, message atom.Message) error
+    Messages(operationContext context.Context, sessionID atom.SessionID) ([]atom.Message, error)
+    DeleteAfter(operationContext context.Context, sessionID atom.SessionID, messageID string) (int, error)
 }
 
 type EventStore interface {
-    Append(ctx context.Context, event atom.Event) error
-    Since(ctx context.Context, instanceID string, seq uint64) ([]atom.Event, error)
+    Append(operationContext context.Context, event atom.Event) error
+    Record(operationContext context.Context, event atom.Event) (atom.Event, error)
+    Since(operationContext context.Context, instanceID string, sequenceNumber uint64) ([]atom.Event, error)
 }
 
 type ProcessStore interface {
-    Save(ctx context.Context, process atom.ProcessRecord) error
-    Get(ctx context.Context, id string) (atom.ProcessRecord, error)
-    List(ctx context.Context, session atom.SessionID) ([]atom.ProcessRecord, error)
+    Save(operationContext context.Context, process atom.ProcessRecord) error
+    Get(operationContext context.Context, processID string) (atom.ProcessRecord, error)
+    List(operationContext context.Context, session atom.SessionID) ([]atom.ProcessRecord, error)
+    CountRunning(operationContext context.Context, instanceID string) (int, error)
 }
 
 type PermissionStore interface {
-    Save(ctx context.Context, decision atom.PermissionDecision) error
-    Get(ctx context.Context, id string) (atom.PermissionDecision, error)
+    Save(operationContext context.Context, decision atom.PermissionDecision) error
+    Get(operationContext context.Context, requestID string) (atom.PermissionDecision, error)
+    Resolve(operationContext context.Context, session atom.Session, target string) (atom.PermissionDecision, bool, error)
 }
 
 type UsageStore interface {
-    Save(ctx context.Context, record atom.UsageRecord) error
-    Session(ctx context.Context, id atom.SessionID) (atom.Statistics, error)
-    Instance(ctx context.Context, id string) (atom.Statistics, error)
-    All(ctx context.Context) (atom.Statistics, error)
+    Save(operationContext context.Context, record atom.UsageRecord) error
+    Session(operationContext context.Context, sessionID atom.SessionID) (atom.Statistics, error)
+    Instance(operationContext context.Context, instanceID string) (atom.Statistics, error)
+    All(operationContext context.Context) (atom.Statistics, error)
 }
 
 type ProviderStore interface {
-    Save(ctx context.Context, spec atom.ProviderSpec) error
-    Get(ctx context.Context, id string) (atom.ProviderSpec, error)
-    All(ctx context.Context) ([]atom.ProviderSpec, error)
-    Delete(ctx context.Context, id string) error
-    SaveModels(ctx context.Context, provider string, models []atom.ModelInfo) error
-    Models(ctx context.Context, provider string) ([]atom.ModelInfo, error)
+    Save(operationContext context.Context, providerSpec atom.ProviderSpec) error
+    Get(operationContext context.Context, providerID string) (atom.ProviderSpec, error)
+    All(operationContext context.Context) ([]atom.ProviderSpec, error)
+    Delete(operationContext context.Context, providerID string) error
+    SaveModels(operationContext context.Context, provider string, models []atom.ModelInfo) error
+    Models(operationContext context.Context, provider string) ([]atom.ModelInfo, error)
+}
+
+type QueueStore interface {
+    Enqueue(operationContext context.Context, message atom.Message, limit int) error
+    All(operationContext context.Context) ([]atom.QueuedMessage, error)
+    Start(operationContext context.Context, messageID string) error
+    Finish(operationContext context.Context, messageID string) error
+    Remove(operationContext context.Context, sessionID atom.SessionID, messageID string) (bool, error)
+    ClearPending(operationContext context.Context, sessionID atom.SessionID) (int, error)
+}
+
+type SecretStore interface {
+    SaveProviderKey(operationContext context.Context, provider string, key string) error
+    ProviderKey(operationContext context.Context, provider string) (string, error)
+    SaveInstanceKey(operationContext context.Context, instanceID string, provider string, key string) error
+    InstanceKey(operationContext context.Context, instanceID string, provider string) (string, error)
+    ResolveKey(operationContext context.Context, instanceID string, provider string) (string, error)
+    DeleteProviderKey(operationContext context.Context, provider string) error
+    DeleteInstanceKey(operationContext context.Context, instanceID string, provider string) error
+}
+
+type SettingsStore interface {
+    Save(operationContext context.Context, scope string, key string, value string) error
+    Get(operationContext context.Context, scope string, key string) (string, error)
+    All(operationContext context.Context, scope string) (map[string]string, error)
+    Delete(operationContext context.Context, scope string, key string) error
+    Resolve(operationContext context.Context, instanceID string, key string) (string, error)
 }
 ```
 
@@ -975,10 +1134,13 @@ The interfaces for the organisms are:
 
 ```go
 type InstanceManager interface {
-    Start(ctx context.Context, spec atom.InstanceSpec) (Instance, error)
-    Get(id string) (Instance, bool)
-    All() []Instance
-    Stop(ctx context.Context, id string) error
+    Start(operationContext context.Context, instanceSpec atom.InstanceSpec) (*instances.Instance, error)
+    Get(instanceID string) (*instances.Instance, bool)
+    All() []*instances.Instance
+    Stop(operationContext context.Context, instanceID string) error
+    IsRunning(instanceID string) bool
+    AgentDepthLimit(operationContext context.Context, instanceID string) (int, error)
+    ProcessLimit(operationContext context.Context, instanceID string) (int, error)
 }
 
 type Instance interface {
@@ -988,9 +1150,9 @@ type Instance interface {
 }
 
 type SessionManager interface {
-    Start(ctx context.Context, parent atom.SessionID) (atom.SessionID, error)
-    Get(ctx context.Context, id atom.SessionID) (atom.Session, error)
-    Agents(ctx context.Context, parent atom.SessionID) ([]atom.SessionID, error)
+    Start(operationContext context.Context, parent atom.SessionID) (atom.SessionID, error)
+    Get(operationContext context.Context, sessionID atom.SessionID) (atom.Session, bool)
+    Agents(operationContext context.Context, parent atom.SessionID) ([]atom.SessionID, error)
 }
 
 type ToolRegistry interface {
@@ -998,12 +1160,17 @@ type ToolRegistry interface {
     Get(name string) (Tool, bool)
     All() []Tool
     Find(query string, category string, limit int) []Tool
+    Upsert(tool Tool)
+    Remove(name string)
 }
 
 type ModelGateway interface {
     Add(provider Provider) error
     Provider(name string) (Provider, bool)
-    Model(id string) (atom.ModelInfo, Provider, bool)
+    Model(modelID string) (atom.ModelInfo, Provider, bool)
+    Resolve(modelID string) (atom.ModelInfo, Provider, error)
+    ResolveAllowed(modelID string, allowed []string) (atom.ModelInfo, Provider, error)
+    Refresh(operationContext context.Context, providerID string) ([]atom.ModelInfo, error)
 }
 ```
 
@@ -1012,6 +1179,21 @@ Requirements:
 - R158: The `harness` package must contain the `Harness`, `Plugin`, `Tool`, `Provider`, and `ProcessWatcher` interfaces.
 - R159: The `internal/molecule/store` package must contain the data interfaces.
 - R160: The Postgres adapter must use the data interfaces.
+
+### 17.5 Runtime Requirements
+
+- R161: File tools and shell commands must use the workspace of the instance.
+- R162: A model call must use a model from the model list of the instance.
+- R163: An MCP connection must continue until the harness stops or the connection gives an error.
+- R164: The API must wait for the current run to stop before it removes messages.
+- R165: A permission decision must apply only to the instance and session of the decision scope.
+- R166: The database must keep a message in the queue before the API gives status `202`.
+- R167: The harness must use the prices from the provider configuration before prices from the database.
+- R168: The standard adapter must give an error for a content type which the adapter cannot send.
+- R169: The context limit must not remove a message from the database.
+- R170: The event stream must use the sequence number from the database.
+- R171: The harness must keep the data of a stopped instance.
+- R172: The queue must give an error when the number of messages is at the queue limit.
 
 ## 18. Protection
 

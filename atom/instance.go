@@ -10,6 +10,7 @@ type InstanceSpec struct {
 	ProcessLimit    int
 	AgentDepthLimit int
 	CreatedAt       time.Time
+	Stopped         bool
 }
 
 type Session struct {
@@ -19,6 +20,7 @@ type Session struct {
 	Depth      int
 	Model      string
 	CreatedAt  time.Time
+	Completed  bool
 }
 
 type AgentTask struct {

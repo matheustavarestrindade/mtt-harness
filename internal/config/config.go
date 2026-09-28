@@ -24,15 +24,15 @@ func Default() File {
 
 func LoadOrDefault(path string) (File, error) {
 	bootstrap := Default()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return bootstrap, nil
-		}
-		return bootstrap, err
+	data, operationError := os.ReadFile(path)
+	if os.IsNotExist(operationError) {
+		return bootstrap, nil
 	}
-	if err := json.Unmarshal(data, &bootstrap); err != nil {
-		return bootstrap, err
+	if operationError != nil {
+		return bootstrap, operationError
+	}
+	if operationError := json.Unmarshal(data, &bootstrap); operationError != nil {
+		return bootstrap, operationError
 	}
 	return bootstrap, nil
 }

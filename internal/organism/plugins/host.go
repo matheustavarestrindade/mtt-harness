@@ -7,30 +7,30 @@ import (
 )
 
 type Host struct {
-	mu     sync.RWMutex
-	h      *harness.Harness
-	loaded map[string]harness.Plugin
+	mutex          sync.RWMutex
+	harnessRuntime *harness.Harness
+	loaded         map[string]harness.Plugin
 }
 
-func New(h *harness.Harness) *Host {
-	return &Host{h: h, loaded: map[string]harness.Plugin{}}
+func New(harnessRuntime *harness.Harness) *Host {
+	return &Host{harnessRuntime: harnessRuntime, loaded: map[string]harness.Plugin{}}
 }
 
-func (p *Host) Attach(plugin harness.Plugin) error {
-	if err := plugin.Setup(p.h); err != nil {
-		return err
+func (pluginHost *Host) Attach(plugin harness.Plugin) error {
+	if operationError := plugin.Setup(pluginHost.harnessRuntime); operationError != nil {
+		return operationError
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.loaded[plugin.Name()] = plugin
+	pluginHost.mutex.Lock()
+	defer pluginHost.mutex.Unlock()
+	pluginHost.loaded[plugin.Name()] = plugin
 	return nil
 }
 
-func (p *Host) All() []harness.Plugin {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	list := make([]harness.Plugin, 0, len(p.loaded))
-	for _, plugin := range p.loaded {
+func (pluginHost *Host) All() []harness.Plugin {
+	pluginHost.mutex.RLock()
+	defer pluginHost.mutex.RUnlock()
+	list := make([]harness.Plugin, 0, len(pluginHost.loaded))
+	for _, plugin := range pluginHost.loaded {
 		list = append(list, plugin)
 	}
 	return list

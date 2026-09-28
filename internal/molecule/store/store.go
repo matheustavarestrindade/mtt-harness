@@ -7,73 +7,86 @@ import (
 )
 
 type InstanceStore interface {
-	Save(ctx context.Context, spec atom.InstanceSpec) error
-	Get(ctx context.Context, id string) (atom.InstanceSpec, error)
-	All(ctx context.Context) ([]atom.InstanceSpec, error)
-	Delete(ctx context.Context, id string) error
+	Save(operationContext context.Context, instanceSpec atom.InstanceSpec) error
+	Get(operationContext context.Context, identifier string) (atom.InstanceSpec, error)
+	All(operationContext context.Context) ([]atom.InstanceSpec, error)
+	Delete(operationContext context.Context, identifier string) error
 }
 
 type SessionStore interface {
-	Save(ctx context.Context, session atom.Session) error
-	Get(ctx context.Context, id atom.SessionID) (atom.Session, error)
-	Agents(ctx context.Context, parent atom.SessionID) ([]atom.SessionID, error)
-	Append(ctx context.Context, message atom.Message) error
-	Messages(ctx context.Context, id atom.SessionID) ([]atom.Message, error)
-	DeleteAfter(ctx context.Context, id atom.SessionID, messageID string) (int, error)
+	Save(operationContext context.Context, session atom.Session) error
+	Get(operationContext context.Context, sessionID atom.SessionID) (atom.Session, error)
+	Agents(operationContext context.Context, parent atom.SessionID) ([]atom.SessionID, error)
+	List(operationContext context.Context, instanceID string) ([]atom.Session, error)
+	Append(operationContext context.Context, message atom.Message) error
+	Messages(operationContext context.Context, sessionID atom.SessionID) ([]atom.Message, error)
+	DeleteAfter(operationContext context.Context, sessionID atom.SessionID, messageID string) (int, error)
+}
+
+type QueueStore interface {
+	Enqueue(operationContext context.Context, message atom.Message, limit int) error
+	All(operationContext context.Context) ([]atom.QueuedMessage, error)
+	Start(operationContext context.Context, messageID string) error
+	Finish(operationContext context.Context, messageID string) error
+	Remove(operationContext context.Context, sessionID atom.SessionID, messageID string) (bool, error)
+	ClearPending(operationContext context.Context, sessionID atom.SessionID) (int, error)
 }
 
 type EventStore interface {
-	Append(ctx context.Context, event atom.Event) error
-	Since(ctx context.Context, instanceID string, seq uint64) ([]atom.Event, error)
+	Append(operationContext context.Context, event atom.Event) error
+	Record(operationContext context.Context, event atom.Event) (atom.Event, error)
+	Since(operationContext context.Context, instanceID string, sequenceNumber uint64) ([]atom.Event, error)
 }
 
 type ProcessStore interface {
-	Save(ctx context.Context, process atom.ProcessRecord) error
-	Get(ctx context.Context, id string) (atom.ProcessRecord, error)
-	List(ctx context.Context, session atom.SessionID) ([]atom.ProcessRecord, error)
-	CountRunning(ctx context.Context, instanceID string) (int, error)
+	Save(operationContext context.Context, process atom.ProcessRecord) error
+	Get(operationContext context.Context, identifier string) (atom.ProcessRecord, error)
+	List(operationContext context.Context, session atom.SessionID) ([]atom.ProcessRecord, error)
+	CountRunning(operationContext context.Context, instanceID string) (int, error)
 }
 
 type PermissionStore interface {
-	Save(ctx context.Context, decision atom.PermissionDecision) error
-	Get(ctx context.Context, id string) (atom.PermissionDecision, error)
+	Save(operationContext context.Context, decision atom.PermissionDecision) error
+	Get(operationContext context.Context, identifier string) (atom.PermissionDecision, error)
+	Resolve(operationContext context.Context, session atom.Session, target string) (atom.PermissionDecision, bool, error)
 }
 
 type UsageStore interface {
-	Save(ctx context.Context, record atom.UsageRecord) error
-	Session(ctx context.Context, id atom.SessionID) (atom.Statistics, error)
-	Instance(ctx context.Context, id string) (atom.Statistics, error)
-	All(ctx context.Context) (atom.Statistics, error)
+	Save(operationContext context.Context, record atom.UsageRecord) error
+	Session(operationContext context.Context, sessionID atom.SessionID) (atom.Statistics, error)
+	Instance(operationContext context.Context, identifier string) (atom.Statistics, error)
+	All(operationContext context.Context) (atom.Statistics, error)
 }
 
 type ProviderStore interface {
-	Save(ctx context.Context, spec atom.ProviderSpec) error
-	Get(ctx context.Context, id string) (atom.ProviderSpec, error)
-	All(ctx context.Context) ([]atom.ProviderSpec, error)
-	Delete(ctx context.Context, id string) error
-	SaveModels(ctx context.Context, provider string, models []atom.ModelInfo) error
-	Models(ctx context.Context, provider string) ([]atom.ModelInfo, error)
+	Save(operationContext context.Context, providerSpec atom.ProviderSpec) error
+	Get(operationContext context.Context, identifier string) (atom.ProviderSpec, error)
+	All(operationContext context.Context) ([]atom.ProviderSpec, error)
+	Delete(operationContext context.Context, identifier string) error
+	SaveModels(operationContext context.Context, provider string, models []atom.ModelInfo) error
+	Models(operationContext context.Context, provider string) ([]atom.ModelInfo, error)
 }
 
 type SecretStore interface {
-	SaveProviderKey(ctx context.Context, provider string, key string) error
-	ProviderKey(ctx context.Context, provider string) (string, error)
-	SaveInstanceKey(ctx context.Context, instanceID string, provider string, key string) error
-	InstanceKey(ctx context.Context, instanceID string, provider string) (string, error)
-	ResolveKey(ctx context.Context, instanceID string, provider string) (string, error)
-	DeleteProviderKey(ctx context.Context, provider string) error
-	DeleteInstanceKey(ctx context.Context, instanceID string, provider string) error
+	SaveProviderKey(operationContext context.Context, provider string, key string) error
+	ProviderKey(operationContext context.Context, provider string) (string, error)
+	SaveInstanceKey(operationContext context.Context, instanceID string, provider string, key string) error
+	InstanceKey(operationContext context.Context, instanceID string, provider string) (string, error)
+	ResolveKey(operationContext context.Context, instanceID string, provider string) (string, error)
+	DeleteProviderKey(operationContext context.Context, provider string) error
+	DeleteInstanceKey(operationContext context.Context, instanceID string, provider string) error
 }
 
 type SettingsStore interface {
-	Save(ctx context.Context, scope string, key string, value string) error
-	Get(ctx context.Context, scope string, key string) (string, error)
-	All(ctx context.Context, scope string) (map[string]string, error)
-	Delete(ctx context.Context, scope string, key string) error
-	Resolve(ctx context.Context, instanceID string, key string) (string, error)
+	Save(operationContext context.Context, scope string, key string, value string) error
+	Get(operationContext context.Context, scope string, key string) (string, error)
+	All(operationContext context.Context, scope string) (map[string]string, error)
+	Delete(operationContext context.Context, scope string, key string) error
+	Resolve(operationContext context.Context, instanceID string, key string) (string, error)
 }
 
 type Store interface {
+	Queue() QueueStore
 	Instances() InstanceStore
 	Sessions() SessionStore
 	Events() EventStore

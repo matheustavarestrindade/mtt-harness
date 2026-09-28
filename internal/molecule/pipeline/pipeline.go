@@ -8,49 +8,49 @@ import (
 )
 
 type Pipeline struct {
-	h *harness.Harness
+	harnessRuntime *harness.Harness
 }
 
-func New(h *harness.Harness) *Pipeline {
-	return &Pipeline{h: h}
+func New(harnessRuntime *harness.Harness) *Pipeline {
+	return &Pipeline{harnessRuntime: harnessRuntime}
 }
 
-func (p *Pipeline) Context(ctx context.Context, messages []atom.Message) ([]atom.Message, error) {
-	return harness.Run(ctx, p.h, atom.StageContextBuild, messages)
+func (pipeline *Pipeline) Context(operationContext context.Context, messages []atom.Message) ([]atom.Message, error) {
+	return harness.Run(operationContext, pipeline.harnessRuntime, atom.StageContextBuild, messages)
 }
 
-func (p *Pipeline) Request(ctx context.Context, request atom.Request) (atom.Request, error) {
-	return harness.Run(ctx, p.h, atom.StageModelRequest, request)
+func (pipeline *Pipeline) Request(operationContext context.Context, request atom.Request) (atom.Request, error) {
+	return harness.Run(operationContext, pipeline.harnessRuntime, atom.StageModelRequest, request)
 }
 
-func (p *Pipeline) Response(ctx context.Context, message atom.Message) (atom.Message, error) {
-	return harness.Run(ctx, p.h, atom.StageModelResponse, message)
+func (pipeline *Pipeline) Response(operationContext context.Context, message atom.Message) (atom.Message, error) {
+	return harness.Run(operationContext, pipeline.harnessRuntime, atom.StageModelResponse, message)
 }
 
-func (p *Pipeline) Plan(ctx context.Context, call atom.ToolCall) (atom.ToolCall, error) {
-	return harness.Run(ctx, p.h, atom.StageActionPlan, call)
+func (pipeline *Pipeline) Plan(operationContext context.Context, call atom.ToolCall) (atom.ToolCall, error) {
+	return harness.Run(operationContext, pipeline.harnessRuntime, atom.StageActionPlan, call)
 }
 
-func (p *Pipeline) Input(ctx context.Context, call atom.ToolCall) (atom.ToolCall, error) {
-	return harness.Run(ctx, p.h, atom.StageToolInput, call)
+func (pipeline *Pipeline) Input(operationContext context.Context, call atom.ToolCall) (atom.ToolCall, error) {
+	return harness.Run(operationContext, pipeline.harnessRuntime, atom.StageToolInput, call)
 }
 
-func (p *Pipeline) Result(ctx context.Context, result atom.ToolResult) (atom.ToolResult, error) {
-	return harness.Run(ctx, p.h, atom.StageToolResult, result)
+func (pipeline *Pipeline) Result(operationContext context.Context, result atom.ToolResult) (atom.ToolResult, error) {
+	return harness.Run(operationContext, pipeline.harnessRuntime, atom.StageToolResult, result)
 }
 
-func (p *Pipeline) Save(ctx context.Context, message atom.Message) (atom.Message, error) {
-	return harness.Run(ctx, p.h, atom.StageMessageSave, message)
+func (pipeline *Pipeline) Save(operationContext context.Context, message atom.Message) (atom.Message, error) {
+	return harness.Run(operationContext, pipeline.harnessRuntime, atom.StageMessageSave, message)
 }
 
-func (p *Pipeline) Output(ctx context.Context, event atom.ProcessEvent) (atom.ProcessEvent, error) {
-	return harness.Run(ctx, p.h, atom.StageProcessOutput, event)
+func (pipeline *Pipeline) Output(operationContext context.Context, event atom.ProcessEvent) (atom.ProcessEvent, error) {
+	return harness.Run(operationContext, pipeline.harnessRuntime, atom.StageProcessOutput, event)
 }
 
-func (p *Pipeline) DecideInput(ctx context.Context, call atom.ToolCall) (atom.Verdict, error) {
-	return harness.Check(ctx, p.h, atom.StageToolInput, call)
+func (pipeline *Pipeline) DecideInput(operationContext context.Context, call atom.ToolCall) (atom.Verdict, error) {
+	return harness.Check(operationContext, pipeline.harnessRuntime, atom.StageToolInput, call)
 }
 
-func (p *Pipeline) DecideRequest(ctx context.Context, request atom.Request) (atom.Verdict, error) {
-	return harness.Check(ctx, p.h, atom.StageModelRequest, request)
+func (pipeline *Pipeline) DecideRequest(operationContext context.Context, request atom.Request) (atom.Verdict, error) {
+	return harness.Check(operationContext, pipeline.harnessRuntime, atom.StageModelRequest, request)
 }

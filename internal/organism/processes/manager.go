@@ -2,8 +2,6 @@ package processes
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -16,226 +14,241 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
-type outputter interface {
-	Output() ([]byte, []byte)
-}
-
 type InstanceLimits interface {
-	ProcessLimit(ctx context.Context, instanceID string) int
+	ProcessLimit(operationContext context.Context, instanceID string) (int, error)
 }
+type Notifier func(context.Context, atom.Session, []atom.Content) error
 
+// Manager owns process observation independently from the originating turn.
+// Starts and instance limits are serialized; Close joins every observer before
+// its context or database can be released.
 type Manager struct {
-	mu         sync.RWMutex
-	supervisor *process.Supervisor
-	store      store.Store
-	h          *harness.Harness
-	bus        *eventbus.Bus
-	limits     InstanceLimits
-	instances  map[string]string
+	mutex          sync.Mutex
+	supervisor     *process.Supervisor
+	store          store.Store
+	harnessRuntime *harness.Harness
+	bus            *eventbus.Bus
+	limits         InstanceLimits
+	instances      map[string]string
+	lifecycle      context.Context
+	cancel         context.CancelFunc
+	observers      sync.WaitGroup
+	closing        bool
+	notifier       Notifier
+	starting       map[string]int
+	starts         sync.WaitGroup
+	instanceStarts map[string]*sync.WaitGroup
 }
 
-func New(supervisor *process.Supervisor, database store.Store, h *harness.Harness, bus *eventbus.Bus, limits InstanceLimits) *Manager {
-	return &Manager{
-		supervisor: supervisor,
-		store:      database,
-		h:          h,
-		bus:        bus,
-		limits:     limits,
-		instances:  map[string]string{},
+func New(supervisor *process.Supervisor, database store.Store, harnessRuntime *harness.Harness, bus *eventbus.Bus, limits InstanceLimits) *Manager {
+	lifecycle, cancel := context.WithCancel(context.Background())
+	return &Manager{supervisor: supervisor, store: database, harnessRuntime: harnessRuntime, bus: bus, limits: limits, instances: map[string]string{}, lifecycle: lifecycle, cancel: cancel, starting: map[string]int{}, instanceStarts: map[string]*sync.WaitGroup{}}
+}
+
+func (processManager *Manager) SetNotifier(notifier Notifier) {
+	processManager.mutex.Lock()
+	defer processManager.mutex.Unlock()
+	processManager.notifier = notifier
+}
+
+func (processManager *Manager) Start(operationContext context.Context, processSpec atom.ProcessSpec) (harness.Process, error) {
+	if processSpec.Notify.Mode == "" {
+		processSpec.Notify.Mode = atom.NotifyExit
 	}
+	if processSpec.Notify.Mode != atom.NotifyExit && processSpec.Notify.Mode != atom.NotifyError && processSpec.Notify.Mode != atom.NotifyInterval {
+		return nil, fmt.Errorf("invalid process notification mode")
+	}
+	if processSpec.Notify.Mode == atom.NotifyInterval && processSpec.Notify.Interval <= 0 {
+		return nil, fmt.Errorf("interval notifications require a positive interval")
+	}
+	if processSpec.Timeout < 0 {
+		return nil, fmt.Errorf("process timeout cannot be negative")
+	}
+	session, _ := harness.SessionFrom(operationContext)
+	workspace, _ := harness.WorkspaceFrom(operationContext)
+	if processSpec.Cwd == "" {
+		processSpec.Cwd = workspace
+	}
+	releaseReservation, operationError := processManager.reserveStart(operationContext, session.InstanceID)
+	if operationError != nil {
+		return nil, operationError
+	}
+	defer releaseReservation()
+	observerContext := harness.WithWorkspace(harness.WithSession(processManager.lifecycle, session), workspace)
+	runningProcess, operationError := processManager.supervisor.StartWithTransform(operationContext, processSpec, func(event atom.ProcessEvent) (atom.ProcessEvent, error) {
+		return harness.Run(observerContext, processManager.harnessRuntime, atom.StageProcessOutput, event)
+	})
+	if operationError != nil {
+		return nil, operationError
+	}
+	record := atom.ProcessRecord{ID: runningProcess.ID(), InstanceID: session.InstanceID, SessionID: session.ID, Spec: processSpec, PID: runningProcess.PID(), Status: "running", StartedAt: time.Now()}
+	if operationError := processManager.store.Processes().Save(operationContext, record); operationError != nil {
+		killError := runningProcess.Kill("")
+		_, _ = runningProcess.Wait()
+		return nil, errors.Join(operationError, killError)
+	}
+	processManager.mutex.Lock()
+	processManager.instances[runningProcess.ID()] = session.InstanceID
+	processManager.mutex.Unlock()
+	processManager.observers.Add(1)
+	go processManager.observe(observerContext, session, runningProcess, record)
+	return runningProcess, nil
 }
 
-func (m *Manager) Start(ctx context.Context, spec atom.ProcessSpec) (harness.Process, error) {
-	session, _ := harness.SessionFrom(ctx)
-	if session.InstanceID != "" && m.limits != nil {
-		if limit := m.limits.ProcessLimit(ctx, session.InstanceID); limit > 0 {
-			if count, err := m.store.Processes().CountRunning(ctx, session.InstanceID); err == nil && count >= limit {
-				return nil, errors.New("process: the process limit of the instance is reached")
-			}
+func (processManager *Manager) StopInstance(operationContext context.Context, instanceID string) (int, error) {
+	processManager.mutex.Lock()
+	starts := processManager.instanceStarts[instanceID]
+	processManager.mutex.Unlock()
+	if starts != nil {
+		if operationError := waitGroup(operationContext, starts); operationError != nil {
+			return 0, operationError
 		}
 	}
-	proc, err := m.supervisor.Start(ctx, spec)
-	if err != nil {
-		return nil, err
-	}
-	record := atom.ProcessRecord{
-		ID:         proc.ID(),
-		InstanceID: session.InstanceID,
-		SessionID:  session.ID,
-		Spec:       spec,
-		PID:        proc.PID(),
-		Status:     "running",
-		StartedAt:  time.Now(),
-	}
-	_ = m.store.Processes().Save(ctx, record)
-	m.mu.Lock()
-	m.instances[proc.ID()] = session.InstanceID
-	m.mu.Unlock()
-	go m.observe(ctx, session, proc, spec)
-	return proc, nil
-}
-
-func (m *Manager) StopInstance(ctx context.Context, instanceID string) int {
-	m.mu.Lock()
-	var ids []string
-	for id, owner := range m.instances {
+	processManager.mutex.Lock()
+	var identifiers []string
+	for identifier, owner := range processManager.instances {
 		if owner == instanceID {
-			ids = append(ids, id)
-			delete(m.instances, id)
+			identifiers = append(identifiers, identifier)
 		}
 	}
-	m.mu.Unlock()
-	count := 0
-	for _, id := range ids {
-		if proc, ok := m.supervisor.Get(id); ok {
-			if err := proc.Kill(atom.Signal("")); err == nil {
+	processManager.mutex.Unlock()
+	var failures []error
+	for _, identifier := range identifiers {
+		runningProcess, found := processManager.supervisor.Get(identifier)
+		if !found {
+			continue
+		}
+		failures = append(failures, runningProcess.Kill(""))
+		done := make(chan struct{})
+		go func() {
+			_, _ = runningProcess.Wait()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-operationContext.Done():
+			return len(identifiers), errors.Join(append(failures, operationContext.Err())...)
+		}
+	}
+	return len(identifiers), errors.Join(failures...)
+}
+
+func (processManager *Manager) Get(identifier string) (harness.Process, bool) {
+	return processManager.supervisor.Get(identifier)
+}
+func (processManager *Manager) All() []harness.Process {
+	return processManager.supervisor.All()
+}
+func (processManager *Manager) Output(identifier string) ([]byte, []byte, bool) {
+	runningProcess, found := processManager.Get(identifier)
+	if !found {
+		return nil, nil, false
+	}
+	stdout, stderr := runningProcess.(*process.Handle).Output()
+	return stdout, stderr, true
+}
+func (processManager *Manager) Subscribe(identifier string) (<-chan atom.ProcessEvent, bool) {
+	return processManager.SubscribeContext(context.Background(), identifier)
+}
+func (processManager *Manager) SubscribeContext(operationContext context.Context, identifier string) (<-chan atom.ProcessEvent, bool) {
+	runningProcess, found := processManager.Get(identifier)
+	if !found {
+		return nil, false
+	}
+	return runningProcess.(*process.Handle).SubscribeContext(operationContext), true
+}
+
+func (processManager *Manager) CheckOwner(operationContext context.Context, identifier string) error {
+	session, found := harness.SessionFrom(operationContext)
+	if !found {
+		return fmt.Errorf("process operation has no session")
+	}
+	record, operationError := processManager.store.Processes().Get(operationContext, identifier)
+	if operationError != nil {
+		return operationError
+	}
+	if record.InstanceID != session.InstanceID {
+		return fmt.Errorf("process belongs to another instance")
+	}
+	return nil
+}
+
+func (processManager *Manager) Close(operationContext context.Context) error {
+	processManager.mutex.Lock()
+	processManager.closing = true
+	processManager.mutex.Unlock()
+	operationError := waitGroup(operationContext, &processManager.starts)
+	operationError = errors.Join(operationError, processManager.supervisor.Close(operationContext))
+	done := make(chan struct{})
+	go func() {
+		processManager.observers.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-operationContext.Done():
+		operationError = errors.Join(operationError, operationContext.Err())
+	}
+	processManager.cancel()
+	return operationError
+}
+
+// Reserve before launching, but invoke plugin callbacks outside manager locks.
+// Shutdown joins reservations before joining observers, preventing Add/Wait races.
+func (processManager *Manager) reserveStart(operationContext context.Context, instanceID string) (func(), error) {
+	processManager.mutex.Lock()
+	defer processManager.mutex.Unlock()
+	if processManager.closing {
+		return nil, fmt.Errorf("process manager is closing")
+	}
+	if instanceID != "" && processManager.limits != nil {
+		if owner, supported := processManager.limits.(interface{ IsRunning(string) bool }); supported && !owner.IsRunning(instanceID) {
+			return nil, fmt.Errorf("instance is stopped")
+		}
+		limit, operationError := processManager.limits.ProcessLimit(operationContext, instanceID)
+		if operationError != nil {
+			return nil, operationError
+		}
+		count := processManager.starting[instanceID]
+		for identifier, owner := range processManager.instances {
+			if owner != instanceID {
+				continue
+			}
+			if running, found := processManager.supervisor.Get(identifier); found && running.(*process.Handle).Running() {
 				count++
 			}
 		}
-	}
-	return count
-}
-
-func (m *Manager) Get(id string) (harness.Process, bool) {
-	return m.supervisor.Get(id)
-}
-
-func (m *Manager) All() []harness.Process {
-	return m.supervisor.All()
-}
-
-type subscriber interface {
-	Subscribe() <-chan atom.ProcessEvent
-}
-
-func (m *Manager) Subscribe(id string) (<-chan atom.ProcessEvent, bool) {
-	proc, ok := m.supervisor.Get(id)
-	if !ok {
-		return nil, false
-	}
-	handle, ok := proc.(subscriber)
-	if !ok {
-		return nil, false
-	}
-	return handle.Subscribe(), true
-}
-
-func (m *Manager) Output(id string) ([]byte, []byte, bool) {
-	proc, ok := m.supervisor.Get(id)
-	if !ok {
-		return nil, nil, false
-	}
-	holder, ok := proc.(outputter)
-	if !ok {
-		return nil, nil, false
-	}
-	stdout, stderr := holder.Output()
-	return stdout, stderr, true
-}
-
-func (m *Manager) observe(ctx context.Context, session atom.Session, proc harness.Process, spec atom.ProcessSpec) {
-	events := proc.Events()
-	var ticker *time.Ticker
-	var ticks <-chan time.Time
-	if spec.Notify.Mode == atom.NotifyInterval && spec.Notify.Interval > 0 {
-		ticker = time.NewTicker(spec.Notify.Interval)
-		ticks = ticker.C
-		defer ticker.Stop()
-	}
-	for {
-		select {
-		case event, ok := <-events:
-			if !ok {
-				return
-			}
-			event, err := harness.Run(ctx, m.h, atom.StageProcessOutput, event)
-			if err != nil {
-				continue
-			}
-			for _, watcher := range m.h.Watchers() {
-				if watcher.Match(event) {
-					current := watcher
-					go current.OnMatch(ctx, event)
-				}
-			}
-			if event.Stream == atom.StreamExit {
-				m.mu.Lock()
-				delete(m.instances, proc.ID())
-				m.mu.Unlock()
-				m.finish(ctx, session, proc, spec, event)
-				return
-			}
-		case <-ticks:
-			m.send(ctx, session, fmt.Sprintf("process %s: %s", proc.ID(), m.tail(proc)))
+		if count >= limit {
+			return nil, fmt.Errorf("process limit of the instance is reached")
 		}
 	}
+	processManager.starting[instanceID]++
+	processManager.starts.Add(1)
+	starts := processManager.instanceStarts[instanceID]
+	if starts == nil {
+		starts = &sync.WaitGroup{}
+		processManager.instanceStarts[instanceID] = starts
+	}
+	starts.Add(1)
+	return func() {
+		processManager.mutex.Lock()
+		defer processManager.mutex.Unlock()
+		processManager.starting[instanceID]--
+		starts.Done()
+		processManager.starts.Done()
+	}, nil
 }
 
-func (m *Manager) finish(ctx context.Context, session atom.Session, proc harness.Process, spec atom.ProcessSpec, event atom.ProcessEvent) {
-	record := atom.ProcessRecord{
-		ID:         proc.ID(),
-		InstanceID: session.InstanceID,
-		SessionID:  session.ID,
-		Spec:       spec,
-		PID:        proc.PID(),
-		Status:     "stopped",
-		StartedAt:  time.Now(),
-		EndedAt:    time.Now(),
+func waitGroup(operationContext context.Context, group *sync.WaitGroup) error {
+	done := make(chan struct{})
+	go func() {
+		group.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-operationContext.Done():
+		return operationContext.Err()
 	}
-	if exit, err := proc.Wait(); err == nil {
-		record.Exit = &exit
-	}
-	_ = m.store.Processes().Save(ctx, record)
-	switch spec.Notify.Mode {
-	case atom.NotifyError:
-		if event.Error != "" {
-			m.send(ctx, session, fmt.Sprintf("process %s stopped with an error: %s", proc.ID(), event.Error))
-		}
-	case atom.NotifyInterval:
-		m.send(ctx, session, fmt.Sprintf("process %s stopped", proc.ID()))
-	default:
-		m.send(ctx, session, fmt.Sprintf("process %s stopped", proc.ID()))
-	}
-}
-
-func (m *Manager) tail(proc harness.Process) string {
-	holder, ok := proc.(outputter)
-	if !ok {
-		return ""
-	}
-	stdout, stderr := holder.Output()
-	if len(stderr) > 0 {
-		return string(stderr)
-	}
-	return string(stdout)
-}
-
-func (m *Manager) send(ctx context.Context, session atom.Session, text string) {
-	if session.ID == "" {
-		return
-	}
-	message := atom.Message{
-		ID:        newID(),
-		SessionID: session.ID,
-		Role:      atom.RoleUser,
-		Content:   []atom.Content{{Type: atom.Text, Text: "[process] " + text}},
-		CreatedAt: time.Now(),
-	}
-	_ = m.store.Sessions().Append(ctx, message)
-	if m.bus != nil {
-		m.bus.Send(ctx, atom.Event{
-			InstanceID: session.InstanceID,
-			SessionID:  session.ID,
-			Name:       atom.EventProcessNotify,
-			Time:       time.Now(),
-		})
-	}
-}
-
-func newID() string {
-	var data [16]byte
-	if _, err := rand.Read(data[:]); err != nil {
-		return "unknown"
-	}
-	return hex.EncodeToString(data[:])
 }

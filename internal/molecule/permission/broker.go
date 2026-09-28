@@ -8,7 +8,7 @@ import (
 )
 
 type Broker struct {
-	mu        sync.Mutex
+	mutex     sync.Mutex
 	pending   map[string]chan atom.PermissionDecision
 	onRequest func(request atom.PermissionRequest)
 }
@@ -17,46 +17,62 @@ func NewBroker() *Broker {
 	return &Broker{pending: map[string]chan atom.PermissionDecision{}}
 }
 
-func (b *Broker) SetRequestHandler(handler func(request atom.PermissionRequest)) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.onRequest = handler
+func (permissionBroker *Broker) SetRequestHandler(handler func(request atom.PermissionRequest)) {
+	permissionBroker.mutex.Lock()
+	defer permissionBroker.mutex.Unlock()
+	permissionBroker.onRequest = handler
 }
 
-func (b *Broker) Request(ctx context.Context, request atom.PermissionRequest) (atom.PermissionDecision, error) {
+func (permissionBroker *Broker) Request(operationContext context.Context, request atom.PermissionRequest, onReady ...func() error) (atom.PermissionDecision, error) {
 	channel := make(chan atom.PermissionDecision, 1)
-	b.mu.Lock()
-	b.pending[request.ID] = channel
-	handler := b.onRequest
-	b.mu.Unlock()
+	permissionBroker.mutex.Lock()
+	permissionBroker.pending[request.ID] = channel
+	handler := permissionBroker.onRequest
+	permissionBroker.mutex.Unlock()
+	defer func() {
+		permissionBroker.mutex.Lock()
+		defer permissionBroker.mutex.Unlock()
+		delete(permissionBroker.pending, request.ID)
+	}()
+	for _, notify := range onReady {
+		if operationError := notify(); operationError != nil {
+			return atom.PermissionDecision{}, operationError
+		}
+	}
 	if handler != nil {
 		handler(request)
 	}
 	select {
 	case decision := <-channel:
 		return decision, nil
-	case <-ctx.Done():
-		return atom.PermissionDecision{RequestID: request.ID, Kind: atom.VerdictDeny, Scope: atom.ScopeOnce}, nil
+	case <-operationContext.Done():
+		return atom.PermissionDecision{}, operationContext.Err()
 	}
 }
 
-func (b *Broker) Resolve(id string, decision atom.PermissionDecision) bool {
-	b.mu.Lock()
-	channel, ok := b.pending[id]
-	if ok {
-		delete(b.pending, id)
+func (permissionBroker *Broker) Resolve(identifier string, decision atom.PermissionDecision) bool {
+	if decision.Scope == "" {
+		decision.Scope = atom.ScopeOnce
 	}
-	b.mu.Unlock()
-	if !ok {
+	if !ValidDecision(decision) {
 		return false
 	}
-	decision.RequestID = id
+	permissionBroker.mutex.Lock()
+	channel, found := permissionBroker.pending[identifier]
+	if found {
+		delete(permissionBroker.pending, identifier)
+	}
+	permissionBroker.mutex.Unlock()
+	if !found {
+		return false
+	}
+	decision.RequestID = identifier
 	channel <- decision
 	return true
 }
 
-func (b *Broker) Pending() int {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return len(b.pending)
+func (permissionBroker *Broker) Pending() int {
+	permissionBroker.mutex.Lock()
+	defer permissionBroker.mutex.Unlock()
+	return len(permissionBroker.pending)
 }

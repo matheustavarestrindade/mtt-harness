@@ -20,7 +20,7 @@ func main() {
 	writer := bufio.NewWriter(os.Stdout)
 	for scanner.Scan() {
 		var request message
-		if err := json.Unmarshal(scanner.Bytes(), &request); err != nil {
+		if operationError := json.Unmarshal(scanner.Bytes(), &request); operationError != nil {
 			continue
 		}
 		if request.ID == nil {
@@ -45,22 +45,22 @@ func main() {
 				},
 			}}}
 		case "tools/call":
-			var params struct {
+			var parameters struct {
 				Name      string `json:"name"`
 				Arguments struct {
 					Text string `json:"text"`
 				} `json:"arguments"`
 			}
-			_ = json.Unmarshal(request.Params, &params)
-			if params.Name != "echo" {
+			_ = json.Unmarshal(request.Params, &parameters)
+			if parameters.Name != "echo" {
 				result = map[string]any{
 					"content": []map[string]any{{"type": "text", "text": "the tool is not known"}},
 					"isError": true,
 				}
-			} else {
-				result = map[string]any{
-					"content": []map[string]any{{"type": "text", "text": "echo: " + params.Arguments.Text}},
-				}
+				break
+			}
+			result = map[string]any{
+				"content": []map[string]any{{"type": "text", "text": "echo: " + parameters.Arguments.Text}},
 			}
 		default:
 			result = map[string]any{}

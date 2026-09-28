@@ -1,6 +1,38 @@
 {
   "format_version": "1",
   "terms": [
+    {"term":"shell","category":"technical_noun","approved_forms":["shells"],"meaning":"the command interpreter used to execute process commands","source":"mtt-harness runtime"},
+    {"term":"percentage","category":"technical_noun","approved_forms":["percentages"],"meaning":"a measured ratio multiplied by one hundred","source":"mtt-harness statistics"},
+    {"term":"token estimate","category":"technical_noun","approved_forms":["token estimates"],"meaning":"a locally calculated approximation of request token usage","source":"mtt-harness context budgeting"},
+    {"term":"token count","category":"technical_noun","approved_forms":["token counts"],"meaning":"the number of model tokens in a request","source":"mtt-harness context budgeting"},
+    {"term":"byte","category":"technical_noun","approved_forms":["bytes"],"meaning":"an eight-bit unit of encoded data","source":"mtt-harness context budgeting"},
+    {"term":"media allowance","category":"technical_noun","approved_forms":["media allowances"],"meaning":"context capacity reserved for a non-text content item","source":"mtt-harness context budgeting"},
+    {"term":"message history","category":"technical_noun","approved_forms":[],"meaning":"the persisted conversation messages of a session","source":"mtt-harness runtime"},
+    {"term":"event bus","category":"technical_noun","approved_forms":[],"meaning":"the service that records events and delivers them to registered handlers","source":"mtt-harness runtime"},
+    {"term":"model gateway","category":"technical_noun","approved_forms":[],"meaning":"the service that resolves providers and models","source":"mtt-harness runtime"},
+    {"term":"schema reference","category":"technical_noun","approved_forms":["schema references"],"meaning":"a JSON Schema reference to another schema definition","source":"mtt-harness schema validation"},
+    {"term":"process manager","category":"technical_noun","approved_forms":[],"meaning":"the service that owns process records, output stages, and notifications","source":"mtt-harness runtime"},
+    {"term":"process supervisor","category":"technical_noun","approved_forms":[],"meaning":"the service that starts operating-system processes and owns their handles","source":"mtt-harness runtime"},
+    {"term":"Unix","category":"technical_noun","approved_forms":[],"meaning":"the operating-system family with process-group signal support","source":"mtt-harness runtime"},
+    {"term":"stop signal","category":"technical_noun","approved_forms":["stop signals"],"meaning":"an operating-system signal that interrupts or terminates a process","source":"mtt-harness runtime"},
+    {"term":"architecture","category":"technical_noun","approved_forms":[],"meaning":"the package-layer structure of the harness","source":"mtt-harness Go design"},
+    {"term":"import","category":"technical_noun","approved_forms":["imports"],"meaning":"a Go declaration that uses another package","source":"mtt-harness Go design"},
+    {"term":"usage record","category":"technical_noun","approved_forms":["usage records"],"meaning":"a stored model call's token and cost data","source":"mtt-harness statistics"},
+    {"term":"message record","category":"technical_noun","approved_forms":["message records"],"meaning":"a stored conversation message","source":"mtt-harness runtime"},
+    {
+      "term": "variable",
+      "category": "technical_noun",
+      "approved_forms": ["variables"],
+      "meaning": "a named storage location in source code",
+      "source": "mtt-harness Go readability decisions"
+    },
+    {
+      "term": "error helper",
+      "category": "technical_noun",
+      "approved_forms": ["error helpers"],
+      "meaning": "a function that centralizes handling of an operation failure",
+      "source": "mtt-harness Go readability decisions"
+    },
     {
       "term": "harness",
       "category": "technical_noun",

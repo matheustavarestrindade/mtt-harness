@@ -8,21 +8,23 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/matheustavarestrindade/mtt-harness/internal/testutil"
 )
 
-func TestHTTPTransport(t *testing.T) {
+func TestHTTPTransport(test *testing.T) {
 	var sessionHeaders []string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sessionHeaders = append(sessionHeaders, r.Header.Get("Mcp-Session-Id"))
+	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, httpRequest *http.Request) {
+		sessionHeaders = append(sessionHeaders, httpRequest.Header.Get("Mcp-Session-Id"))
 		var request rpcMessage
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if operationError := json.NewDecoder(httpRequest.Body).Decode(&request); operationError != nil {
+			http.Error(responseWriter, operationError.Error(), http.StatusBadRequest)
 			return
 		}
 		var result any
 		switch request.Method {
 		case "initialize":
-			w.Header().Set("Mcp-Session-Id", "session-1")
+			responseWriter.Header().Set("Mcp-Session-Id", "session-1")
 			result = map[string]any{
 				"protocolVersion": ProtocolVersion,
 				"capabilities":    map[string]any{"tools": map[string]any{}},
@@ -35,7 +37,7 @@ func TestHTTPTransport(t *testing.T) {
 				"inputSchema": map[string]any{"type": "object"},
 			}}}
 		case "tools/call":
-			w.Header().Set("Content-Type", "text/event-stream")
+			responseWriter.Header().Set("Content-Type", "text/event-stream")
 			answer, _ := json.Marshal(map[string]any{
 				"jsonrpc": "2.0",
 				"id":      request.ID,
@@ -43,37 +45,34 @@ func TestHTTPTransport(t *testing.T) {
 					"content": []map[string]any{{"type": "text", "text": "remote: ok"}},
 				},
 			})
-			fmt.Fprintf(w, "data: %s\n\n", answer)
+			fmt.Fprintf(responseWriter, "data: %s\n\n", answer)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": request.ID, "result": result})
+		responseWriter.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(responseWriter).Encode(map[string]any{"jsonrpc": "2.0", "id": request.ID, "result": result})
 	}))
 	defer server.Close()
 
-	client, err := Start(context.Background(), ServerSpec{Name: "remote", URL: server.URL}, 30*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
+	client, operationError := Start(context.Background(), ServerSpec{Name: "remote", URL: server.URL}, 30*time.Second)
+	testutil.RequireNoError(test, operationError)
+
 	defer client.Close()
-	ctx := context.Background()
-	tools, err := client.ListTools(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	operationContext := context.Background()
+	tools, operationError := client.ListTools(operationContext)
+	testutil.RequireNoError(test, operationError)
+
 	if len(tools) != 1 || tools[0].Name != "echo" {
-		t.Fatalf("tools = %+v", tools)
+		test.Fatalf("tools = %+v", tools)
 	}
-	result, err := client.CallTool(ctx, "echo", []byte(`{"text":"x"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
+	result, operationError := client.CallTool(operationContext, "echo", []byte(`{"text":"x"}`))
+	testutil.RequireNoError(test, operationError)
+
 	if len(result.Content) != 1 || result.Content[0].Text != "remote: ok" {
-		t.Fatalf("result = %+v", result)
+		test.Fatalf("result = %+v", result)
 	}
 	for index, header := range sessionHeaders {
 		if index > 0 && header != "session-1" {
-			t.Fatalf("the session header %d = %q", index, header)
+			test.Fatalf("the session header %d = %q", index, header)
 		}
 	}
 }
