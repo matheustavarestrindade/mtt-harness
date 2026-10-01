@@ -231,6 +231,7 @@ type Provider interface {
 
 type ModelInfo struct {
     ID         string
+    Name       string `json:",omitempty"`
     Level      int
     Input      []MediaType
     Output     []MediaType
@@ -262,6 +263,8 @@ The provider gives the model list for the instance. A model gives:
 - The input media types and the output media types.
 - If the model can start tools.
 - The context limit.
+
+The field `Name` is optional. It gives a display label for the model. The field `ID` gives the value for model requests and instance model lists. A model version can change without a change to the model ID.
 
 A message has content items. A content item has one media type and the data of the item. Thus, the harness can send text, an image, audio, or a file to a model.
 
@@ -348,7 +351,7 @@ The API gives `CacheHitRate` and `CacheHitPercentage`. The percentage is the rat
 
 ### 6.2 Provider Data
 
-The harness reads the providers from a JSON file. The file has one entry for a provider. The provider data has:
+The harness has default provider data for OpenAI and DeepSeek. It also reads a JSON file to override the data or add providers. The file has one entry for a provider. The provider data has:
 
 - The name of the provider.
 - The API URL.
@@ -357,6 +360,8 @@ The harness reads the providers from a JSON file. The file has one entry for a p
 - The interval for the model list.
 - The prices of the models. The field is optional.
 - The models. The field is optional.
+- The protocol: `responses` or `chat_completions`.
+- The authentication method: `api_key`, `chatgpt`, or `none`.
 
 The harness keeps the provider data, the model lists, and the prices in the database. Thus, the instances read the model data from the database.
 
@@ -370,6 +375,8 @@ A model list endpoint usually gives the model IDs and the limits. A model list e
 
 The harness refreshes the model data at the interval. The default interval is 24 hours. The user can refresh the model data from the API. The harness keeps the last model list when the API gives an error.
 
+A model list response can give only IDs. The harness uses model data from the provider file before default model data. It uses default model data before data from the model cache. When a model list endpoint is available, the harness uses the IDs in the response.
+
 A provider can use the `Refresher` interface:
 
 ```go
@@ -382,8 +389,8 @@ The standard adapter uses `Refresher` when the provider data has a model list UR
 
 Requirements:
 
-- R41: The harness must read the provider data from a JSON file.
-- R42: The provider data must give a name, an API URL, and a model list URL.
+- R41: The harness must read provider data from a JSON file when the file is available.
+- R42: The provider data must give a name and an API URL. A model list URL is optional when the provider uses a model list from configuration.
 - R43: The provider file can give the prices and the models.
 - R44: The harness must keep the provider data, the model lists, and the prices in the database.
 - R45: The harness must keep the secret of a provider in the database.
@@ -408,6 +415,30 @@ type TokenCounter interface {
     CountTokens(operationContext context.Context, request atom.Request) (int, error)
 }
 ```
+
+### 6.4 Provider Connections
+
+The default provider IDs are `openai`, `deepseek`, and `openai-codex`. OpenAI and DeepSeek use API keys. The provider `openai-codex` uses a ChatGPT subscription. The test provider can run with the default providers. The default providers are available in test mode.
+
+The provider file can override the default data. A file entry is not necessary for a default provider. The user sets an API key with the API or the UI. New requests use the new API key. The harness can continue to run during a key change.
+
+The provider `openai-codex` uses OAuth device authentication. The API gives a URL, a user code, and a login ID. The user opens the OpenAI URL and supplies the code. The harness waits for OpenAI authorization. The user must supply the code in 15 minutes.
+
+The database keeps OAuth credentials. The harness can refresh an OAuth credential before the expiry time. Credential requests run one at a time. If the user cancels or replaces a login, the harness must discard subsequent credential responses for the login. The harness stops the login worker before the database closes.
+
+Provider responses do not contain API keys or OAuth tokens. The provider data includes `Connected` and `ModelCount`. The field `Connected` shows that a credential is in the database. It does not show model access. The provider examines model access during a model call.
+
+The API gives the providers in the provider registry. A database entry without a provider in the registry is not in the response. The response includes the test provider when it is active.
+
+The default providers use the Responses API. The adapter sends a tool call when the input JSON is available. It does not wait until the model stream stops. The database keeps the field `ProviderState` for the next request to the same provider. The message response does not contain the field `ProviderState`. The context estimate includes the bytes in the field `ProviderState`.
+
+Requirements:
+
+- R187: OpenAI and DeepSeek must be available without a provider file.
+- R188: The user can set a provider key while the container runs.
+- R189: The provider `openai-codex` must use account authentication, not an API key.
+- R190: The API must not give provider authentication tokens to a client.
+- R191: A tool result request must keep the reasoning data necessary for the provider.
 
 ## 7. Stages
 
@@ -555,15 +586,15 @@ A verdict of `deny` must stop a tool before the harness reads a permission decis
 
 ### 10.2 Find Tools
 
-The harness gives the model the `search_tool` tool. The model starts `search_tool` with a query. The query has a category or text. The tool result gives the tools which agree with the query. Each found tool gives:
+The harness gives the model the `search_tool` tool. The model starts `search_tool` with a query. The query has a category or text. The result gives only the fields `Name` and `Categories` of a tool.
 
-- The name and the description.
-- The category.
-- The input schema.
+The harness makes a search document from the tool name, description, categories, and input schema. A tool can also give usage examples through the optional `SearchDocument` method. For semantic search, a model changes the document to a vector. The query uses the same model. Lexical search uses TF-IDF vectors from the same documents.
 
-The `search_tool` function compares the query with the search text. The search text is the name, the description, and the categories of a tool. The function divides the query into words. A tool agrees with the query when the search text has the words of the query.
+The function compares the query vector with the document vectors. It uses cosine similarity. The default minimum is 0.3 for semantic search and 0.01 for lexical search. Configuration can change the minimum values to a value from 0 to 1. Lexical search gives capability descriptions a weight of 0.75 and full search documents a weight of 0.25.
 
-The function must ignore the difference between `A` and `a`. The function uses code only. Thus, the function does not use a model.
+The search documents and vectors stay in the harness. They are not in the tool result or the model request. The result does not contain tool descriptions or input schemas. The harness gets the descriptions and schemas from the registry for the next model request.
+
+A full tool name selects the tool directly. A category without query text gives the tools in the category. A request for vectors is not necessary for a full name or category. The function must ignore the difference between `A` and `a`. It does not use a text-generation model for tool discovery.
 
 The input fields of `search_tool` are:
 
@@ -571,7 +602,23 @@ The input fields of `search_tool` are:
 - `category`: the category of the tools. The field is optional.
 - `limit`: the maximum number of tools in the result. The default is 10. The maximum is 50.
 
-The sequence of the result has 3 groups. The category group is before the name group. The name group is before the description group. Thus, the result is the same for the same query and the same tool group. The tool result can be empty.
+The result puts the largest cosine similarity first. Tools with the same cosine similarity are in name sequence. The category field must agree with the tool category. The result for a category without text is in tool name sequence. The result can be empty.
+
+The harness keeps document vectors in memory. A change to the tool document causes new document vectors. A tool removal also removes the vectors from the cache. Lexical search calculates new TF-IDF weights after a tool change. MCP tool descriptions and schemas come from the server.
+
+The `tool_search` section of `providers.json` gives the mode, model directory, and the minimum cosine similarity values. The mode can be `auto`, `semantic`, or `lexical`. The default mode is `auto`.
+
+The mode `auto` uses semantic search when available. An error during model startup or vector calculation causes automatic fallback to lexical search. The backend stays in lexical search until the harness starts again. The harness records the selected backend and error cause.
+
+The Docker image includes the MiniLM model and tokenizer from the model source. Hugot runs the model in the harness with Go. A model server and native library are not necessary. The image build gets model assets from a specified source revision. It compares SHA-256 values. The harness does not get model assets at runtime.
+
+MiniLM accepts a maximum of 256 WordPiece tokens for an input. The tokenizer divides long documents into sections. It must keep the full document. The harness keeps a vector for a section. The search score is the largest cosine similarity of the tool's sections.
+
+The `semantic` build tag includes the optional model adapter. Without the `semantic` build tag, a Go build has only lexical search. The Docker target `core` also uses lexical search. The registry uses the `Searcher` interface. It does not use Hugot. The model adapter can be removed independently of the lexical backend.
+
+An error during vector calculation in `semantic` mode gives a tool error. It must not give an empty result with status `ok`. Cancellation must not cause automatic fallback. Cancellation stops subsequent chunks and discards the result in progress. The chunk in progress completes before model teardown. The harness must wait for tool discovery before it releases model resources.
+
+Conversation vector recall is not necessary for tool discovery. Conversation vector recall is for a subsequent milestone.
 
 The harness adds the found tools to the tool group of the session. Thus, the model can start the found tools on the next turn. The model can start `search_tool` again for other tools.
 
@@ -580,19 +627,19 @@ The harness gives the tool group and the `search_tool` tool in the model request
 Requirements:
 
 - R80: A tool must have one or more categories.
-- R81: The `search_tool` function must compare the query with the search text.
-- R82: The `search_tool` function must not use a model.
-- R83: The `search_tool` function must divide the query into words.
-- R84: A tool must agree with the query when the search text of the tool has the words of the query.
+- R81: Text queries must compare the query vector with the tool document vectors.
+- R82: For semantic search, a model must make vectors. Lexical search must use TF-IDF. Tool discovery must not use a text-generation model.
+- R83: A search document must include the tool description, usage examples when available, and input schema.
+- R84: Text queries must apply the minimum cosine similarity from configuration.
 - R85: The `search_tool` function must ignore the difference between `A` and `a`.
 - R86: The `category` field must agree with the category of a tool.
 - R87: The result must not have a number of tools above the `limit` field.
 - R88: The default limit must be 10 and the maximum limit must be 50.
-- R89: The result must put the tools which agree by category before the tools which agree by name.
-- R90: The result must put the tools which agree by name before the tools which agree by description.
-- R91: The `search_tool` function must give the same result for the same query and the same tool group.
+- R89: Text queries must put the largest cosine similarity first.
+- R90: Tools with the same cosine similarity value must be in name sequence.
+- R91: Tool discovery must give the same sequence for the same vectors and tool group.
 - R92: The harness must give the `search_tool` tool to the model.
-- R93: The result of `search_tool` must give the name, the description, the category, and the input schema of the found tools.
+- R93: The result of `search_tool` must give only `Name` and `Categories` for the found tools.
 - R94: The harness must add the found tools to the tool group of the session.
 - R95: The harness must give the tool group and the `search_tool` tool in the model request.
 - R96: The harness must not give a tool to the model when the tool is not in the tool group.
@@ -601,9 +648,64 @@ Requirements:
 
 The tool description and input schema give the model information about the tool. The input schema must give the purpose of a parameter. A parameter for a duration must have a unit. An optional parameter must have a description of the default behavior. The description must give the meaning of special input data, such as `0` or an empty string.
 
-The tool description must tell the model about the behavior of the tool. For example, `write` replaces the full file content. The process tools use a harness process ID, not a PID from the operating system. The `agent` tool uses the instance default model when the input does not give a model ID.
+The tool description must tell the model about the behavior of the tool. For example, `write` replaces the full file content when the input does not give a line range. The process tools use a harness process ID, not a PID from the operating system. The `agent` tool uses the instance default model when the input does not give a model ID.
 
 The model request must keep the parameter descriptions and defaults. A new model list must not replace the parameter descriptions of the `agent` tool. An MCP server gives the descriptions and schemas for the tools of the server. The harness must not add an incorrect unit to an external parameter.
+
+### 10.4 File Tools
+
+The tools `read`, `write`, and `replace` have optional `start_line` and `end_line` parameters. Line numbers start at 1. The line range includes the start line and the end line. Without `start_line`, the range starts at line 1. Without `end_line`, the range continues to EOF.
+
+The end of a line is LF or EOF. An empty file has 0 lines. The last LF does not make a new line. A start line must be in the file when the input gives a range. The `read` tool stops at EOF when `end_line` is after the last line. The `write` and `replace` tools give an error when a line from the input is not in the file.
+
+The `write` tool replaces the full lines in the range. The other file data does not change. An empty replacement removes the selected lines. Without a range, `write` replaces the full file content or makes a new file. The parent directory must be available.
+
+The last line break of the selected text can be LF or CRLF. The tool keeps the last line break when the replacement has text but does not have a last LF. Internal line breaks in the replacement do not change. Without a range, the tool writes the replacement text without a change.
+
+The `replace` tool finds the text from `old_text` and gives the text from `new_text`. The input `old_text` must not be empty. An empty `new_text` removes the text match. The text must agree in letter case, space characters, and line breaks. The text match must stay in the selected range. The tool gives an error without a file change when it cannot find the text.
+
+The `replace` tool has 3 mode values:
+
+- `first`: replace the initial text match in the range. This is the default mode.
+- `last`: replace the last text match in the range.
+- `all`: replace the text matches in sequence from the start of the range. A text match must not use text from a previous text match.
+
+The tool does not examine the new text again. It does not use a regular expression. A file edit uses a temporary file and a rename operation. The file edit keeps the permission bits of the file. A file edit replaces the file at the path. Other hard links keep the previous content.
+
+The harness puts file edits to the same resolved path in sequence.
+
+The tool input can be:
+
+```json
+{"path":"src/main.go","start_line":10,"end_line":30}
+{"path":"src/main.go","start_line":12,"end_line":14,"content":"replacement text"}
+{"path":"src/main.go","old_text":"oldName","new_text":"newName","mode":"all","start_line":10,"end_line":30}
+```
+
+### 10.5 Read Output A/B Test
+
+The process environment variable `MTT_READ_LINE_NUMBERS` selects the output format of `read`. The harness reads the variable when it attaches the tool. The control value is `false` or `0`. If the variable does not have a value, the harness selects the control. The test value is `true` or `1`. An incorrect value prevents a program start.
+
+The control output has file text only. The test output has the file line number before the text. For example, a range from line 10 starts with `10: `. The line prefix is output data, not file content. A model must not put the line prefix into a file edit. The tool description gives the active output format to the model.
+
+The A/B test does not change the selected lines or the file content. The model, task, and files must be the same for the control and the test. A new process start is necessary to change the output format.
+
+Docker Compose reads the local `.env` file and gives the variable to the harness container. The `.env.example` file gives an example.
+
+The repository must not contain the local `.env` file. The Go program reads the process environment only. The harness settings and provider secrets stay in the database.
+
+Set the value in `.env`:
+
+```dotenv
+# Numbered output; use false for the plain-text control.
+MTT_READ_LINE_NUMBERS=true
+```
+
+Start the harness:
+
+```sh
+docker compose up --build
+```
 
 ## 11. Processes
 
@@ -721,6 +823,7 @@ Postgres is the default database. The tables are:
 - `providers`
 - `models`
 - `provider_keys`
+- `provider_oauth`
 - `settings`
 
 The `messages` table keeps the content, the tool call data, and the tool results of a message.
@@ -774,6 +877,10 @@ The initial API paths are:
 - `POST /providers/{id}/refresh`: refresh the model data.
 - `PUT /providers/{id}/key`: set the secret of a provider.
 - `DELETE /providers/{id}/key`: remove the secret of a provider.
+- `POST /providers/{id}/auth/device`: start device authentication.
+- `GET /providers/{id}/auth/device/{login_id}`: get login status.
+- `DELETE /providers/{id}/auth/device/{login_id}`: cancel a login.
+- `DELETE /providers/{id}/auth`: remove the account credential.
 - `GET /settings`: read the harness settings.
 - `PUT /settings/{key}`: change a harness setting.
 - `DELETE /settings/{key}`: remove a harness setting.
@@ -869,6 +976,7 @@ The files of the project are:
 ```
 mtt-harness/
   go.mod
+  .env.example                 # local benchmark configuration template
   mtt.example.json             # the example bootstrap file
   providers.json               # the provider data
   mcp.example.json             # the example MCP server file
@@ -882,6 +990,9 @@ mtt-harness/
     providers.go                # provider loading and refresh
     mcp.go                      # MCP loading and tool registration
     tools.go                    # built-in tool registration
+    experiments.go              # process-level benchmark switches
+    tool_search.go              # search configuration and lifecycle
+    tool_search_{core,semantic}.go # optional backend factory
     plugins.go                  # plugin registration
   atom/                        # atoms: values only
     message.go
@@ -911,6 +1022,14 @@ mtt-harness/
       schema/schema.go         # the input schema check
       pipeline/pipeline.go     # the middleware chain
       contextbuilder/context.go
+      embedding/embedding.go   # the encoder and chunk interfaces
+      embedding/minilm/        # optional pure-Go model adapter
+      toolsearch/config.go     # tool search configuration
+      toolsearch/searcher.go   # the stable ranking interface
+      toolsearch/selector.go   # mode selection and automatic fallback
+      toolsearch/lexical.go    # TF-IDF and cosine similarity
+      toolsearch/documents.go  # internal tool documents
+      toolsearch/index.go      # document vectors and cosine similarity
       provider/standard.go     # the standard adapter
       provider/request.go      # HTTP requests and content encoding
       provider/content.go      # text and media encoding
@@ -960,6 +1079,7 @@ mtt-harness/
       loop/usage.go            # model cost calculation
       loop/events.go           # loop events
       registry/registry.go     # the ToolRegistry
+      registry/search.go       # category filters and tool discovery
       plugins/host.go          # the PluginHost
       instances/manager.go     # the InstanceManager
       processes/manager.go     # the ProcessManager
@@ -991,6 +1111,9 @@ mtt-harness/
       bash.go
       read.go
       write.go
+      replace.go               # literal replacements in file ranges
+      line_range.go            # shared line boundary rules
+      file_edit.go             # per-path edit ordering and atomic replacement
       search.go                # the `search_tool` tool
       process.go               # the process tools
       agent.go
@@ -1165,6 +1288,9 @@ type QueueStore interface {
 }
 
 type SecretStore interface {
+    SaveOAuthCredential(operationContext context.Context, provider string, credential atom.OAuthCredential) error
+    OAuthCredential(operationContext context.Context, provider string) (atom.OAuthCredential, error)
+    DeleteOAuthCredential(operationContext context.Context, provider string) error
     SaveProviderKey(operationContext context.Context, provider string, key string) error
     ProviderKey(operationContext context.Context, provider string) (string, error)
     SaveInstanceKey(operationContext context.Context, instanceID string, provider string, key string) error
@@ -1257,6 +1383,12 @@ Requirements:
 - R178: A revert operation must not start work in a stopped coordinator.
 - R179: A tool input schema must give the parameter descriptions, units, defaults, and the meaning of special input data.
 - R180: A model request must keep the tool parameter descriptions when the harness changes the model list.
+- R181: The file tools must use the same line number and range rules.
+- R182: The `read` tool must give only the selected file lines.
+- R183: A file edit with a range must keep the file data before and after the range.
+- R184: The `replace` tool must have the mode values `first`, `last`, and `all`.
+- R185: The `replace` tool must not change the file when it cannot find the text.
+- R186: The line prefix must be optional for the A/B test.
 
 ## 18. Protection
 

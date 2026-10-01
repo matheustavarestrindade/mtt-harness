@@ -1,12 +1,25 @@
 package api
 
-import "net/http"
+import (
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
+	"net/http"
+	"strings"
+)
 
 func (server *Server) saveProviderKey(responseWriter http.ResponseWriter, request *http.Request) {
+	if request.PathValue("id") == provider.CodexProvider {
+		writeError(responseWriter, http.StatusBadRequest, "use ChatGPT device sign-in for the coding plan")
+		return
+	}
 	var input struct {
 		Key string `json:"key"`
 	}
 	if respondToError(responseWriter, http.StatusBadRequest, readJSON(request, &input)) {
+		return
+	}
+	input.Key = strings.TrimSpace(input.Key)
+	if input.Key == "" {
+		writeError(responseWriter, http.StatusBadRequest, "the API key must not be empty; use DELETE to disconnect")
 		return
 	}
 	if respondToError(responseWriter, http.StatusInternalServerError, server.store.Secrets().SaveProviderKey(request.Context(), request.PathValue("id"), input.Key)) {

@@ -19,7 +19,9 @@ type Cost struct {
 }
 
 type ModelInfo struct {
-	ID         string
+	ID string
+	// Name is an optional display label. Requests and allowlists use ID.
+	Name       string `json:",omitempty"`
 	Level      int
 	Input      []MediaType
 	Output     []MediaType
@@ -29,11 +31,13 @@ type ModelInfo struct {
 }
 
 type ProviderSpec struct {
-	Name          string
-	APIURL        string
-	ModelListURL  string
-	PriceTableURL string
-	Interval      time.Duration
+	Name           string
+	Protocol       string
+	Authentication string
+	APIURL         string
+	ModelListURL   string
+	PriceTableURL  string
+	Interval       time.Duration
 }
 
 type ProviderKey struct {
@@ -95,9 +99,17 @@ type Request struct {
 }
 
 type ResponsePart struct {
-	Text      string
-	Content   []Content
-	ToolIndex *int
-	ToolCall  *ToolCall
-	Usage     *Usage
+	Text          string
+	Content       []Content
+	ToolIndex     *int
+	ToolCall      *ToolCall
+	Usage         *Usage
+	ProviderState *ProviderState
+}
+
+// ProviderState preserves provider-specific reasoning items for stateless tool
+// continuations. An adapter must only replay state belonging to its own provider.
+type ProviderState struct {
+	Provider  string
+	Reasoning []json.RawMessage
 }

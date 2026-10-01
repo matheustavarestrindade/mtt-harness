@@ -19,7 +19,16 @@ services:
     init: true
     build: .
     user: "${MTT_UID:-1000}:${MTT_GID:-1000}"
+    # Compose reads this benchmark switch from the local .env file.
+    environment:
+      MTT_READ_LINE_NUMBERS: ${MTT_READ_LINE_NUMBERS:-false}
     command:
+      - --config
+      - /etc/mtt/mtt.json
+      - --providers-file
+      - /etc/mtt/providers.json
+      - --mcp-file
+      - /etc/mtt/mcp.json
       - --database-url
       - postgres://${MTT_DB_USER:-mtt}:${MTT_DB_PASSWORD:-mtt}@postgres:5432/${MTT_DB_NAME:-mtt}?sslmode=disable
       - --port
@@ -28,7 +37,29 @@ services:
     ports:
       - "${MTT_HOST_PORT:-18080}:8080"
     volumes:
-      - .:/workspace
+      - type: bind
+        source: ./workspace
+        target: /workspace
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./mtt.json
+        target: /etc/mtt/mtt.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./providers.json
+        target: /etc/mtt/providers.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./mcp.json
+        target: /etc/mtt/mcp.json
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,7 +93,8 @@ services:
     environment:
       CGO_ENABLED: "0"
       MTT_TEST_DATABASE_URL: postgres://mtt:mtt@postgres-test:5432/mtt_test?sslmode=disable
-    command: ["go", "test", "./..."]
+      MTT_TEST_SEARCH_MODEL_DIRECTORY: /opt/mtt/models/all-MiniLM-L6-v2
+    command: ["go", "test", "-tags", "semantic", "./..."]
     depends_on:
       postgres-test:
         condition: service_healthy

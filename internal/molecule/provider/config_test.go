@@ -19,7 +19,7 @@ func TestLoadFile(test *testing.T) {
 				"api_key_env": "MTT_TEST_PROVIDER_KEY",
 				"refresh_hours": 12,
 				"prices": {"m1": {"currency": "USD", "input": 2, "output": 4}},
-				"models": [{"id": "m1", "tools": true, "context_max": 1000, "input": ["text", "image"], "output": ["text"]}]
+				"models": [{"id": "m1", "name": "Example Model", "tools": true, "context_max": 1000, "input": ["text", "image"], "output": ["text"]}]
 			}
 		]
 	}`
@@ -44,5 +44,8 @@ func TestLoadFile(test *testing.T) {
 	}
 	if len(configuration.Models[0].Input) != 2 || configuration.Models[0].Input[1] != "image" {
 		test.Fatalf("input media = %+v", configuration.Models[0].Input)
+	}
+	if configuration.Models[0].Name != "Example Model" {
+		test.Fatalf("configured model display name = %q", configuration.Models[0].Name)
 	}
 }

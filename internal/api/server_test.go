@@ -29,7 +29,7 @@ func TestAPIFlow(test *testing.T) {
 	database := memory.New()
 	harnessRuntime := harness.New()
 	bus := eventbus.New(harnessRuntime)
-	toolRegistry := registry.New(harnessRuntime)
+	toolRegistry := registry.New(harnessRuntime, nil)
 	broker := permission.NewBroker()
 	models := gateway.New(harnessRuntime)
 	testProvider := provider.NewTest("test", provider.TextWithUsage("hello", atom.Usage{Input: 10, Output: 2}))

@@ -18,6 +18,13 @@ type ToolSpec struct {
 
 type ToolGroup []ToolSpec
 
+// ToolReference is a compact discovery result. The loop obtains callable
+// instructions and schemas from the authoritative registry, not this result.
+type ToolReference struct {
+	Name       string
+	Categories []string
+}
+
 type ToolCall struct {
 	ID    string
 	Name  string

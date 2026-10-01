@@ -8,35 +8,37 @@ import (
 )
 
 type Store struct {
-	mutex          sync.RWMutex
-	instances      map[string]atom.InstanceSpec
-	sessions       map[atom.SessionID]atom.Session
-	messages       map[atom.SessionID][]atom.Message
-	events         []atom.Event
-	sequenceNumber uint64
-	processes      map[string]atom.ProcessRecord
-	permissions    map[string]atom.PermissionDecision
-	usage          []atom.UsageRecord
-	providers      map[string]atom.ProviderSpec
-	models         map[string][]atom.ModelInfo
-	secretKeys     map[string]atom.ProviderKey
-	settings       map[string]string
-	queued         map[string]atom.QueuedMessage
-	queueSequence  uint64
+	mutex            sync.RWMutex
+	instances        map[string]atom.InstanceSpec
+	sessions         map[atom.SessionID]atom.Session
+	messages         map[atom.SessionID][]atom.Message
+	events           []atom.Event
+	sequenceNumber   uint64
+	processes        map[string]atom.ProcessRecord
+	permissions      map[string]atom.PermissionDecision
+	usage            []atom.UsageRecord
+	providers        map[string]atom.ProviderSpec
+	models           map[string][]atom.ModelInfo
+	secretKeys       map[string]atom.ProviderKey
+	oauthCredentials map[string]atom.OAuthCredential
+	settings         map[string]string
+	queued           map[string]atom.QueuedMessage
+	queueSequence    uint64
 }
 
 func New() *Store {
 	return &Store{
-		instances:   map[string]atom.InstanceSpec{},
-		sessions:    map[atom.SessionID]atom.Session{},
-		messages:    map[atom.SessionID][]atom.Message{},
-		processes:   map[string]atom.ProcessRecord{},
-		permissions: map[string]atom.PermissionDecision{},
-		providers:   map[string]atom.ProviderSpec{},
-		models:      map[string][]atom.ModelInfo{},
-		secretKeys:  map[string]atom.ProviderKey{},
-		settings:    map[string]string{},
-		queued:      map[string]atom.QueuedMessage{},
+		instances:        map[string]atom.InstanceSpec{},
+		sessions:         map[atom.SessionID]atom.Session{},
+		messages:         map[atom.SessionID][]atom.Message{},
+		processes:        map[string]atom.ProcessRecord{},
+		permissions:      map[string]atom.PermissionDecision{},
+		providers:        map[string]atom.ProviderSpec{},
+		models:           map[string][]atom.ModelInfo{},
+		secretKeys:       map[string]atom.ProviderKey{},
+		oauthCredentials: map[string]atom.OAuthCredential{},
+		settings:         map[string]string{},
+		queued:           map[string]atom.QueuedMessage{},
 	}
 }
 

@@ -14,6 +14,9 @@ import (
 )
 
 func (standardProvider *Standard) Stream(operationContext context.Context, request atom.Request) (harness.Stream, error) {
+	if standardProvider.providerSpec.Protocol == "responses" {
+		return standardProvider.streamResponses(operationContext, request)
+	}
 	messages, operationError := encodeMessages(request.Messages)
 	if operationError != nil {
 		return nil, operationError
@@ -43,12 +46,8 @@ func (standardProvider *Standard) Stream(operationContext context.Context, reque
 		return nil, operationError
 	}
 	httpRequest.Header.Set("Content-Type", "application/json")
-	key, operationError := standardProvider.secret(operationContext)
-	if operationError != nil {
+	if operationError := standardProvider.authenticate(httpRequest); operationError != nil {
 		return nil, operationError
-	}
-	if key != "" {
-		httpRequest.Header.Set("Authorization", "Bearer "+key)
 	}
 	response, operationError := standardProvider.client.Do(httpRequest)
 	if operationError != nil {

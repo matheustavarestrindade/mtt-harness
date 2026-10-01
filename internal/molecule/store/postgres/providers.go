@@ -12,14 +12,15 @@ type providers struct{ store *Store }
 
 func (providerStore *providers) Save(operationContext context.Context, providerSpec atom.ProviderSpec) error {
 	_, operationError := providerStore.store.pool.Exec(operationContext, `
-		INSERT INTO providers (name, api_url, model_list_url, price_table_url, interval_seconds)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO providers (name, api_url, model_list_url, price_table_url, interval_seconds, protocol, authentication)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (name) DO UPDATE SET
 			api_url = EXCLUDED.api_url,
 			model_list_url = EXCLUDED.model_list_url,
 			price_table_url = EXCLUDED.price_table_url,
-			interval_seconds = EXCLUDED.interval_seconds`,
-		providerSpec.Name, providerSpec.APIURL, providerSpec.ModelListURL, providerSpec.PriceTableURL, int64(providerSpec.Interval/time.Second))
+			interval_seconds = EXCLUDED.interval_seconds,
+			protocol = EXCLUDED.protocol, authentication = EXCLUDED.authentication`,
+		providerSpec.Name, providerSpec.APIURL, providerSpec.ModelListURL, providerSpec.PriceTableURL, int64(providerSpec.Interval/time.Second), providerSpec.Protocol, providerSpec.Authentication)
 	return operationError
 }
 
@@ -27,16 +28,16 @@ func (providerStore *providers) Get(operationContext context.Context, identifier
 	var providerSpec atom.ProviderSpec
 	var seconds int64
 	operationError := providerStore.store.pool.QueryRow(operationContext, `
-		SELECT name, api_url, model_list_url, price_table_url, interval_seconds
+		SELECT name, api_url, model_list_url, price_table_url, interval_seconds, protocol, authentication
 		FROM providers WHERE name = $1`, identifier).
-		Scan(&providerSpec.Name, &providerSpec.APIURL, &providerSpec.ModelListURL, &providerSpec.PriceTableURL, &seconds)
+		Scan(&providerSpec.Name, &providerSpec.APIURL, &providerSpec.ModelListURL, &providerSpec.PriceTableURL, &seconds, &providerSpec.Protocol, &providerSpec.Authentication)
 	providerSpec.Interval = time.Duration(seconds) * time.Second
 	return providerSpec, operationError
 }
 
 func (providerStore *providers) All(operationContext context.Context) ([]atom.ProviderSpec, error) {
 	rows, operationError := providerStore.store.pool.Query(operationContext, `
-		SELECT name, api_url, model_list_url, price_table_url, interval_seconds
+		SELECT name, api_url, model_list_url, price_table_url, interval_seconds, protocol, authentication
 		FROM providers ORDER BY name`)
 	if operationError != nil {
 		return nil, operationError
@@ -46,7 +47,7 @@ func (providerStore *providers) All(operationContext context.Context) ([]atom.Pr
 	for rows.Next() {
 		var providerSpec atom.ProviderSpec
 		var seconds int64
-		if operationError := rows.Scan(&providerSpec.Name, &providerSpec.APIURL, &providerSpec.ModelListURL, &providerSpec.PriceTableURL, &seconds); operationError != nil {
+		if operationError := rows.Scan(&providerSpec.Name, &providerSpec.APIURL, &providerSpec.ModelListURL, &providerSpec.PriceTableURL, &seconds, &providerSpec.Protocol, &providerSpec.Authentication); operationError != nil {
 			return nil, operationError
 		}
 		providerSpec.Interval = time.Duration(seconds) * time.Second
@@ -78,9 +79,9 @@ func (providerStore *providers) SaveModels(operationContext context.Context, pro
 			prices = data
 		}
 		if _, operationError := tx.Exec(operationContext, `
-			INSERT INTO models (provider, id, level, input, output, tools, context_max, prices)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-			provider, model.ID, model.Level, input, output, model.Tools, model.ContextMax, prices); operationError != nil {
+			INSERT INTO models (provider, id, level, input, output, tools, context_max, prices, name)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+			provider, model.ID, model.Level, input, output, model.Tools, model.ContextMax, prices, model.Name); operationError != nil {
 			return operationError
 		}
 	}
@@ -89,7 +90,7 @@ func (providerStore *providers) SaveModels(operationContext context.Context, pro
 
 func (providerStore *providers) Models(operationContext context.Context, provider string) ([]atom.ModelInfo, error) {
 	rows, operationError := providerStore.store.pool.Query(operationContext, `
-		SELECT id, level, input, output, tools, context_max, prices
+		SELECT id, level, input, output, tools, context_max, prices, name
 		FROM models WHERE provider = $1 ORDER BY id`, provider)
 	if operationError != nil {
 		return nil, operationError
@@ -99,7 +100,7 @@ func (providerStore *providers) Models(operationContext context.Context, provide
 	for rows.Next() {
 		var model atom.ModelInfo
 		var input, output, prices []byte
-		if operationError := rows.Scan(&model.ID, &model.Level, &input, &output, &model.Tools, &model.ContextMax, &prices); operationError != nil {
+		if operationError := rows.Scan(&model.ID, &model.Level, &input, &output, &model.Tools, &model.ContextMax, &prices, &model.Name); operationError != nil {
 			return nil, operationError
 		}
 		_ = json.Unmarshal(input, &model.Input)

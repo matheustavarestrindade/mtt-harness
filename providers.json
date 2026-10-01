@@ -1,4 +1,10 @@
 {
+  "tool_search": {
+    "mode": "auto",
+    "model_directory": "/opt/mtt/models/all-MiniLM-L6-v2",
+    "semantic_minimum_similarity": 0.3,
+    "lexical_minimum_similarity": 0.01
+  },
   "providers": [
     {
       "name": "openai",

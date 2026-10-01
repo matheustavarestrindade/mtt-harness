@@ -28,6 +28,7 @@ func NewTest(name string, script ...[]atom.ResponsePart) *Test {
 		providerName: name,
 		model: atom.ModelInfo{
 			ID:         name + "-model",
+			Name:       "Test model",
 			Input:      []atom.MediaType{atom.Text},
 			Output:     []atom.MediaType{atom.Text},
 			Tools:      true,

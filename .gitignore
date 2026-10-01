@@ -17,6 +17,7 @@ coverage.out
 coverage.html
 
 .cortexkit/
+/workspace/
 
 # editor and system
 .DS_Store

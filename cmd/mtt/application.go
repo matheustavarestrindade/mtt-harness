@@ -20,11 +20,13 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/permission"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/process"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/toolsearch"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/gateway"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/instances"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/loop"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/memory"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/processes"
+	"github.com/matheustavarestrindade/mtt-harness/internal/organism/providerauth"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/registry"
 )
 
@@ -33,8 +35,11 @@ func runApplication(configuration config.File) (operationError error) {
 	defer cancelApplication()
 	database := openStore(operationContext, configuration.DatabaseURL)
 	defer database.Close()
+	providerAuthentication := providerauth.New(operationContext, database.Secrets(), nil)
+	defer providerAuthentication.Close()
 	var messageQueue *loop.Queue
 	var processManager *processes.Manager
+	var toolSearch *toolsearch.Selector
 	closeMCP := func() error {
 		return nil
 	}
@@ -49,13 +54,17 @@ func runApplication(configuration config.File) (operationError error) {
 			operationError = errors.Join(operationError, processManager.Close(shutdownContext))
 		}
 		operationError = errors.Join(operationError, closeMCP())
+		if toolSearch != nil {
+			operationError = errors.Join(operationError, toolSearch.Close())
+		}
 		cancelApplication()
 	}()
 	harnessRuntime := harness.New()
 	eventBus := eventbus.New(harnessRuntime)
 	eventBus.SetRecorder(database.Events().Record)
 	token := resolveToken(operationContext, database, configuration.APIToken)
-	toolRegistry := registry.New(harnessRuntime)
+	toolSearch = loadToolSearch(operationContext, configuration.ProvidersFile)
+	toolRegistry := registry.New(harnessRuntime, toolSearch)
 	permissionEngine := permission.NewEngine()
 	permissionBroker := permission.NewBroker()
 	processSupervisor := process.New(0)
@@ -84,9 +93,7 @@ func runApplication(configuration config.File) (operationError error) {
 		requireStartupSuccess(modelGateway.Add(testProvider), "attach test provider")
 		log.Printf("mtt: the test provider is in use")
 	}
-	if !configuration.TestProvider {
-		loadProviders(operationContext, configuration.ProvidersFile, modelGateway, database)
-	}
+	loadProviders(operationContext, configuration.ProvidersFile, modelGateway, database, providerAuthentication)
 	mcpCleanup, mcpError := loadMCP(operationContext, configuration.MCPFile, toolRegistry)
 	requireStartupSuccess(mcpError, "connect MCP servers")
 	closeMCP = mcpCleanup
@@ -97,6 +104,7 @@ func runApplication(configuration config.File) (operationError error) {
 			Token: token, Store: database, Instances: instanceManager, Bus: eventBus,
 			Broker: permissionBroker, Loop: agentLoop, Queue: messageQueue,
 			Processes: processManager, Gateway: modelGateway,
+			ProviderAuth: providerAuthentication,
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		BaseContext: func(net.Listener) context.Context {

@@ -6,7 +6,8 @@
 - Plugins: Go packages in the module. External tools come from MCP servers (`mcp.json`, stdio or HTTP).
 - First user surface: a headless API (HTTP + WebSocket).
 - Database: Postgres. Vector recall is deferred to version 2.
-- Configuration: no `.env`. `mtt.json` is the bootstrap file (port, database URL, file paths, optional token). The database holds the settings and the provider secrets.
+- Application configuration: `mtt.json` is the bootstrap file (port, database URL, file paths, optional token). The database holds the settings and the provider secrets.
+- Benchmark configuration: Docker Compose reads the local, gitignored `.env` file and forwards `MTT_READ_LINE_NUMBERS` into the harness. `.env.example` documents the switch. The Go process reads the environment once at tool registration; it does not load `.env` itself.
 
 ## Writing Style
 
@@ -28,6 +29,15 @@ Rules:
 
 `Spec.md` gives the design: one loop, four boundaries, stages, plugins, tools, processes, the database, the API, the atoms/molecules/organisms layers, and the milestones.
 
+## Web UI Boundary
+
+- `ui/` is a standalone API client, not part of the harness runtime. Its package, dependencies, configuration, build, tests, proxy, and documentation belong inside `ui/`.
+- Do not change the harness, API behavior/contracts, Go code, database, runtime configuration, or root Docker services to satisfy a UI requirement unless the user explicitly authorizes that backend change. Adapt the client to the existing API and document gaps instead.
+- Root `routes.md` documents the implemented public API. Check handlers and atom JSON shapes before changing client types or route documentation; the actual wire format is authoritative.
+- The UI uses Svelte 5 runes, Tailwind CSS, reusable shadcn-svelte components, lucide-svelte icons, and Sonner notifications. It must support desktop and mobile, including keyboard access, touch targets, small screens, and long message/tool output.
+- The UI follows the atoms → molecules → organisms dependency layers. Put primitives/types in `ui/src/lib/atoms`, composed controls and clients in `molecules`, and state/workflow/layout owners in `organisms`. Enforce the direction with the UI layer check.
+- UI-specific design and setup documents live under `ui/`. See `ui/AGENTS.md` before editing the client.
+
 ## Go Readability Decisions
 
 - Use complete, descriptive variable, parameter, field, and receiver names. Use `harnessRuntime`, `toolRegistry`, `configuration`, `operationContext`, `operationError`, `request`, and `responseWriter`; do not use `h`, `reg`, `cfg`, `ctx`, `err`, `r`, or `w`. Established domain acronyms such as ID, URL, HTTP, JSON, SQL, and MCP are acceptable.
@@ -47,6 +57,25 @@ Rules:
 - Built-in `bash.timeout` and `bash.interval` are milliseconds. A missing or zero timeout means no automatic process timeout; `wait` defaults to true, `notify` defaults to exit, and interval notifications need a positive interval.
 - MCP descriptions and schemas belong to their servers. Preserve that metadata; do not invent units or defaults for unknown external parameters.
 
+## Tool Discovery
+
+- Tool discovery embeds full tool descriptions, usage examples, and input schemas. Built-in index-only usage documents are in `internal/tools/search_documents.go`; `harness.ToolSearchDocumentation` is optional for plugins. Do not add keyword/alias lists such as `SearchTerms`.
+- `search_tool` returns compact `Name`/`Categories` references. The loop resolves full callable definitions from the authoritative registry for the next model request. Search documents and vectors must not be sent in provider requests or tool results.
+- `providers.json.tool_search` selects `auto`, `semantic`, or `lexical` with separate cosine thresholds. `auto` uses MiniLM when available and permanently falls back to TF-IDF after a reported initialization/inference failure. Cancellation never starts fallback work. Strict `semantic` mode returns recoverable tool errors on inference failure.
+- MiniLM uses the optional Hugot v0.7.0 pure-Go adapter in `internal/molecule/embedding/minilm`, behind the `semantic` build tag. The only application import is in `cmd/mtt/tool_search_semantic.go`. The core build and registry depend on `toolsearch.Searcher`, not Hugot. Keep model-specific code and dependencies inside that adapter so it can be removed.
+- The standard Docker image bundles the pinned official `all-MiniLM-L6-v2` ONNX model and tokenizer under `/opt/mtt/models`. It uses no model server, native ONNX Runtime, or CGO. The Docker `core` target skips model assets and inference. Model downloads occur at image build time only.
+- MiniLM inputs have a 256-WordPiece limit. Split full documents with the real tokenizer, retain every chunk, and rank the best chunk per tool. The cache invalidates changed/removed documents. TF-IDF uses the same complete metadata, weighting capability descriptions above invocation examples. Conversation vector recall remains deferred.
+- Exact tool names and category-only discovery bypass vector work. A failed strict search must return a recoverable tool error, rather than an empty successful result. Startup logs show the requested/selected backend and automatic fallback causes.
+
+## File Editing and Read Benchmark
+
+- `read`, `write`, and `replace` use optional `start_line` / `end_line` with 1-based inclusive bounds. Omitted start means line 1; omitted end means EOF. A trailing LF does not add a phantom line, and an empty file has zero lines.
+- `read` clamps an oversized end to EOF. Edits reject out-of-file bounds. Range writes require an existing file, replace complete selected lines, and preserve the selected block's closing LF/CRLF if non-empty replacement content lacks a final LF. Empty content deletes the selection. Whole-file writes remain verbatim and can create files.
+- `replace` uses exact case-sensitive `old_text` / `new_text` and `mode: first|last|all` (default first). Matches stay inside the selected range. `all` processes non-overlapping original matches; replacement text is not searched again. No match is an error with no file change.
+- File edits resolve workspace paths, serialize harness updates to the same canonical path, and use a same-directory temporary file plus rename. Existing permission bits are preserved. The path's contents are replaced, so other hard links retain the old contents; external editors do not join the harness's per-path gate.
+- Control variant: unset `MTT_READ_LINE_NUMBERS` or set it to `false` / `0`. Treatment: set it to `true` / `1`, which returns `N: text` with absolute file line numbers. Labels are not file content. The flag is not a model input; changing it requires restarting the harness.
+- Put `MTT_READ_LINE_NUMBERS=true` in `.env` for treatment, or `MTT_READ_LINE_NUMBERS=false` for control, then run `docker compose up --build`. For a new checkout, copy `.env.example` to `.env`. Compose loads the file automatically and forwards the flag; an exported shell value takes precedence. Keep model, prompts, files, and other settings identical between benchmark variants.
+
 ## Commands
 
 ```sh
@@ -59,6 +88,9 @@ go test ./...
 - `mtt.json` is local and gitignored; `mtt.example.json` shows the keys.
 - Flags win over the file: `--port`, `--database-url`, `--providers-file`, `--mcp-file`, `--test-provider`, `--config`.
 - `providers.json` holds the provider URLs, models, prices, and refresh interval. It has no secrets.
+- OpenAI (`openai`), DeepSeek (`deepseek`), and the OpenAI ChatGPT coding plan (`openai-codex`) have built-in defaults. `providers.json` supplements/overrides them. Test-provider mode adds the test model; it must not bypass real providers.
+- Model request IDs are separate from optional display names. DeepSeek's `deepseek-flash` currently identifies DeepSeek-V4.1-Flash; `deepseek-v4-pro` identifies DeepSeek-V4-Pro-0813. Both support tools and a 1M context; only Flash supports images. Verify updates against the provider documentation. Model refresh uses configured metadata before built-in metadata before cached metadata, while the model-list response determines available IDs.
+- API keys use the existing database secret store. Coding-plan OAuth access/refresh tokens use `provider_oauth`; public provider/message responses must not expose tokens or internal reasoning continuation data. Device sign-in runs server-side and works from the Docker/Tailscale UI.
 - Provider keys are database configuration: `PUT /providers/{id}/key` sets the key for the harness; `PUT /instances/{id}/providers/{provider}/key` sets the key for one instance. The instance key wins.
 - Settings are database configuration: `PUT /settings/{key}` sets a value for the harness; `PUT /instances/{id}/settings/{key}` sets a value for one instance. Keys: `agent_depth_limit`, `process_limit`, `api_token`.
 - The initial start makes the API token and shows it one time. The user can also set `api_token` in `mtt.json`.
@@ -66,13 +98,26 @@ go test ./...
 
 ## Docker
 
-Run the harness and Postgres in containers (the harness works on this directory through `/workspace`):
+Run the harness and Postgres in containers. The standard harness image includes local embeddings. Only `./workspace` is mounted read/write at `/workspace`; it is not the harness repository. Bootstrap and provider/MCP files are mounted read-only under `/etc/mtt`.
+
+For a new checkout, prepare the local files and directory:
+
+```sh
+mkdir -p workspace
+cp -n mtt.example.json mtt.json
+cp -n mcp.example.json mcp.json
+cp -n .env.example .env
+```
+
+Then start Compose:
 
 ```sh
 docker compose up --build
 ```
 
 The API is on `http://localhost:18080`. The health path `/health` is open; the other paths need the API token (from the initial-start log or `mtt.json`).
+
+The first image build downloads and verifies the local model assets. Runtime model inference stays inside the harness. Use `/workspace` in the API; host files for a project belong in `./workspace` or a subdirectory there. Keep `workspace/` out of Git and the Docker build context. See `docs/tool-search.md` for core-only builds and the removal procedure.
 
 Run the test suite in containers (the Postgres store tests use the separate, temporary `postgres-test` database; runtime data stays in `postgres`):
 
@@ -86,7 +131,7 @@ Stop the containers:
 docker compose down
 ```
 
-The compose service uses the test provider. For a real model API, run `MTT_TEST_PROVIDER=false docker compose up --build` and set the provider key with the API.
+The compose service includes the test provider. Configure OpenAI or DeepSeek in the UI Providers screen, or use the provider-key API. A real provider works without changing Docker flags. Set `MTT_TEST_PROVIDER=false` only to remove the optional test model.
 
 ## Runtime Ownership and Recovery
 

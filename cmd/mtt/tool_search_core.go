@@ -1,0 +1,14 @@
+//go:build !semantic
+
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/toolsearch"
+)
+
+func newSemanticSearch(operationContext context.Context, configuration toolsearch.Configuration) (toolsearch.Searcher, error) {
+	return nil, fmt.Errorf("semantic search was not compiled; build with -tags semantic or choose lexical mode")
+}

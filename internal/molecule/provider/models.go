@@ -15,6 +15,16 @@ func (standardProvider *Standard) Refresh(operationContext context.Context) ([]a
 	operationContext, cancel := context.WithTimeout(operationContext, 30*time.Second)
 	defer cancel()
 	if standardProvider.providerSpec.ModelListURL == "" {
+		if standardProvider.Name() == CodexProvider {
+			request, operationError := http.NewRequestWithContext(operationContext, http.MethodGet, standardProvider.providerSpec.APIURL, nil)
+			if operationError != nil {
+				return nil, operationError
+			}
+			if operationError := standardProvider.authenticate(request); operationError != nil {
+				return nil, operationError
+			}
+			return standardProvider.Models(), nil
+		}
 		return nil, errors.New("provider: the model list URL is not in the provider data")
 	}
 	prices, operationError := standardProvider.prices(operationContext)
@@ -25,12 +35,8 @@ func (standardProvider *Standard) Refresh(operationContext context.Context) ([]a
 	if operationError != nil {
 		return nil, operationError
 	}
-	key, operationError := standardProvider.secret(operationContext)
-	if operationError != nil {
+	if operationError := standardProvider.authenticate(request); operationError != nil {
 		return nil, operationError
-	}
-	if key != "" {
-		request.Header.Set("Authorization", "Bearer "+key)
 	}
 	response, operationError := standardProvider.client.Do(request)
 	if operationError != nil {
@@ -58,6 +64,21 @@ func (standardProvider *Standard) Refresh(operationContext context.Context) ([]a
 	for _, model := range standardProvider.Models() {
 		previous[model.ID] = model
 	}
+	// Model-list endpoints often supply only IDs. Restore built-in capability
+	// metadata ahead of stale cache entries, then apply explicit configuration.
+	for _, configuration := range Defaults() {
+		if configuration.Spec.Name != standardProvider.Name() {
+			continue
+		}
+		for _, model := range configuration.Models {
+			previous[model.ID] = model
+		}
+	}
+	standardProvider.mutex.RLock()
+	for _, model := range standardProvider.configuredModels {
+		previous[model.ID] = model
+	}
+	standardProvider.mutex.RUnlock()
 	var models []atom.ModelInfo
 	for _, item := range list.Data {
 		if item.ID == "" {

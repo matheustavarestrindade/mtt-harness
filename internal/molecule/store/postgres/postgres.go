@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS message_queue (
 	running boolean NOT NULL DEFAULT false
 );
 CREATE INDEX IF NOT EXISTS message_queue_session ON message_queue (session_id, seq);
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS provider_state jsonb;
 CREATE TABLE IF NOT EXISTS events (
 	seq bigserial PRIMARY KEY,
 	instance_id text NOT NULL,
@@ -120,6 +121,17 @@ CREATE TABLE IF NOT EXISTS models (
 	context_max int NOT NULL DEFAULT 0,
 	prices jsonb,
 	PRIMARY KEY (provider, id)
+);
+ALTER TABLE models ADD COLUMN IF NOT EXISTS name text NOT NULL DEFAULT '';
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS protocol text NOT NULL DEFAULT '';
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS authentication text NOT NULL DEFAULT '';
+CREATE TABLE IF NOT EXISTS provider_oauth (
+	provider text PRIMARY KEY,
+	access_token text NOT NULL,
+	refresh_token text NOT NULL,
+	account_id text NOT NULL DEFAULT '',
+	residency text NOT NULL DEFAULT '',
+	expires_at timestamptz NOT NULL
 );
 `
 

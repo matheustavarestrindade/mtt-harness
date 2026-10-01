@@ -10,30 +10,33 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/instances"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/loop"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/processes"
+	"github.com/matheustavarestrindade/mtt-harness/internal/organism/providerauth"
 )
 
 type Server struct {
-	token     string
-	store     store.Store
-	instances *instances.Manager
-	bus       *eventbus.Bus
-	broker    *permission.Broker
-	loop      *loop.Loop
-	queue     *loop.Queue
-	processes *processes.Manager
-	gateway   *gateway.Gateway
+	token        string
+	store        store.Store
+	instances    *instances.Manager
+	bus          *eventbus.Bus
+	broker       *permission.Broker
+	loop         *loop.Loop
+	queue        *loop.Queue
+	processes    *processes.Manager
+	gateway      *gateway.Gateway
+	providerAuth *providerauth.Service
 }
 
 type Config struct {
-	Token     string
-	Store     store.Store
-	Instances *instances.Manager
-	Bus       *eventbus.Bus
-	Broker    *permission.Broker
-	Loop      *loop.Loop
-	Queue     *loop.Queue
-	Processes *processes.Manager
-	Gateway   *gateway.Gateway
+	Token        string
+	Store        store.Store
+	Instances    *instances.Manager
+	Bus          *eventbus.Bus
+	Broker       *permission.Broker
+	Loop         *loop.Loop
+	Queue        *loop.Queue
+	Processes    *processes.Manager
+	Gateway      *gateway.Gateway
+	ProviderAuth *providerauth.Service
 }
 
 func New(configuration Config) *Server {
@@ -41,15 +44,16 @@ func New(configuration Config) *Server {
 		configuration.Bus.SetRecorder(configuration.Store.Events().Record)
 	}
 	return &Server{
-		token:     configuration.Token,
-		store:     configuration.Store,
-		instances: configuration.Instances,
-		bus:       configuration.Bus,
-		broker:    configuration.Broker,
-		loop:      configuration.Loop,
-		queue:     configuration.Queue,
-		processes: configuration.Processes,
-		gateway:   configuration.Gateway,
+		token:        configuration.Token,
+		store:        configuration.Store,
+		instances:    configuration.Instances,
+		bus:          configuration.Bus,
+		broker:       configuration.Broker,
+		loop:         configuration.Loop,
+		queue:        configuration.Queue,
+		processes:    configuration.Processes,
+		gateway:      configuration.Gateway,
+		providerAuth: configuration.ProviderAuth,
 	}
 }
 
@@ -84,6 +88,10 @@ func (server *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /providers/{id}/refresh", server.refreshProvider)
 	mux.HandleFunc("PUT /providers/{id}/key", server.saveProviderKey)
 	mux.HandleFunc("DELETE /providers/{id}/key", server.deleteProviderKey)
+	mux.HandleFunc("POST /providers/{id}/auth/device", server.startProviderLogin)
+	mux.HandleFunc("GET /providers/{id}/auth/device/{login_id}", server.providerLoginStatus)
+	mux.HandleFunc("DELETE /providers/{id}/auth/device/{login_id}", server.cancelProviderLogin)
+	mux.HandleFunc("DELETE /providers/{id}/auth", server.disconnectProvider)
 	mux.HandleFunc("GET /settings", server.globalSettings)
 	mux.HandleFunc("PUT /settings/{key}", server.saveGlobalSetting)
 	mux.HandleFunc("DELETE /settings/{key}", server.deleteGlobalSetting)

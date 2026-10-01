@@ -36,7 +36,11 @@ func TestDiscoveredToolContractsReachProviderRequests(test *testing.T) {
 		} `json:"function"`
 	}
 	type wireRequest struct {
-		Tools []wireTool `json:"tools"`
+		Tools    []wireTool `json:"tools"`
+		Messages []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"messages"`
 	}
 	requests := make(chan wireRequest, 2)
 	var calls atomic.Int32
@@ -67,7 +71,7 @@ func TestDiscoveredToolContractsReachProviderRequests(test *testing.T) {
 	standardProvider.SetModels([]atom.ModelInfo{{ID: "wire-model", Input: []atom.MediaType{atom.Text}, Tools: true, ContextMax: 128000}})
 	testStack.harnessRuntime.Provider(standardProvider)
 	for _, tool := range []harness.Tool{
-		tools.NewSearch(testStack.registry), tools.NewBash(nil), tools.Read{}, tools.Write{},
+		tools.NewSearch(testStack.registry), tools.NewBash(nil), tools.Read{}, tools.Write{}, tools.Replace{},
 		tools.NewProcessOutput(nil), tools.NewProcessKill(nil), &tools.Agent{RunTask: testStack.loop.RunAgentTask}, tools.Finish{},
 		&mcp.Tool{Server: "remote", Spec: mcp.ToolSpec{Name: "lookup", Description: "External lookup", InputSchema: json.RawMessage(`{"type":"object","properties":{"timeout":{"type":"integer","description":"Server timeout in seconds.","default":15}}}`)}},
 	} {
@@ -92,8 +96,29 @@ func TestDiscoveredToolContractsReachProviderRequests(test *testing.T) {
 			}
 		}
 	}
-	if len(definitions) != 9 {
+	for _, message := range payload.Messages {
+		if message.Role != "tool" {
+			continue
+		}
+		var references []map[string]json.RawMessage
+		testutil.RequireNoError(test, json.Unmarshal([]byte(message.Content), &references))
+		for _, reference := range references {
+			if len(reference) != 2 || reference["Name"] == nil || reference["Categories"] == nil {
+				test.Fatalf("provider history contains verbose discovery metadata: %s", message.Content)
+			}
+		}
+	}
+	if len(definitions) != 10 {
 		test.Fatalf("discovered definitions: %v", definitions)
+	}
+	for _, name := range []string{"read", "write", "replace"} {
+		properties := definitions[name].Function.Parameters.Properties
+		if properties["start_line"].Description == "" || properties["end_line"].Description == "" {
+			test.Fatalf("%s line-range instructions did not reach the provider", name)
+		}
+	}
+	if properties := definitions["replace"].Function.Parameters.Properties; properties["mode"].Default != "first" || len(properties["mode"].Enum) != 3 {
+		test.Fatalf("replace mode contract disappeared: %+v", properties)
 	}
 	bashProperties := definitions["bash"].Function.Parameters.Properties
 	if !strings.Contains(bashProperties["timeout"].Description, "milliseconds") || !strings.Contains(bashProperties["interval"].Description, "milliseconds") {
@@ -113,4 +138,28 @@ func TestDiscoveredToolContractsReachProviderRequests(test *testing.T) {
 	if external.Description != "Server timeout in seconds." || external.Default != float64(15) {
 		test.Fatalf("MCP metadata changed: %+v", external)
 	}
+}
+
+func TestShellQueryEnablesBashOnTheNextModelRequest(test *testing.T) {
+	testStack := newStack(test,
+		provider.Call("search_tool", `{"query":"shell command exec"}`),
+		provider.Text("done"),
+	)
+	testutil.RequireNoError(test, testStack.registry.Add(tools.NewSearch(testStack.registry)))
+	testutil.RequireNoError(test, testStack.registry.Add(tools.NewBash(nil)))
+	session := testStack.instance(test, 2)
+	testStack.user(test, session, "find the command execution tool")
+	testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
+	if len(testStack.provider.Requests) != 2 {
+		test.Fatalf("discovery did not continue to the next request: %d", len(testStack.provider.Requests))
+	}
+	for _, toolSpec := range testStack.provider.Requests[1].Tools {
+		if toolSpec.Name == "bash" {
+			if toolSpec.Description == "" || len(toolSpec.InputSchema.JSON) == 0 {
+				test.Fatal("compact discovery lost the callable bash instructions or schema")
+			}
+			return
+		}
+	}
+	test.Fatal("the shell query did not enable bash in the next request")
 }

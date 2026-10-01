@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -12,12 +13,14 @@ import (
 type KeyResolver func(operationContext context.Context, instanceID string, provider string) (string, error)
 
 type Standard struct {
-	providerSpec atom.ProviderSpec
-	client       *http.Client
-	mutex        sync.RWMutex
-	models       []atom.ModelInfo
-	inlinePrices map[string]atom.Prices
-	key          KeyResolver
+	providerSpec     atom.ProviderSpec
+	client           *http.Client
+	mutex            sync.RWMutex
+	models           []atom.ModelInfo
+	configuredModels []atom.ModelInfo
+	inlinePrices     map[string]atom.Prices
+	key              KeyResolver
+	headers          func(context.Context) (http.Header, error)
 }
 
 func New(providerSpec atom.ProviderSpec) *Standard {
@@ -29,6 +32,41 @@ func New(providerSpec atom.ProviderSpec) *Standard {
 
 func (standardProvider *Standard) Name() string {
 	return standardProvider.providerSpec.Name
+}
+
+// Spec reports public transport metadata, never credentials.
+func (standardProvider *Standard) Spec() atom.ProviderSpec {
+	return standardProvider.providerSpec
+}
+
+// SetHeaderResolver supplies request-time authentication for account-based
+// providers. It must be configured before the provider is published.
+func (standardProvider *Standard) SetHeaderResolver(resolver func(context.Context) (http.Header, error)) {
+	standardProvider.headers = resolver
+}
+
+func (standardProvider *Standard) authenticate(request *http.Request) error {
+	if standardProvider.headers != nil {
+		headers, operationError := standardProvider.headers(request.Context())
+		if operationError != nil {
+			return operationError
+		}
+		for name, values := range headers {
+			request.Header[name] = append([]string(nil), values...)
+		}
+		return nil
+	}
+	key, operationError := standardProvider.secret(request.Context())
+	if operationError != nil {
+		return operationError
+	}
+	if key == "" && standardProvider.providerSpec.Authentication == "api_key" {
+		return fmt.Errorf("connect %s with an API key in Providers", standardProvider.Name())
+	}
+	if key != "" {
+		request.Header.Set("Authorization", "Bearer "+key)
+	}
+	return nil
 }
 
 func (standardProvider *Standard) Models() []atom.ModelInfo {
@@ -47,6 +85,15 @@ func (standardProvider *Standard) SetModels(models []atom.ModelInfo) {
 			standardProvider.models[index].Prices = &priceCopy
 		}
 	}
+}
+
+// SetModelConfiguration retains authoritative file metadata independently of
+// the current account's model list. Refreshes can change availability, but a
+// stale cache or temporarily absent model must not erase these overrides.
+func (standardProvider *Standard) SetModelConfiguration(models []atom.ModelInfo) {
+	standardProvider.mutex.Lock()
+	defer standardProvider.mutex.Unlock()
+	standardProvider.configuredModels = append([]atom.ModelInfo(nil), models...)
 }
 
 func (standardProvider *Standard) SetKeyResolver(resolver KeyResolver) {

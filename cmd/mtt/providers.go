@@ -11,36 +11,29 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/gateway"
+	"github.com/matheustavarestrindade/mtt-harness/internal/organism/providerauth"
 )
 
-func loadProviders(operationContext context.Context, path string, modelGateway *gateway.Gateway, database store.Store) {
+func loadProviders(operationContext context.Context, path string, modelGateway *gateway.Gateway, database store.Store, authentication *providerauth.Service) {
 	configurations, operationError := provider.LoadFile(path)
 	if errors.Is(operationError, os.ErrNotExist) {
-		log.Printf("mtt: the provider file %s is not there", path)
-		return
+		configurations = nil
+		operationError = nil
 	}
 	requireStartupSuccess(operationError, "load provider configuration")
-	for _, configuration := range configurations {
+	for _, configuration := range provider.WithDefaults(configurations) {
 		standardProvider := provider.New(configuration.Spec)
 		standardProvider.SetPrices(configuration.Prices)
+		standardProvider.SetModelConfiguration(configuration.Models)
 		standardProvider.SetKeyResolver(func(operationContext context.Context, instanceID string, name string) (string, error) {
 			return database.Secrets().ResolveKey(operationContext, instanceID, name)
 		})
+		if configuration.Spec.Authentication == "chatgpt" {
+			standardProvider.SetHeaderResolver(authentication.Headers)
+		}
 		cachedModels, cacheError := database.Providers().Models(operationContext, configuration.Spec.Name)
 		requireStartupSuccess(cacheError, "load provider model cache")
-		for _, configured := range configuration.Models {
-			replaced := false
-			for index := range cachedModels {
-				if cachedModels[index].ID == configured.ID {
-					cachedModels[index] = configured
-					replaced = true
-					break
-				}
-			}
-			if !replaced {
-				cachedModels = append(cachedModels, configured)
-			}
-		}
+		cachedModels = provider.MergeModels(cachedModels, configuration.Models)
 		if len(cachedModels) > 0 {
 			standardProvider.SetModels(cachedModels)
 		}

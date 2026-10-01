@@ -50,7 +50,7 @@ func TestMCPConnectionsLiveUntilApplicationCleanup(test *testing.T) {
 	configuration, operationError := json.Marshal(map[string]any{"servers": []map[string]any{{"name": "test", "url": server.URL, "enabled": true}}})
 	testutil.RequireNoError(test, operationError)
 	testutil.RequireNoError(test, os.WriteFile(configurationPath, configuration, 0600))
-	toolRegistry := registry.New(harness.New())
+	toolRegistry := registry.New(harness.New(), nil)
 	cleanup, operationError := loadMCP(context.Background(), configurationPath, toolRegistry)
 	testutil.RequireNoError(test, operationError)
 	defer cleanup()

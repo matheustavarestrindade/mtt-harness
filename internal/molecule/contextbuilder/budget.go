@@ -81,6 +81,11 @@ func countTokens(operationContext context.Context, request atom.Request, provide
 	count := 16 + len(tools)
 	for _, message := range request.Messages {
 		count += 8
+		if message.ProviderState != nil {
+			for _, reasoning := range message.ProviderState.Reasoning {
+				count += len(reasoning)
+			}
+		}
 		for _, content := range message.Content {
 			if content.Type == atom.Text {
 				count += len(content.Text)

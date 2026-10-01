@@ -68,6 +68,9 @@ type ProviderStore interface {
 }
 
 type SecretStore interface {
+	SaveOAuthCredential(operationContext context.Context, provider string, credential atom.OAuthCredential) error
+	OAuthCredential(operationContext context.Context, provider string) (atom.OAuthCredential, error)
+	DeleteOAuthCredential(operationContext context.Context, provider string) error
 	SaveProviderKey(operationContext context.Context, provider string, key string) error
 	ProviderKey(operationContext context.Context, provider string) (string, error)
 	SaveInstanceKey(operationContext context.Context, instanceID string, provider string, key string) error

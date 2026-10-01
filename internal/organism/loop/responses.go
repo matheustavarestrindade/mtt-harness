@@ -37,6 +37,7 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 	var tasks []*toolTask
 	var content []atom.Content
 	var usage *atom.Usage
+	var providerState *atom.ProviderState
 	for {
 		part, operationError := responseStream.Recv(operationContext)
 		if errors.Is(operationError, io.EOF) {
@@ -65,6 +66,9 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 			}()
 		}
 		content = append(content, part.Content...)
+		if part.ProviderState != nil {
+			providerState = part.ProviderState
+		}
 		if part.Usage != nil {
 			usage = part.Usage
 		}
@@ -83,6 +87,7 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 		ID: newID(), SessionID: session.ID, Role: atom.RoleAssistant,
 		Content:   content,
 		ToolCalls: calls, Usage: usage, CreatedAt: time.Now(),
+		ProviderState: providerState,
 	}
 	if usage != nil {
 		usage.Cost = cost(modelCall.model, usage)

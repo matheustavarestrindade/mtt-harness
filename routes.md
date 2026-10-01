@@ -1,0 +1,376 @@
+# Harness API Contracts
+
+The document gives the HTTP and WebSocket API contracts. The source is `internal/api/server.go`, the handler files, and the `atom` types. Use the code as the source for an API contract check.
+
+## Connection and Authentication
+
+The default Docker URL is `http://localhost:18080`. The route paths start at the harness URL. The UI proxy adds the `/api` prefix. The harness does not use the prefix.
+
+`GET /health` is open. Token authentication is necessary for the other paths. Use a header for HTTP requests:
+
+```http
+Authorization: Bearer TOKEN
+Content-Type: application/json
+```
+
+The handler accepts `?token=TOKEN` when the header does not contain a `Bearer` value. A browser WebSocket client can use the query parameter. The header value applies when the request also has a query value. An authentication error gives `401`. A settings store error gives `503`.
+
+The request body has a limit of 16 MiB. It must contain one JSON value. The decoder accepts unknown object fields. A JSON error gives `400`.
+
+The handlers give JSON responses. An error response has the shape:
+
+```json
+{"error":"description of the failed operation"}
+```
+
+The HTTP router can give a text response for an unknown path or an incorrect method. The harness does not have a CORS handler. The UI uses a same-origin proxy.
+
+## JSON Format
+
+The atom response keys are `ID`, `Workspace`, `Content`, and `CreatedAt`, for example. Request DTO keys include `workspace` and `default_model`. Do not change the keys.
+
+A timestamp uses the `RFC 3339` format. A duration in a Go data type is an integer in nanoseconds. The duration unit applies to the fields:
+
+```text
+Provider.Interval
+ProcessSpec.Timeout
+ProcessSpec.Notify.Interval
+ToolResult.Duration
+```
+
+The `bash` tool input uses milliseconds for `timeout` and `interval`.
+
+A byte slice uses a Base64 string or `null` in JSON. The fields `ToolCall.Input`, `Event.Payload`, and `Schema.JSON` contain JSON values.
+
+A list can be `null`. The message, agent, process, and provider handlers give empty arrays when data is not available. Other handlers can give `null`.
+
+## Instance Routes
+
+```text
+| Method | Path | Input | Success | Handler errors |
+|---|---|---|---|---|
+| GET | `/instances` | none | `200`, `Instance[]` or null | `500` |
+| POST | `/instances` | `InstanceInput` | `201`, `Instance` | `400`, `500` |
+| GET | `/instances/{id}` | none | `200`, `Instance` | `404` |
+| DELETE | `/instances/{id}` | none | `200`, `{"status":"stopped"}` | `404`, `500` |
+| POST | `/instances/{id}/start` | none | `200`, `Instance` | `404`, `400`, `409`, `500` |
+| GET | `/instances/{id}/models` | none | `200`, `Model[]` or null | `404` |
+| GET | `/instances/{id}/sessions` | none | `200`, `Session[]` | `404`, `500` |
+| POST | `/instances/{id}/sessions` | optional `{"model":"provider/model"}` | `201`, `Session` | `404`, `400`, `500` |
+| GET | `/instances/{id}/statistics` | none | `200`, `Statistics` | `500` |
+```
+
+`InstanceInput`:
+
+```json
+{
+  "workspace": "/workspace",
+  "models": ["test/test-model"],
+  "default_model": "test/test-model",
+  "process_limit": 8,
+  "agent_depth_limit": 2
+}
+```
+
+The workspace must be a directory on the server. A relative path starts at the process directory. An empty model list lets the instance use available models. The session model must be in the instance model list. Without a model value, the session uses the instance default.
+
+The fields `process_limit` and `agent_depth_limit` set an instance configuration value when the input is above 0. A value of 0 does not set a limit in the instance request. To set a value of 0, send a request to a settings route. The instance response fields can be 0 after the configuration data goes to settings.
+
+When an instance stops, the database keeps the configuration and sessions. The active turns and processes stop. Messages in the queue can continue when the instance starts again. The instance must be active to give a model list or make a session. The API can read the configuration of a stopped instance.
+
+## Session and Queue Routes
+
+```text
+| Method | Path | Input | Success | Handler errors |
+|---|---|---|---|---|
+| GET | `/sessions/{id}` | none | `200`, `Session` | `404` |
+| GET | `/sessions/{id}/messages` | none | `200`, `Message[]` | `500` |
+| POST | `/sessions/{id}/messages` | `{"content":"text"}` or content array | `202`, `AcceptedMessage` | `404`, `400`, `409`, `429`, `500` |
+| GET | `/sessions/{id}/status` | none | `200`, `QueueStatus` | `500` |
+| POST | `/sessions/{id}/cancel` | none | `200`, `{"status":"cancelled"}` | `409`, `500` |
+| DELETE | `/sessions/{id}/queue/{message_id}` | none | `200`, `{"status":"removed"}` | `404`, `500` |
+| POST | `/sessions/{id}/revert` | `{"message_id":"ID"}` | `200`, `RevertResult` | `404`, `400`, `500` |
+| GET | `/sessions/{id}/agents` | none | `200`, session ID array | `500` |
+| GET | `/sessions/{id}/statistics` | none | `200`, `Statistics` | `500` |
+| GET | `/sessions/{id}/processes` | none | `200`, `ProcessRecord[]` | `500` |
+| GET | `/sessions/{id}/events` | WebSocket upgrade; optional `since` | event frames | `404`, `400`, upgrade error |
+```
+
+The database keeps a message in the queue before the API gives `202`. The message goes into history when the turn starts. A session can have 128 messages that wait. The harness limit is 4096 messages that wait or run.
+
+A full queue gives `429`. A stopped instance or a completed child agent gives `409`. A queue that is closed or a revert operation can also give `409`.
+
+```json
+{
+  "status": "queued",
+  "position": 1,
+  "message": {
+    "ID": "message-id",
+    "SessionID": "session-id",
+    "Seq": 0,
+    "Role": "user",
+    "Content": [{"Type":"text","Text":"Inspect this project","Data":null,"MIME":"","URL":"","Filename":"","AudioID":""}],
+    "ToolCalls": null,
+    "ToolCallID": "",
+    "Usage": null,
+    "CreatedAt": "2026-09-28T12:00:00Z"
+  }
+}
+```
+
+Queue position is a snapshot when the API accepts the message. The turn can start before the client gets the response. Status has the shape:
+
+```json
+{"running":true,"queued":1,"messages":["waiting-message-id"],"error":""}
+```
+
+The `messages` field can be `null`. It contains the IDs of messages that wait. Message text and the active message ID are not included. The `running` value includes the claim operation before the provider starts. The `error` field gives a coordinator error when available.
+
+The route `POST /sessions/{id}/cancel` tells the worker to cancel the turn. The response does not wait until the worker stops. A session without an active turn gives `409`. The route `DELETE /sessions/{id}/queue/{message_id}` removes a message that waits. It gives `404` when the message does not wait in the queue.
+
+When the user cancels a turn, file edits stay. The background processes do not automatically stop.
+
+The revert operation keeps the selected message and removes the messages after it. The API stops new input. It waits until the active turn stops before it removes history. The API also removes the messages from the queue.
+
+Usage records stay because the model usage occurred. A revert operation changes conversation history, not file content.
+
+```json
+{"status":"reverted","removed":3}
+```
+
+The `removed` value counts history messages only. A coordinator error during a revert operation gives `500`. A collection route or a status route can give an empty result for an unknown session.
+
+Content request example:
+
+```json
+{"content":[{"Type":"text","Text":"Describe this image"},{"Type":"image","MIME":"image/png","Data":"BASE64_DATA"}]}
+```
+
+Content types are `text`, `image`, `audio`, and `file`. A media item must have data, a URL, or an audio ID. The loop examines model compatibility before the model call. Thus, an accepted message can give a turn error.
+
+## Providers and Keys
+
+```text
+| Method | Path | Input | Success | Handler errors |
+|---|---|---|---|---|
+| GET | `/providers` | none | `200`, `Provider[]` | `500`, `503` |
+| GET | `/providers/{id}/models` | none | `200`, `Model[]` | `404`, `503` |
+| POST | `/providers/{id}/refresh` | none | `200`, `Model[]` | `502`, `500` |
+| PUT | `/providers/{id}/key` | `{"key":"SECRET"}` | `200`, `{"status":"saved"}` | `400`, `500` |
+| DELETE | `/providers/{id}/key` | none | `200`, `{"status":"deleted"}` | `500` |
+| PUT | `/instances/{id}/providers/{provider}/key` | `{"key":"SECRET"}` | `200`, `{"status":"saved"}` | `400`, `500` |
+| DELETE | `/instances/{id}/providers/{provider}/key` | none | `200`, `{"status":"deleted"}` | `500` |
+| POST | `/providers/openai-codex/auth/device` | none | `202`, `DeviceLogin` | `400`, `502`, `503` |
+| GET | `/providers/openai-codex/auth/device/{login_id}` | none | `200`, `DeviceLogin` | `404`, `503` |
+| DELETE | `/providers/openai-codex/auth/device/{login_id}` | none | `200`, `{"status":"cancelled"}` | `404`, `503` |
+| DELETE | `/providers/openai-codex/auth` | none | `200`, `{"status":"disconnected"}` | `500`, `503` |
+```
+
+The provider ID is the provider name. The providers `openai`, `deepseek`, and `openai-codex` have default provider data. The file `providers.json` can override the data or add providers. The API cannot add a provider. A provider route gives model IDs without the provider prefix.
+
+An instance model list uses `provider/model`. An ID without a provider prefix is correct only when one provider has the model ID.
+
+The instance key overrides the harness key. Provider routes do not give secret values. A key handler does not examine if the provider or instance is in the database. A harness key must not be empty. The `DELETE` method removes a harness key. An instance key can be empty.
+
+The API key route does not accept a credential for `openai-codex`. The provider uses device authentication. The refresh route uses the harness provider configuration. For `openai-codex`, the model list comes from configuration. The refresh operation examines the credential. It does not get a model list from OpenAI.
+
+The provider list contains providers in the registry and the test provider when available. A previous database provider without a registry entry is not in the response. Provider data includes the fields:
+
+```typescript
+Protocol: '' | 'responses' | 'chat_completions';
+Authentication: '' | 'api_key' | 'chatgpt' | 'none';
+Connected: boolean; // stored credential, not a guarantee of model access
+ModelCount: number; // cached model count
+```
+
+The field `Connected` is `true` for a provider without authentication. For `openai` and `deepseek`, it shows that a harness key is in the database. For `openai-codex`, it shows that OAuth tokens are in the database. The key handler does not examine if the key gives model access. A client can send a request to the refresh route after it sets a key.
+
+Device authentication uses the response:
+
+```typescript
+type DeviceLogin = {
+  ID: string; // harness login ID, not the upstream device secret
+  Provider: 'openai-codex';
+  VerificationURL: string;
+  UserCode: string;
+  ExpiresAt: string; // RFC 3339; device code lasts 15 minutes
+  Status: 'pending' | 'connected' | 'cancelled' | 'expired' | 'error';
+  Error: string;
+};
+```
+
+The user opens the OpenAI URL and supplies the code. The server waits for OpenAI authorization and stores the credential. The UI can read login status at an interval of 2 seconds. A new login replaces the previous login.
+
+The user can cancel a login that is in progress. This does not remove a credential from the database. The route `DELETE /providers/openai-codex/auth` removes the credential.
+
+The authentication routes use the same API credential as the other routes. They send `Cache-Control: no-store`. Access tokens, refresh tokens, and the upstream device secret are not in the response. A login in progress stops when the harness stops. A credential in the database stays when the harness starts again.
+
+## Settings
+
+```text
+| Method | Path | Input | Success | Handler errors |
+|---|---|---|---|---|
+| GET | `/settings` | none | `200`, string map | `500` |
+| PUT | `/settings/{key}` | `{"value":"STRING"}` | `200`, `{"status":"saved"}` | `400`, `500` |
+| DELETE | `/settings/{key}` | none | `200`, `{"status":"deleted"}` | `400`, `500` |
+| GET | `/instances/{id}/settings` | none | `200`, string map | `500` |
+| PUT | `/instances/{id}/settings/{key}` | `{"value":"STRING"}` | `200`, `{"status":"saved"}` | `400`, `500` |
+| DELETE | `/instances/{id}/settings/{key}` | none | `200`, `{"status":"deleted"}` | `400`, `500` |
+```
+
+Configuration values use strings. A limit value also uses a string:
+
+```json
+{"agent_depth_limit":"2","process_limit":"8"}
+```
+
+The limit value must be 0 or more. The `api_token` value must not be empty. The token is a harness configuration value only. An instance cannot override the token, and the API cannot remove it. A token change applies to subsequent requests.
+
+The `GET` routes give the database values for one scope. Instance values and harness values stay in different responses. A harness settings response can include `api_token`. The handler does not examine if the instance is in the database.
+
+## Permission and Process Routes
+
+```text
+| Method | Path | Input | Success | Handler errors |
+|---|---|---|---|---|
+| POST | `/permissions/{id}` | `PermissionInput` | `200`, `{"status":"resolved"}` | `400`, `404` |
+| GET | `/statistics` | none | `200`, `Statistics` | `500` |
+| GET | `/health` | none | `200`, `{"status":"ok"}` | none |
+| GET | `/processes/{id}/output` | WebSocket upgrade | output frames | `404`, upgrade error |
+```
+
+```json
+{"kind":"allow","scope":"once"}
+```
+
+Permission type is `allow` or `deny`. Scope is `once`, `session`, or `always`. An empty scope or a request without a scope uses `once`. A decision in the database applies in the instance of the decision. A request that is not open gives `404`.
+
+The API does not have a route to read open permission requests. Session events give the requests and decisions.
+
+Session statistics include the usage of child agents. The cost list has an entry for a currency. A `null` cost value does not show free usage. It shows that cost data is not available.
+
+The `Input` value does not include `CacheRead` or `CacheWrite`. The cache ratio is `CacheRead / (Input + CacheRead + CacheWrite)`. The cache ratio is 0 when the total input is 0.
+
+The `/health` route gives a liveness response. It does not examine the provider or database. The output route uses a harness process ID, not an OS PID.
+
+The harness keeps a maximum of 256 KiB for a process stream. It keeps output from the last 128 completed processes. The database can keep process data after the output is removed. The API does not have an HTTP route to stop a process.
+
+## WebSocket Data
+
+Session event URL:
+
+```text
+ws://localhost:18080/sessions/SESSION_ID/events?token=TOKEN&since=0
+```
+
+The `since` value is a sequence cursor. The default is 0. The range is `0..9223372036854775807`. The server gives the database events after the cursor, then new session events.
+
+The database sequence includes events from different sessions. Session sequence values can have a difference above 1. Use the last received sequence number when the client connects again.
+
+```json
+{"Seq":42,"InstanceID":"instance-id","SessionID":"session-id","Name":"model.chunk","Payload":{"text":"Hello"},"Time":"2026-09-28T12:00:00Z"}
+```
+
+The server sends JSON text frames. The client receives events on the route. It must not send commands on the socket. The client must open a new connection after a socket error. The server closes a connection if output cannot complete in 5 seconds.
+
+Event payload data:
+
+```text
+| Event | Payload |
+|---|---|
+| `turn.start` | null |
+| `turn.end` | `{"status":"completed"}`, `cancelled`, or `error` |
+| `model.call` | `{"model":"provider/model"}` |
+| `model.chunk` | `{"text":"fragment"}` |
+| `action.received` | `ToolCall` |
+| `tool.start` | `ToolCall` |
+| `tool.end` | `{"call":ToolCall,"status":"ok","result":ToolResult}` |
+| `permission.request` | `PermissionRequest` |
+| `permission.decision` | `PermissionDecision` |
+| `run.error` | `{"message_id":"ID","error":"description"}` |
+| `run.cancelled` | `{"message_id":"ID","error":"description"}` |
+| `run.interrupted` | `{"message_id":"ID"}` |
+| `process.start`, `process.output`, `process.exit` | `ProcessEvent` |
+| `process.notification` | null |
+| `agent.start` | `{"session":"child-session-id","task":"task text"}` |
+| `agent.end` | `{"session":"child-session-id"}` |
+```
+
+A plugin can use other event IDs and payloads. A constant in `atom/event.go` does not show that a handler sends the event.
+
+Process output URL and frame:
+
+```text
+ws://localhost:18080/processes/PROCESS_ID/output?token=TOKEN
+```
+
+```json
+{"stream":"stdout","data":"command output\n","error":""}
+```
+
+The process stream does not have a sequence cursor. It gives the output buffer, then new output. Stream values are `start`, `stdout`, `stderr`, and `exit`. The socket closes at exit.
+
+The `data` field is a string in the process stream. The `ProcessEvent.Data` field uses Base64 in a session event.
+
+## Data Types
+
+The code gives the JSON data types in TypeScript. It is not a harness dependency. A list can be `null` where shown. A duration uses nanoseconds.
+
+```typescript
+type Instance = {
+  ID: string; Workspace: string; Models: string[] | null; DefaultModel: string;
+  ProcessLimit: number; AgentDepthLimit: number; CreatedAt: string; Stopped: boolean;
+};
+type Session = {
+  ID: string; InstanceID: string; Parent: string; Depth: number;
+  Model: string; CreatedAt: string; Completed: boolean;
+};
+type Content = {
+  Type: 'text' | 'image' | 'audio' | 'file'; Text: string;
+  Data: string | null; MIME: string; URL: string; Filename: string; AudioID: string;
+};
+type ToolCall = { ID: string; Name: string; Input: unknown };
+type ToolResult = {
+  CallID: string; Status: 'ok' | 'denied' | 'error'; Content: Content[] | null;
+  Error: string; Duration: number;
+};
+type Message = {
+  ID: string; SessionID: string; Seq: number; Role: 'system' | 'user' | 'assistant' | 'tool';
+  Content: Content[] | null; ToolCalls: ToolCall[] | null; ToolCallID: string;
+  Usage: Usage | null; CreatedAt: string;
+};
+type Cost = { Currency: string; Value: number };
+type Usage = {
+  Input: number; CacheRead: number; CacheWrite: number; Output: number;
+  Reasoning: number; Cost: Cost | null;
+};
+type Statistics = Usage & {
+  Calls: number; Costs: Cost[] | null; CacheHitRate: number; CacheHitPercentage: number;
+};
+type Provider = {
+  Name: string; APIURL: string; ModelListURL: string; PriceTableURL: string; Interval: number;
+  Protocol: '' | 'responses' | 'chat_completions';
+  Authentication: '' | 'api_key' | 'chatgpt' | 'none';
+  Connected: boolean; ModelCount: number;
+};
+type Model = {
+  ID: string; Name?: string; Level: number; Input: string[] | null; Output: string[] | null;
+  Tools: boolean; ContextMax: number;
+  Prices: null | { Currency: string; Input: number; Output: number; CacheRead: number; CacheWrite: number };
+};
+type PermissionRequest = { ID: string; InstanceID: string; SessionID: string; Target: string; Why: string };
+type PermissionDecision = { RequestID: string; InstanceID: string; SessionID: string; Target: string; Kind: 'allow' | 'deny'; Scope: 'once' | 'session' | 'always'; CreatedAt: string };
+type ProcessRecord = {
+  ID: string; InstanceID: string; SessionID: string; PID: number; Status: string;
+  Spec: { Command: string; Args: string[] | null; Cwd: string; Env: string[] | null;
+    Notify: { Mode: 'exit' | 'error' | 'interval'; Interval: number }; Timeout: number };
+  Exit: null | { Code: number; Signal: string; Error: string }; StartedAt: string; EndedAt: string;
+};
+type ProcessEvent = { ProcessID: string; Stream: 'start' | 'stdout' | 'stderr' | 'exit'; Data: string | null; Error: string; At: string };
+```
+
+Model prices apply to 1000000 tokens. The `ContextMax` field is the model token limit. The `Input` and `Output` lists give the media types of the model. The `Tools` field shows if the model can use tools.
+
+The optional field `Name` is a display label. Model requests use `ID`. For example, `deepseek-flash` is the API ID for `DeepSeek-V4.1-Flash`. The ID `deepseek-v4-pro` refers to `DeepSeek-V4-Pro-0813`. See the [DeepSeek model data](https://api-docs.deepseek.com/quick_start/pricing) for the provider data.
+
+The harness calculates cost from provider usage. It does not calculate cost from the context limit estimate.

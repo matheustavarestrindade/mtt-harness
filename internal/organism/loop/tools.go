@@ -160,9 +160,15 @@ func (agentLoop *Loop) toolsFor(operationContext context.Context, session atom.S
 }
 
 func (agentLoop *Loop) absorb(operationContext context.Context, session atom.Session, result atom.ToolResult) error {
-	var found []atom.ToolSpec
-	if operationError := json.Unmarshal([]byte(result.Text()), &found); operationError != nil {
+	var references []atom.ToolReference
+	if operationError := json.Unmarshal([]byte(result.Text()), &references); operationError != nil {
 		return operationError
+	}
+	var found []atom.ToolSpec
+	for _, reference := range references {
+		if tool, exists := agentLoop.configuration.Registry.Get(reference.Name); exists {
+			found = append(found, specOf(tool))
+		}
 	}
 	agentLimit := 0
 	if agentLoop.configuration.Instances != nil {

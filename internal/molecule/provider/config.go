@@ -16,13 +16,15 @@ type Config struct {
 }
 
 type fileEntry struct {
-	Name          string               `json:"name"`
-	APIURL        string               `json:"api_url"`
-	ModelListURL  string               `json:"model_list_url"`
-	PriceTableURL string               `json:"price_table_url"`
-	RefreshHours  int                  `json:"refresh_hours"`
-	Prices        map[string]filePrice `json:"prices"`
-	Models        []fileModel          `json:"models"`
+	Name           string               `json:"name"`
+	Protocol       string               `json:"protocol"`
+	Authentication string               `json:"authentication"`
+	APIURL         string               `json:"api_url"`
+	ModelListURL   string               `json:"model_list_url"`
+	PriceTableURL  string               `json:"price_table_url"`
+	RefreshHours   int                  `json:"refresh_hours"`
+	Prices         map[string]filePrice `json:"prices"`
+	Models         []fileModel          `json:"models"`
 }
 
 type filePrice struct {
@@ -35,6 +37,7 @@ type filePrice struct {
 
 type fileModel struct {
 	ID         string   `json:"id"`
+	Name       string   `json:"name"`
 	Level      int      `json:"level"`
 	Input      []string `json:"input"`
 	Output     []string `json:"output"`
@@ -57,6 +60,15 @@ func LoadFile(path string) ([]Config, error) {
 	}
 	var configs []Config
 	for _, entry := range file.Providers {
+		if entry.Protocol != "" && entry.Protocol != "responses" && entry.Protocol != "chat_completions" {
+			return nil, errors.New("provider protocol must be responses or chat_completions")
+		}
+		if entry.Authentication != "" && entry.Authentication != "api_key" && entry.Authentication != "none" && entry.Authentication != "chatgpt" {
+			return nil, errors.New("provider authentication must be api_key, chatgpt or none")
+		}
+		if entry.Authentication == "chatgpt" && entry.Name != CodexProvider {
+			return nil, errors.New("ChatGPT authentication belongs to openai-codex")
+		}
 		if entry.RefreshHours < 0 {
 			return nil, errors.New("provider refresh interval cannot be negative")
 		}
@@ -84,6 +96,7 @@ func LoadFile(path string) ([]Config, error) {
 		for _, model := range entry.Models {
 			info := atom.ModelInfo{
 				ID:         model.ID,
+				Name:       model.Name,
 				Level:      model.Level,
 				Tools:      model.Tools,
 				ContextMax: model.ContextMax,
@@ -101,11 +114,13 @@ func LoadFile(path string) ([]Config, error) {
 		}
 		configs = append(configs, Config{
 			Spec: atom.ProviderSpec{
-				Name:          entry.Name,
-				APIURL:        entry.APIURL,
-				ModelListURL:  entry.ModelListURL,
-				PriceTableURL: entry.PriceTableURL,
-				Interval:      time.Duration(entry.RefreshHours) * time.Hour,
+				Name:           entry.Name,
+				Protocol:       entry.Protocol,
+				Authentication: entry.Authentication,
+				APIURL:         entry.APIURL,
+				ModelListURL:   entry.ModelListURL,
+				PriceTableURL:  entry.PriceTableURL,
+				Interval:       time.Duration(entry.RefreshHours) * time.Hour,
 			},
 			Prices: prices,
 			Models: models,
