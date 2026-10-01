@@ -21,6 +21,10 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 	if operationError != nil {
 		return nil, operationError
 	}
+	messages, operationError = agentLoop.prependStartPrompt(operationContext, session, messages)
+	if operationError != nil {
+		return nil, operationError
+	}
 	messages, operationError = agentLoop.pipeline.Context(operationContext, messages)
 	if operationError != nil {
 		return nil, operationError

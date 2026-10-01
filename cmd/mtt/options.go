@@ -14,6 +14,7 @@ func parseArguments(arguments []string) (config.File, error) {
 	databaseURL := flags.String("database-url", "", "the Postgres URL")
 	providersFile := flags.String("providers-file", "", "the providers file")
 	mcpFile := flags.String("mcp-file", "", "the MCP server file")
+	startPromptFile := flags.String("start-prompt-file", "", "the startup prompt template file (default start_prompt.md)")
 	testProvider := flags.Bool("test-provider", false, "use the test provider")
 	if operationError := flags.Parse(arguments); operationError != nil {
 		return config.File{}, operation.WrapError(operationError, "parse arguments")
@@ -33,6 +34,9 @@ func parseArguments(arguments []string) (config.File, error) {
 	}
 	if *mcpFile != "" {
 		configuration.MCPFile = *mcpFile
+	}
+	if *startPromptFile != "" {
+		configuration.StartPromptFile = *startPromptFile
 	}
 	flags.Visit(func(option *flag.Flag) {
 		if option.Name == "test-provider" {

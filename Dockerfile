@@ -30,11 +30,12 @@ RUN go build -tags semantic -trimpath -ldflags="-s -w" -o /out/mtt ./cmd/mtt
 FROM alpine:3.22 AS core
 RUN adduser -D -u 10001 mtt
 COPY --from=core-builder /out/mtt /usr/local/bin/mtt
-COPY --from=core-builder /src/providers.json /src/mcp.example.json /src/mtt.example.json /etc/mtt/
+COPY --from=core-builder /src/providers.json /src/mcp.example.json /src/mtt.example.json /src/start_prompt.md /etc/mtt/
 WORKDIR /workspace
 USER mtt
 EXPOSE 8080
 ENTRYPOINT ["mtt"]
+CMD ["--start-prompt-file", "/etc/mtt/start_prompt.md"]
 
 FROM core AS runtime
 COPY --from=builder /out/mtt /usr/local/bin/mtt

@@ -13,6 +13,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/eventbus"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/permission"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/pipeline"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/startprompt"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 	"github.com/matheustavarestrindade/mtt-harness/internal/operation"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/gateway"
@@ -24,15 +25,16 @@ import (
 const defaultMaxRounds = 64
 
 type Config struct {
-	Gateway   *gateway.Gateway
-	Registry  *registry.Registry
-	Store     store.Store
-	Bus       *eventbus.Bus
-	Broker    *permission.Broker
-	Engine    *permission.Engine
-	Processes *processes.Manager
-	Instances *instances.Manager
-	MaxRounds int
+	Gateway     *gateway.Gateway
+	Registry    *registry.Registry
+	Store       store.Store
+	Bus         *eventbus.Bus
+	Broker      *permission.Broker
+	Engine      *permission.Engine
+	Processes   *processes.Manager
+	Instances   *instances.Manager
+	StartPrompt *startprompt.Template
+	MaxRounds   int
 }
 
 type Loop struct {

@@ -103,7 +103,9 @@ go test ./...
 ## Configuration
 
 - `mtt.json` is local and gitignored; `mtt.example.json` shows the keys.
-- Flags win over the file: `--port`, `--database-url`, `--providers-file`, `--mcp-file`, `--test-provider`, `--config`.
+- Flags win over the file: `--port`, `--database-url`, `--providers-file`, `--mcp-file`, `--start-prompt-file`, `--test-provider`, `--config`.
+- `start_prompt.md` is the shared startup system-prompt template. `start_prompt_file` selects another file; relative paths use the process working directory. Load it once at startup and render one request-local system message before context/request middleware and budgeting. Never persist that generated message in session history or put fallback instructions in provider adapters.
+- Prompt variables come from explicit session/runtime values and the authoritative tool registry. `{tool_list}` is a compact registered catalog; `{NAME_info}` renders that tool's description/categories/input schema, including live agent model choices. Rendering never activates tools or exposes search-only documents. Preserve single-pass substitution, `{{variable}}` escaping, recoverable missing-tool errors, and child-session context. See `docs/start-prompt.md`.
 - `providers.json` holds the provider URLs, models, prices, and refresh interval. It has no secrets.
 - All default provider endpoints, model IDs, capabilities, prices, and model levels belong in `providers.json`, never in Go catalogs. The file ships OpenAI, DeepSeek, and OpenAI ChatGPT coding-plan entries. A missing/empty file injects no providers. Test-provider mode adds its test model alongside file providers.
 - Use switch-based protocol/authentication/catalog-format dispatch. A compatible provider is added through JSON, without a provider-name branch. Model IDs and display names are separate; do not infer capabilities from names. Refresh availability follows the remote catalog, including removals and an empty list. Metadata precedence is explicit per-model JSON > remote metadata > provider-level JSON defaults > cache. Missing tool metadata stays unknown and permits tool requests; explicit `tools:false` suppresses tools. Persist that distinction across restarts. Codex uses its configured `/models` URL and `codex` catalog format, not a static Go model list.
@@ -116,7 +118,7 @@ go test ./...
 
 ## Docker
 
-Run the harness and Postgres in containers. The standard harness image includes local embeddings. Only `./workspace` is mounted read/write at `/workspace`; it is not the harness repository. Bootstrap and provider/MCP files are mounted read-only under `/etc/mtt`.
+Run the harness and Postgres in containers. The standard harness image includes local embeddings. Only `./workspace` is mounted read/write at `/workspace`; it is not the harness repository. Bootstrap, provider/MCP, and startup-prompt files are mounted read-only under `/etc/mtt`.
 
 For a new checkout, prepare the local files and directory:
 

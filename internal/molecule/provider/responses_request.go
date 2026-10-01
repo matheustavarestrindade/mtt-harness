@@ -21,11 +21,9 @@ func (standardProvider *Standard) streamResponses(operationContext context.Conte
 		"model": request.Model, "input": input, "stream": true, "store": false,
 		"include": []string{"reasoning.encrypted_content"}, "parallel_tool_calls": true,
 	}
-	if instructions != "" {
+	// Keep the ChatGPT wire field present without adding provider-owned prompts.
+	if instructions != "" || standardProvider.providerSpec.Authentication == "chatgpt" {
 		payload["instructions"] = instructions
-	}
-	if standardProvider.providerSpec.Authentication == "chatgpt" && instructions == "" {
-		payload["instructions"] = "You are a coding assistant. Use the provided tools to complete the user's task."
 	}
 	if len(request.Tools) > 0 {
 		encoded, operationError := encodeFunctionToolDefinitions(request.Tools)

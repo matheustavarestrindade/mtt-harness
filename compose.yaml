@@ -29,6 +29,8 @@ services:
       - /etc/mtt/providers.json
       - --mcp-file
       - /etc/mtt/mcp.json
+      - --start-prompt-file
+      - /etc/mtt/start_prompt.md
       - --database-url
       - postgres://${MTT_DB_USER:-mtt}:${MTT_DB_PASSWORD:-mtt}@postgres:5432/${MTT_DB_NAME:-mtt}?sslmode=disable
       - --port
@@ -57,6 +59,12 @@ services:
       - type: bind
         source: ./mcp.json
         target: /etc/mtt/mcp.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./start_prompt.md
+        target: /etc/mtt/start_prompt.md
         read_only: true
         bind:
           create_host_path: false

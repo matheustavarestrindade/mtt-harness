@@ -12,7 +12,7 @@ func TestLoadOrDefault(test *testing.T) {
 	bootstrap, operationError := LoadOrDefault(filepath.Join(test.TempDir(), "missing.json"))
 	testutil.RequireNoError(test, operationError)
 
-	if bootstrap.Port != 8080 || bootstrap.ProvidersFile != "providers.json" {
+	if bootstrap.Port != 8080 || bootstrap.ProvidersFile != "providers.json" || bootstrap.StartPromptFile != "start_prompt.md" {
 		test.Fatalf("default = %+v", bootstrap)
 	}
 	path := filepath.Join(test.TempDir(), "mtt.json")
