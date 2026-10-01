@@ -4,5 +4,6 @@
   "providers_file": "providers.json",
   "api_token": "",
   "test_provider": false,
-  "mcp_file": "mcp.json"
+  "mcp_file": "mcp.json",
+  "start_prompt_file": "start_prompt.md"
 }

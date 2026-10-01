@@ -20,6 +20,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/permission"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/process"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/startprompt"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/toolsearch"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/gateway"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/instances"
@@ -31,6 +32,8 @@ import (
 )
 
 func runApplication(configuration config.File) (operationError error) {
+	startupPrompt, operationError := startprompt.Load(configuration.StartPromptFile)
+	requireStartupSuccess(operationError, "load startup prompt")
 	operationContext, cancelApplication := context.WithCancel(context.Background())
 	defer cancelApplication()
 	database := openStore(operationContext, configuration.DatabaseURL)
@@ -77,6 +80,7 @@ func runApplication(configuration config.File) (operationError error) {
 	agentLoop := loop.New(harnessRuntime, loop.Config{
 		Gateway: modelGateway, Registry: toolRegistry, Store: database, Bus: eventBus,
 		Broker: permissionBroker, Engine: permissionEngine, Instances: instanceManager,
+		StartPrompt: startupPrompt,
 	})
 	attachTools(toolRegistry, processManager, agentLoop)
 	messageQueue = loop.NewQueue(agentLoop)

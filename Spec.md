@@ -166,6 +166,41 @@ The queue keeps a coordinator until the queue closes. The `Close` operation stop
 
 Postgres transactions keep the database data correct. The memory store continues to use the mutex for the maps of the store. The session command loop does not replace the data interfaces or the permission checks.
 
+### 4.2 Startup Prompt
+
+The file `start_prompt.md` supplies the system instructions for the providers. The field `start_prompt_file` in the bootstrap file selects a different file. The command-line argument `--start-prompt-file` replaces the value from the bootstrap file. Relative paths use the directory from which you start the harness.
+
+The harness reads the template one time when the program starts. After a template change, stop and start the harness. An empty file does not supply system instructions. A file error or an unknown variable causes a startup error.
+
+The loop prepares the system message before the context and request stages. The message is before the history from the database for a model call. It is not written to the database. System messages from the database stay after it. The context limit includes the message.
+
+The template accepts the variables:
+
+- `{tool_list}`: the name and categories of the tools in the registry, in name sequence.
+- `{NAME_info}`: the name, description, categories, and input schema of the tool `NAME` from the registry.
+- `{workspace}`: the instance workspace directory.
+- `{session_id}` and `{instance_id}`: the session and instance IDs.
+- `{model}`: the session model, or the instance default when the session model is empty.
+- `{agent_depth}`: 0 for the primary session, or the depth of the child agent.
+- `{os}` and `{arch}`: the system and architecture of the harness program.
+
+Tool data comes from the registry for a model call. For example, `{bash_info}` gives the full tool definition of `bash`. The `agent` definition includes the instance model list. Tool variables do not change the session tool group. The model uses tool discovery to add tools to the group.
+
+Use 2 braces before and after the variable name for literal text. For example, `{{workspace}}` gives `{workspace}`. Substitution occurs one time. JSON braces do not change. If a tool in a variable is not in the registry, the turn gives an error before the model call.
+
+See `docs/start-prompt.md` for variable rules and Docker configuration.
+
+Requirements:
+
+- R192: The harness must get default system instructions from the template file.
+- R193: A model request must receive the template values for the session before the context stage.
+- R194: The harness must not write the system message from the template to the database.
+- R195: A tool definition from the template must come from the runtime registry and keep the full input schema.
+- R196: Template substitution must not change the session tool group or run a command.
+- R197: A tool variable for a tool which is not in the registry must give a turn error. Other sessions must continue.
+- R198: The context limit must include the system message from the template.
+- R199: Provider adapters must not add default system instructions.
+
 ## 5. Instances
 
 A user starts an instance with a workspace directory. The harness gives an ID to the instance. The instance start request gives:
@@ -450,7 +485,7 @@ The default providers use the Responses API. The adapter sends a tool call when 
 
 Requirements:
 
-- R187: OpenAI and DeepSeek must be available without a provider file.
+- R187: The default provider data must come from `providers.json`.
 - R188: The user can set a provider key while the container runs.
 - R189: The provider `openai-codex` must use account authentication, not an API key.
 - R190: The API must not give provider authentication tokens to a client.
@@ -996,6 +1031,7 @@ mtt-harness/
   mtt.example.json             # the example bootstrap file
   providers.json               # the provider data
   mcp.example.json             # the example MCP server file
+  start_prompt.md              # the shared system-prompt template
   cmd/mtt/
     main.go                     # the entry point
     application.go              # runtime wiring and API lifecycle
@@ -1038,6 +1074,8 @@ mtt-harness/
       schema/schema.go         # the input schema check
       pipeline/pipeline.go     # the middleware chain
       contextbuilder/context.go
+      startprompt/template.go  # template loading and variable syntax
+      startprompt/variables.go # session and tool text substitution
       embedding/embedding.go   # the encoder and chunk interfaces
       embedding/minilm/        # optional pure-Go model adapter
       toolsearch/config.go     # tool search configuration
@@ -1086,6 +1124,7 @@ mtt-harness/
       loop/coordinator_operations.go # database workers
       loop/coordinator_execution.go # model workers
       loop/requests.go         # request preparation and policy
+      loop/start_prompt.go     # request-local system instructions
       loop/responses.go        # model response collection
       loop/messages.go         # response and result persistence
       loop/models.go          # model selection and media checks

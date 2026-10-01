@@ -116,7 +116,7 @@ The Docker configuration puts the host directory `./workspace` at `/workspace`. 
 
 The loop makes model context in `internal/organism/loop/requests.go`. The function `contextbuilder.Builder.Build` reads session history. A plugin can change messages at the context stage.
 
-The harness does not read a general system message file. The ChatGPT adapter has a default instruction in `internal/molecule/provider/responses_request.go`. DeepSeek uses session messages and tool definitions.
+The harness reads `start_prompt.md` for system instructions. The template can include session values and tool data from the registry. See `docs/start-prompt.md` for variables and configuration.
 
 ## Checks
 

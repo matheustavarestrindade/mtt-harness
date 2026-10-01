@@ -12,6 +12,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/eventbus"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/permission"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/startprompt"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store/memory"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/toolsearch"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/gateway"
@@ -78,6 +79,11 @@ type stack struct {
 
 func newStack(test *testing.T, script ...[]atom.ResponsePart) *stack {
 	test.Helper()
+	return newStackWithStartPrompt(test, nil, script...)
+}
+
+func newStackWithStartPrompt(test *testing.T, startupPrompt *startprompt.Template, script ...[]atom.ResponsePart) *stack {
+	test.Helper()
 	database := memory.New()
 	harnessRuntime := harness.New()
 	bus := eventbus.New(harnessRuntime)
@@ -102,13 +108,14 @@ func newStack(test *testing.T, script ...[]atom.ResponsePart) *stack {
 		return nil
 	}, nil)
 	runner := loop.New(harnessRuntime, loop.Config{
-		Gateway:   models,
-		Registry:  toolRegistry,
-		Store:     database,
-		Bus:       bus,
-		Broker:    broker,
-		Engine:    engine,
-		Instances: instanceManager,
+		Gateway:     models,
+		Registry:    toolRegistry,
+		Store:       database,
+		Bus:         bus,
+		Broker:      broker,
+		Engine:      engine,
+		Instances:   instanceManager,
+		StartPrompt: startupPrompt,
 	})
 	return &stack{
 		harnessRuntime: harnessRuntime,

@@ -9,6 +9,7 @@ mtt
 bin
 dist
 *.md
+!start_prompt.md
 ste
 scripts/*
 !scripts/format/

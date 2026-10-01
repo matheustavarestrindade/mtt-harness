@@ -2,6 +2,74 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "command-line argument",
+      "category": "technical_noun",
+      "approved_forms": [
+        "command-line arguments"
+      ],
+      "meaning": "an option or value supplied when invoking a program",
+      "source": "bootstrap configuration"
+    },
+    {
+      "term": "system instruction",
+      "category": "technical_noun",
+      "approved_forms": [
+        "system instructions"
+      ],
+      "meaning": "text in a system message that directs model behavior",
+      "source": "startup prompt templates"
+    },
+    {
+      "term": "variable name",
+      "category": "technical_noun",
+      "approved_forms": [
+        "variable names"
+      ],
+      "meaning": "case-sensitive identifier used by a template substitution",
+      "source": "startup prompt templates"
+    },
+    {
+      "term": "brace",
+      "category": "technical_noun",
+      "approved_forms": [
+        "braces"
+      ],
+      "meaning": "curly punctuation character delimiting a template variable or JSON object",
+      "source": "startup prompt templates"
+    },
+    {
+      "term": "literal text",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "text reproduced without template interpretation",
+      "source": "startup prompt templates"
+    },
+    {
+      "term": "startup prompt",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "system instructions prepared from the shared harness template",
+      "source": "startup prompt templates"
+    },
+    {
+      "term": "template",
+      "category": "technical_noun",
+      "approved_forms": [
+        "templates"
+      ],
+      "meaning": "text with named variables replaced by request-specific values",
+      "source": "startup prompt templates"
+    },
+    {
+      "term": "substitution",
+      "category": "technical_noun",
+      "approved_forms": [
+        "substitutions"
+      ],
+      "meaning": "replacement of a named template variable with its text value",
+      "source": "startup prompt templates"
+    },
+    {
       "term": "semantic search",
       "category": "technical_noun",
       "approved_forms": [],
