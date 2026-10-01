@@ -15,6 +15,7 @@ RUN wget -q -O model.onnx "https://huggingface.co/sentence-transformers/all-Mini
     && echo "fc1993fde0a95c24ec6c022539d41cf6e2f7c9721e5415d6fb6897472a9cd4b7  sentence_bert_config.json" | sha256sum -c -
 
 FROM golang:1.26-alpine AS core-builder
+RUN apk add --no-cache git
 ENV CGO_ENABLED=0
 WORKDIR /src
 COPY go.mod go.sum ./

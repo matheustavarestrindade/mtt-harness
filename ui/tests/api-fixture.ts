@@ -154,14 +154,12 @@ export async function mockHarness(page: Page) {
             running.add(session.ID);
             event(session, 'turn.start', null);
           } else {
-            histories
-              .get(session.ID)
-              ?.push({
-                ...message,
-                ID: `assistant-${identifier}`,
-                Role: 'assistant',
-                Content: [{ ...message.Content![0], Text: `Done. ${content}` }],
-              });
+            histories.get(session.ID)?.push({
+              ...message,
+              ID: `assistant-${identifier}`,
+              Role: 'assistant',
+              Content: [{ ...message.Content![0], Text: `Done. ${content}` }],
+            });
             event(session, 'turn.end', { status: 'completed' });
           }
           return reply({ status: 'queued', position: 1, message }, 202);

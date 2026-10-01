@@ -41,6 +41,7 @@ Rules:
 ## Go Readability Decisions
 
 - Use complete, descriptive variable, parameter, field, and receiver names. Use `harnessRuntime`, `toolRegistry`, `configuration`, `operationContext`, `operationError`, `request`, and `responseWriter`; do not use `h`, `reg`, `cfg`, `ctx`, `err`, `r`, or `w`. Established domain acronyms such as ID, URL, HTTP, JSON, SQL, and MCP are acceptable.
+- Function and method names must identify the operation and its target, such as `requestOAuthTokens`, `activateDiscoveredTools`, and `pollDeviceAuthorization`. Audit surrounding implementation and call sites, not just the example named in a review. Keep standard interface contracts such as `Close`, `Read`, and `Run` where required.
 - Prefer guard clauses and early returns. Handle invalid input and failed operations first; keep the successful path at the outer indentation level. Avoid `else` after a branch that returns.
 - Use named error helpers for repeated handling: startup requirements, test assertions, HTTP error responses, and contextual error wrapping. Runtime failures must return errors to their caller. A failed tool, provider, or database operation must not terminate the harness. Do not swallow errors or recover arbitrary programming panics.
 - Keep `cmd/mtt/main.go` as a short entry point. Put argument parsing, application wiring, authentication, storage setup, provider loading, and MCP loading in separate, clearly named files.
@@ -77,6 +78,22 @@ Rules:
 - Put `MTT_READ_LINE_NUMBERS=true` in `.env` for treatment, or `MTT_READ_LINE_NUMBERS=false` for control, then run `docker compose up --build`. For a new checkout, copy `.env.example` to `.env`. Compose loads the file automatically and forwards the flag; an exported shell value takes precedence. Keep model, prompts, files, and other settings identical between benchmark variants.
 
 ## Commands
+
+Install the versioned formatting hook once per checkout:
+
+```sh
+./scripts/install-hooks
+```
+
+The hook formats staged Go files with `go/format`, root JSON with two-space indentation, and UI code/JSON with the UI's Prettier configuration. Run `npm ci` inside `ui/` before committing UI code. It updates only the staged content and its matching working file; it never stages unrelated edits or permission changes. If a partially staged file needs formatting, the commit stops without changing that file. Format it, then stage the intended hunks again.
+
+Format tracked working files without staging them:
+
+```sh
+go run ./scripts/format --all
+```
+
+Build and test:
 
 ```sh
 go build ./...
@@ -136,7 +153,7 @@ The compose service includes the test provider. Configure OpenAI or DeepSeek in 
 
 ## Runtime Ownership and Recovery
 
-- Session queue state is channel-owned: `Queue.runDirectory` owns coordinator references and lifecycle gates; `sessionCoordinator.run` owns each session's pending list, active queued turn, admission mode, and terminal error. Send commands instead of accessing that state from other goroutines.
+- Session queue state is channel-owned: `Queue.runDirectory` owns coordinator references and lifecycle gates; `sessionCoordinator.runCommandLoop` owns each session's pending list, active queued turn, admission mode, and terminal error. Send commands instead of accessing that state from other goroutines.
 - Coordinator handlers must not perform database/network I/O, run models/tools, wait for workers, or invoke plugin callbacks. Those operations run in workers and report completion through bounded channels. Replies have capacity one so abandoned callers do not block owners.
 - `Queue.Close` is irreversible once accepted and joins owners and their workers before storage closes. A caller deadline cancels its wait, not the shutdown. Keep memory-store mutexes and Postgres transactions for their separate data-ownership responsibilities.
 - The queue persists accepted messages and restores pending work at startup. Limits: 128 waiting messages per session and 4096 total waiting/running messages. Interrupted active turns are reported instead of replayed.

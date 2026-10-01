@@ -10,5 +10,7 @@ bin
 dist
 *.md
 ste
-scripts
+scripts/*
+!scripts/format/
+!scripts/format/**
 workspace/

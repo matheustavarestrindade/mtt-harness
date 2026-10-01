@@ -1,239 +1,1846 @@
 {
   "format_version": "1",
   "terms": [
-    {"term":"semantic search","category":"technical_noun","approved_forms":[],"meaning":"tool retrieval from vectors made by a trained embedding model","source":"optional local tool search"},
-    {"term":"vector calculation","category":"technical_noun","approved_forms":[],"meaning":"generation of document or query vectors by an encoder","source":"optional local tool search"},
-    {"term":"runtime","category":"technical_noun","approved_forms":[],"meaning":"the period when the harness application is executing","source":"optional local tool search"},
-    {"term":"lexical backend","category":"technical_noun","approved_forms":[],"meaning":"the non-neural TF-IDF search implementation","source":"optional local tool search"},
-    {"term":"document chunk","category":"technical_noun","approved_forms":["document chunks"],"meaning":"a complete retained segment of a tokenizer-bounded tool document","source":"optional local tool search"},
-    {"term":"model chunk","category":"technical_noun","approved_forms":["model chunks"],"meaning":"an inference input bounded by the model token limit","source":"optional local tool search"},
-    {"term":"startup error","category":"technical_noun","approved_forms":["startup errors"],"meaning":"an initialization failure that prevents application startup","source":"optional local tool search"},
-    {"term":"lexical search","category":"technical_noun","approved_forms":[],"meaning":"tool retrieval from shared words weighted with TF-IDF","source":"optional local tool search"},
-    {"term":"TF-IDF","category":"technical_noun","approved_forms":[],"meaning":"term frequency and inverse document frequency vector weighting","source":"optional local tool search"},
-    {"term":"TF-IDF weight","category":"technical_noun","approved_forms":["TF-IDF weights"],"meaning":"a term frequency value scaled by its inverse document frequency","source":"optional local tool search"},
-    {"term":"MiniLM","category":"technical_noun","approved_forms":[],"meaning":"the pinned all-MiniLM-L6-v2 sentence embedding model","source":"optional local tool search"},
-    {"term":"Hugot","category":"technical_noun","approved_forms":[],"meaning":"the optional Go inference library used by the MiniLM adapter","source":"optional local tool search"},
-    {"term":"tokenizer","category":"technical_noun","approved_forms":["tokenizers"],"meaning":"the model-specific encoder that divides text into token IDs","source":"optional local tool search"},
-    {"term":"WordPiece token","category":"technical_noun","approved_forms":["WordPiece tokens"],"meaning":"a token produced by the MiniLM WordPiece tokenizer","source":"optional local tool search"},
-    {"term":"backend","category":"technical_noun","approved_forms":["backends"],"meaning":"an implementation of the tool ranking interface","source":"optional local tool search"},
-    {"term":"automatic fallback","category":"technical_noun","approved_forms":[],"meaning":"the permanent switch from failed semantic inference to lexical retrieval in auto mode","source":"optional local tool search"},
-    {"term":"model asset","category":"technical_noun","approved_forms":["model assets"],"meaning":"an inference model or tokenizer file bundled with the image","source":"optional local tool search"},
-    {"term":"source revision","category":"technical_noun","approved_forms":["source revisions"],"meaning":"a pinned repository commit identifying model files","source":"optional local tool search"},
-    {"term":"SHA-256","category":"technical_noun","approved_forms":[],"meaning":"the cryptographic digest used to verify downloaded model assets","source":"optional local tool search"},
-    {"term":"ONNX","category":"technical_noun","approved_forms":[],"meaning":"the interchange format of the bundled neural model","source":"optional local tool search"},
-    {"term":"native library","category":"technical_noun","approved_forms":["native libraries"],"meaning":"a separately packaged platform shared library required by an inference engine","source":"optional local tool search"},
-    {"term":"CGO","category":"technical_noun","approved_forms":[],"meaning":"the Go facility for calling native C code","source":"optional local tool search"},
-    {"term":"build tag","category":"technical_noun","approved_forms":["build tags"],"meaning":"a Go source-file constraint that selects optional code","source":"optional local tool search"},
-    {"term":"Go build","category":"technical_noun","approved_forms":["Go builds"],"meaning":"compilation of Go source into an application executable","source":"optional local tool search"},
-    {"term":"image build","category":"technical_noun","approved_forms":["image builds"],"meaning":"the Docker process that assembles a container image","source":"optional local tool search"},
-    {"term":"Docker target","category":"technical_noun","approved_forms":["Docker targets"],"meaning":"a named stage selected for a Docker image build","source":"optional local tool search"},
-    {"term":"image stage","category":"technical_noun","approved_forms":["image stages"],"meaning":"a named stage in the Docker image definition","source":"optional local tool search"},
-    {"term":"model startup","category":"technical_noun","approved_forms":[],"meaning":"creation of the optional inference session and model pipeline","source":"optional local tool search"},
-    {"term":"model teardown","category":"technical_noun","approved_forms":[],"meaning":"release of model resources after searches finish","source":"optional local tool search"},
-    {"term":"model resource","category":"technical_noun","approved_forms":["model resources"],"meaning":"memory and tensor ownership held by the optional model session","source":"optional local tool search"},
-    {"term":"search score","category":"technical_noun","approved_forms":["search scores"],"meaning":"a cosine similarity used to rank a tool internally","source":"optional local tool search"},
-    {"term":"capability description","category":"technical_noun","approved_forms":["capability descriptions"],"meaning":"the authoritative tool name, categories, and description used for field weighting","source":"optional local tool search"},
-    {"term":"model license","category":"technical_noun","approved_forms":["model licenses"],"meaning":"the distribution license declared by a model source","source":"optional local tool search"},
-    {"term":"tool discovery","category":"technical_noun","approved_forms":[],"meaning":"the operation that locates callable capabilities for a session","source":"tool discovery"},
-    {"term":"usage example","category":"technical_noun","approved_forms":["usage examples"],"meaning":"an example invocation and workflow stored in a tool search document","source":"tool discovery"},
-    {"term":"cancellation","category":"technical_noun","approved_forms":[],"meaning":"termination of an outstanding operation through its context","source":"runtime ownership"},
-    {"term":"read-only mount","category":"technical_noun","approved_forms":["read-only mounts"],"meaning":"a container bind mount whose host contents cannot be modified","source":"Docker isolation"},
-    {"term":"read-write mount","category":"technical_noun","approved_forms":["read-write mounts"],"meaning":"a container bind mount that permits changes to host contents","source":"Docker isolation"},
-    {"term":"embedding","category":"technical_noun","approved_forms":["embeddings"],"meaning":"a numerical vector that encodes text for semantic comparison","source":"tool discovery"},
-    {"term":"embedding model","category":"technical_noun","approved_forms":["embedding models"],"meaning":"a model that converts text into vectors rather than generating answers","source":"tool discovery"},
-    {"term":"embedding request","category":"technical_noun","approved_forms":["embedding requests"],"meaning":"an API request that converts texts into vectors","source":"tool discovery"},
-    {"term":"embedding API","category":"technical_noun","approved_forms":[],"meaning":"the HTTP interface for a text embedding model","source":"tool discovery"},
-    {"term":"cosine similarity","category":"technical_noun","approved_forms":[],"meaning":"the normalized dot product used to compare embedding vectors","source":"tool discovery"},
-    {"term":"search document","category":"technical_noun","approved_forms":["search documents"],"meaning":"internal tool description, usage, and schema text indexed for discovery","source":"tool discovery"},
-    {"term":"text-generation model","category":"technical_noun","approved_forms":["text-generation models"],"meaning":"a model that generates conversation text or tool calls","source":"tool discovery"},
-    {"term":"Ollama","category":"technical_noun","approved_forms":[],"meaning":"the local model service used to serve tool-search embeddings","source":"tool discovery"},
-    {"term":"model weights","category":"technical_noun","approved_forms":[],"meaning":"the persisted numerical parameters of the local embedding model","source":"tool discovery"},
-    {"term":"subscription","category":"technical_noun","approved_forms":["subscriptions"],"meaning":"a paid provider account plan with model access","source":"provider authentication"},
-    {"term":"account","category":"technical_noun","approved_forms":["accounts"],"meaning":"a provider identity used for model authentication","source":"provider authentication"},
-    {"term":"authorization","category":"technical_noun","approved_forms":[],"meaning":"provider approval of a device authentication request","source":"provider authentication"},
-    {"term":"access token","category":"technical_noun","approved_forms":["access tokens"],"meaning":"the OAuth credential sent to the model provider","source":"provider authentication"},
-    {"term":"refresh token","category":"technical_noun","approved_forms":["refresh tokens"],"meaning":"the OAuth credential used to obtain a new access token","source":"provider authentication"},
-    {"term":"expiry time","category":"technical_noun","approved_forms":["expiry times"],"meaning":"the timestamp at which an OAuth token becomes invalid","source":"provider authentication"},
-    {"term":"OpenAI","category":"technical_noun","approved_forms":[],"meaning":"the model provider and authentication service","source":"provider defaults"},
-    {"term":"DeepSeek","category":"technical_noun","approved_forms":[],"meaning":"the model provider with an OpenAI-compatible API","source":"provider defaults"},
-    {"term":"ChatGPT","category":"technical_noun","approved_forms":[],"meaning":"the OpenAI account service used for coding-plan access","source":"provider authentication"},
-    {"term":"OAuth","category":"technical_noun","approved_forms":[],"meaning":"the authorization protocol used for provider account access","source":"provider authentication"},
-    {"term":"device code","category":"technical_noun","approved_forms":["device codes"],"meaning":"a short-lived code for provider account authorization","source":"provider authentication"},
-    {"term":"device-code login","category":"technical_noun","approved_forms":[],"meaning":"an account sign-in method with a user code and provider web page","source":"provider authentication"},
-    {"term":"coding plan","category":"technical_noun","approved_forms":["coding plans"],"meaning":"a provider subscription that permits coding-model requests","source":"provider authentication"},
-    {"term":"sign-in","category":"technical_noun","approved_forms":[],"meaning":"the process of authenticating a provider account","source":"provider authentication"},
-    {"term":"login","category":"technical_noun","approved_forms":["logins"],"meaning":"a provider account authorization attempt","source":"provider authentication"},
-    {"term":"reasoning continuation","category":"technical_noun","approved_forms":["reasoning continuations"],"meaning":"provider output state required for a subsequent tool-result request","source":"Responses API adapter"},
-    {"term":"Responses API","category":"technical_noun","approved_forms":[],"meaning":"the OpenAI-compatible semantic event streaming model API","source":"provider adapter"},
-    {"term":"credential","category":"technical_noun","approved_forms":["credentials"],"meaning":"a token used to authenticate API access","source":"ui/README.md"},
-    {"term":"test suite","category":"technical_noun","approved_forms":["test suites"],"meaning":"a collection of automated project checks","source":"ui/README.md"},
-    {"term":"session title","category":"technical_noun","approved_forms":["session titles"],"meaning":"a display name for a conversation","source":"ui/docs/design.md"},
-    {"term":"Node.js","category":"technical_noun","approved_forms":[],"meaning":"the JavaScript runtime used for UI tooling","source":"ui/README.md"},
-    {"term":"API token","category":"technical_noun","approved_forms":["API tokens"],"meaning":"the credential used to authenticate API requests","source":"routes.md"},
-    {"term":"HTTP router","category":"technical_noun","approved_forms":[],"meaning":"the Go HTTP method and path dispatcher","source":"routes.md"},
-    {"term":"prefix","category":"technical_noun","approved_forms":["prefixes"],"meaning":"a leading segment of a URL or qualified identifier","source":"routes.md"},
-    {"term":"integer","category":"technical_noun","approved_forms":["integers"],"meaning":"a whole-number JSON or configuration value","source":"routes.md"},
-    {"term":"format","category":"technical_noun","approved_forms":["formats"],"meaning":"the encoded representation of API data","source":"routes.md"},
-    {"term":"relative path","category":"technical_noun","approved_forms":["relative paths"],"meaning":"a filesystem path based on a working directory","source":"routes.md"},
-    {"term":"working directory","category":"technical_noun","approved_forms":[],"meaning":"the process directory used to resolve relative paths","source":"routes.md"},
-    {"term":"claim operation","category":"technical_noun","approved_forms":[],"meaning":"the queue transition that claims the next active turn","source":"routes.md"},
-    {"term":"background process","category":"technical_noun","approved_forms":["background processes"],"meaning":"a managed process whose lifetime can exceed a turn","source":"routes.md"},
-    {"term":"conversation","category":"technical_noun","approved_forms":["conversations"],"meaning":"a session message history","source":"ui/README.md"},
-    {"term":"collection","category":"technical_noun","approved_forms":["collections"],"meaning":"a set of API records","source":"routes.md"},
-    {"term":"model compatibility","category":"technical_noun","approved_forms":[],"meaning":"the media and tool capabilities accepted by a model","source":"routes.md"},
-    {"term":"OS PID","category":"technical_noun","approved_forms":[],"meaning":"an operating-system process identifier","source":"routes.md"},
-    {"term":"process stream","category":"technical_noun","approved_forms":["process streams"],"meaning":"the output event channel of a managed process","source":"routes.md"},
-    {"term":"stream","category":"technical_noun","approved_forms":["streams"],"meaning":"a sequence of response or process output chunks","source":"routes.md"},
-    {"term":"frame","category":"technical_noun","approved_forms":["frames"],"meaning":"one WebSocket protocol message","source":"routes.md"},
-    {"term":"cursor","category":"technical_noun","approved_forms":["cursors"],"meaning":"the last event sequence used for a replay request","source":"routes.md"},
-    {"term":"cache ratio","category":"technical_noun","approved_forms":[],"meaning":"the cache-read fraction of input tokens","source":"routes.md"},
-    {"term":"access log","category":"technical_noun","approved_forms":[],"meaning":"the request record maintained by nginx","source":"ui/README.md"},
-    {"term":"phone","category":"technical_noun","approved_forms":["phones"],"meaning":"a mobile device used to access the UI","source":"ui/README.md"},
-    {"term":"screen","category":"technical_noun","approved_forms":["screens"],"meaning":"the display surface of the UI device","source":"ui/docs/design.md"},
-    {"term":"editor","category":"technical_noun","approved_forms":["editors"],"meaning":"a UI component for modifying text or configuration","source":"ui/README.md"},
-    {"term":"terminal","category":"technical_noun","approved_forms":["terminals"],"meaning":"a process input and output UI","source":"ui/README.md"},
-    {"term":"preview server","category":"technical_noun","approved_forms":[],"meaning":"the Vite server for the compiled UI","source":"ui/README.md"},
-    {"term":"executable","category":"technical_noun","approved_forms":["executables"],"meaning":"a program file launched by browser tests","source":"ui/README.md"},
-    {"term":"UI compilation","category":"technical_noun","approved_forms":[],"meaning":"the build step that produces static UI assets","source":"ui/README.md"},
-    {"term":"view","category":"technical_noun","approved_forms":["views"],"meaning":"a selected UI screen or panel","source":"ui/docs/design.md"},
-    {"term":"message draft","category":"technical_noun","approved_forms":["message drafts"],"meaning":"client text not yet submitted to the API","source":"ui/docs/design.md"},
-    {"term":"icon","category":"technical_noun","approved_forms":["icons"],"meaning":"a graphical UI symbol from Lucide","source":"ui/docs/design.md"},
-    {"term":"dependency","category":"technical_noun","approved_forms":["dependencies"],"meaning":"a package or lower-layer module used by a component","source":"ui/docs/design.md"},
-    {"term":"dialog","category":"technical_noun","approved_forms":["dialogs"],"meaning":"a modal UI panel","source":"ui/docs/design.md"},
-    {"term":"badge","category":"technical_noun","approved_forms":["badges"],"meaning":"a compact status or model label","source":"ui/docs/design.md"},
-    {"term":"console","category":"technical_noun","approved_forms":[],"meaning":"the browser workspace application","source":"ui/docs/design.md"},
-    {"term":"UI control","category":"technical_noun","approved_forms":["UI controls"],"meaning":"an interactive browser input or button","source":"ui/docs/design.md"},
-    {"term":"label","category":"technical_noun","approved_forms":["labels"],"meaning":"the visible or accessible name of a UI element","source":"ui/docs/design.md"},
-    {"term":"connection","category":"technical_noun","approved_forms":["connections"],"meaning":"a browser HTTP or WebSocket connection to the API","source":"ui/docs/design.md"},
-    {"term":"filename","category":"technical_noun","approved_forms":["filenames"],"meaning":"the name attached to a media content item","source":"ui/docs/design.md"},
-    {"term":"MTT Console","category":"technical_noun","approved_forms":[],"meaning":"the standalone web client for the harness API","source":"ui/README.md"},
-    {"term":"UI","category":"technical_noun","approved_forms":[],"meaning":"the web user interface","source":"ui/docs/design.md"},
-    {"term":"API contract","category":"technical_noun","approved_forms":["API contracts"],"meaning":"the implemented request and response behavior of an API route","source":"routes.md"},
-    {"term":"route","category":"technical_noun","approved_forms":["routes"],"meaning":"an HTTP method and path handled by the API","source":"routes.md"},
-    {"term":"route path","category":"technical_noun","approved_forms":["route paths"],"meaning":"the URL path of an HTTP API route","source":"routes.md"},
-    {"term":"proxy","category":"technical_noun","approved_forms":["proxies"],"meaning":"a server that forwards browser requests to the harness","source":"ui/README.md"},
-    {"term":"same-origin proxy","category":"technical_noun","approved_forms":[],"meaning":"an HTTP proxy that shares the browser page origin","source":"ui/README.md"},
-    {"term":"CORS","category":"technical_noun","approved_forms":[],"meaning":"cross-origin resource sharing in a browser","source":"routes.md"},
-    {"term":"browser","category":"technical_noun","approved_forms":["browsers"],"meaning":"a web application client program","source":"ui/README.md"},
-    {"term":"browser tab","category":"technical_noun","approved_forms":["browser tabs"],"meaning":"one tab-scoped browser document context","source":"ui/README.md"},
-    {"term":"authentication","category":"technical_noun","approved_forms":[],"meaning":"verification of the API access token","source":"routes.md"},
-    {"term":"header","category":"technical_noun","approved_forms":["headers"],"meaning":"an HTTP request or response metadata field","source":"routes.md"},
-    {"term":"request body","category":"technical_noun","approved_forms":["request bodies"],"meaning":"the data payload of an HTTP request","source":"routes.md"},
-    {"term":"decoder","category":"technical_noun","approved_forms":["decoders"],"meaning":"a component that parses JSON into typed data","source":"routes.md"},
-    {"term":"DTO","category":"technical_noun","approved_forms":["DTOs"],"meaning":"a data transfer object","source":"routes.md"},
-    {"term":"timestamp","category":"technical_noun","approved_forms":["timestamps"],"meaning":"an encoded time value","source":"routes.md"},
-    {"term":"nanosecond","category":"technical_noun","approved_forms":["nanoseconds"],"meaning":"one billionth of a second as a duration unit","source":"routes.md"},
-    {"term":"byte slice","category":"technical_noun","approved_forms":["byte slices"],"meaning":"a Go byte array view serialized as Base64 in JSON","source":"routes.md"},
-    {"term":"JSON format","category":"technical_noun","approved_forms":[],"meaning":"the JSON encoding shape of API data","source":"routes.md"},
-    {"term":"array","category":"technical_noun","approved_forms":["arrays"],"meaning":"an indexed collection in JSON or TypeScript","source":"routes.md"},
-    {"term":"list","category":"technical_noun","approved_forms":["lists"],"meaning":"a collection of API records","source":"routes.md"},
-    {"term":"snapshot","category":"technical_noun","approved_forms":["snapshots"],"meaning":"a point-in-time view of client or queue data","source":"routes.md"},
-    {"term":"history","category":"technical_noun","approved_forms":[],"meaning":"stored conversation messages in order","source":"routes.md"},
-    {"term":"media item","category":"technical_noun","approved_forms":["media items"],"meaning":"a typed image audio or file content value","source":"routes.md"},
-    {"term":"liveness response","category":"technical_noun","approved_forms":[],"meaning":"a response showing that the HTTP process accepts requests","source":"routes.md"},
-    {"term":"sequence cursor","category":"technical_noun","approved_forms":["sequence cursors"],"meaning":"an exclusive last-seen event sequence used for replay","source":"routes.md"},
-    {"term":"payload","category":"technical_noun","approved_forms":["payloads"],"meaning":"the data body of an event or protocol message","source":"routes.md"},
-    {"term":"socket","category":"technical_noun","approved_forms":["sockets"],"meaning":"a WebSocket network connection","source":"routes.md"},
-    {"term":"Docker","category":"technical_noun","approved_forms":[],"meaning":"the container runtime used for deployment and tests","source":"ui/README.md"},
-    {"term":"Tailscale","category":"technical_noun","approved_forms":[],"meaning":"the private network used for remote access to the UI","source":"ui/README.md"},
-    {"term":"Tailscale address","category":"technical_noun","approved_forms":[],"meaning":"the private IP address assigned to a host by Tailscale","source":"ui/README.md"},
-    {"term":"bind address","category":"technical_noun","approved_forms":[],"meaning":"the host network address used for a listening port","source":"ui/README.md"},
-    {"term":"host","category":"technical_noun","approved_forms":["hosts"],"meaning":"a computer running a network service","source":"ui/README.md"},
-    {"term":"computer","category":"technical_noun","approved_forms":["computers"],"meaning":"the physical or virtual host of a service","source":"ui/README.md"},
-    {"term":"IP","category":"technical_noun","approved_forms":[],"meaning":"an Internet Protocol address","source":"ui/README.md"},
-    {"term":"firewall","category":"technical_noun","approved_forms":["firewalls"],"meaning":"network packet filtering on the host","source":"ui/README.md"},
-    {"term":"nginx","category":"technical_noun","approved_forms":[],"meaning":"the static-file server and reverse proxy in the UI image","source":"ui/README.md"},
-    {"term":"Vite","category":"technical_noun","approved_forms":[],"meaning":"the UI development and bundling tool","source":"ui/README.md"},
-    {"term":"TypeScript","category":"technical_noun","approved_forms":[],"meaning":"the typed JavaScript language used by the UI","source":"ui/docs/design.md"},
-    {"term":"Svelte","category":"technical_noun","approved_forms":[],"meaning":"the UI component framework","source":"ui/docs/design.md"},
-    {"term":"rune","category":"technical_noun","approved_forms":["runes"],"meaning":"a Svelte 5 reactive compiler primitive","source":"ui/docs/design.md"},
-    {"term":"Tailwind CSS","category":"technical_noun","approved_forms":[],"meaning":"the CSS utility system used in the UI","source":"ui/docs/design.md"},
-    {"term":"shadcn-svelte","category":"technical_noun","approved_forms":[],"meaning":"the reusable Svelte component registry","source":"ui/docs/design.md"},
-    {"term":"Lucide","category":"technical_noun","approved_forms":[],"meaning":"the UI icon library","source":"ui/docs/design.md"},
-    {"term":"Sonner","category":"technical_noun","approved_forms":[],"meaning":"the UI notification component","source":"ui/docs/design.md"},
-    {"term":"frontend","category":"technical_noun","approved_forms":[],"meaning":"the standalone browser application","source":"ui/README.md"},
-    {"term":"component","category":"technical_noun","approved_forms":["components"],"meaning":"a reusable Svelte UI unit","source":"ui/docs/design.md"},
-    {"term":"primitive","category":"technical_noun","approved_forms":["primitives"],"meaning":"a low-level reusable UI component","source":"ui/docs/design.md"},
-    {"term":"form","category":"technical_noun","approved_forms":["forms"],"meaning":"a group of browser input controls","source":"ui/README.md"},
-    {"term":"button","category":"technical_noun","approved_forms":["buttons"],"meaning":"an interactive UI command control","source":"ui/README.md"},
-    {"term":"navigation","category":"technical_noun","approved_forms":[],"meaning":"workspace and session selection controls","source":"ui/docs/design.md"},
-    {"term":"navigation drawer","category":"technical_noun","approved_forms":[],"meaning":"the collapsible navigation panel on small screens","source":"ui/README.md"},
-    {"term":"sidebar","category":"technical_noun","approved_forms":[],"meaning":"the persistent navigation area on large screens","source":"ui/docs/design.md"},
-    {"term":"composer","category":"technical_noun","approved_forms":[],"meaning":"the message-entry UI component","source":"ui/README.md"},
-    {"term":"keyboard focus","category":"technical_noun","approved_forms":[],"meaning":"the UI element selected for keyboard input","source":"ui/docs/design.md"},
-    {"term":"viewport","category":"technical_noun","approved_forms":[],"meaning":"the browser display area","source":"ui/docs/design.md"},
-    {"term":"safe-area padding","category":"technical_noun","approved_forms":[],"meaning":"CSS spacing for screen cutouts and browser controls","source":"ui/docs/design.md"},
-    {"term":"message receipt","category":"technical_noun","approved_forms":["message receipts"],"meaning":"a client record of a message accepted by the queue API","source":"ui/docs/design.md"},
-    {"term":"HTML","category":"technical_noun","approved_forms":[],"meaning":"browser document markup","source":"ui/docs/design.md"},
-    {"term":"Markdown","category":"technical_noun","approved_forms":[],"meaning":"the document markup used by the repository","source":"ui/docs/design.md"},
-    {"term":"pagination","category":"technical_noun","approved_forms":[],"meaning":"reading a collection through bounded pages","source":"ui/docs/design.md"},
-    {"term":"media upload","category":"technical_noun","approved_forms":[],"meaning":"a browser operation that sends media content to the API","source":"ui/docs/design.md"},
-    {"term":"browser test","category":"technical_noun","approved_forms":["browser tests","Browser Tests"],"meaning":"an automated UI test in a real browser","source":"ui/README.md"},
-    {"term":"API fixture","category":"technical_noun","approved_forms":["API fixtures"],"meaning":"test-only data with the API wire format","source":"ui/README.md"},
-    {"term":"Docker Compose","category":"technical_noun","approved_forms":[],"meaning":"the container orchestration program that reads compose.yaml and the local .env file","source":"mtt-harness Docker configuration"},
-    {"term":"line","category":"technical_noun","approved_forms":["lines"],"meaning":"a unit of file text terminated by LF or by EOF","source":"mtt-harness file tools"},
-    {"term":"line range","category":"technical_noun","approved_forms":["line ranges"],"meaning":"the inclusive start and end lines selected for a file operation","source":"mtt-harness file tools"},
-    {"term":"line number","category":"technical_noun","approved_forms":["line numbers"],"meaning":"a one-based position of a file line","source":"mtt-harness file tools"},
-    {"term":"line break","category":"technical_noun","approved_forms":["line breaks"],"meaning":"an LF or CRLF text line terminator","source":"mtt-harness file tools"},
-    {"term":"line prefix","category":"technical_noun","approved_forms":["line prefixes"],"meaning":"the N: label added to read output in the treatment variant","source":"mtt-harness read benchmark"},
-    {"term":"EOF","category":"technical_noun","approved_forms":[],"meaning":"the end of a file","source":"mtt-harness file tools"},
-    {"term":"LF","category":"technical_noun","approved_forms":[],"meaning":"the line-feed byte","source":"mtt-harness file tools"},
-    {"term":"CRLF","category":"technical_noun","approved_forms":[],"meaning":"the carriage-return and line-feed byte pair","source":"mtt-harness file tools"},
-    {"term":"parent directory","category":"technical_noun","approved_forms":["parent directories"],"meaning":"the directory containing a file path","source":"mtt-harness file tools"},
-    {"term":"text match","category":"technical_noun","approved_forms":["text matches"],"meaning":"an exact occurrence of old_text within the selected file region","source":"mtt-harness replace tool"},
-    {"term":"letter case","category":"technical_noun","approved_forms":[],"meaning":"the distinction between uppercase and lowercase text characters","source":"mtt-harness replace tool"},
-    {"term":"space character","category":"technical_noun","approved_forms":["space characters"],"meaning":"a whitespace character in literal text","source":"mtt-harness replace tool"},
-    {"term":"regular expression","category":"technical_noun","approved_forms":["regular expressions"],"meaning":"a pattern language, which the literal replace tool does not interpret","source":"mtt-harness replace tool"},
-    {"term":"file edit","category":"technical_noun","approved_forms":["file edits"],"meaning":"a write or replace operation on a file","source":"mtt-harness file tools"},
-    {"term":"rename operation","category":"technical_noun","approved_forms":["rename operations"],"meaning":"a filesystem operation that replaces the destination path with a prepared temporary file","source":"mtt-harness file tools"},
-    {"term":"permission bits","category":"technical_noun","approved_forms":[],"meaning":"the read/write/execute access mode bits of a file","source":"mtt-harness file tools"},
-    {"term":"hard link","category":"technical_noun","approved_forms":["hard links"],"meaning":"another directory entry referring to the same filesystem object","source":"mtt-harness file tools"},
-    {"term":"output format","category":"technical_noun","approved_forms":["output formats"],"meaning":"the raw or line-numbered representation sent by read","source":"mtt-harness read benchmark"},
-    {"term":"operating system","category":"technical_noun","approved_forms":["operating systems"],"meaning":"the system software that manages processes and supplies their PIDs","source":"mtt-harness process tools"},
-    {"term":"duration","category":"technical_noun","approved_forms":["durations"],"meaning":"the time length supplied as a tool parameter","source":"mtt-harness tool contracts"},
-    {"term":"string","category":"technical_noun","approved_forms":["strings"],"meaning":"a JSON or Go text value","source":"mtt-harness tool contracts"},
-    {"term":"PID","category":"technical_noun","approved_forms":["PIDs"],"meaning":"the operating system identifier for a process, distinct from the harness process ID","source":"mtt-harness process tools"},
-    {"term":"coordinator","category":"technical_noun","approved_forms":["coordinators"],"meaning":"the single owner of a session queue or directory state","source":"mtt-harness concurrency model"},
-    {"term":"goroutine","category":"technical_noun","approved_forms":["goroutines"],"meaning":"a concurrent function execution managed by the Go runtime","source":"Go concurrency"},
-    {"term":"queue state","category":"technical_noun","approved_forms":[],"meaning":"the pending work, active turn, admission mode, and errors owned by a coordinator","source":"mtt-harness concurrency model"},
-    {"term":"inbox","category":"technical_noun","approved_forms":["inboxes"],"meaning":"the bounded channel through which a coordinator receives commands","source":"mtt-harness concurrency model"},
-    {"term":"channel","category":"technical_noun","approved_forms":["channels"],"meaning":"a Go communication primitive for sending typed values between goroutines","source":"Go concurrency"},
-    {"term":"caller","category":"technical_noun","approved_forms":["callers"],"meaning":"the function or request that invokes an operation","source":"mtt-harness runtime"},
-    {"term":"worker","category":"technical_noun","approved_forms":["workers"],"meaning":"a goroutine that executes work and reports its result to an owner","source":"mtt-harness concurrency model"},
-    {"term":"completion message","category":"technical_noun","approved_forms":["completion messages"],"meaning":"a worker result sent to its owning coordinator","source":"mtt-harness concurrency model"},
-    {"term":"plugin callback","category":"technical_noun","approved_forms":["plugin callbacks"],"meaning":"a plugin function invoked for a registered event or stage","source":"mtt-harness plugin model"},
-    {"term":"admission","category":"technical_noun","approved_forms":[],"meaning":"acceptance of a new operation by a runtime owner","source":"mtt-harness concurrency model"},
-    {"term":"mutex","category":"technical_noun","approved_forms":["mutexes"],"meaning":"a mutual exclusion primitive that protects shared memory","source":"Go concurrency"},
-    {"term":"map","category":"technical_noun","approved_forms":["maps"],"meaning":"a Go data structure that associates keys with values","source":"Go data structures"},
-    {"term":"shell","category":"technical_noun","approved_forms":["shells"],"meaning":"the command interpreter used to execute process commands","source":"mtt-harness runtime"},
-    {"term":"percentage","category":"technical_noun","approved_forms":["percentages"],"meaning":"a measured ratio multiplied by one hundred","source":"mtt-harness statistics"},
-    {"term":"token estimate","category":"technical_noun","approved_forms":["token estimates"],"meaning":"a locally calculated approximation of request token usage","source":"mtt-harness context budgeting"},
-    {"term":"token count","category":"technical_noun","approved_forms":["token counts"],"meaning":"the number of model tokens in a request","source":"mtt-harness context budgeting"},
-    {"term":"byte","category":"technical_noun","approved_forms":["bytes"],"meaning":"an eight-bit unit of encoded data","source":"mtt-harness context budgeting"},
-    {"term":"media allowance","category":"technical_noun","approved_forms":["media allowances"],"meaning":"context capacity reserved for a non-text content item","source":"mtt-harness context budgeting"},
-    {"term":"message history","category":"technical_noun","approved_forms":[],"meaning":"the persisted conversation messages of a session","source":"mtt-harness runtime"},
-    {"term":"event bus","category":"technical_noun","approved_forms":[],"meaning":"the service that records events and delivers them to registered handlers","source":"mtt-harness runtime"},
-    {"term":"model gateway","category":"technical_noun","approved_forms":[],"meaning":"the service that resolves providers and models","source":"mtt-harness runtime"},
-    {"term":"schema reference","category":"technical_noun","approved_forms":["schema references"],"meaning":"a JSON Schema reference to another schema definition","source":"mtt-harness schema validation"},
-    {"term":"process manager","category":"technical_noun","approved_forms":[],"meaning":"the service that owns process records, output stages, and notifications","source":"mtt-harness runtime"},
-    {"term":"process supervisor","category":"technical_noun","approved_forms":[],"meaning":"the service that starts operating-system processes and owns their handles","source":"mtt-harness runtime"},
-    {"term":"Unix","category":"technical_noun","approved_forms":[],"meaning":"the operating-system family with process-group signal support","source":"mtt-harness runtime"},
-    {"term":"stop signal","category":"technical_noun","approved_forms":["stop signals"],"meaning":"an operating-system signal that interrupts or terminates a process","source":"mtt-harness runtime"},
-    {"term":"architecture","category":"technical_noun","approved_forms":[],"meaning":"the package-layer structure of the harness","source":"mtt-harness Go design"},
-    {"term":"import","category":"technical_noun","approved_forms":["imports"],"meaning":"a Go declaration that uses another package","source":"mtt-harness Go design"},
-    {"term":"usage record","category":"technical_noun","approved_forms":["usage records"],"meaning":"a stored model call's token and cost data","source":"mtt-harness statistics"},
-    {"term":"message record","category":"technical_noun","approved_forms":["message records"],"meaning":"a stored conversation message","source":"mtt-harness runtime"},
+    {
+      "term": "semantic search",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "tool retrieval from vectors made by a trained embedding model",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "vector calculation",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "generation of document or query vectors by an encoder",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "runtime",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the period when the harness application is executing",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "lexical backend",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the non-neural TF-IDF search implementation",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "document chunk",
+      "category": "technical_noun",
+      "approved_forms": [
+        "document chunks"
+      ],
+      "meaning": "a complete retained segment of a tokenizer-bounded tool document",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "model chunk",
+      "category": "technical_noun",
+      "approved_forms": [
+        "model chunks"
+      ],
+      "meaning": "an inference input bounded by the model token limit",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "startup error",
+      "category": "technical_noun",
+      "approved_forms": [
+        "startup errors"
+      ],
+      "meaning": "an initialization failure that prevents application startup",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "lexical search",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "tool retrieval from shared words weighted with TF-IDF",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "TF-IDF",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "term frequency and inverse document frequency vector weighting",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "TF-IDF weight",
+      "category": "technical_noun",
+      "approved_forms": [
+        "TF-IDF weights"
+      ],
+      "meaning": "a term frequency value scaled by its inverse document frequency",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "MiniLM",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the pinned all-MiniLM-L6-v2 sentence embedding model",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "Hugot",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the optional Go inference library used by the MiniLM adapter",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "tokenizer",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tokenizers"
+      ],
+      "meaning": "the model-specific encoder that divides text into token IDs",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "WordPiece token",
+      "category": "technical_noun",
+      "approved_forms": [
+        "WordPiece tokens"
+      ],
+      "meaning": "a token produced by the MiniLM WordPiece tokenizer",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "backend",
+      "category": "technical_noun",
+      "approved_forms": [
+        "backends"
+      ],
+      "meaning": "an implementation of the tool ranking interface",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "automatic fallback",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the permanent switch from failed semantic inference to lexical retrieval in auto mode",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "model asset",
+      "category": "technical_noun",
+      "approved_forms": [
+        "model assets"
+      ],
+      "meaning": "an inference model or tokenizer file bundled with the image",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "source revision",
+      "category": "technical_noun",
+      "approved_forms": [
+        "source revisions"
+      ],
+      "meaning": "a pinned repository commit identifying model files",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "SHA-256",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the cryptographic digest used to verify downloaded model assets",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "ONNX",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the interchange format of the bundled neural model",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "native library",
+      "category": "technical_noun",
+      "approved_forms": [
+        "native libraries"
+      ],
+      "meaning": "a separately packaged platform shared library required by an inference engine",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "CGO",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the Go facility for calling native C code",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "build tag",
+      "category": "technical_noun",
+      "approved_forms": [
+        "build tags"
+      ],
+      "meaning": "a Go source-file constraint that selects optional code",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "Go build",
+      "category": "technical_noun",
+      "approved_forms": [
+        "Go builds"
+      ],
+      "meaning": "compilation of Go source into an application executable",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "image build",
+      "category": "technical_noun",
+      "approved_forms": [
+        "image builds"
+      ],
+      "meaning": "the Docker process that assembles a container image",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "Docker target",
+      "category": "technical_noun",
+      "approved_forms": [
+        "Docker targets"
+      ],
+      "meaning": "a named stage selected for a Docker image build",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "image stage",
+      "category": "technical_noun",
+      "approved_forms": [
+        "image stages"
+      ],
+      "meaning": "a named stage in the Docker image definition",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "model startup",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "creation of the optional inference session and model pipeline",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "model teardown",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "release of model resources after searches finish",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "model resource",
+      "category": "technical_noun",
+      "approved_forms": [
+        "model resources"
+      ],
+      "meaning": "memory and tensor ownership held by the optional model session",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "search score",
+      "category": "technical_noun",
+      "approved_forms": [
+        "search scores"
+      ],
+      "meaning": "a cosine similarity used to rank a tool internally",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "capability description",
+      "category": "technical_noun",
+      "approved_forms": [
+        "capability descriptions"
+      ],
+      "meaning": "the authoritative tool name, categories, and description used for field weighting",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "model license",
+      "category": "technical_noun",
+      "approved_forms": [
+        "model licenses"
+      ],
+      "meaning": "the distribution license declared by a model source",
+      "source": "optional local tool search"
+    },
+    {
+      "term": "tool discovery",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the operation that locates callable capabilities for a session",
+      "source": "tool discovery"
+    },
+    {
+      "term": "usage example",
+      "category": "technical_noun",
+      "approved_forms": [
+        "usage examples"
+      ],
+      "meaning": "an example invocation and workflow stored in a tool search document",
+      "source": "tool discovery"
+    },
+    {
+      "term": "cancellation",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "termination of an outstanding operation through its context",
+      "source": "runtime ownership"
+    },
+    {
+      "term": "read-only mount",
+      "category": "technical_noun",
+      "approved_forms": [
+        "read-only mounts"
+      ],
+      "meaning": "a container bind mount whose host contents cannot be modified",
+      "source": "Docker isolation"
+    },
+    {
+      "term": "read-write mount",
+      "category": "technical_noun",
+      "approved_forms": [
+        "read-write mounts"
+      ],
+      "meaning": "a container bind mount that permits changes to host contents",
+      "source": "Docker isolation"
+    },
+    {
+      "term": "embedding",
+      "category": "technical_noun",
+      "approved_forms": [
+        "embeddings"
+      ],
+      "meaning": "a numerical vector that encodes text for semantic comparison",
+      "source": "tool discovery"
+    },
+    {
+      "term": "embedding model",
+      "category": "technical_noun",
+      "approved_forms": [
+        "embedding models"
+      ],
+      "meaning": "a model that converts text into vectors rather than generating answers",
+      "source": "tool discovery"
+    },
+    {
+      "term": "embedding request",
+      "category": "technical_noun",
+      "approved_forms": [
+        "embedding requests"
+      ],
+      "meaning": "an API request that converts texts into vectors",
+      "source": "tool discovery"
+    },
+    {
+      "term": "embedding API",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the HTTP interface for a text embedding model",
+      "source": "tool discovery"
+    },
+    {
+      "term": "cosine similarity",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the normalized dot product used to compare embedding vectors",
+      "source": "tool discovery"
+    },
+    {
+      "term": "search document",
+      "category": "technical_noun",
+      "approved_forms": [
+        "search documents"
+      ],
+      "meaning": "internal tool description, usage, and schema text indexed for discovery",
+      "source": "tool discovery"
+    },
+    {
+      "term": "text-generation model",
+      "category": "technical_noun",
+      "approved_forms": [
+        "text-generation models"
+      ],
+      "meaning": "a model that generates conversation text or tool calls",
+      "source": "tool discovery"
+    },
+    {
+      "term": "Ollama",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the local model service used to serve tool-search embeddings",
+      "source": "tool discovery"
+    },
+    {
+      "term": "model weights",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the persisted numerical parameters of the local embedding model",
+      "source": "tool discovery"
+    },
+    {
+      "term": "subscription",
+      "category": "technical_noun",
+      "approved_forms": [
+        "subscriptions"
+      ],
+      "meaning": "a paid provider account plan with model access",
+      "source": "provider authentication"
+    },
+    {
+      "term": "account",
+      "category": "technical_noun",
+      "approved_forms": [
+        "accounts"
+      ],
+      "meaning": "a provider identity used for model authentication",
+      "source": "provider authentication"
+    },
+    {
+      "term": "authorization",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "provider approval of a device authentication request",
+      "source": "provider authentication"
+    },
+    {
+      "term": "access token",
+      "category": "technical_noun",
+      "approved_forms": [
+        "access tokens"
+      ],
+      "meaning": "the OAuth credential sent to the model provider",
+      "source": "provider authentication"
+    },
+    {
+      "term": "refresh token",
+      "category": "technical_noun",
+      "approved_forms": [
+        "refresh tokens"
+      ],
+      "meaning": "the OAuth credential used to obtain a new access token",
+      "source": "provider authentication"
+    },
+    {
+      "term": "expiry time",
+      "category": "technical_noun",
+      "approved_forms": [
+        "expiry times"
+      ],
+      "meaning": "the timestamp at which an OAuth token becomes invalid",
+      "source": "provider authentication"
+    },
+    {
+      "term": "OpenAI",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the model provider and authentication service",
+      "source": "provider defaults"
+    },
+    {
+      "term": "DeepSeek",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the model provider with an OpenAI-compatible API",
+      "source": "provider defaults"
+    },
+    {
+      "term": "ChatGPT",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the OpenAI account service used for coding-plan access",
+      "source": "provider authentication"
+    },
+    {
+      "term": "OAuth",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the authorization protocol used for provider account access",
+      "source": "provider authentication"
+    },
+    {
+      "term": "device code",
+      "category": "technical_noun",
+      "approved_forms": [
+        "device codes"
+      ],
+      "meaning": "a short-lived code for provider account authorization",
+      "source": "provider authentication"
+    },
+    {
+      "term": "device-code login",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "an account sign-in method with a user code and provider web page",
+      "source": "provider authentication"
+    },
+    {
+      "term": "coding plan",
+      "category": "technical_noun",
+      "approved_forms": [
+        "coding plans"
+      ],
+      "meaning": "a provider subscription that permits coding-model requests",
+      "source": "provider authentication"
+    },
+    {
+      "term": "sign-in",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the process of authenticating a provider account",
+      "source": "provider authentication"
+    },
+    {
+      "term": "login",
+      "category": "technical_noun",
+      "approved_forms": [
+        "logins"
+      ],
+      "meaning": "a provider account authorization attempt",
+      "source": "provider authentication"
+    },
+    {
+      "term": "reasoning continuation",
+      "category": "technical_noun",
+      "approved_forms": [
+        "reasoning continuations"
+      ],
+      "meaning": "provider output state required for a subsequent tool-result request",
+      "source": "Responses API adapter"
+    },
+    {
+      "term": "Responses API",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the OpenAI-compatible semantic event streaming model API",
+      "source": "provider adapter"
+    },
+    {
+      "term": "credential",
+      "category": "technical_noun",
+      "approved_forms": [
+        "credentials"
+      ],
+      "meaning": "a token used to authenticate API access",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "test suite",
+      "category": "technical_noun",
+      "approved_forms": [
+        "test suites"
+      ],
+      "meaning": "a collection of automated project checks",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "session title",
+      "category": "technical_noun",
+      "approved_forms": [
+        "session titles"
+      ],
+      "meaning": "a display name for a conversation",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "Node.js",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the JavaScript runtime used for UI tooling",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "API token",
+      "category": "technical_noun",
+      "approved_forms": [
+        "API tokens"
+      ],
+      "meaning": "the credential used to authenticate API requests",
+      "source": "routes.md"
+    },
+    {
+      "term": "HTTP router",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the Go HTTP method and path dispatcher",
+      "source": "routes.md"
+    },
+    {
+      "term": "prefix",
+      "category": "technical_noun",
+      "approved_forms": [
+        "prefixes"
+      ],
+      "meaning": "a leading segment of a URL or qualified identifier",
+      "source": "routes.md"
+    },
+    {
+      "term": "integer",
+      "category": "technical_noun",
+      "approved_forms": [
+        "integers"
+      ],
+      "meaning": "a whole-number JSON or configuration value",
+      "source": "routes.md"
+    },
+    {
+      "term": "format",
+      "category": "technical_noun",
+      "approved_forms": [
+        "formats"
+      ],
+      "meaning": "the encoded representation of API data",
+      "source": "routes.md"
+    },
+    {
+      "term": "relative path",
+      "category": "technical_noun",
+      "approved_forms": [
+        "relative paths"
+      ],
+      "meaning": "a filesystem path based on a working directory",
+      "source": "routes.md"
+    },
+    {
+      "term": "working directory",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the process directory used to resolve relative paths",
+      "source": "routes.md"
+    },
+    {
+      "term": "claim operation",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the queue transition that claims the next active turn",
+      "source": "routes.md"
+    },
+    {
+      "term": "background process",
+      "category": "technical_noun",
+      "approved_forms": [
+        "background processes"
+      ],
+      "meaning": "a managed process whose lifetime can exceed a turn",
+      "source": "routes.md"
+    },
+    {
+      "term": "conversation",
+      "category": "technical_noun",
+      "approved_forms": [
+        "conversations"
+      ],
+      "meaning": "a session message history",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "collection",
+      "category": "technical_noun",
+      "approved_forms": [
+        "collections"
+      ],
+      "meaning": "a set of API records",
+      "source": "routes.md"
+    },
+    {
+      "term": "model compatibility",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the media and tool capabilities accepted by a model",
+      "source": "routes.md"
+    },
+    {
+      "term": "OS PID",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "an operating-system process identifier",
+      "source": "routes.md"
+    },
+    {
+      "term": "process stream",
+      "category": "technical_noun",
+      "approved_forms": [
+        "process streams"
+      ],
+      "meaning": "the output event channel of a managed process",
+      "source": "routes.md"
+    },
+    {
+      "term": "stream",
+      "category": "technical_noun",
+      "approved_forms": [
+        "streams"
+      ],
+      "meaning": "a sequence of response or process output chunks",
+      "source": "routes.md"
+    },
+    {
+      "term": "frame",
+      "category": "technical_noun",
+      "approved_forms": [
+        "frames"
+      ],
+      "meaning": "one WebSocket protocol message",
+      "source": "routes.md"
+    },
+    {
+      "term": "cursor",
+      "category": "technical_noun",
+      "approved_forms": [
+        "cursors"
+      ],
+      "meaning": "the last event sequence used for a replay request",
+      "source": "routes.md"
+    },
+    {
+      "term": "cache ratio",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the cache-read fraction of input tokens",
+      "source": "routes.md"
+    },
+    {
+      "term": "access log",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the request record maintained by nginx",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "phone",
+      "category": "technical_noun",
+      "approved_forms": [
+        "phones"
+      ],
+      "meaning": "a mobile device used to access the UI",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "screen",
+      "category": "technical_noun",
+      "approved_forms": [
+        "screens"
+      ],
+      "meaning": "the display surface of the UI device",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "editor",
+      "category": "technical_noun",
+      "approved_forms": [
+        "editors"
+      ],
+      "meaning": "a UI component for modifying text or configuration",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "terminal",
+      "category": "technical_noun",
+      "approved_forms": [
+        "terminals"
+      ],
+      "meaning": "a process input and output UI",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "preview server",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the Vite server for the compiled UI",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "executable",
+      "category": "technical_noun",
+      "approved_forms": [
+        "executables"
+      ],
+      "meaning": "a program file launched by browser tests",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "UI compilation",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the build step that produces static UI assets",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "view",
+      "category": "technical_noun",
+      "approved_forms": [
+        "views"
+      ],
+      "meaning": "a selected UI screen or panel",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "message draft",
+      "category": "technical_noun",
+      "approved_forms": [
+        "message drafts"
+      ],
+      "meaning": "client text not yet submitted to the API",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "icon",
+      "category": "technical_noun",
+      "approved_forms": [
+        "icons"
+      ],
+      "meaning": "a graphical UI symbol from Lucide",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "dependency",
+      "category": "technical_noun",
+      "approved_forms": [
+        "dependencies"
+      ],
+      "meaning": "a package or lower-layer module used by a component",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "dialog",
+      "category": "technical_noun",
+      "approved_forms": [
+        "dialogs"
+      ],
+      "meaning": "a modal UI panel",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "badge",
+      "category": "technical_noun",
+      "approved_forms": [
+        "badges"
+      ],
+      "meaning": "a compact status or model label",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "console",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the browser workspace application",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "UI control",
+      "category": "technical_noun",
+      "approved_forms": [
+        "UI controls"
+      ],
+      "meaning": "an interactive browser input or button",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "label",
+      "category": "technical_noun",
+      "approved_forms": [
+        "labels"
+      ],
+      "meaning": "the visible or accessible name of a UI element",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "connection",
+      "category": "technical_noun",
+      "approved_forms": [
+        "connections"
+      ],
+      "meaning": "a browser HTTP or WebSocket connection to the API",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "filename",
+      "category": "technical_noun",
+      "approved_forms": [
+        "filenames"
+      ],
+      "meaning": "the name attached to a media content item",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "MTT Console",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the standalone web client for the harness API",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "UI",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the web user interface",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "API contract",
+      "category": "technical_noun",
+      "approved_forms": [
+        "API contracts"
+      ],
+      "meaning": "the implemented request and response behavior of an API route",
+      "source": "routes.md"
+    },
+    {
+      "term": "route",
+      "category": "technical_noun",
+      "approved_forms": [
+        "routes"
+      ],
+      "meaning": "an HTTP method and path handled by the API",
+      "source": "routes.md"
+    },
+    {
+      "term": "route path",
+      "category": "technical_noun",
+      "approved_forms": [
+        "route paths"
+      ],
+      "meaning": "the URL path of an HTTP API route",
+      "source": "routes.md"
+    },
+    {
+      "term": "proxy",
+      "category": "technical_noun",
+      "approved_forms": [
+        "proxies"
+      ],
+      "meaning": "a server that forwards browser requests to the harness",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "same-origin proxy",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "an HTTP proxy that shares the browser page origin",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "CORS",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "cross-origin resource sharing in a browser",
+      "source": "routes.md"
+    },
+    {
+      "term": "browser",
+      "category": "technical_noun",
+      "approved_forms": [
+        "browsers"
+      ],
+      "meaning": "a web application client program",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "browser tab",
+      "category": "technical_noun",
+      "approved_forms": [
+        "browser tabs"
+      ],
+      "meaning": "one tab-scoped browser document context",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "authentication",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "verification of the API access token",
+      "source": "routes.md"
+    },
+    {
+      "term": "header",
+      "category": "technical_noun",
+      "approved_forms": [
+        "headers"
+      ],
+      "meaning": "an HTTP request or response metadata field",
+      "source": "routes.md"
+    },
+    {
+      "term": "request body",
+      "category": "technical_noun",
+      "approved_forms": [
+        "request bodies"
+      ],
+      "meaning": "the data payload of an HTTP request",
+      "source": "routes.md"
+    },
+    {
+      "term": "decoder",
+      "category": "technical_noun",
+      "approved_forms": [
+        "decoders"
+      ],
+      "meaning": "a component that parses JSON into typed data",
+      "source": "routes.md"
+    },
+    {
+      "term": "DTO",
+      "category": "technical_noun",
+      "approved_forms": [
+        "DTOs"
+      ],
+      "meaning": "a data transfer object",
+      "source": "routes.md"
+    },
+    {
+      "term": "timestamp",
+      "category": "technical_noun",
+      "approved_forms": [
+        "timestamps"
+      ],
+      "meaning": "an encoded time value",
+      "source": "routes.md"
+    },
+    {
+      "term": "nanosecond",
+      "category": "technical_noun",
+      "approved_forms": [
+        "nanoseconds"
+      ],
+      "meaning": "one billionth of a second as a duration unit",
+      "source": "routes.md"
+    },
+    {
+      "term": "byte slice",
+      "category": "technical_noun",
+      "approved_forms": [
+        "byte slices"
+      ],
+      "meaning": "a Go byte array view serialized as Base64 in JSON",
+      "source": "routes.md"
+    },
+    {
+      "term": "JSON format",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the JSON encoding shape of API data",
+      "source": "routes.md"
+    },
+    {
+      "term": "array",
+      "category": "technical_noun",
+      "approved_forms": [
+        "arrays"
+      ],
+      "meaning": "an indexed collection in JSON or TypeScript",
+      "source": "routes.md"
+    },
+    {
+      "term": "list",
+      "category": "technical_noun",
+      "approved_forms": [
+        "lists"
+      ],
+      "meaning": "a collection of API records",
+      "source": "routes.md"
+    },
+    {
+      "term": "snapshot",
+      "category": "technical_noun",
+      "approved_forms": [
+        "snapshots"
+      ],
+      "meaning": "a point-in-time view of client or queue data",
+      "source": "routes.md"
+    },
+    {
+      "term": "history",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "stored conversation messages in order",
+      "source": "routes.md"
+    },
+    {
+      "term": "media item",
+      "category": "technical_noun",
+      "approved_forms": [
+        "media items"
+      ],
+      "meaning": "a typed image audio or file content value",
+      "source": "routes.md"
+    },
+    {
+      "term": "liveness response",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "a response showing that the HTTP process accepts requests",
+      "source": "routes.md"
+    },
+    {
+      "term": "sequence cursor",
+      "category": "technical_noun",
+      "approved_forms": [
+        "sequence cursors"
+      ],
+      "meaning": "an exclusive last-seen event sequence used for replay",
+      "source": "routes.md"
+    },
+    {
+      "term": "payload",
+      "category": "technical_noun",
+      "approved_forms": [
+        "payloads"
+      ],
+      "meaning": "the data body of an event or protocol message",
+      "source": "routes.md"
+    },
+    {
+      "term": "socket",
+      "category": "technical_noun",
+      "approved_forms": [
+        "sockets"
+      ],
+      "meaning": "a WebSocket network connection",
+      "source": "routes.md"
+    },
+    {
+      "term": "Docker",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the container runtime used for deployment and tests",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "Tailscale",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the private network used for remote access to the UI",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "Tailscale address",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the private IP address assigned to a host by Tailscale",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "bind address",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the host network address used for a listening port",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "host",
+      "category": "technical_noun",
+      "approved_forms": [
+        "hosts"
+      ],
+      "meaning": "a computer running a network service",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "computer",
+      "category": "technical_noun",
+      "approved_forms": [
+        "computers"
+      ],
+      "meaning": "the physical or virtual host of a service",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "IP",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "an Internet Protocol address",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "firewall",
+      "category": "technical_noun",
+      "approved_forms": [
+        "firewalls"
+      ],
+      "meaning": "network packet filtering on the host",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "nginx",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the static-file server and reverse proxy in the UI image",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "Vite",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the UI development and bundling tool",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "TypeScript",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the typed JavaScript language used by the UI",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "Svelte",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the UI component framework",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "rune",
+      "category": "technical_noun",
+      "approved_forms": [
+        "runes"
+      ],
+      "meaning": "a Svelte 5 reactive compiler primitive",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "Tailwind CSS",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the CSS utility system used in the UI",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "shadcn-svelte",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the reusable Svelte component registry",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "Lucide",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the UI icon library",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "Sonner",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the UI notification component",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "frontend",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the standalone browser application",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "component",
+      "category": "technical_noun",
+      "approved_forms": [
+        "components"
+      ],
+      "meaning": "a reusable Svelte UI unit",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "primitive",
+      "category": "technical_noun",
+      "approved_forms": [
+        "primitives"
+      ],
+      "meaning": "a low-level reusable UI component",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "form",
+      "category": "technical_noun",
+      "approved_forms": [
+        "forms"
+      ],
+      "meaning": "a group of browser input controls",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "button",
+      "category": "technical_noun",
+      "approved_forms": [
+        "buttons"
+      ],
+      "meaning": "an interactive UI command control",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "navigation",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "workspace and session selection controls",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "navigation drawer",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the collapsible navigation panel on small screens",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "sidebar",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the persistent navigation area on large screens",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "composer",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the message-entry UI component",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "keyboard focus",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the UI element selected for keyboard input",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "viewport",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the browser display area",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "safe-area padding",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "CSS spacing for screen cutouts and browser controls",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "message receipt",
+      "category": "technical_noun",
+      "approved_forms": [
+        "message receipts"
+      ],
+      "meaning": "a client record of a message accepted by the queue API",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "HTML",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "browser document markup",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "Markdown",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the document markup used by the repository",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "pagination",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "reading a collection through bounded pages",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "media upload",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "a browser operation that sends media content to the API",
+      "source": "ui/docs/design.md"
+    },
+    {
+      "term": "browser test",
+      "category": "technical_noun",
+      "approved_forms": [
+        "browser tests",
+        "Browser Tests"
+      ],
+      "meaning": "an automated UI test in a real browser",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "API fixture",
+      "category": "technical_noun",
+      "approved_forms": [
+        "API fixtures"
+      ],
+      "meaning": "test-only data with the API wire format",
+      "source": "ui/README.md"
+    },
+    {
+      "term": "Docker Compose",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the container orchestration program that reads compose.yaml and the local .env file",
+      "source": "mtt-harness Docker configuration"
+    },
+    {
+      "term": "line",
+      "category": "technical_noun",
+      "approved_forms": [
+        "lines"
+      ],
+      "meaning": "a unit of file text terminated by LF or by EOF",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "line range",
+      "category": "technical_noun",
+      "approved_forms": [
+        "line ranges"
+      ],
+      "meaning": "the inclusive start and end lines selected for a file operation",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "line number",
+      "category": "technical_noun",
+      "approved_forms": [
+        "line numbers"
+      ],
+      "meaning": "a one-based position of a file line",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "line break",
+      "category": "technical_noun",
+      "approved_forms": [
+        "line breaks"
+      ],
+      "meaning": "an LF or CRLF text line terminator",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "line prefix",
+      "category": "technical_noun",
+      "approved_forms": [
+        "line prefixes"
+      ],
+      "meaning": "the N: label added to read output in the treatment variant",
+      "source": "mtt-harness read benchmark"
+    },
+    {
+      "term": "EOF",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the end of a file",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "LF",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the line-feed byte",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "CRLF",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the carriage-return and line-feed byte pair",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "parent directory",
+      "category": "technical_noun",
+      "approved_forms": [
+        "parent directories"
+      ],
+      "meaning": "the directory containing a file path",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "text match",
+      "category": "technical_noun",
+      "approved_forms": [
+        "text matches"
+      ],
+      "meaning": "an exact occurrence of old_text within the selected file region",
+      "source": "mtt-harness replace tool"
+    },
+    {
+      "term": "letter case",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the distinction between uppercase and lowercase text characters",
+      "source": "mtt-harness replace tool"
+    },
+    {
+      "term": "space character",
+      "category": "technical_noun",
+      "approved_forms": [
+        "space characters"
+      ],
+      "meaning": "a whitespace character in literal text",
+      "source": "mtt-harness replace tool"
+    },
+    {
+      "term": "regular expression",
+      "category": "technical_noun",
+      "approved_forms": [
+        "regular expressions"
+      ],
+      "meaning": "a pattern language, which the literal replace tool does not interpret",
+      "source": "mtt-harness replace tool"
+    },
+    {
+      "term": "file edit",
+      "category": "technical_noun",
+      "approved_forms": [
+        "file edits"
+      ],
+      "meaning": "a write or replace operation on a file",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "rename operation",
+      "category": "technical_noun",
+      "approved_forms": [
+        "rename operations"
+      ],
+      "meaning": "a filesystem operation that replaces the destination path with a prepared temporary file",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "permission bits",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the read/write/execute access mode bits of a file",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "hard link",
+      "category": "technical_noun",
+      "approved_forms": [
+        "hard links"
+      ],
+      "meaning": "another directory entry referring to the same filesystem object",
+      "source": "mtt-harness file tools"
+    },
+    {
+      "term": "output format",
+      "category": "technical_noun",
+      "approved_forms": [
+        "output formats"
+      ],
+      "meaning": "the raw or line-numbered representation sent by read",
+      "source": "mtt-harness read benchmark"
+    },
+    {
+      "term": "operating system",
+      "category": "technical_noun",
+      "approved_forms": [
+        "operating systems"
+      ],
+      "meaning": "the system software that manages processes and supplies their PIDs",
+      "source": "mtt-harness process tools"
+    },
+    {
+      "term": "duration",
+      "category": "technical_noun",
+      "approved_forms": [
+        "durations"
+      ],
+      "meaning": "the time length supplied as a tool parameter",
+      "source": "mtt-harness tool contracts"
+    },
+    {
+      "term": "string",
+      "category": "technical_noun",
+      "approved_forms": [
+        "strings"
+      ],
+      "meaning": "a JSON or Go text value",
+      "source": "mtt-harness tool contracts"
+    },
+    {
+      "term": "PID",
+      "category": "technical_noun",
+      "approved_forms": [
+        "PIDs"
+      ],
+      "meaning": "the operating system identifier for a process, distinct from the harness process ID",
+      "source": "mtt-harness process tools"
+    },
+    {
+      "term": "coordinator",
+      "category": "technical_noun",
+      "approved_forms": [
+        "coordinators"
+      ],
+      "meaning": "the single owner of a session queue or directory state",
+      "source": "mtt-harness concurrency model"
+    },
+    {
+      "term": "goroutine",
+      "category": "technical_noun",
+      "approved_forms": [
+        "goroutines"
+      ],
+      "meaning": "a concurrent function execution managed by the Go runtime",
+      "source": "Go concurrency"
+    },
+    {
+      "term": "queue state",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the pending work, active turn, admission mode, and errors owned by a coordinator",
+      "source": "mtt-harness concurrency model"
+    },
+    {
+      "term": "inbox",
+      "category": "technical_noun",
+      "approved_forms": [
+        "inboxes"
+      ],
+      "meaning": "the bounded channel through which a coordinator receives commands",
+      "source": "mtt-harness concurrency model"
+    },
+    {
+      "term": "channel",
+      "category": "technical_noun",
+      "approved_forms": [
+        "channels"
+      ],
+      "meaning": "a Go communication primitive for sending typed values between goroutines",
+      "source": "Go concurrency"
+    },
+    {
+      "term": "caller",
+      "category": "technical_noun",
+      "approved_forms": [
+        "callers"
+      ],
+      "meaning": "the function or request that invokes an operation",
+      "source": "mtt-harness runtime"
+    },
+    {
+      "term": "worker",
+      "category": "technical_noun",
+      "approved_forms": [
+        "workers"
+      ],
+      "meaning": "a goroutine that executes work and reports its result to an owner",
+      "source": "mtt-harness concurrency model"
+    },
+    {
+      "term": "completion message",
+      "category": "technical_noun",
+      "approved_forms": [
+        "completion messages"
+      ],
+      "meaning": "a worker result sent to its owning coordinator",
+      "source": "mtt-harness concurrency model"
+    },
+    {
+      "term": "plugin callback",
+      "category": "technical_noun",
+      "approved_forms": [
+        "plugin callbacks"
+      ],
+      "meaning": "a plugin function invoked for a registered event or stage",
+      "source": "mtt-harness plugin model"
+    },
+    {
+      "term": "admission",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "acceptance of a new operation by a runtime owner",
+      "source": "mtt-harness concurrency model"
+    },
+    {
+      "term": "mutex",
+      "category": "technical_noun",
+      "approved_forms": [
+        "mutexes"
+      ],
+      "meaning": "a mutual exclusion primitive that protects shared memory",
+      "source": "Go concurrency"
+    },
+    {
+      "term": "map",
+      "category": "technical_noun",
+      "approved_forms": [
+        "maps"
+      ],
+      "meaning": "a Go data structure that associates keys with values",
+      "source": "Go data structures"
+    },
+    {
+      "term": "shell",
+      "category": "technical_noun",
+      "approved_forms": [
+        "shells"
+      ],
+      "meaning": "the command interpreter used to execute process commands",
+      "source": "mtt-harness runtime"
+    },
+    {
+      "term": "percentage",
+      "category": "technical_noun",
+      "approved_forms": [
+        "percentages"
+      ],
+      "meaning": "a measured ratio multiplied by one hundred",
+      "source": "mtt-harness statistics"
+    },
+    {
+      "term": "token estimate",
+      "category": "technical_noun",
+      "approved_forms": [
+        "token estimates"
+      ],
+      "meaning": "a locally calculated approximation of request token usage",
+      "source": "mtt-harness context budgeting"
+    },
+    {
+      "term": "token count",
+      "category": "technical_noun",
+      "approved_forms": [
+        "token counts"
+      ],
+      "meaning": "the number of model tokens in a request",
+      "source": "mtt-harness context budgeting"
+    },
+    {
+      "term": "byte",
+      "category": "technical_noun",
+      "approved_forms": [
+        "bytes"
+      ],
+      "meaning": "an eight-bit unit of encoded data",
+      "source": "mtt-harness context budgeting"
+    },
+    {
+      "term": "media allowance",
+      "category": "technical_noun",
+      "approved_forms": [
+        "media allowances"
+      ],
+      "meaning": "context capacity reserved for a non-text content item",
+      "source": "mtt-harness context budgeting"
+    },
+    {
+      "term": "message history",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the persisted conversation messages of a session",
+      "source": "mtt-harness runtime"
+    },
+    {
+      "term": "event bus",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the service that records events and delivers them to registered handlers",
+      "source": "mtt-harness runtime"
+    },
+    {
+      "term": "model gateway",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the service that resolves providers and models",
+      "source": "mtt-harness runtime"
+    },
+    {
+      "term": "schema reference",
+      "category": "technical_noun",
+      "approved_forms": [
+        "schema references"
+      ],
+      "meaning": "a JSON Schema reference to another schema definition",
+      "source": "mtt-harness schema validation"
+    },
+    {
+      "term": "process manager",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the service that owns process records, output stages, and notifications",
+      "source": "mtt-harness runtime"
+    },
+    {
+      "term": "process supervisor",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the service that starts operating-system processes and owns their handles",
+      "source": "mtt-harness runtime"
+    },
+    {
+      "term": "Unix",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the operating-system family with process-group signal support",
+      "source": "mtt-harness runtime"
+    },
+    {
+      "term": "stop signal",
+      "category": "technical_noun",
+      "approved_forms": [
+        "stop signals"
+      ],
+      "meaning": "an operating-system signal that interrupts or terminates a process",
+      "source": "mtt-harness runtime"
+    },
+    {
+      "term": "architecture",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the package-layer structure of the harness",
+      "source": "mtt-harness Go design"
+    },
+    {
+      "term": "import",
+      "category": "technical_noun",
+      "approved_forms": [
+        "imports"
+      ],
+      "meaning": "a Go declaration that uses another package",
+      "source": "mtt-harness Go design"
+    },
+    {
+      "term": "usage record",
+      "category": "technical_noun",
+      "approved_forms": [
+        "usage records"
+      ],
+      "meaning": "a stored model call's token and cost data",
+      "source": "mtt-harness statistics"
+    },
+    {
+      "term": "message record",
+      "category": "technical_noun",
+      "approved_forms": [
+        "message records"
+      ],
+      "meaning": "a stored conversation message",
+      "source": "mtt-harness runtime"
+    },
     {
       "term": "variable",
       "category": "technical_noun",
-      "approved_forms": ["variables"],
+      "approved_forms": [
+        "variables"
+      ],
       "meaning": "a named storage location in source code",
       "source": "mtt-harness Go readability decisions"
     },
     {
       "term": "error helper",
       "category": "technical_noun",
-      "approved_forms": ["error helpers"],
+      "approved_forms": [
+        "error helpers"
+      ],
       "meaning": "a function that centralizes handling of an operation failure",
       "source": "mtt-harness Go readability decisions"
     },

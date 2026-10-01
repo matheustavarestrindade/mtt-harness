@@ -3,7 +3,10 @@
     {
       "name": "example",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-everything"],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-everything"
+      ],
       "env": {},
       "url": "",
       "headers": {},
