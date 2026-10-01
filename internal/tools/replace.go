@@ -65,15 +65,15 @@ func (Replace) Run(operationContext context.Context, call atom.ToolCall) (atom.T
 	if mode != "first" && mode != "last" && mode != "all" {
 		return atom.ToolResult{}, fmt.Errorf("replace: mode must be first, last, or all")
 	}
-	if _, _, operationError := input.bounds(); operationError != nil {
+	if _, _, operationError := input.resolveLineBounds(); operationError != nil {
 		return atom.ToolResult{}, operationError
 	}
 	path, operationError := harness.WorkspacePath(operationContext, input.Path)
 	if operationError != nil {
 		return atom.ToolResult{}, operationError
 	}
-	summary, operationError := updateFile(operationContext, path, false, func(original []byte) (fileChange, error) {
-		start, end, operationError := input.byteRange(original)
+	summary, operationError := applyAtomicFileEdit(operationContext, path, false, func(original []byte) (fileChange, error) {
+		start, end, operationError := input.resolveByteRange(original)
 		if operationError != nil {
 			return fileChange{}, operationError
 		}

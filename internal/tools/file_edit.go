@@ -56,10 +56,10 @@ func acquireFileEdit(operationContext context.Context, path string) (func(), err
 	}
 }
 
-// updateFile serializes harness edits to the same resolved path. A replacement
+// applyAtomicFileEdit serializes harness edits to the same resolved path. A replacement
 // is prepared before rename so invalid ranges, absent matches, and failed writes
 // leave the original file intact. External editors do not participate in this gate.
-func updateFile(operationContext context.Context, path string, allowCreate bool, transform func([]byte) (fileChange, error)) (string, error) {
+func applyAtomicFileEdit(operationContext context.Context, path string, allowCreate bool, transform func([]byte) (fileChange, error)) (string, error) {
 	release, operationError := acquireFileEdit(operationContext, path)
 	if operationError != nil {
 		return "", operationError
@@ -89,13 +89,13 @@ func updateFile(operationContext context.Context, path string, allowCreate bool,
 	if operationError := operationContext.Err(); operationError != nil {
 		return "", operationError
 	}
-	if operationError := replaceFile(operationContext, path, information, change.content); operationError != nil {
+	if operationError := replaceFileContentsAtomically(operationContext, path, information, change.content); operationError != nil {
 		return "", operationError
 	}
 	return change.summary, nil
 }
 
-func replaceFile(operationContext context.Context, path string, information os.FileInfo, content []byte) error {
+func replaceFileContentsAtomically(operationContext context.Context, path string, information os.FileInfo, content []byte) error {
 	permissions := os.FileMode(0o644)
 	if information != nil {
 		// Rename permission alone must not bypass a read-only destination.

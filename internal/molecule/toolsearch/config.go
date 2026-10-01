@@ -50,7 +50,7 @@ func LoadConfiguration(path string) (Configuration, error) {
 	if configuration.Mode != ModeLexical && configuration.ModelDirectory == "" {
 		return Configuration{}, fmt.Errorf("tool_search.model_directory is required for semantic search")
 	}
-	if !validMinimum(configuration.SemanticMinimumSimilarity) || !validMinimum(configuration.LexicalMinimumSimilarity) {
+	if !validSimilarityThreshold(configuration.SemanticMinimumSimilarity) || !validSimilarityThreshold(configuration.LexicalMinimumSimilarity) {
 		return Configuration{}, fmt.Errorf("tool search similarity minimums must be finite values between 0 and 1")
 	}
 	if configuration.ModelDirectory != "" && !filepath.IsAbs(configuration.ModelDirectory) {
@@ -63,6 +63,6 @@ func LoadConfiguration(path string) (Configuration, error) {
 	return configuration, nil
 }
 
-func validMinimum(value float64) bool {
+func validSimilarityThreshold(value float64) bool {
 	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0 && value <= 1
 }

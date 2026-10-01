@@ -65,7 +65,7 @@
     if (workspaceOpen) workspaceError = '';
   });
 
-  async function action(name: string, operation: () => Promise<void>) {
+  async function runWorkbenchAction(name: string, operation: () => Promise<void>) {
     busy = name;
     try {
       await operation();
@@ -78,7 +78,7 @@
     }
   }
   async function connect(base: string, token: string) {
-    await action('connect', async () => {
+    await runWorkbenchAction('connect', async () => {
       await workbench.connect(base, token);
       if (workbench.connection !== 'connected') return;
       preferences = { base, token };
@@ -88,7 +88,7 @@
   }
   async function createWorkspace(input: InstanceInput) {
     workspaceError = '';
-    await action('workspace', async () => {
+    await runWorkbenchAction('workspace', async () => {
       try {
         await workbench.createInstance(input);
       } catch (error) {
@@ -111,7 +111,7 @@
     });
   }
   async function createSession(model: string) {
-    await action('session', async () => {
+    await runWorkbenchAction('session', async () => {
       await workbench.createSession(model);
       sessionOpen = false;
       menuOpen = false;
@@ -121,20 +121,20 @@
   function selectInstance(instance: Instance) {
     providersOpen = false;
     menuOpen = false;
-    void action('select', () => workbench.selectInstance(instance));
+    void runWorkbenchAction('select', () => workbench.selectInstance(instance));
   }
   function selectSession(session: Session) {
     providersOpen = false;
     menuOpen = false;
-    void action('select', () => workbench.selectSession(session));
+    void runWorkbenchAction('select', () => workbench.selectSession(session));
   }
-  async function send() {
+  async function sendDraftMessage() {
     const identifier = sessionID;
     const content = drafts[identifier] ?? '';
     if (disabled || sending || !content.trim()) return;
     sending = true;
     try {
-      await workbench.send(content);
+      await workbench.sendMessage(content);
       if (drafts[identifier] === content) drafts[identifier] = '';
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Message was not accepted.');
@@ -142,10 +142,10 @@
       sending = false;
     }
   }
-  function decision(identifier: string, kind: 'allow' | 'deny') {
-    void action(identifier, async () => {
+  function resolvePermissionRequest(identifier: string, kind: 'allow' | 'deny') {
+    void runWorkbenchAction(identifier, async () => {
       try {
-        await workbench.decide(identifier, kind);
+        await workbench.resolvePermissionRequest(identifier, kind);
       } catch (error) {
         if (error instanceof ApiError && error.status === 404)
           workbench.permissions = workbench.permissions.filter((entry) => entry.ID !== identifier);
@@ -180,7 +180,7 @@
     }}
     onSelectInstance={selectInstance}
     onSelectSession={selectSession}
-    onRefresh={() => void action('refresh', () => workbench.refreshInstances())}
+    onRefresh={() => void runWorkbenchAction('refresh', () => workbench.refreshInstances())}
     {providersOpen}
     onProviders={() => {
       menuOpen = false;
@@ -306,10 +306,10 @@
           onConnection={() => (connectionOpen = true)}
           onWorkspace={() => (workspaceOpen = true)}
           onSession={() => (sessionOpen = true)}
-          onResume={() => void action('resume', () => workbench.resumeInstance())}
+          onResume={() => void runWorkbenchAction('resume', () => workbench.resumeInstance())}
           onCancelQueued={(identifier) =>
-            void action(identifier, () => workbench.cancelQueued(identifier))}
-          onDecision={decision}
+            void runWorkbenchAction(identifier, () => workbench.cancelQueuedMessage(identifier))}
+          onDecision={resolvePermissionRequest}
           onPrompt={(text) => {
             if (sessionID) drafts[sessionID] = text;
           }}
@@ -325,8 +325,9 @@
               {sending}
               running={workbench.status.running}
               cancelling={busy === 'cancel'}
-              onSend={() => void send()}
-              onCancel={() => void action('cancel', () => workbench.cancel())}
+              onSend={() => void sendDraftMessage()}
+              onCancel={() =>
+                void runWorkbenchAction('cancel', () => workbench.cancelCurrentTurn())}
             />
             <div class="mt-1 flex items-center justify-between gap-2">
               <UsageBar statistics={workbench.statistics} /><span

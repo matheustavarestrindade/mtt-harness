@@ -25,20 +25,20 @@
   const keyProviders = $derived(
     providers.filter((provider) => provider.Authentication === 'api_key'),
   );
-  const titleOf = (provider: Provider) =>
+  const providerDisplayName = (provider: Provider) =>
     provider.Name === 'openai'
       ? 'OpenAI'
       : provider.Name === 'deepseek'
         ? 'DeepSeek'
         : provider.Name;
-  const keyURL = (provider: Provider) =>
+  const providerKeyManagementURL = (provider: Provider) =>
     provider.Name === 'deepseek'
       ? 'https://platform.deepseek.com/api_keys'
       : 'https://platform.openai.com/api-keys';
-  const messageOf = (failure: unknown) =>
+  const providerErrorMessage = (failure: unknown) =>
     failure instanceof Error ? failure.message : 'Provider setup failed.';
 
-  async function load() {
+  async function loadProvidersAndModels() {
     catalogRequest?.abort();
     catalogRequest = new AbortController();
     const signal = AbortSignal.any([lifetime.signal, catalogRequest.signal]);
@@ -55,7 +55,7 @@
               error: '',
             };
           } catch (failure) {
-            return { provider: provider.Name, models: [], error: messageOf(failure) };
+            return { provider: provider.Name, models: [], error: providerErrorMessage(failure) };
           }
         }),
       );
@@ -65,16 +65,16 @@
         modelLists.map(({ provider, models, error }) => [provider, { models, error }]),
       );
     } catch (failure) {
-      if (!signal.aborted) error = messageOf(failure);
+      if (!signal.aborted) error = providerErrorMessage(failure);
     } finally {
       if (!signal.aborted) loading = false;
     }
   }
-  async function changed() {
-    await load();
+  async function refreshProviderViews() {
+    await loadProvidersAndModels();
     if (!lifetime.signal.aborted) await onChanged();
   }
-  async function save(provider: Provider, key: string): Promise<boolean> {
+  async function saveProviderAPIKey(provider: Provider, key: string): Promise<boolean> {
     busy = provider.Name;
     errors[provider.Name] = '';
     let saved = false;
@@ -83,85 +83,87 @@
       saved = true;
       try {
         await api.refreshProvider(provider.Name, lifetime.signal);
-        if (!lifetime.signal.aborted) toast.success(`${titleOf(provider)} is ready`);
+        if (!lifetime.signal.aborted) toast.success(`${providerDisplayName(provider)} is ready`);
       } catch (failure) {
         if (!lifetime.signal.aborted)
-          errors[provider.Name] = `Key saved, but model refresh failed: ${messageOf(failure)}`;
+          errors[provider.Name] =
+            `Key saved, but model refresh failed: ${providerErrorMessage(failure)}`;
       }
-      await changed();
+      await refreshProviderViews();
     } catch (failure) {
-      if (!lifetime.signal.aborted) errors[provider.Name] = messageOf(failure);
+      if (!lifetime.signal.aborted) errors[provider.Name] = providerErrorMessage(failure);
     } finally {
       if (!lifetime.signal.aborted) busy = '';
     }
     return saved;
   }
-  async function action(identifier: string, operation: () => Promise<unknown>) {
-    busy = identifier;
-    errors[identifier] = '';
+  async function runProviderAction(providerID: string, operation: () => Promise<unknown>) {
+    busy = providerID;
+    errors[providerID] = '';
     try {
       await operation();
-      await changed();
+      await refreshProviderViews();
     } catch (failure) {
-      if (!lifetime.signal.aborted) errors[identifier] = messageOf(failure);
+      if (!lifetime.signal.aborted) errors[providerID] = providerErrorMessage(failure);
     } finally {
       if (!lifetime.signal.aborted) busy = '';
     }
   }
-  async function poll(identifier: string) {
+  async function pollDeviceLoginStatus(loginID: string) {
     const providerID = login?.Provider;
     if (!providerID) return;
     try {
-      const result = await api.providerLogin(providerID, identifier, lifetime.signal);
-      if (lifetime.signal.aborted || login?.ID !== identifier) return;
-      login = result;
-      if (result.Status === 'pending') {
-        timer = setTimeout(() => void poll(identifier), 2000);
+      const loginStatus = await api.providerLogin(providerID, loginID, lifetime.signal);
+      if (lifetime.signal.aborted || login?.ID !== loginID) return;
+      login = loginStatus;
+      if (loginStatus.Status === 'pending') {
+        timer = setTimeout(() => void pollDeviceLoginStatus(loginID), 2000);
         return;
       }
-      if (result.Status === 'connected') {
+      if (loginStatus.Status === 'connected') {
         toast.success('OpenAI coding plan connected');
         try {
           await api.refreshProvider(providerID, lifetime.signal);
         } catch (failure) {
           if (!lifetime.signal.aborted)
-            errors[providerID] = `Signed in, but model refresh failed: ${messageOf(failure)}`;
+            errors[providerID] =
+              `Signed in, but model refresh failed: ${providerErrorMessage(failure)}`;
         }
-        await changed();
+        await refreshProviderViews();
       }
     } catch (failure) {
-      if (!lifetime.signal.aborted) errors[providerID] = messageOf(failure);
+      if (!lifetime.signal.aborted) errors[providerID] = providerErrorMessage(failure);
     }
   }
-  async function signIn() {
+  async function startCodingPlanLogin() {
     const providerID = codingPlan?.Name;
     if (!providerID) return;
     busy = providerID;
     errors[busy] = '';
     clearTimeout(timer);
     try {
-      const result = await api.startProviderLogin(providerID, lifetime.signal);
+      const deviceLogin = await api.startProviderLogin(providerID, lifetime.signal);
       if (lifetime.signal.aborted) return;
-      login = result;
-      timer = setTimeout(() => void poll(result.ID), 2000);
+      login = deviceLogin;
+      timer = setTimeout(() => void pollDeviceLoginStatus(deviceLogin.ID), 2000);
     } catch (failure) {
-      if (!lifetime.signal.aborted) errors[providerID] = messageOf(failure);
+      if (!lifetime.signal.aborted) errors[providerID] = providerErrorMessage(failure);
     } finally {
       if (!lifetime.signal.aborted) busy = '';
     }
   }
-  async function cancelLogin() {
+  async function cancelDeviceLogin() {
     if (!login) return;
     clearTimeout(timer);
-    const identifier = login.ID;
+    const loginID = login.ID;
     const providerID = login.Provider;
-    await action(providerID, () =>
-      api.cancelProviderLogin(providerID, identifier, lifetime.signal),
+    await runProviderAction(providerID, () =>
+      api.cancelProviderLogin(providerID, loginID, lifetime.signal),
     );
-    if (!lifetime.signal.aborted && login?.ID === identifier) login = null;
+    if (!lifetime.signal.aborted && login?.ID === loginID) login = null;
   }
   onMount(() => {
-    void load();
+    void loadProvidersAndModels();
   });
   onDestroy(() => {
     lifetime.abort();
@@ -188,7 +190,7 @@
         class="icon-button shrink-0"
         aria-label="Reload providers"
         disabled={!!busy || loading}
-        onclick={() => void load()}><RefreshCw class="size-4" /></Button
+        onclick={() => void loadProvidersAndModels()}><RefreshCw class="size-4" /></Button
       >
     </div>
     {#if loading}<p role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
@@ -199,18 +201,22 @@
       {#each keyProviders as provider (provider.Name)}
         <ProviderKeyCard
           {provider}
-          title={titleOf(provider)}
-          keyURL={keyURL(provider)}
+          title={providerDisplayName(provider)}
+          keyURL={providerKeyManagementURL(provider)}
           busy={!!busy}
           error={errors[provider.Name] ?? ''}
           models={catalogs[provider.Name]?.models ?? []}
           modelsLoading={loading}
           modelsError={catalogs[provider.Name]?.error ?? ''}
-          onSave={(key) => save(provider, key)}
+          onSave={(key) => saveProviderAPIKey(provider, key)}
           onDisconnect={() =>
-            void action(provider.Name, () => api.deleteProviderKey(provider.Name, lifetime.signal))}
+            void runProviderAction(provider.Name, () =>
+              api.deleteProviderKey(provider.Name, lifetime.signal),
+            )}
           onRefresh={() =>
-            void action(provider.Name, () => api.refreshProvider(provider.Name, lifetime.signal))}
+            void runProviderAction(provider.Name, () =>
+              api.refreshProvider(provider.Name, lifetime.signal),
+            )}
         />
       {/each}
       {#if codingPlan}
@@ -262,14 +268,17 @@
                 variant="outline"
                 class="h-11 w-full"
                 disabled={!!busy}
-                onclick={() => void cancelLogin()}>Cancel sign-in</Button
+                onclick={() => void cancelDeviceLogin()}>Cancel sign-in</Button
               >
             </div>
           {:else}
             {#if login?.Error}<p role="alert" class="mb-3 break-words text-sm text-destructive">
                 {login.Error}
               </p>{/if}
-            <Button class="h-11 w-full" disabled={!!busy} onclick={() => void signIn()}
+            <Button
+              class="h-11 w-full"
+              disabled={!!busy}
+              onclick={() => void startCodingPlanLogin()}
               >{#if busy === codingPlan.Name}<LoaderCircle
                   class="size-4 animate-spin"
                 />{:else}<LogIn class="size-4" />{/if}{codingPlan.Connected
@@ -288,7 +297,7 @@
               class="mt-3 h-11 text-xs"
               disabled={!!busy}
               onclick={() =>
-                void action(codingPlan.Name, async () => {
+                void runProviderAction(codingPlan.Name, async () => {
                   clearTimeout(timer);
                   login = null;
                   await api.disconnectCodingPlan(codingPlan.Name, lifetime.signal);

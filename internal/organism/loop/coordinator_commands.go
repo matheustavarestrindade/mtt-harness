@@ -60,7 +60,7 @@ type runningTurn struct {
 	done      chan struct{}
 }
 
-func (coordinator *sessionCoordinator) ask(operationContext context.Context, command sessionCommand) (sessionReply, error) {
+func (coordinator *sessionCoordinator) requestSessionCommand(operationContext context.Context, command sessionCommand) (sessionReply, error) {
 	command.operationContext = operationContext
 	command.reply = make(chan sessionReply, 1)
 	if operationError := operationContext.Err(); operationError != nil {

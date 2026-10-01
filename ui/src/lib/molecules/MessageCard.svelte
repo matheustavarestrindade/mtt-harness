@@ -3,7 +3,7 @@
   import { toast } from 'svelte-sonner';
   import { Button } from '$lib/atoms/ui/button';
   import type { Message } from '$lib/atoms/types';
-  import { messageText, time } from '$lib/atoms/format';
+  import { messageText, formatTimestamp } from '$lib/atoms/format';
   let { message }: { message: Message } = $props();
   const text = $derived(messageText(message));
   async function copyText() {
@@ -52,7 +52,7 @@
             ? 'System'
             : 'Assistant'}</span
       ><time class="text-[10px] text-muted-foreground" datetime={message.CreatedAt}
-        >{time(message.CreatedAt)}</time
+        >{formatTimestamp(message.CreatedAt)}</time
       ><Button
         variant="ghost"
         size="icon"

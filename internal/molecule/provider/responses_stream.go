@@ -43,7 +43,7 @@ type responseItem struct {
 	} `json:"content"`
 }
 
-func parseResponses(operationContext context.Context, body io.ReadCloser, stream *httpStream, providerName string) {
+func parseResponsesAPIEvents(operationContext context.Context, body io.ReadCloser, stream *httpStream, providerName string) {
 	defer body.Close()
 	defer close(stream.parts)
 	scanner := bufio.NewScanner(body)

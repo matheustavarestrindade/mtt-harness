@@ -141,7 +141,7 @@ The session coordinator keeps the queue state of one session. One goroutine runs
 ```
 API requests -> queue directory -> session command inbox
                                       |
-                               sessionCoordinator.run
+                               sessionCoordinator.runCommandLoop
                                       |
                            model and database workers
                                       |
@@ -1174,6 +1174,8 @@ The Go code must use the full name of a variable. The name must give the purpose
 harnessRuntime := harness.New()
 toolRegistry := registry.New()
 ```
+
+The name of a function must give the operation and the object of the operation. Use `requestOAuthTokens` to identify a token request. Use `activateDiscoveredTools` to identify a tool group change.
 
 The function must stop when the input is not correct or an operation gives an error. The error check must come before the primary operation.
 

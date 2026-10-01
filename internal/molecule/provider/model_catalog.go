@@ -52,7 +52,7 @@ func decodeModelCatalog(responseBody io.Reader, format string) ([]catalogModel, 
 		for _, entry := range *response.Data {
 			model := catalogModel{ID: entry.ID, ModelMetadata: entry.ModelMetadata}
 			if entry.Pricing != nil {
-				model.Prices = &atom.Prices{Currency: "USD", Input: perMillion(entry.Pricing.Prompt), Output: perMillion(entry.Pricing.Completion), CacheRead: perMillion(entry.Pricing.InputCacheRead), CacheWrite: perMillion(entry.Pricing.InputCacheWrite)}
+				model.Prices = &atom.Prices{Currency: "USD", Input: pricePerMillionTokens(entry.Pricing.Prompt), Output: pricePerMillionTokens(entry.Pricing.Completion), CacheRead: pricePerMillionTokens(entry.Pricing.InputCacheRead), CacheWrite: pricePerMillionTokens(entry.Pricing.InputCacheWrite)}
 			}
 			catalog = append(catalog, model)
 		}

@@ -10,7 +10,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
-func (processManager *Manager) tail(runningProcess harness.Process) string {
+func (processManager *Manager) recentProcessOutput(runningProcess harness.Process) string {
 	stdout, stderr, _ := processManager.Output(runningProcess.ID())
 	if len(stderr) > 0 {
 		return string(stderr)
@@ -18,7 +18,7 @@ func (processManager *Manager) tail(runningProcess harness.Process) string {
 	return string(stdout)
 }
 
-func (processManager *Manager) send(operationContext context.Context, session atom.Session, text string) error {
+func (processManager *Manager) sendProcessNotification(operationContext context.Context, session atom.Session, text string) error {
 	if session.ID == "" {
 		return nil
 	}

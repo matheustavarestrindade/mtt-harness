@@ -58,7 +58,7 @@ func (messageQueue *Queue) SubmitContent(operationContext context.Context, sessi
 	if operationError != nil {
 		return atom.Message{}, 0, operationError
 	}
-	response, operationError := coordinator.ask(operationContext, sessionCommand{kind: submitMessage, message: message})
+	response, operationError := coordinator.requestSessionCommand(operationContext, sessionCommand{kind: submitMessage, message: message})
 	message.Content = append([]atom.Content(nil), message.Content...)
 	for index := range message.Content {
 		message.Content[index].Data = append([]byte(nil), message.Content[index].Data...)
@@ -74,7 +74,7 @@ func (messageQueue *Queue) Cancel(operationContext context.Context, sessionID at
 	if coordinator == nil {
 		return messageQueue.loop.CancelRun(sessionID), nil
 	}
-	response, operationError := coordinator.ask(operationContext, sessionCommand{kind: cancelCurrent})
+	response, operationError := coordinator.requestSessionCommand(operationContext, sessionCommand{kind: cancelCurrent})
 	return response.cancelled, operationError
 }
 
@@ -87,7 +87,7 @@ func (messageQueue *Queue) CancelMessage(operationContext context.Context, sessi
 	if operationError != nil {
 		return false, operationError
 	}
-	response, operationError := coordinator.ask(operationContext, sessionCommand{kind: cancelPending, messageID: messageID})
+	response, operationError := coordinator.requestSessionCommand(operationContext, sessionCommand{kind: cancelPending, messageID: messageID})
 	return response.cancelled, operationError
 }
 
@@ -96,7 +96,7 @@ func (messageQueue *Queue) Status(operationContext context.Context, sessionID at
 	if operationError != nil || coordinator == nil {
 		return QueueStatus{}, operationError
 	}
-	response, operationError := coordinator.ask(operationContext, sessionCommand{kind: readStatus})
+	response, operationError := coordinator.requestSessionCommand(operationContext, sessionCommand{kind: readStatus})
 	return response.status, operationError
 }
 

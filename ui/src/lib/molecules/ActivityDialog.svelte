@@ -2,7 +2,7 @@
   import { Radio, Terminal } from 'lucide-svelte';
   import * as Dialog from '$lib/atoms/ui/dialog';
   import type { HarnessEvent } from '$lib/atoms/types';
-  import { time } from '$lib/atoms/format';
+  import { formatTimestamp } from '$lib/atoms/format';
   let { open = $bindable(false), events = [] }: { open?: boolean; events?: HarnessEvent[] } =
     $props();
 </script>
@@ -23,7 +23,8 @@
         >
           <summary class="flex min-h-11 cursor-pointer items-center gap-2 px-3 text-xs"
             ><Terminal class="size-3 text-primary" /><span class="font-mono">{event.Name}</span
-            ><span class="ml-auto text-[10px] text-muted-foreground">{time(event.Time)}</span
+            ><span class="ml-auto text-[10px] text-muted-foreground"
+              >{formatTimestamp(event.Time)}</span
             ></summary
           >
           <pre class="tool-output m-2 whitespace-pre-wrap break-all">{JSON.stringify(

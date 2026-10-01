@@ -46,7 +46,7 @@ func TestStartupRecoveryDoesNotHideProgrammingPanics(test *testing.T) {
 func TestRunReturnsInvalidConfigurationError(test *testing.T) {
 	configurationPath := filepath.Join(test.TempDir(), "mtt.json")
 	testutil.RequireNoError(test, os.WriteFile(configurationPath, []byte("invalid JSON"), 0600))
-	if operationError := run([]string{"--config", configurationPath}); operationError == nil {
+	if operationError := runCommandLine([]string{"--config", configurationPath}); operationError == nil {
 		test.Fatal("invalid bootstrap configuration did not fail startup")
 	}
 }

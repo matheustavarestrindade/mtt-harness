@@ -42,11 +42,11 @@ type directoryCompletion struct {
 }
 
 func (messageQueue *Queue) coordinator(operationContext context.Context, session atom.Session, create bool) (*sessionCoordinator, error) {
-	response, operationError := messageQueue.ask(operationContext, queueCommand{kind: findSession, session: session, create: create})
+	response, operationError := messageQueue.requestDirectoryCommand(operationContext, queueCommand{kind: findSession, session: session, create: create})
 	return response.coordinator, operationError
 }
 
-func (messageQueue *Queue) ask(operationContext context.Context, command queueCommand) (queueReply, error) {
+func (messageQueue *Queue) requestDirectoryCommand(operationContext context.Context, command queueCommand) (queueReply, error) {
 	command.operationContext = operationContext
 	command.reply = make(chan queueReply, 1)
 	if operationError := operationContext.Err(); operationError != nil {

@@ -42,19 +42,19 @@ func newSessionCoordinator(agentLoop *Loop, session atom.Session, pending []atom
 	if stopped {
 		coordinator.mode = sessionStopped
 	}
-	go coordinator.run()
+	go coordinator.runCommandLoop()
 	return coordinator
 }
 
-func (coordinator *sessionCoordinator) run() {
+func (coordinator *sessionCoordinator) runCommandLoop() {
 	defer close(coordinator.done)
 	for {
-		if !coordinator.advance() {
+		if !coordinator.advancePendingWork() {
 			return
 		}
 		select {
 		case command := <-coordinator.commands:
-			coordinator.handle(command)
+			coordinator.handleSessionCommand(command)
 		case completed := <-coordinator.completed:
 			coordinator.handleOperation(completed)
 		case completed := <-coordinator.runFinished:
@@ -63,7 +63,7 @@ func (coordinator *sessionCoordinator) run() {
 	}
 }
 
-func (coordinator *sessionCoordinator) handle(command sessionCommand) {
+func (coordinator *sessionCoordinator) handleSessionCommand(command sessionCommand) {
 	if operationError := command.operationContext.Err(); operationError != nil && command.kind != closeSession {
 		command.respond(sessionReply{operationError: operationError})
 		return
@@ -185,7 +185,7 @@ func (coordinator *sessionCoordinator) rejectMutations(operationError error) {
 	coordinator.mutations = nil
 }
 
-func (coordinator *sessionCoordinator) advance() bool {
+func (coordinator *sessionCoordinator) advancePendingWork() bool {
 	if coordinator.working == nil {
 		if coordinator.revert != nil {
 			coordinator.startOperation(*coordinator.revert)
@@ -204,7 +204,7 @@ func (coordinator *sessionCoordinator) advance() bool {
 		if !coordinator.instanceRunning() {
 			coordinator.mode = sessionStopped
 		} else {
-			coordinator.startRun()
+			coordinator.startQueuedTurn()
 		}
 	}
 	if coordinator.active != nil || coordinator.working != nil || coordinator.revert != nil {

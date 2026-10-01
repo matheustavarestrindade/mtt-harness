@@ -32,7 +32,7 @@ func (server *Server) startProviderLogin(responseWriter http.ResponseWriter, req
 	if !server.supportsDeviceLogin(responseWriter, request) {
 		return
 	}
-	login, operationError := server.providerAuth.Start(request.Context(), request.PathValue("id"))
+	login, operationError := server.providerAuth.StartDeviceLogin(request.Context(), request.PathValue("id"))
 	if respondToError(responseWriter, http.StatusBadGateway, operationError) {
 		return
 	}
@@ -43,7 +43,7 @@ func (server *Server) providerLoginStatus(responseWriter http.ResponseWriter, re
 	if !server.supportsDeviceLogin(responseWriter, request) {
 		return
 	}
-	login, operationError := server.providerAuth.Status(request.Context(), request.PathValue("id"), request.PathValue("login_id"))
+	login, operationError := server.providerAuth.DeviceLoginStatus(request.Context(), request.PathValue("id"), request.PathValue("login_id"))
 	if respondToError(responseWriter, http.StatusNotFound, operationError) {
 		return
 	}
@@ -54,7 +54,7 @@ func (server *Server) cancelProviderLogin(responseWriter http.ResponseWriter, re
 	if !server.supportsDeviceLogin(responseWriter, request) {
 		return
 	}
-	if respondToError(responseWriter, http.StatusNotFound, server.providerAuth.Cancel(request.Context(), request.PathValue("id"), request.PathValue("login_id"))) {
+	if respondToError(responseWriter, http.StatusNotFound, server.providerAuth.CancelDeviceLogin(request.Context(), request.PathValue("id"), request.PathValue("login_id"))) {
 		return
 	}
 	writeJSON(responseWriter, http.StatusOK, map[string]string{"status": "cancelled"})
@@ -64,7 +64,7 @@ func (server *Server) disconnectProvider(responseWriter http.ResponseWriter, req
 	if !server.supportsDeviceLogin(responseWriter, request) {
 		return
 	}
-	if respondToError(responseWriter, http.StatusInternalServerError, server.providerAuth.Disconnect(request.Context(), request.PathValue("id"))) {
+	if respondToError(responseWriter, http.StatusInternalServerError, server.providerAuth.DisconnectProvider(request.Context(), request.PathValue("id"))) {
 		return
 	}
 	writeJSON(responseWriter, http.StatusOK, map[string]string{"status": "disconnected"})

@@ -4,11 +4,8 @@ package providerauth
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
-	"net/http"
 	"sync"
-	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/openaiauth"
@@ -26,29 +23,29 @@ type loginFlow struct {
 // The polling worker performs network I/O outside the gate, then checks its
 // generation before saving credentials. Close cancels and joins that worker.
 type Service struct {
-	context context.Context
-	cancel  context.CancelFunc
-	secrets store.SecretStore
-	client  *openaiauth.Client
-	gate    chan struct{}
-	flow    *loginFlow
-	closed  bool
-	workers sync.WaitGroup
+	lifetimeContext      context.Context
+	cancelLifetime       context.CancelFunc
+	secretStore          store.SecretStore
+	authenticationClient *openaiauth.Client
+	credentialGate       chan struct{}
+	activeLogin          *loginFlow
+	closed               bool
+	pollingWorkers       sync.WaitGroup
 }
 
-func New(operationContext context.Context, secrets store.SecretStore, client *openaiauth.Client) *Service {
-	if client == nil {
-		client = openaiauth.New()
+func New(operationContext context.Context, secretStore store.SecretStore, authenticationClient *openaiauth.Client) *Service {
+	if authenticationClient == nil {
+		authenticationClient = openaiauth.New()
 	}
-	lifetime, cancel := context.WithCancel(operationContext)
-	return &Service{context: lifetime, cancel: cancel, secrets: secrets, client: client, gate: make(chan struct{}, 1)}
+	lifetimeContext, cancelLifetime := context.WithCancel(operationContext)
+	return &Service{lifetimeContext: lifetimeContext, cancelLifetime: cancelLifetime, secretStore: secretStore, authenticationClient: authenticationClient, credentialGate: make(chan struct{}, 1)}
 }
 
-func (service *Service) acquire(operationContext context.Context) error {
+func (authenticationService *Service) acquireCredentialGate(operationContext context.Context) error {
 	select {
-	case service.gate <- struct{}{}:
+	case authenticationService.credentialGate <- struct{}{}:
 		if operationError := operationContext.Err(); operationError != nil {
-			service.release()
+			authenticationService.releaseCredentialGate()
 			return operationError
 		}
 		return nil
@@ -57,113 +54,16 @@ func (service *Service) acquire(operationContext context.Context) error {
 	}
 }
 
-func (service *Service) release() { <-service.gate }
+func (authenticationService *Service) releaseCredentialGate() { <-authenticationService.credentialGate }
 
-func (service *Service) Start(operationContext context.Context, providerID string) (atom.DeviceLogin, error) {
-	if operationError := service.acquire(operationContext); operationError != nil {
-		return atom.DeviceLogin{}, operationError
-	}
-	defer service.release()
-	if service.closed || service.context.Err() != nil {
-		return atom.DeviceLogin{}, errors.New("provider authentication is shutting down")
-	}
-	challenge, operationError := service.client.Start(operationContext)
-	if operationError != nil {
-		return atom.DeviceLogin{}, operationError
-	}
-	if service.flow != nil {
-		service.flow.cancel()
-	}
-	loginContext, cancel := context.WithDeadline(service.context, challenge.ExpiresAt)
-	flow := &loginFlow{cancel: cancel, status: atom.DeviceLogin{
-		ID: rand.Text(), Provider: providerID, VerificationURL: challenge.VerificationURL,
-		UserCode: challenge.UserCode, ExpiresAt: challenge.ExpiresAt, Status: "pending",
-	}}
-	service.flow = flow
-	service.workers.Add(1)
-	go service.poll(loginContext, flow, challenge)
-	return flow.status, nil
-}
-
-func (service *Service) Status(operationContext context.Context, providerID, identifier string) (atom.DeviceLogin, error) {
-	if operationError := service.acquire(operationContext); operationError != nil {
-		return atom.DeviceLogin{}, operationError
-	}
-	defer service.release()
-	if service.flow == nil || service.flow.status.ID != identifier || service.flow.status.Provider != providerID {
-		return atom.DeviceLogin{}, ErrLoginNotFound
-	}
-	return service.flow.status, nil
-}
-
-func (service *Service) Cancel(operationContext context.Context, providerID, identifier string) error {
-	if operationError := service.acquire(operationContext); operationError != nil {
-		return operationError
-	}
-	defer service.release()
-	if service.flow == nil || service.flow.status.ID != identifier || service.flow.status.Provider != providerID {
-		return ErrLoginNotFound
-	}
-	if service.flow.status.Status != "pending" {
-		return nil
-	}
-	service.flow.cancel()
-	service.flow.status.Status = "cancelled"
-	return nil
-}
-
-func (service *Service) Disconnect(operationContext context.Context, providerID string) error {
-	if operationError := service.acquire(operationContext); operationError != nil {
-		return operationError
-	}
-	defer service.release()
-	if service.flow != nil && service.flow.status.Provider == providerID {
-		service.flow.cancel()
-		service.flow.status.Status = "cancelled"
-	}
-	return service.secrets.DeleteOAuthCredential(operationContext, providerID)
-}
-
-func (service *Service) Headers(operationContext context.Context, providerID string) (http.Header, error) {
-	if operationError := service.acquire(operationContext); operationError != nil {
-		return nil, operationError
-	}
-	defer service.release()
-	credential, operationError := service.secrets.OAuthCredential(operationContext, providerID)
-	if operationError != nil {
-		return nil, operationError
-	}
-	if credential.AccessToken == "" {
-		return nil, errors.New("connect the OpenAI coding plan in Providers")
-	}
-	if time.Until(credential.ExpiresAt) < time.Minute {
-		credential, operationError = service.client.Refresh(operationContext, credential)
-		if operationError != nil {
-			return nil, operationError
-		}
-		if operationError := service.secrets.SaveOAuthCredential(operationContext, providerID, credential); operationError != nil {
-			return nil, operationError
-		}
-	}
-	headers := make(http.Header)
-	headers.Set("Authorization", "Bearer "+credential.AccessToken)
-	headers.Set("ChatGPT-Account-Id", credential.AccountID)
-	headers.Set("originator", "mtt-harness")
-	headers.Set("User-Agent", "mtt-harness/1.0")
-	if credential.Residency != "" {
-		headers.Set("x-openai-internal-codex-residency", credential.Residency)
-	}
-	return headers, nil
-}
-
-func (service *Service) Close() {
-	service.cancel()
+func (authenticationService *Service) Close() {
+	authenticationService.cancelLifetime()
 	// This short owner join uses no request context; shutdown is irreversible.
-	service.gate <- struct{}{}
-	service.closed = true
-	if service.flow != nil {
-		service.flow.cancel()
+	authenticationService.credentialGate <- struct{}{}
+	authenticationService.closed = true
+	if authenticationService.activeLogin != nil {
+		authenticationService.activeLogin.cancel()
 	}
-	service.release()
-	service.workers.Wait()
+	authenticationService.releaseCredentialGate()
+	authenticationService.pollingWorkers.Wait()
 }

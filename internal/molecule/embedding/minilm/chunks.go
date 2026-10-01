@@ -9,15 +9,15 @@ import (
 	"unicode/utf8"
 )
 
-// splitText preserves every byte of a document. The counter uses the model's
+// splitTextWithinTokenLimit preserves every byte of a document. The counter uses the model's
 // real tokenizer with truncation disabled; a token estimate is not sufficient.
-func splitText(operationContext context.Context, text string, count func(string) int) ([]string, error) {
+func splitTextWithinTokenLimit(operationContext context.Context, text string, countTokens func(string) int) ([]string, error) {
 	var chunks []string
 	for text != "" {
 		if operationError := operationContext.Err(); operationError != nil {
 			return nil, operationError
 		}
-		if count(text) <= maxTokens {
+		if countTokens(text) <= maxTokens {
 			chunks = append(chunks, text)
 			break
 		}
@@ -34,7 +34,7 @@ func splitText(operationContext context.Context, text string, count func(string)
 				return nil, operationError
 			}
 			middle := low + (high-low)/2
-			if count(text[:boundaries[middle]]) <= maxTokens {
+			if countTokens(text[:boundaries[middle]]) <= maxTokens {
 				selected = boundaries[middle]
 				low = middle + 1
 				continue
@@ -54,7 +54,7 @@ func splitText(operationContext context.Context, text string, count func(string)
 			}
 			boundary -= size
 		}
-		for count(text[:selected]) > maxTokens {
+		for countTokens(text[:selected]) > maxTokens {
 			_, size := utf8.DecodeLastRuneInString(text[:selected])
 			selected -= size
 			if selected == 0 {

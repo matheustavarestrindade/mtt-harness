@@ -53,7 +53,7 @@
         if (feed) feed.scrollTop = feed.scrollHeight;
       });
   });
-  function scroll() {
+  function updateScrollPosition() {
     if (feed) following = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 100;
   }
 </script>
@@ -63,7 +63,7 @@
   <div
     bind:this={feed}
     class="h-full min-w-0 overflow-y-auto overscroll-y-contain"
-    onscroll={scroll}
+    onscroll={updateScrollPosition}
     role="region"
     aria-label="Conversation"
     tabindex="0"

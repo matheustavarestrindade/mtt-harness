@@ -46,7 +46,7 @@ func (standardProvider *Standard) SetHeaderResolver(resolver func(context.Contex
 	standardProvider.headers = resolver
 }
 
-func (standardProvider *Standard) authenticate(request *http.Request) error {
+func (standardProvider *Standard) applyAuthenticationHeaders(request *http.Request) error {
 	if standardProvider.headers != nil {
 		headers, operationError := standardProvider.headers(request.Context())
 		if operationError != nil {
@@ -57,7 +57,7 @@ func (standardProvider *Standard) authenticate(request *http.Request) error {
 		}
 		return nil
 	}
-	key, operationError := standardProvider.secret(request.Context())
+	key, operationError := standardProvider.resolveAPIKey(request.Context())
 	if operationError != nil {
 		return operationError
 	}
@@ -94,7 +94,7 @@ func (standardProvider *Standard) SetKeyResolver(resolver KeyResolver) {
 	standardProvider.key = resolver
 }
 
-func (standardProvider *Standard) secret(operationContext context.Context) (string, error) {
+func (standardProvider *Standard) resolveAPIKey(operationContext context.Context) (string, error) {
 	standardProvider.mutex.RLock()
 	resolver := standardProvider.key
 	standardProvider.mutex.RUnlock()

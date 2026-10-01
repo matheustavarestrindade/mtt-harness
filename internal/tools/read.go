@@ -75,7 +75,7 @@ func (readTool Read) Run(operationContext context.Context, call atom.ToolCall) (
 	if operationError := operationContext.Err(); operationError != nil {
 		return atom.ToolResult{}, operationError
 	}
-	start, end, operationError := input.lineRange.bounds()
+	start, end, operationError := input.lineRange.resolveLineBounds()
 	if operationError != nil {
 		return atom.ToolResult{}, operationError
 	}
@@ -112,7 +112,7 @@ func (readTool Read) Run(operationContext context.Context, call atom.ToolCall) (
 			break
 		}
 	}
-	if input.specified() && start > lineNumber {
+	if input.hasBounds() && start > lineNumber {
 		return atom.ToolResult{}, fmt.Errorf("start_line %d exceeds the file's %d lines", start, lineNumber)
 	}
 	return atom.ToolResult{

@@ -13,7 +13,7 @@ import (
 )
 
 func (standardProvider *Standard) streamResponses(operationContext context.Context, request atom.Request) (harness.Stream, error) {
-	input, instructions, operationError := responseInput(request.Messages, standardProvider.Name())
+	input, instructions, operationError := encodeResponsesAPIInput(request.Messages, standardProvider.Name())
 	if operationError != nil {
 		return nil, operationError
 	}
@@ -28,7 +28,7 @@ func (standardProvider *Standard) streamResponses(operationContext context.Conte
 		payload["instructions"] = "You are a coding assistant. Use the provided tools to complete the user's task."
 	}
 	if len(request.Tools) > 0 {
-		encoded, operationError := encodeTools(request.Tools)
+		encoded, operationError := encodeFunctionToolDefinitions(request.Tools)
 		if operationError != nil {
 			return nil, operationError
 		}
@@ -61,7 +61,7 @@ func (standardProvider *Standard) streamResponses(operationContext context.Conte
 	if session, found := harness.SessionFrom(operationContext); found {
 		httpRequest.Header.Set("session_id", string(session.ID))
 	}
-	if operationError := standardProvider.authenticate(httpRequest); operationError != nil {
+	if operationError := standardProvider.applyAuthenticationHeaders(httpRequest); operationError != nil {
 		return nil, operationError
 	}
 	response, operationError := standardProvider.client.Do(httpRequest)
@@ -73,6 +73,6 @@ func (standardProvider *Standard) streamResponses(operationContext context.Conte
 		return nil, fmt.Errorf("%s Responses API returned HTTP %d; check provider access and the selected model", standardProvider.Name(), response.StatusCode)
 	}
 	stream := &httpStream{parts: make(chan atom.ResponsePart, 64)}
-	go parseResponses(operationContext, response.Body, stream, standardProvider.Name())
+	go parseResponsesAPIEvents(operationContext, response.Body, stream, standardProvider.Name())
 	return stream, nil
 }

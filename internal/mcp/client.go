@@ -73,9 +73,9 @@ func Start(operationContext context.Context, serverSpec ServerSpec, timeout time
 	var operationError error
 	switch {
 	case serverSpec.Command != "":
-		transport, operationError = startStdio(serverSpec)
+		transport, operationError = startStdioTransport(serverSpec)
 	case serverSpec.URL != "":
-		transport, operationError = startHTTP(serverSpec)
+		transport, operationError = startHTTPTransport(serverSpec)
 	default:
 		return nil, errors.New("mcp: the server data has no command and no URL")
 	}
@@ -90,11 +90,11 @@ func Start(operationContext context.Context, serverSpec ServerSpec, timeout time
 		pending:   map[int64]chan rpcMessage{},
 		changes:   make(chan struct{}, 1), lifecycle: lifecycle, cancel: stop,
 	}
-	go client.read()
-	go client.dispatchChanges()
+	go client.readServerMessages()
+	go client.dispatchToolListChanges()
 	initContext, cancel := context.WithTimeout(operationContext, timeout)
 	defer cancel()
-	initialization, operationError := client.call(initContext, "initialize", map[string]any{
+	initialization, operationError := client.callServerMethod(initContext, "initialize", map[string]any{
 		"protocolVersion": ProtocolVersion,
 		"capabilities":    map[string]any{},
 		"clientInfo":      map[string]any{"name": "mtt-harness", "version": "0.1.0"},
@@ -122,7 +122,7 @@ func Start(operationContext context.Context, serverSpec ServerSpec, timeout time
 	if remote, supported := transport.(*httpTransport); supported {
 		remote.SetProtocolVersion(initialized.Version)
 	}
-	if operationError := client.notify(operationContext, "notifications/initialized", nil); operationError != nil {
+	if operationError := client.sendServerNotification(operationContext, "notifications/initialized", nil); operationError != nil {
 		_ = client.Close()
 		return nil, operationError
 	}
@@ -142,12 +142,12 @@ func (client *Client) OnToolsChanged(handler func(operationContext context.Conte
 	client.onChanged = handler
 }
 
-func (client *Client) call(operationContext context.Context, method string, params any) (json.RawMessage, error) {
+func (client *Client) callServerMethod(operationContext context.Context, method string, parameters any) (json.RawMessage, error) {
 	operationContext, cancel := context.WithTimeout(operationContext, client.timeout)
 	defer cancel()
 	stop := context.AfterFunc(client.lifecycle, cancel)
 	defer stop()
-	parameters, operationError := encodeParameters(params)
+	encodedParameters, operationError := encodeParameters(parameters)
 	if operationError != nil {
 		return nil, operationError
 	}
@@ -161,13 +161,13 @@ func (client *Client) call(operationContext context.Context, method string, para
 	channel := make(chan rpcMessage, 1)
 	client.pending[identifier] = channel
 	client.mutex.Unlock()
-	data, operationError := json.Marshal(rpcMessage{JSONRPC: "2.0", ID: &identifier, Method: method, Params: parameters})
+	data, operationError := json.Marshal(rpcMessage{JSONRPC: "2.0", ID: &identifier, Method: method, Params: encodedParameters})
 	if operationError != nil {
-		client.discard(identifier)
+		client.removePendingCall(identifier)
 		return nil, operationError
 	}
 	if operationError := client.transport.Send(operationContext, data); operationError != nil {
-		client.discard(identifier)
+		client.removePendingCall(identifier)
 		return nil, operationError
 	}
 	select {
@@ -180,36 +180,36 @@ func (client *Client) call(operationContext context.Context, method string, para
 		}
 		return message.Result, nil
 	case <-operationContext.Done():
-		client.discard(identifier)
+		client.removePendingCall(identifier)
 		return nil, operationContext.Err()
 	}
 }
 
-func (client *Client) notify(operationContext context.Context, method string, params any) error {
+func (client *Client) sendServerNotification(operationContext context.Context, method string, parameters any) error {
 	operationContext, cancel := context.WithTimeout(operationContext, client.timeout)
 	defer cancel()
-	parameters, operationError := encodeParameters(params)
+	encodedParameters, operationError := encodeParameters(parameters)
 	if operationError != nil {
 		return operationError
 	}
-	data, operationError := json.Marshal(rpcMessage{JSONRPC: "2.0", Method: method, Params: parameters})
+	data, operationError := json.Marshal(rpcMessage{JSONRPC: "2.0", Method: method, Params: encodedParameters})
 	if operationError != nil {
 		return operationError
 	}
 	return client.transport.Send(operationContext, data)
 }
 
-func (client *Client) discard(identifier int64) {
+func (client *Client) removePendingCall(identifier int64) {
 	client.mutex.Lock()
 	defer client.mutex.Unlock()
 	delete(client.pending, identifier)
 }
 
-func (client *Client) read() {
+func (client *Client) readServerMessages() {
 	for {
 		data, operationError := client.transport.Receive(client.lifecycle)
 		if operationError != nil {
-			client.fail()
+			client.failPendingCalls()
 			return
 		}
 		var message rpcMessage
@@ -241,7 +241,7 @@ func (client *Client) read() {
 	}
 }
 
-func (client *Client) fail() {
+func (client *Client) failPendingCalls() {
 	client.mutex.Lock()
 	defer client.mutex.Unlock()
 	client.closed = true
@@ -253,7 +253,7 @@ func (client *Client) fail() {
 }
 
 func (client *Client) Close() error {
-	client.fail()
+	client.failPendingCalls()
 	return client.transport.Close()
 }
 
@@ -268,7 +268,7 @@ func (client *Client) ListTools(operationContext context.Context) ([]ToolSpec, e
 		if cursor != "" {
 			parameters["cursor"] = cursor
 		}
-		result, operationError := client.call(operationContext, "tools/list", parameters)
+		result, operationError := client.callServerMethod(operationContext, "tools/list", parameters)
 		if operationError != nil {
 			return nil, operationError
 		}
@@ -298,7 +298,7 @@ func (client *Client) CallTool(operationContext context.Context, name string, ar
 	if len(arguments) == 0 {
 		arguments = json.RawMessage("{}")
 	}
-	result, operationError := client.call(operationContext, "tools/call", map[string]any{"name": name, "arguments": arguments})
+	result, operationError := client.callServerMethod(operationContext, "tools/call", map[string]any{"name": name, "arguments": arguments})
 	if operationError != nil {
 		return CallResult{}, operationError
 	}
@@ -323,7 +323,7 @@ func encodeParameters(parameters any) (json.RawMessage, error) {
 	return json.Marshal(parameters)
 }
 
-func (client *Client) dispatchChanges() {
+func (client *Client) dispatchToolListChanges() {
 	for {
 		select {
 		case <-client.lifecycle.Done():

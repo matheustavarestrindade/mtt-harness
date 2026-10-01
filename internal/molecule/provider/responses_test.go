@@ -95,12 +95,12 @@ func TestResponsesStreamsToolBeforeCompletionAndKeepsContinuation(test *testing.
 	if tool["name"] != "read" || tool["type"] != "function" || tool["strict"] != false || tool["parameters"] == nil || tool["function"] != nil {
 		test.Fatalf("Responses tool schema = %#v", tool)
 	}
-	input, _, operationError := responseInput([]atom.Message{message, {Role: atom.RoleTool, ToolCallID: "call-1", Content: []atom.Content{{Type: atom.Text, Text: "contents"}}}}, "openai")
+	input, _, operationError := encodeResponsesAPIInput([]atom.Message{message, {Role: atom.RoleTool, ToolCallID: "call-1", Content: []atom.Content{{Type: atom.Text, Text: "contents"}}}}, "openai")
 	testutil.RequireNoError(test, operationError)
 	if len(input) != 3 || input[0].(map[string]any)["type"] != "reasoning" || input[2].(map[string]any)["call_id"] != "call-1" {
 		test.Fatalf("continuation = %#v", input)
 	}
-	other, _, operationError := responseInput([]atom.Message{message}, "deepseek")
+	other, _, operationError := encodeResponsesAPIInput([]atom.Message{message}, "deepseek")
 	testutil.RequireNoError(test, operationError)
 	if len(other) != 1 || other[0].(map[string]any)["type"] != "function_call" {
 		test.Fatalf("cross-provider state leaked: %#v", other)
@@ -120,7 +120,7 @@ func TestResponsesRejectsTruncatedFailedAndMalformedStreams(test *testing.T) {
 		"data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"call_id\":\"c\",\"name\":\"read\",\"arguments\":\"{\"}}\n\n",
 	} {
 		stream := &httpStream{parts: make(chan atom.ResponsePart, 64)}
-		parseResponses(context.Background(), io.NopCloser(strings.NewReader(body)), stream, "openai")
+		parseResponsesAPIEvents(context.Background(), io.NopCloser(strings.NewReader(body)), stream, "openai")
 		for range stream.parts {
 		}
 		if stream.operationError == nil {
@@ -132,7 +132,7 @@ func TestResponsesRejectsTruncatedFailedAndMalformedStreams(test *testing.T) {
 func TestResponsesMultilineEventsAndDeepSeekReasoning(test *testing.T) {
 	body := "event: response.completed\ndata: {\"type\":\"response.completed\",\ndata: \"response\":{\"output\":[{\"type\":\"reasoning\",\"content\":[{\"type\":\"reasoning_text\",\"text\":\"retained reasoning\"}]},{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"answer\"}]}]}}\n\n"
 	stream := &httpStream{parts: make(chan atom.ResponsePart, 64)}
-	parseResponses(context.Background(), io.NopCloser(strings.NewReader(body)), stream, "deepseek")
+	parseResponsesAPIEvents(context.Background(), io.NopCloser(strings.NewReader(body)), stream, "deepseek")
 	var state *atom.ProviderState
 	text := ""
 	for part := range stream.parts {

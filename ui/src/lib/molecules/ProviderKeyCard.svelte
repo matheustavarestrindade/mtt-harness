@@ -32,7 +32,7 @@
     onRefresh: () => void;
   } = $props();
   let key = $state('');
-  async function save(event: SubmitEvent) {
+  async function submitProviderKey(event: SubmitEvent) {
     event.preventDefault();
     const submitted = key.trim();
     if (await onSave(submitted)) key = '';
@@ -53,7 +53,7 @@
       >{provider.Connected ? 'Configured' : 'Not connected'}</span
     >
   </div>
-  <form class="space-y-3" onsubmit={save}>
+  <form class="space-y-3" onsubmit={submitProviderKey}>
     <Label for={`provider-key-${provider.Name}`}>{title} API key</Label>
     <Input
       id={`provider-key-${provider.Name}`}

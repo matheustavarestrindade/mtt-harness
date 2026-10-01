@@ -31,7 +31,7 @@ func (standardProvider *Standard) streamChatCompletions(operationContext context
 	}
 	payload := map[string]any{"model": request.Model, "messages": messages, "stream": true, "stream_options": map[string]any{"include_usage": true}}
 	if len(request.Tools) > 0 {
-		tools, operationError := encodeTools(request.Tools)
+		tools, operationError := encodeFunctionToolDefinitions(request.Tools)
 		if operationError != nil {
 			return nil, operationError
 		}
@@ -54,7 +54,7 @@ func (standardProvider *Standard) streamChatCompletions(operationContext context
 		return nil, operationError
 	}
 	httpRequest.Header.Set("Content-Type", "application/json")
-	if operationError := standardProvider.authenticate(httpRequest); operationError != nil {
+	if operationError := standardProvider.applyAuthenticationHeaders(httpRequest); operationError != nil {
 		return nil, operationError
 	}
 	response, operationError := standardProvider.client.Do(httpRequest)
@@ -67,11 +67,11 @@ func (standardProvider *Standard) streamChatCompletions(operationContext context
 		return nil, fmt.Errorf("provider HTTP status %d: %s", response.StatusCode, strings.TrimSpace(string(data)))
 	}
 	stream := &httpStream{parts: make(chan atom.ResponsePart, 64)}
-	go parseSSE(operationContext, response.Body, stream)
+	go parseChatCompletionEvents(operationContext, response.Body, stream)
 	return stream, nil
 }
 
-func encodeTools(tools []atom.ToolSpec) ([]map[string]any, error) {
+func encodeFunctionToolDefinitions(tools []atom.ToolSpec) ([]map[string]any, error) {
 	var result []map[string]any
 	for _, tool := range tools {
 		var parameters any = map[string]any{"type": "object"}

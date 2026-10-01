@@ -37,7 +37,7 @@ export class HarnessConsole {
   private selection = new AbortController();
   private sessionReads = new AbortController();
   private closeStream: (() => void) | undefined;
-  private poll: ReturnType<typeof setTimeout> | undefined;
+  private sessionPollTimer: ReturnType<typeof setTimeout> | undefined;
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   private refreshing = false;
   private refreshPending = false;
@@ -55,7 +55,7 @@ export class HarnessConsole {
       this.instances = instances;
       this.connection = 'connected';
       saveConnection({ base, token });
-      void this.loadCatalog(api, signal);
+      void this.loadProviderCatalog(api, signal);
       const first = instances.find((instance) => !instance.Stopped) ?? instances[0];
       if (first) await this.selectInstance(first);
     } catch (error) {
@@ -69,7 +69,7 @@ export class HarnessConsole {
   disconnect(forget = true) {
     this.lifetime.abort();
     this.selection.abort();
-    this.stopSession();
+    this.stopSessionObservers();
     this.lifetime = new AbortController();
     this.selection = new AbortController();
     this.api = null;
@@ -84,13 +84,13 @@ export class HarnessConsole {
     if (forget) forgetConnection();
   }
 
-  private stopSession() {
+  private stopSessionObservers() {
     this.sessionReads.abort();
     this.closeStream?.();
     this.closeStream = undefined;
-    clearTimeout(this.poll);
+    clearTimeout(this.sessionPollTimer);
     clearTimeout(this.refreshTimer);
-    this.poll = undefined;
+    this.sessionPollTimer = undefined;
     this.refreshTimer = undefined;
     this.sessionReads = new AbortController();
     this.refreshing = false;
@@ -106,13 +106,13 @@ export class HarnessConsole {
     this.loading = false;
   }
 
-  private client(): HarnessApi {
+  private requireAPIClient(): HarnessApi {
     if (!this.api || this.connection !== 'connected')
       throw new Error('Connect to the harness first.');
     return this.api;
   }
 
-  private async loadCatalog(api: HarnessApi, signal: AbortSignal) {
+  private async loadProviderCatalog(api: HarnessApi, signal: AbortSignal) {
     try {
       const providers = await api.providers(signal);
       const results = await Promise.allSettled(
@@ -139,20 +139,20 @@ export class HarnessConsole {
   }
 
   async refreshInstances() {
-    const api = this.client();
+    const api = this.requireAPIClient();
     const signal = this.lifetime.signal;
     const instances = await api.instances(signal);
     if (!signal.aborted) this.instances = instances;
   }
 
   providerClient(): HarnessApi {
-    return this.client();
+    return this.requireAPIClient();
   }
 
   async refreshProviderCatalog() {
-    const api = this.client();
+    const api = this.requireAPIClient();
     const signal = this.lifetime.signal;
-    await this.loadCatalog(api, signal);
+    await this.loadProviderCatalog(api, signal);
     const instance = this.instance;
     if (!signal.aborted && instance && !instance.Stopped) {
       const models = await api.models(instance.ID, signal);
@@ -161,10 +161,10 @@ export class HarnessConsole {
   }
 
   async selectInstance(instance: Instance) {
-    const api = this.client();
+    const api = this.requireAPIClient();
     this.selection.abort();
     this.selection = new AbortController();
-    this.stopSession();
+    this.stopSessionObservers();
     const signal = this.selection.signal;
     this.instance = instance;
     this.sessions = [];
@@ -192,8 +192,8 @@ export class HarnessConsole {
   }
 
   async selectSession(session: Session) {
-    const api = this.client();
-    this.stopSession();
+    const api = this.requireAPIClient();
+    this.stopSessionObservers();
     this.session = session;
     this.error = '';
     this.loading = true;
@@ -209,12 +209,12 @@ export class HarnessConsole {
         if (!signal.aborted) this.streamState = state;
       },
     );
-    const poll = async () => {
+    const pollSessionStatus = async () => {
       if (signal.aborted) return;
       await this.refreshSession();
-      if (!signal.aborted) this.poll = setTimeout(poll, 1500);
+      if (!signal.aborted) this.sessionPollTimer = setTimeout(pollSessionStatus, 1500);
     };
-    this.poll = setTimeout(poll, 1500);
+    this.sessionPollTimer = setTimeout(pollSessionStatus, 1500);
   }
 
   async refreshSession() {
@@ -252,13 +252,13 @@ export class HarnessConsole {
         this.refreshing = false;
         if (this.refreshPending) {
           this.refreshPending = false;
-          this.scheduleRefresh();
+          this.scheduleSessionRefresh();
         }
       }
     }
   }
 
-  private scheduleRefresh() {
+  private scheduleSessionRefresh() {
     if (this.refreshTimer) return;
     this.refreshTimer = setTimeout(() => {
       this.refreshTimer = undefined;
@@ -284,11 +284,11 @@ export class HarnessConsole {
       this.permissions = this.permissions.filter((entry) => entry.ID !== payload.RequestID);
     if (['turn.end', 'run.cancelled', 'run.error', 'run.interrupted'].includes(event.Name))
       this.permissions = [];
-    if (event.Name !== 'model.chunk') this.scheduleRefresh();
+    if (event.Name !== 'model.chunk') this.scheduleSessionRefresh();
   }
 
   async createInstance(input: InstanceInput) {
-    const api = this.client();
+    const api = this.requireAPIClient();
     const signal = this.lifetime.signal;
     const instance = await api.createInstance(input);
     if (signal.aborted) return;
@@ -297,7 +297,7 @@ export class HarnessConsole {
   }
 
   async createSession(model: string) {
-    const api = this.client();
+    const api = this.requireAPIClient();
     const instance = this.instance;
     if (!instance) throw new Error('Choose a workspace first.');
     const session = await api.createSession(instance.ID, model);
@@ -306,11 +306,11 @@ export class HarnessConsole {
     await this.selectSession(session);
   }
 
-  async send(content: string) {
-    const api = this.client();
+  async sendMessage(content: string) {
+    const api = this.requireAPIClient();
     const session = this.session;
     if (!session) throw new Error('Create a session first.');
-    const receipt = await api.send(session.ID, content);
+    const receipt = await api.sendMessage(session.ID, content);
     if (this.api === api && this.session?.ID === session.ID) {
       this.receipts = [...this.receipts, receipt.message];
       await this.refreshSession();
@@ -318,29 +318,29 @@ export class HarnessConsole {
     return receipt;
   }
 
-  async cancel() {
+  async cancelCurrentTurn() {
     if (this.session) {
-      await this.client().cancel(this.session.ID);
+      await this.requireAPIClient().cancelCurrentTurn(this.session.ID);
       await this.refreshSession();
     }
   }
-  async cancelQueued(messageID: string) {
+  async cancelQueuedMessage(messageID: string) {
     if (this.session) {
-      await this.client().cancelQueued(this.session.ID, messageID);
+      await this.requireAPIClient().cancelQueuedMessage(this.session.ID, messageID);
       this.receipts = this.receipts.filter((entry) => entry.ID !== messageID);
       await this.refreshSession();
     }
   }
-  async decide(requestID: string, kind: 'allow' | 'deny') {
-    await this.client().resolvePermission(requestID, kind);
+  async resolvePermissionRequest(requestID: string, kind: 'allow' | 'deny') {
+    await this.requireAPIClient().resolvePermission(requestID, kind);
     this.permissions = this.permissions.filter((entry) => entry.ID !== requestID);
-    this.scheduleRefresh();
+    this.scheduleSessionRefresh();
   }
   async resumeInstance() {
     const instance = this.instance;
-    const api = this.client();
+    const api = this.requireAPIClient();
     if (!instance) return;
-    const resumed = await api.resume(instance.ID);
+    const resumed = await api.resumeInstance(instance.ID);
     if (this.api === api) {
       await this.refreshInstances();
       if (this.instance?.ID === instance.ID) await this.selectInstance(resumed);

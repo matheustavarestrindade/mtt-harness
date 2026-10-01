@@ -15,7 +15,7 @@ import (
 func TestChunksPreserveUnicodeAndLateSpecifications(test *testing.T) {
 	text := strings.Repeat("schema café 😀 field description\n", 100) + "FINAL_PARAMETER: interrupt process group"
 	count := func(text string) int { return utf8.RuneCountInString(text) + 2 }
-	chunks, operationError := splitText(context.Background(), text, count)
+	chunks, operationError := splitTextWithinTokenLimit(context.Background(), text, count)
 	testutil.RequireNoError(test, operationError)
 	if len(chunks) < 2 || strings.Join(chunks, "") != text {
 		test.Fatal("chunking omitted document content")
@@ -30,7 +30,7 @@ func TestChunksPreserveUnicodeAndLateSpecifications(test *testing.T) {
 	}
 	operationContext, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, operationError = splitText(operationContext, text, count)
+	_, operationError = splitTextWithinTokenLimit(operationContext, text, count)
 	if !errors.Is(operationError, context.Canceled) {
 		test.Fatal("chunking ignored cancellation")
 	}

@@ -217,17 +217,17 @@ export class HarnessApi {
       signal,
     );
   }
-  send(sessionID: string, content: string) {
+  sendMessage(sessionID: string, content: string) {
     return this.request<AcceptedMessage>(
       `sessions/${encodeURIComponent(sessionID)}/messages`,
       'POST',
       { content },
     );
   }
-  cancel(sessionID: string) {
+  cancelCurrentTurn(sessionID: string) {
     return this.request(`sessions/${encodeURIComponent(sessionID)}/cancel`, 'POST');
   }
-  cancelQueued(sessionID: string, messageID: string) {
+  cancelQueuedMessage(sessionID: string, messageID: string) {
     return this.request(
       `sessions/${encodeURIComponent(sessionID)}/queue/${encodeURIComponent(messageID)}`,
       'DELETE',
@@ -239,7 +239,7 @@ export class HarnessApi {
       scope: 'once',
     });
   }
-  resume(instanceID: string) {
+  resumeInstance(instanceID: string) {
     return this.request<Instance>(`instances/${encodeURIComponent(instanceID)}/start`, 'POST');
   }
 

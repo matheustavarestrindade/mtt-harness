@@ -83,7 +83,7 @@ func (encoder *Encoder) Embed(operationContext context.Context, texts []string) 
 		if operationError := operationContext.Err(); operationError != nil {
 			return nil, operationError
 		}
-		if encoder.tokenCount(text) > maxTokens {
+		if encoder.countWordPieceTokens(text) > maxTokens {
 			return nil, fmt.Errorf("MiniLM input exceeds %d tokens; split the document before encoding", maxTokens)
 		}
 		result, operationError := encoder.pipeline.RunPipeline([]string{text})
@@ -119,10 +119,10 @@ func (encoder *Encoder) Split(operationContext context.Context, text string) ([]
 	if encoder.closed {
 		return nil, ErrClosed
 	}
-	return splitText(operationContext, text, encoder.tokenCount)
+	return splitTextWithinTokenLimit(operationContext, text, encoder.countWordPieceTokens)
 }
 
-func (encoder *Encoder) tokenCount(text string) int {
+func (encoder *Encoder) countWordPieceTokens(text string) int {
 	return len(encoder.pipeline.GetModel().Tokenizer.GoTokenizer.Tokenizer.Encode(text))
 }
 

@@ -9,54 +9,54 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/openaiauth"
 )
 
-func (service *Service) poll(operationContext context.Context, flow *loginFlow, challenge openaiauth.DeviceChallenge) {
-	defer service.workers.Done()
-	defer flow.cancel()
+func (authenticationService *Service) pollDeviceAuthorization(operationContext context.Context, pendingLogin *loginFlow, challenge openaiauth.DeviceChallenge) {
+	defer authenticationService.pollingWorkers.Done()
+	defer pendingLogin.cancel()
 	for {
-		timer := time.NewTimer(challenge.Interval)
+		pollTimer := time.NewTimer(challenge.PollInterval)
 		select {
 		case <-operationContext.Done():
-			timer.Stop()
-			service.finish(flow, atom.OAuthCredential{}, operationContext.Err())
+			pollTimer.Stop()
+			authenticationService.completeDeviceLogin(pendingLogin, atom.OAuthCredential{}, operationContext.Err())
 			return
-		case <-timer.C:
+		case <-pollTimer.C:
 		}
-		credential, operationError := service.client.Poll(operationContext, challenge)
+		credential, operationError := authenticationService.authenticationClient.PollDeviceAuthorization(operationContext, challenge)
 		if errors.Is(operationError, openaiauth.ErrPending) {
 			continue
 		}
 		if operationError == nil {
 			operationError = operationContext.Err()
 		}
-		service.finish(flow, credential, operationError)
+		authenticationService.completeDeviceLogin(pendingLogin, credential, operationError)
 		return
 	}
 }
 
-func (service *Service) finish(flow *loginFlow, credential atom.OAuthCredential, operationError error) {
-	service.gate <- struct{}{}
-	defer service.release()
-	if service.flow != flow || flow.status.Status != "pending" || service.closed {
+func (authenticationService *Service) completeDeviceLogin(pendingLogin *loginFlow, credential atom.OAuthCredential, operationError error) {
+	authenticationService.credentialGate <- struct{}{}
+	defer authenticationService.releaseCredentialGate()
+	if authenticationService.activeLogin != pendingLogin || pendingLogin.status.Status != "pending" || authenticationService.closed {
 		return
 	}
-	if service.context.Err() != nil {
-		operationError = service.context.Err()
+	if authenticationService.lifetimeContext.Err() != nil {
+		operationError = authenticationService.lifetimeContext.Err()
 	}
 	if operationError == nil {
-		operationError = service.secrets.SaveOAuthCredential(service.context, flow.status.Provider, credential)
+		operationError = authenticationService.secretStore.SaveOAuthCredential(authenticationService.lifetimeContext, pendingLogin.status.Provider, credential)
 	}
 	if operationError == nil {
-		flow.status.Status = "connected"
-		flow.status.UserCode = ""
+		pendingLogin.status.Status = "connected"
+		pendingLogin.status.UserCode = ""
 		return
 	}
-	flow.status.Status = "error"
-	flow.status.Error = operationError.Error()
+	pendingLogin.status.Status = "error"
+	pendingLogin.status.Error = operationError.Error()
 	if errors.Is(operationError, context.DeadlineExceeded) {
-		flow.status.Status = "expired"
-		flow.status.Error = "The OpenAI device code expired. Start sign-in again."
+		pendingLogin.status.Status = "expired"
+		pendingLogin.status.Error = "The OpenAI device code expired. Start sign-in again."
 	}
 	if errors.Is(operationError, context.Canceled) {
-		flow.status.Status = "cancelled"
+		pendingLogin.status.Status = "cancelled"
 	}
 }

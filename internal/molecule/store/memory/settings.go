@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func settingOf(scope string, key string) string {
+func settingStorageKey(scope string, key string) string {
 	return scope + "/" + key
 }
 
@@ -14,14 +14,14 @@ type settings struct{ store *Store }
 func (settingsStore *settings) Save(operationContext context.Context, scope string, key string, value string) error {
 	settingsStore.store.mutex.Lock()
 	defer settingsStore.store.mutex.Unlock()
-	settingsStore.store.settings[settingOf(scope, key)] = value
+	settingsStore.store.settings[settingStorageKey(scope, key)] = value
 	return nil
 }
 
 func (settingsStore *settings) Get(operationContext context.Context, scope string, key string) (string, error) {
 	settingsStore.store.mutex.RLock()
 	defer settingsStore.store.mutex.RUnlock()
-	return settingsStore.store.settings[settingOf(scope, key)], nil
+	return settingsStore.store.settings[settingStorageKey(scope, key)], nil
 }
 
 func (settingsStore *settings) All(operationContext context.Context, scope string) (map[string]string, error) {
@@ -40,15 +40,15 @@ func (settingsStore *settings) All(operationContext context.Context, scope strin
 func (settingsStore *settings) Delete(operationContext context.Context, scope string, key string) error {
 	settingsStore.store.mutex.Lock()
 	defer settingsStore.store.mutex.Unlock()
-	delete(settingsStore.store.settings, settingOf(scope, key))
+	delete(settingsStore.store.settings, settingStorageKey(scope, key))
 	return nil
 }
 
 func (settingsStore *settings) Resolve(operationContext context.Context, instanceID string, key string) (string, error) {
 	settingsStore.store.mutex.RLock()
 	defer settingsStore.store.mutex.RUnlock()
-	if value := settingsStore.store.settings[settingOf(instanceID, key)]; value != "" {
+	if value := settingsStore.store.settings[settingStorageKey(instanceID, key)]; value != "" {
 		return value, nil
 	}
-	return settingsStore.store.settings[settingOf("", key)], nil
+	return settingsStore.store.settings[settingStorageKey("", key)], nil
 }

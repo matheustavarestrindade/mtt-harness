@@ -137,9 +137,9 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 			session.Completed = true
 			operationError = errors.Join(operationError, agentLoop.configuration.Store.Sessions().Save(completionContext, session))
 		}
-		operationError = errors.Join(operationError, agentLoop.emit(completionContext, session, atom.EventTurnEnd, map[string]any{"status": status}))
+		operationError = errors.Join(operationError, agentLoop.emitSessionEvent(completionContext, session, atom.EventTurnEnd, map[string]any{"status": status}))
 	}()
-	if operationError := agentLoop.emit(operationContext, session, atom.EventTurnStart, nil); operationError != nil {
+	if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventTurnStart, nil); operationError != nil {
 		return operationError
 	}
 	for round := 0; round < agentLoop.configuration.MaxRounds; round++ {

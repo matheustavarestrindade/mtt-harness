@@ -62,12 +62,12 @@ func (providerStore *providers) Delete(operationContext context.Context, identif
 }
 
 func (providerStore *providers) SaveModels(operationContext context.Context, provider string, models []atom.ModelInfo) error {
-	tx, operationError := providerStore.store.pool.Begin(operationContext)
+	transaction, operationError := providerStore.store.pool.Begin(operationContext)
 	if operationError != nil {
 		return operationError
 	}
-	defer tx.Rollback(operationContext)
-	if _, operationError := tx.Exec(operationContext, `DELETE FROM models WHERE provider = $1`, provider); operationError != nil {
+	defer transaction.Rollback(operationContext)
+	if _, operationError := transaction.Exec(operationContext, `DELETE FROM models WHERE provider = $1`, provider); operationError != nil {
 		return operationError
 	}
 	for _, model := range models {
@@ -78,14 +78,14 @@ func (providerStore *providers) SaveModels(operationContext context.Context, pro
 			data, _ := json.Marshal(model.Prices)
 			prices = data
 		}
-		if _, operationError := tx.Exec(operationContext, `
+		if _, operationError := transaction.Exec(operationContext, `
 			INSERT INTO models (provider, id, level, input, output, tools, context_max, prices, name, tool_support_unknown)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 			provider, model.ID, model.Level, input, output, model.Tools, model.ContextMax, prices, model.Name, model.ToolSupportUnknown); operationError != nil {
 			return operationError
 		}
 	}
-	return tx.Commit(operationContext)
+	return transaction.Commit(operationContext)
 }
 
 func (providerStore *providers) Models(operationContext context.Context, provider string) ([]atom.ModelInfo, error) {

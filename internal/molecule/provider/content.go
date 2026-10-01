@@ -16,7 +16,7 @@ func encodeMessages(messages []atom.Message) ([]map[string]any, error) {
 		if len(attachments) == 0 {
 			return nil
 		}
-		content, operationError := contentOf(attachments)
+		content, operationError := encodeChatMessageContent(attachments)
 		if operationError != nil {
 			return operationError
 		}
@@ -33,7 +33,7 @@ func encodeMessages(messages []atom.Message) ([]map[string]any, error) {
 		item := map[string]any{"role": string(message.Role)}
 		switch message.Role {
 		case atom.RoleTool, atom.RoleAssistant:
-			item["content"] = textOf(message.Content)
+			item["content"] = concatenateContentText(message.Content)
 			if message.Role == atom.RoleTool {
 				item["tool_call_id"] = message.ToolCallID
 			}
@@ -58,7 +58,7 @@ func encodeMessages(messages []atom.Message) ([]map[string]any, error) {
 				item["tool_calls"] = calls
 			}
 		default:
-			content, operationError := contentOf(message.Content)
+			content, operationError := encodeChatMessageContent(message.Content)
 			if operationError != nil {
 				return nil, operationError
 			}
@@ -74,7 +74,7 @@ func encodeMessages(messages []atom.Message) ([]map[string]any, error) {
 
 // Chat Completions only permits text in tool messages. Media is retained and
 // sent after the complete group of tool replies, never between paired replies.
-func contentOf(contents []atom.Content) (any, error) {
+func encodeChatMessageContent(contents []atom.Content) (any, error) {
 	hasMedia := false
 	for _, content := range contents {
 		if content.Type != atom.Text {
@@ -82,7 +82,7 @@ func contentOf(contents []atom.Content) (any, error) {
 		}
 	}
 	if !hasMedia {
-		return textOf(contents), nil
+		return concatenateContentText(contents), nil
 	}
 	var parts []map[string]any
 	for _, content := range contents {
@@ -143,7 +143,7 @@ func contentOf(contents []atom.Content) (any, error) {
 	return parts, nil
 }
 
-func textOf(contents []atom.Content) string {
+func concatenateContentText(contents []atom.Content) string {
 	var text []string
 	for _, content := range contents {
 		if content.Type == atom.Text {

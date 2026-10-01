@@ -11,7 +11,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
-func (agentLoop *Loop) emit(operationContext context.Context, session atom.Session, name atom.EventName, payload any) error {
+func (agentLoop *Loop) emitSessionEvent(operationContext context.Context, session atom.Session, name atom.EventName, payload any) error {
 	operationContext = harness.WithSession(operationContext, session)
 	var raw json.RawMessage
 	if payload != nil {

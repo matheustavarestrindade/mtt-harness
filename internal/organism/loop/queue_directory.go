@@ -26,7 +26,7 @@ func (messageQueue *Queue) runDirectory() {
 	for {
 		select {
 		case command := <-messageQueue.commands:
-			directory.handle(command)
+			directory.handleDirectoryCommand(command)
 		case completed := <-messageQueue.completed:
 			directory.handleCompletion(completed)
 		}
@@ -39,7 +39,7 @@ func (messageQueue *Queue) runDirectory() {
 	}
 }
 
-func (directory *queueDirectory) handle(command queueCommand) {
+func (directory *queueDirectory) handleDirectoryCommand(command queueCommand) {
 	if operationError := command.operationContext.Err(); operationError != nil && command.kind != closeQueue {
 		command.respond(queueReply{operationError: operationError})
 		return
@@ -93,7 +93,7 @@ func (directory *queueDirectory) handle(command queueCommand) {
 		if command.kind == stopInstance {
 			directory.stopped[command.instanceID] = true
 		}
-		coordinators := directory.matching(command.instanceID)
+		coordinators := directory.coordinatorsForInstance(command.instanceID)
 		directory.operations++
 		go directory.queue.controlSessions(command, coordinators)
 	default:
@@ -111,10 +111,10 @@ func (directory *queueDirectory) beginClose(command queueCommand) {
 		directory.restoreCancel()
 	}
 	directory.operations++
-	go directory.queue.controlSessions(queueCommand{kind: closeQueue, operationContext: context.Background()}, directory.matching(""))
+	go directory.queue.controlSessions(queueCommand{kind: closeQueue, operationContext: context.Background()}, directory.coordinatorsForInstance(""))
 }
 
-func (directory *queueDirectory) matching(instanceID string) []*sessionCoordinator {
+func (directory *queueDirectory) coordinatorsForInstance(instanceID string) []*sessionCoordinator {
 	var coordinators []*sessionCoordinator
 	for _, coordinator := range directory.sessions {
 		if instanceID == "" || coordinator.session.InstanceID == instanceID {

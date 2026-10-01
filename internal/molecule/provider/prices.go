@@ -27,7 +27,7 @@ func (standardProvider *Standard) SetPrices(prices map[string]atom.Prices) {
 	}
 }
 
-func (standardProvider *Standard) prices(operationContext context.Context) (map[string]atom.Prices, error) {
+func (standardProvider *Standard) loadConfiguredPrices(operationContext context.Context) (map[string]atom.Prices, error) {
 	result := map[string]atom.Prices{}
 	standardProvider.mutex.RLock()
 	for identifier, price := range standardProvider.inlinePrices {
@@ -87,7 +87,7 @@ func (standardProvider *Standard) readPriceTable(operationContext context.Contex
 	return io.ReadAll(io.LimitReader(response.Body, 1<<20))
 }
 
-func perMillion(value string) float64 {
+func pricePerMillionTokens(value string) float64 {
 	if value == "" {
 		return 0
 	}

@@ -21,13 +21,13 @@ export function messageText(message: Message): string {
     .map((content) => content.Text)
     .join('\n');
 }
-export function count(value: number): string {
+export function formatTokenCount(value: number): string {
   return new Intl.NumberFormat(undefined, {
     notation: value >= 10_000 ? 'compact' : 'standard',
     maximumFractionDigits: 1,
   }).format(value);
 }
-export function time(value: string): string {
+export function formatTimestamp(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.valueOf())
     ? ''

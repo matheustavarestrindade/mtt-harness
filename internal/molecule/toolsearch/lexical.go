@@ -14,12 +14,12 @@ import (
 // Its corpus cache is gate-owned. Any catalog change rebuilds IDF weights so
 // removed or changed MCP tools cannot retain a stale vocabulary or score.
 type Lexical struct {
-	minimum     float64
-	gate        chan struct{}
-	fingerprint [32]byte
-	ready       bool
-	idf         map[string]float64
-	vectors     []lexicalDocument
+	minimum                    float64
+	gate                       chan struct{}
+	fingerprint                [32]byte
+	ready                      bool
+	inverseDocumentFrequencies map[string]float64
+	vectors                    []lexicalDocument
 }
 
 type lexicalDocument struct {
@@ -43,12 +43,12 @@ func (lexical *Lexical) Search(operationContext context.Context, documents []Doc
 	defer func() { <-lexical.gate }()
 	fingerprint := corpusFingerprint(documents)
 	if !lexical.ready || lexical.fingerprint != fingerprint {
-		if operationError := lexical.rebuild(operationContext, documents); operationError != nil {
+		if operationError := lexical.rebuildDocumentVectors(operationContext, documents); operationError != nil {
 			return nil, operationError
 		}
 		lexical.fingerprint, lexical.ready = fingerprint, true
 	}
-	queryVector := lexical.weight(termCounts(query))
+	queryVector := lexical.weightTermFrequencies(termCounts(query))
 	if len(queryVector) == 0 {
 		return nil, nil
 	}
@@ -71,7 +71,7 @@ func (lexical *Lexical) Search(operationContext context.Context, documents []Doc
 	return matches, nil
 }
 
-func (lexical *Lexical) rebuild(operationContext context.Context, documents []Document) error {
+func (lexical *Lexical) rebuildDocumentVectors(operationContext context.Context, documents []Document) error {
 	frequencies := map[string]int{}
 	counts := make([]map[string]float64, len(documents))
 	for position, document := range documents {
@@ -83,18 +83,18 @@ func (lexical *Lexical) rebuild(operationContext context.Context, documents []Do
 			frequencies[term]++
 		}
 	}
-	lexical.idf = make(map[string]float64, len(frequencies))
+	lexical.inverseDocumentFrequencies = make(map[string]float64, len(frequencies))
 	for term, frequency := range frequencies {
 		// Add one after smoothing so a one-document catalog stays searchable.
-		lexical.idf[term] = math.Log(float64(len(documents)+1)/float64(frequency+1)) + 1
+		lexical.inverseDocumentFrequencies[term] = math.Log(float64(len(documents)+1)/float64(frequency+1)) + 1
 	}
 	lexical.vectors = make([]lexicalDocument, len(documents))
 	for position, document := range documents {
-		vector := lexical.weight(counts[position])
+		vector := lexical.weightTermFrequencies(counts[position])
 		if document.Summary != "" {
 			// The full schema remains searchable. Primary capability metadata
 			// receives more weight than an example mentioning another tool.
-			summary := lexical.weight(termCounts(document.Summary))
+			summary := lexical.weightTermFrequencies(termCounts(document.Summary))
 			for term := range vector {
 				vector[term] *= 0.25
 			}
@@ -108,11 +108,11 @@ func (lexical *Lexical) rebuild(operationContext context.Context, documents []Do
 	return nil
 }
 
-func (lexical *Lexical) weight(counts map[string]float64) map[string]float64 {
+func (lexical *Lexical) weightTermFrequencies(counts map[string]float64) map[string]float64 {
 	vector := make(map[string]float64, len(counts))
 	magnitude := 0.0
 	for _, term := range sortedTerms(counts) {
-		inverseFrequency, present := lexical.idf[term]
+		inverseFrequency, present := lexical.inverseDocumentFrequencies[term]
 		if !present {
 			continue
 		}

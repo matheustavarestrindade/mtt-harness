@@ -1,7 +1,7 @@
 <script lang="ts">
   import { ArrowDownToLine, ArrowUpFromLine, Coins, Database } from 'lucide-svelte';
   import type { Statistics } from '$lib/atoms/types';
-  import { count, costLabel } from '$lib/atoms/format';
+  import { formatTokenCount, costLabel } from '$lib/atoms/format';
   let { statistics }: { statistics: Statistics | null } = $props();
 </script>
 
@@ -15,13 +15,14 @@
     ><ArrowDownToLine class="size-3" />Input
     <span class="font-mono text-foreground/80"
       >{statistics
-        ? count(statistics.Input + statistics.CacheRead + statistics.CacheWrite)
+        ? formatTokenCount(statistics.Input + statistics.CacheRead + statistics.CacheWrite)
         : '—'}</span
     ></span
   >
   <span class="flex items-center gap-1.5"
     ><ArrowUpFromLine class="size-3" />Output
-    <span class="font-mono text-foreground/80">{statistics ? count(statistics.Output) : '—'}</span
+    <span class="font-mono text-foreground/80"
+      >{statistics ? formatTokenCount(statistics.Output) : '—'}</span
     ></span
   >
   <span class="hidden items-center gap-1.5 sm:flex"

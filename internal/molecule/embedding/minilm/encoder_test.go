@@ -28,7 +28,7 @@ func TestEncoderRealTokenizerPreservesFullDocumentAndLifecycle(test *testing.T) 
 		test.Fatal("real tokenizer truncated the document")
 	}
 	for _, chunk := range chunks {
-		if encoder.tokenCount(chunk) > maxTokens {
+		if encoder.countWordPieceTokens(chunk) > maxTokens {
 			test.Fatal("chunk exceeds actual WordPiece limit")
 		}
 	}

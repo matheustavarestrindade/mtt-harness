@@ -100,5 +100,5 @@ func (server *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /instances/{id}/settings/{key}", server.deleteInstanceSetting)
 	mux.HandleFunc("PUT /instances/{id}/providers/{provider}/key", server.saveInstanceKey)
 	mux.HandleFunc("DELETE /instances/{id}/providers/{provider}/key", server.deleteInstanceKey)
-	return server.auth(mux)
+	return server.authenticateAPIRequest(mux)
 }

@@ -71,14 +71,14 @@ func (index *Index) Search(operationContext context.Context, documents []Documen
 			vectors[position] = cached.vectors
 			continue
 		}
-		chunks, operationError := index.split(operationContext, text)
+		chunks, operationError := index.splitEmbeddingInput(operationContext, text)
 		if operationError != nil {
 			return nil, operationError
 		}
 		changed[position] = inputRange{start: len(inputs), end: len(inputs) + len(chunks)}
 		inputs = append(inputs, chunks...)
 	}
-	queryChunks, operationError := index.split(operationContext, index.options.QueryPrefix+query)
+	queryChunks, operationError := index.splitEmbeddingInput(operationContext, index.options.QueryPrefix+query)
 	if operationError != nil {
 		return nil, operationError
 	}
@@ -95,7 +95,7 @@ func (index *Index) Search(operationContext context.Context, documents []Documen
 		return nil, fmt.Errorf("tool search: embedding count does not match input count")
 	}
 	for position := range embeddings {
-		embeddings[position], operationError = normalize(embeddings[position])
+		embeddings[position], operationError = normalizeEmbeddingVector(embeddings[position])
 		if operationError != nil {
 			return nil, operationError
 		}
@@ -108,7 +108,7 @@ func (index *Index) Search(operationContext context.Context, documents []Documen
 		if operationError := operationContext.Err(); operationError != nil {
 			return nil, operationError
 		}
-		best := -1.0
+		bestSimilarity := -1.0
 		for _, documentVector := range vectors[position] {
 			for _, queryVector := range embeddings[queryStart:] {
 				if len(documentVector) != len(queryVector) {
@@ -118,11 +118,11 @@ func (index *Index) Search(operationContext context.Context, documents []Documen
 				for dimension, value := range queryVector {
 					similarity += value * documentVector[dimension]
 				}
-				best = max(best, similarity)
+				bestSimilarity = max(bestSimilarity, similarity)
 			}
 		}
-		if best >= index.options.MinimumSimilarity {
-			matches = append(matches, Match{ID: document.ID, Similarity: best})
+		if bestSimilarity >= index.options.MinimumSimilarity {
+			matches = append(matches, Match{ID: document.ID, Similarity: bestSimilarity})
 		}
 	}
 	active := map[string]bool{}
@@ -139,7 +139,7 @@ func (index *Index) Search(operationContext context.Context, documents []Documen
 	return matches, nil
 }
 
-func (index *Index) split(operationContext context.Context, text string) ([]string, error) {
+func (index *Index) splitEmbeddingInput(operationContext context.Context, text string) ([]string, error) {
 	if splitter, available := index.embedder.(embedding.Splitter); available {
 		chunks, operationError := splitter.Split(operationContext, text)
 		if operationError != nil {
@@ -163,7 +163,7 @@ func (index *Index) Close() error {
 	return nil
 }
 
-func normalize(vector []float64) ([]float64, error) {
+func normalizeEmbeddingVector(vector []float64) ([]float64, error) {
 	magnitude := 0.0
 	for _, value := range vector {
 		if math.IsNaN(value) || math.IsInf(value, 0) {

@@ -65,18 +65,18 @@ func (Write) Run(operationContext context.Context, call atom.ToolCall) (atom.Too
 	if operationError := operationContext.Err(); operationError != nil {
 		return atom.ToolResult{}, operationError
 	}
-	if _, _, operationError := input.lineRange.bounds(); operationError != nil {
+	if _, _, operationError := input.lineRange.resolveLineBounds(); operationError != nil {
 		return atom.ToolResult{}, operationError
 	}
 	path, operationError := harness.WorkspacePath(operationContext, input.Path)
 	if operationError != nil {
 		return atom.ToolResult{}, operationError
 	}
-	summary, operationError := updateFile(operationContext, path, !input.specified(), func(original []byte) (fileChange, error) {
-		if !input.specified() {
+	summary, operationError := applyAtomicFileEdit(operationContext, path, !input.hasBounds(), func(original []byte) (fileChange, error) {
+		if !input.hasBounds() {
 			return fileChange{content: []byte(input.Content), summary: "the file is written"}, nil
 		}
-		start, end, operationError := input.byteRange(original)
+		start, end, operationError := input.resolveByteRange(original)
 		if operationError != nil {
 			return fileChange{}, operationError
 		}

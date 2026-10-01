@@ -10,12 +10,12 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
 
-func responseInput(messages []atom.Message, providerName string) ([]any, string, error) {
+func encodeResponsesAPIInput(messages []atom.Message, providerName string) ([]any, string, error) {
 	input := make([]any, 0, len(messages))
 	var instructions []string
 	for _, message := range messages {
 		if message.Role == atom.RoleSystem {
-			instructions = append(instructions, textOf(message.Content))
+			instructions = append(instructions, concatenateContentText(message.Content))
 			continue
 		}
 		if message.Role == atom.RoleAssistant && message.ProviderState != nil && message.ProviderState.Provider == providerName {
@@ -31,20 +31,20 @@ func responseInput(messages []atom.Message, providerName string) ([]any, string,
 			}
 		}
 		if message.Role == atom.RoleTool {
-			output, operationError := responseContent(message.Content)
+			output, operationError := encodeResponsesAPIContent(message.Content)
 			if operationError != nil {
 				return nil, "", operationError
 			}
 			input = append(input, map[string]any{"type": "function_call_output", "call_id": message.ToolCallID, "output": output})
 			continue
 		}
-		content, operationError := responseContent(message.Content)
+		content, operationError := encodeResponsesAPIContent(message.Content)
 		if operationError != nil {
 			return nil, "", operationError
 		}
 		// An assistant can consist only of function calls; do not add an empty
 		// assistant message between its reasoning and those calls.
-		if message.Role != atom.RoleAssistant || textOf(message.Content) != "" || len(message.ToolCalls) == 0 {
+		if message.Role != atom.RoleAssistant || concatenateContentText(message.Content) != "" || len(message.ToolCalls) == 0 {
 			input = append(input, map[string]any{"role": string(message.Role), "content": content})
 		}
 		for _, call := range message.ToolCalls {
@@ -54,7 +54,7 @@ func responseInput(messages []atom.Message, providerName string) ([]any, string,
 	return input, strings.Join(instructions, "\n\n"), nil
 }
 
-func responseContent(contents []atom.Content) (any, error) {
+func encodeResponsesAPIContent(contents []atom.Content) (any, error) {
 	var parts []map[string]any
 	hasMedia := false
 	for _, content := range contents {
@@ -97,7 +97,7 @@ func responseContent(contents []atom.Content) (any, error) {
 		}
 	}
 	if !hasMedia {
-		return textOf(contents), nil
+		return concatenateContentText(contents), nil
 	}
 	return parts, nil
 }

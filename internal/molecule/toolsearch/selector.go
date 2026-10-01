@@ -62,7 +62,7 @@ func NewSelector(operationContext context.Context, mode Mode, factory Factory, l
 		selector.semantic, selector.selected = semantic, ModeSemantic
 		return selector, nil
 	}
-	if mode == ModeSemantic || cancellation(operationContext, operationError) {
+	if mode == ModeSemantic || isSearchCancellation(operationContext, operationError) {
 		return nil, operationError
 	}
 	selector.reportFallback(operationError)
@@ -102,7 +102,7 @@ func (selector *Selector) Search(operationContext context.Context, documents []D
 	if operationError == nil {
 		return matches, nil
 	}
-	if selector.mode == ModeSemantic || cancellation(operationContext, operationError) {
+	if selector.mode == ModeSemantic || isSearchCancellation(operationContext, operationError) {
 		return nil, operationError
 	}
 	selector.selected = ModeLexical
@@ -131,6 +131,6 @@ func (selector *Selector) reportFallback(operationError error) {
 	}
 }
 
-func cancellation(operationContext context.Context, operationError error) bool {
+func isSearchCancellation(operationContext context.Context, operationError error) bool {
 	return operationContext.Err() != nil || errors.Is(operationError, context.Canceled) || errors.Is(operationError, context.DeadlineExceeded)
 }

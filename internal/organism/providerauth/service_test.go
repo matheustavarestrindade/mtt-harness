@@ -32,7 +32,7 @@ func TestRefreshIsSerializedAndDisconnectRemovesCredentials(test *testing.T) {
 	defer server.Close()
 	database := memory.New()
 	testutil.RequireNoError(test, database.Secrets().SaveOAuthCredential(operationContext, "example-plan", atom.OAuthCredential{AccessToken: "expired", RefreshToken: "old-refresh", AccountID: "account", ExpiresAt: time.Now().Add(-time.Minute)}))
-	service := New(operationContext, database.Secrets(), &openaiauth.Client{Issuer: server.URL, HTTP: server.Client()})
+	service := New(operationContext, database.Secrets(), &openaiauth.Client{IssuerURL: server.URL, HTTPClient: server.Client()})
 	defer service.Close()
 	var workers sync.WaitGroup
 	failures := make(chan error, 20)
@@ -40,7 +40,7 @@ func TestRefreshIsSerializedAndDisconnectRemovesCredentials(test *testing.T) {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			headers, operationError := service.Headers(operationContext, "example-plan")
+			headers, operationError := service.ProviderAuthenticationHeaders(operationContext, "example-plan")
 			if operationError != nil {
 				failures <- operationError
 				return
@@ -58,8 +58,8 @@ func TestRefreshIsSerializedAndDisconnectRemovesCredentials(test *testing.T) {
 	if refreshes.Load() != 1 {
 		test.Fatalf("concurrent refreshes = %d", refreshes.Load())
 	}
-	testutil.RequireNoError(test, service.Disconnect(operationContext, "example-plan"))
-	if _, operationError := service.Headers(operationContext, "example-plan"); operationError == nil {
+	testutil.RequireNoError(test, service.DisconnectProvider(operationContext, "example-plan"))
+	if _, operationError := service.ProviderAuthenticationHeaders(operationContext, "example-plan"); operationError == nil {
 		test.Fatal("disconnected provider still has headers")
 	}
 }
@@ -76,28 +76,28 @@ func TestCancelledAndSupersededLoginCannotSaveLateCredentials(test *testing.T) {
 	}))
 	defer server.Close()
 	database := memory.New()
-	service := New(operationContext, database.Secrets(), &openaiauth.Client{Issuer: server.URL, HTTP: server.Client()})
+	service := New(operationContext, database.Secrets(), &openaiauth.Client{IssuerURL: server.URL, HTTPClient: server.Client()})
 	defer service.Close()
-	login, operationError := service.Start(operationContext, "example-plan")
+	login, operationError := service.StartDeviceLogin(operationContext, "example-plan")
 	testutil.RequireNoError(test, operationError)
-	old := service.flow
-	testutil.RequireNoError(test, service.Cancel(operationContext, "example-plan", login.ID))
+	supersededLogin := service.activeLogin
+	testutil.RequireNoError(test, service.CancelDeviceLogin(operationContext, "example-plan", login.ID))
 	credential := atom.OAuthCredential{AccessToken: "late", RefreshToken: "late-refresh", AccountID: "account", ExpiresAt: time.Now().Add(time.Hour)}
-	service.finish(old, credential, nil)
+	service.completeDeviceLogin(supersededLogin, credential, nil)
 	stored, operationError := database.Secrets().OAuthCredential(operationContext, "example-plan")
 	testutil.RequireNoError(test, operationError)
 	if stored.AccessToken != "" {
 		test.Fatal("cancelled login saved credentials")
 	}
-	_, operationError = service.Start(operationContext, "example-plan")
+	_, operationError = service.StartDeviceLogin(operationContext, "example-plan")
 	testutil.RequireNoError(test, operationError)
-	service.finish(old, credential, nil)
+	service.completeDeviceLogin(supersededLogin, credential, nil)
 	stored, operationError = database.Secrets().OAuthCredential(operationContext, "example-plan")
 	testutil.RequireNoError(test, operationError)
 	if stored.AccessToken != "" {
 		test.Fatal("superseded login saved credentials")
 	}
-	status, operationError := service.Status(operationContext, "example-plan", service.flow.status.ID)
+	status, operationError := service.DeviceLoginStatus(operationContext, "example-plan", service.activeLogin.status.ID)
 	testutil.RequireNoError(test, operationError)
 	if status.Status != "pending" {
 		test.Fatalf("new login = %#v", status)
@@ -122,13 +122,13 @@ func TestDeviceLoginPersistsAcrossServiceRestart(test *testing.T) {
 	}))
 	defer server.Close()
 	database := memory.New()
-	client := &openaiauth.Client{Issuer: server.URL, HTTP: server.Client()}
+	client := &openaiauth.Client{IssuerURL: server.URL, HTTPClient: server.Client()}
 	service := New(operationContext, database.Secrets(), client)
 	defer service.Close()
-	login, operationError := service.Start(operationContext, "example-plan")
+	login, operationError := service.StartDeviceLogin(operationContext, "example-plan")
 	testutil.RequireNoError(test, operationError)
 	for {
-		status, operationError := service.Status(operationContext, "example-plan", login.ID)
+		status, operationError := service.DeviceLoginStatus(operationContext, "example-plan", login.ID)
 		testutil.RequireNoError(test, operationError)
 		if status.Status != "pending" {
 			if status.Status != "connected" || status.UserCode != "" {
@@ -145,7 +145,7 @@ func TestDeviceLoginPersistsAcrossServiceRestart(test *testing.T) {
 	service.Close()
 	restarted := New(operationContext, database.Secrets(), client)
 	defer restarted.Close()
-	headers, operationError := restarted.Headers(operationContext, "example-plan")
+	headers, operationError := restarted.ProviderAuthenticationHeaders(operationContext, "example-plan")
 	testutil.RequireNoError(test, operationError)
 	if headers.Get("Authorization") != "Bearer "+access || headers.Get("ChatGPT-Account-Id") != "account" {
 		test.Fatal("completed login did not survive service restart")

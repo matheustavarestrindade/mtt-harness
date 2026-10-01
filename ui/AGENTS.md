@@ -3,6 +3,7 @@
 - This directory is a standalone HTTP/WebSocket client of the harness API. Do not modify Go code, API contracts, database schema, root runtime configuration, or root Compose services for UI convenience without explicit user permission.
 - Keep UI dependencies, build output, development proxy, fixtures, tests, and documentation in this directory. The Vite proxy adapts browser access; it adds no harness business logic.
 - Use Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`) and TypeScript. Keep transport code, client state, and visual components separate.
+- Use descriptive operation names in application code, such as `sendMessage`, `cancelCurrentTurn`, `loadProvidersAndModels`, and `runProviderAction`. Install the root formatting hook with `../scripts/install-hooks`; it uses this directory's Prettier configuration and dependencies for UI code.
 - Use `src/lib/atoms`, `src/lib/molecules`, and `src/lib/organisms`, with imports pointing downward. Atoms contain wire types, pure helpers, icons, and shadcn primitives under `atoms/ui`. Molecules contain composed controls, HTTP/WebSocket clients, and browser storage. Organisms coordinate state, workflows, navigation, and the workbench. `App.svelte` stays a short entry point.
 - Atoms must not import molecules or organisms. Molecules must not import organisms. `npm run check:layers` verifies these rules, including Svelte script imports. Keep shadcn generation paths aligned with `atoms/ui`.
 - Use lucide-svelte for icons and svelte-sonner for notifications.

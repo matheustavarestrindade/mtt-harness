@@ -12,11 +12,11 @@ type lineRange struct {
 	EndLine   *int `json:"end_line"`
 }
 
-func (selection lineRange) specified() bool {
+func (selection lineRange) hasBounds() bool {
 	return selection.StartLine != nil || selection.EndLine != nil
 }
 
-func (selection lineRange) bounds() (int, int, error) {
+func (selection lineRange) resolveLineBounds() (int, int, error) {
 	start, end := 1, 0
 	if selection.StartLine != nil {
 		start = *selection.StartLine
@@ -35,12 +35,12 @@ func (selection lineRange) bounds() (int, int, error) {
 
 // byteRange is strict for edits: a supplied endpoint must exist. Read ranges
 // clamp their end at EOF instead, because reading beyond EOF cannot edit data.
-func (selection lineRange) byteRange(data []byte) (int, int, error) {
-	start, end, operationError := selection.bounds()
+func (selection lineRange) resolveByteRange(data []byte) (int, int, error) {
+	start, end, operationError := selection.resolveLineBounds()
 	if operationError != nil {
 		return 0, 0, operationError
 	}
-	if !selection.specified() {
+	if !selection.hasBounds() {
 		return 0, len(data), nil
 	}
 	startOffset := -1

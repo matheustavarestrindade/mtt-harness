@@ -28,7 +28,7 @@ func loadProviders(operationContext context.Context, path string, modelGateway *
 		switch configuration.Spec.Authentication {
 		case "chatgpt":
 			standardProvider.SetHeaderResolver(func(operationContext context.Context) (http.Header, error) {
-				return authentication.Headers(operationContext, configuration.Spec.Name)
+				return authentication.ProviderAuthenticationHeaders(operationContext, configuration.Spec.Name)
 			})
 		case "", "api_key":
 			standardProvider.SetKeyResolver(database.Secrets().ResolveKey)

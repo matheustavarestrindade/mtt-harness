@@ -17,7 +17,7 @@ func (standardProvider *Standard) Refresh(operationContext context.Context) ([]a
 	}
 	operationContext, cancelRefresh := context.WithTimeout(operationContext, 30*time.Second)
 	defer cancelRefresh()
-	prices, operationError := standardProvider.prices(operationContext)
+	prices, operationError := standardProvider.loadConfiguredPrices(operationContext)
 	if operationError != nil {
 		return nil, operationError
 	}
@@ -25,7 +25,7 @@ func (standardProvider *Standard) Refresh(operationContext context.Context) ([]a
 	if operationError != nil {
 		return nil, operationError
 	}
-	if operationError := standardProvider.authenticate(request); operationError != nil {
+	if operationError := standardProvider.applyAuthenticationHeaders(request); operationError != nil {
 		return nil, operationError
 	}
 	response, operationError := standardProvider.client.Do(request)

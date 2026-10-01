@@ -19,7 +19,7 @@
     onSend: () => void;
     onCancel: () => void;
   } = $props();
-  function keydown(event: KeyboardEvent) {
+  function handleComposerKeydown(event: KeyboardEvent) {
     // Enter keeps a newline on mobile keyboards. Desktop users have an explicit
     // modifier shortcut that does not interfere with IME composition.
     if (
@@ -54,7 +54,7 @@
         ? 'Add another message to the queue…'
         : 'Give the harness a task…'}
     {disabled}
-    onkeydown={keydown}
+    onkeydown={handleComposerKeydown}
   />
   <div class="flex min-h-14 items-center justify-between gap-2 px-3 pb-3">
     <span class="pl-1 text-[10px] text-muted-foreground"
