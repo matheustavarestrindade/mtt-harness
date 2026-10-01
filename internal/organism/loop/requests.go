@@ -60,7 +60,7 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 	}
 	modelID = modelProvider.Name() + "/" + modelInfo.ID
 	request.Model = modelInfo.ID
-	if !modelInfo.Tools {
+	if !modelInfo.Tools && !modelInfo.ToolSupportUnknown {
 		request.Tools = nil
 	}
 	request, operationError = agentLoop.contextBuilder.Fit(operationContext, request, modelInfo, modelProvider)

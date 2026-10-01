@@ -17,7 +17,8 @@ type Standard struct {
 	client           *http.Client
 	mutex            sync.RWMutex
 	models           []atom.ModelInfo
-	configuredModels []atom.ModelInfo
+	configuredModels []ModelConfiguration
+	modelDefaults    ModelMetadata
 	inlinePrices     map[string]atom.Prices
 	key              KeyResolver
 	headers          func(context.Context) (http.Header, error)
@@ -85,15 +86,6 @@ func (standardProvider *Standard) SetModels(models []atom.ModelInfo) {
 			standardProvider.models[index].Prices = &priceCopy
 		}
 	}
-}
-
-// SetModelConfiguration retains authoritative file metadata independently of
-// the current account's model list. Refreshes can change availability, but a
-// stale cache or temporarily absent model must not erase these overrides.
-func (standardProvider *Standard) SetModelConfiguration(models []atom.ModelInfo) {
-	standardProvider.mutex.Lock()
-	defer standardProvider.mutex.Unlock()
-	standardProvider.configuredModels = append([]atom.ModelInfo(nil), models...)
 }
 
 func (standardProvider *Standard) SetKeyResolver(resolver KeyResolver) {

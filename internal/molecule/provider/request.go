@@ -14,9 +14,17 @@ import (
 )
 
 func (standardProvider *Standard) Stream(operationContext context.Context, request atom.Request) (harness.Stream, error) {
-	if standardProvider.providerSpec.Protocol == "responses" {
+	switch standardProvider.providerSpec.Protocol {
+	case "responses":
 		return standardProvider.streamResponses(operationContext, request)
+	case "", "chat_completions":
+		return standardProvider.streamChatCompletions(operationContext, request)
+	default:
+		return nil, fmt.Errorf("unsupported provider protocol %q", standardProvider.providerSpec.Protocol)
 	}
+}
+
+func (standardProvider *Standard) streamChatCompletions(operationContext context.Context, request atom.Request) (harness.Stream, error) {
 	messages, operationError := encodeMessages(request.Messages)
 	if operationError != nil {
 		return nil, operationError

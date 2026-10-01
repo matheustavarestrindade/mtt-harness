@@ -236,6 +236,7 @@ type ModelInfo struct {
     Input      []MediaType
     Output     []MediaType
     Tools      bool
+    ToolSupportUnknown bool `json:",omitempty"`
     ContextMax int
     Prices     *Prices
 }
@@ -351,15 +352,19 @@ The API gives `CacheHitRate` and `CacheHitPercentage`. The percentage is the rat
 
 ### 6.2 Provider Data
 
-The harness has default provider data for OpenAI and DeepSeek. It also reads a JSON file to override the data or add providers. The file has one entry for a provider. The provider data has:
+The default provider data is in `providers.json`. The file includes OpenAI and DeepSeek. The ChatGPT coding plan also uses data from the file. Source files must not contain a default provider list or model list.
+
+The file has one entry for a provider. A missing or empty file does not add providers. The provider data has:
 
 - The name of the provider.
 - The API URL.
 - The model list URL.
+- The model list format: `openai` or `codex`. The default is `openai`.
 - The price table URL. The field is optional.
 - The interval for the model list.
 - The prices of the models. The field is optional.
 - The models. The field is optional.
+- The default model data. The field is optional.
 - The protocol: `responses` or `chat_completions`.
 - The authentication method: `api_key`, `chatgpt`, or `none`.
 
@@ -375,7 +380,18 @@ A model list endpoint usually gives the model IDs and the limits. A model list e
 
 The harness refreshes the model data at the interval. The default interval is 24 hours. The user can refresh the model data from the API. The harness keeps the last model list when the API gives an error.
 
-A model list response can give only IDs. The harness uses model data from the provider file before default model data. It uses default model data before data from the model cache. When a model list endpoint is available, the harness uses the IDs in the response.
+A model list response can give only IDs. The harness uses model data in the sequence that follows:
+
+- Data for a specified model in the JSON file.
+- Data from the model list response.
+- Default data from `model_defaults` in the JSON file.
+- Data from the model cache.
+
+When a model list endpoint is available, the harness uses only the IDs in a correct response. An empty list removes available models. A request error or an incorrect response keeps the last correct list. Model data in the JSON file must not add IDs to the response list.
+
+The field `ToolSupportUnknown` is `true` when the response does not give data about tools. Then the harness sends the tool definitions. The provider can reject the request. A value of `false` for `tools` removes tool definitions. The database keeps `ToolSupportUnknown` with `Tools`.
+
+For the `codex` format, the adapter reads the model list URL with account authentication. The response has a `models` array with `slug`, `display_name`, `context_window`, and `input_modalities` fields. The configuration supplies the URL and client version. A source code change is not necessary to change the URL or version.
 
 A provider can use the `Refresher` interface:
 
@@ -389,7 +405,7 @@ The standard adapter uses `Refresher` when the provider data has a model list UR
 
 Requirements:
 
-- R41: The harness must read provider data from a JSON file when the file is available.
+- R41: The provider file must give the default provider data and model data.
 - R42: The provider data must give a name and an API URL. A model list URL is optional when the provider uses a model list from configuration.
 - R43: The provider file can give the prices and the models.
 - R44: The harness must keep the provider data, the model lists, and the prices in the database.

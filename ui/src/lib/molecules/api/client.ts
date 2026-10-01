@@ -140,33 +140,38 @@ export class HarnessApi {
       45_000,
     );
   }
-  startProviderLogin(signal?: AbortSignal) {
+  startProviderLogin(providerID: string, signal?: AbortSignal) {
     return this.request<DeviceLogin>(
-      'providers/openai-codex/auth/device',
+      `providers/${encodeURIComponent(providerID)}/auth/device`,
       'POST',
       undefined,
       signal,
       30_000,
     );
   }
-  providerLogin(identifier: string, signal?: AbortSignal) {
+  providerLogin(providerID: string, loginID: string, signal?: AbortSignal) {
     return this.request<DeviceLogin>(
-      `providers/openai-codex/auth/device/${encodeURIComponent(identifier)}`,
+      `providers/${encodeURIComponent(providerID)}/auth/device/${encodeURIComponent(loginID)}`,
       'GET',
       undefined,
       signal,
     );
   }
-  cancelProviderLogin(identifier: string, signal?: AbortSignal) {
+  cancelProviderLogin(providerID: string, loginID: string, signal?: AbortSignal) {
     return this.request(
-      `providers/openai-codex/auth/device/${encodeURIComponent(identifier)}`,
+      `providers/${encodeURIComponent(providerID)}/auth/device/${encodeURIComponent(loginID)}`,
       'DELETE',
       undefined,
       signal,
     );
   }
-  disconnectCodingPlan(signal?: AbortSignal) {
-    return this.request('providers/openai-codex/auth', 'DELETE', undefined, signal);
+  disconnectCodingPlan(providerID: string, signal?: AbortSignal) {
+    return this.request(
+      `providers/${encodeURIComponent(providerID)}/auth`,
+      'DELETE',
+      undefined,
+      signal,
+    );
   }
   async providerModels(providerID: string, signal?: AbortSignal) {
     return (

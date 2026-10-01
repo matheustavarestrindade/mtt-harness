@@ -21,7 +21,7 @@
   const lifetime = new AbortController();
   let catalogRequest: AbortController | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const codingPlan = $derived(providers.find((provider) => provider.Name === 'openai-codex'));
+  const codingPlan = $derived(providers.find((provider) => provider.Authentication === 'chatgpt'));
   const keyProviders = $derived(
     providers.filter((provider) => provider.Authentication === 'api_key'),
   );
@@ -109,8 +109,10 @@
     }
   }
   async function poll(identifier: string) {
+    const providerID = login?.Provider;
+    if (!providerID) return;
     try {
-      const result = await api.providerLogin(identifier, lifetime.signal);
+      const result = await api.providerLogin(providerID, identifier, lifetime.signal);
       if (lifetime.signal.aborted || login?.ID !== identifier) return;
       login = result;
       if (result.Status === 'pending') {
@@ -119,23 +121,31 @@
       }
       if (result.Status === 'connected') {
         toast.success('OpenAI coding plan connected');
+        try {
+          await api.refreshProvider(providerID, lifetime.signal);
+        } catch (failure) {
+          if (!lifetime.signal.aborted)
+            errors[providerID] = `Signed in, but model refresh failed: ${messageOf(failure)}`;
+        }
         await changed();
       }
     } catch (failure) {
-      if (!lifetime.signal.aborted) errors['openai-codex'] = messageOf(failure);
+      if (!lifetime.signal.aborted) errors[providerID] = messageOf(failure);
     }
   }
   async function signIn() {
-    busy = 'openai-codex';
+    const providerID = codingPlan?.Name;
+    if (!providerID) return;
+    busy = providerID;
     errors[busy] = '';
     clearTimeout(timer);
     try {
-      const result = await api.startProviderLogin(lifetime.signal);
+      const result = await api.startProviderLogin(providerID, lifetime.signal);
       if (lifetime.signal.aborted) return;
       login = result;
       timer = setTimeout(() => void poll(result.ID), 2000);
     } catch (failure) {
-      if (!lifetime.signal.aborted) errors['openai-codex'] = messageOf(failure);
+      if (!lifetime.signal.aborted) errors[providerID] = messageOf(failure);
     } finally {
       if (!lifetime.signal.aborted) busy = '';
     }
@@ -144,7 +154,10 @@
     if (!login) return;
     clearTimeout(timer);
     const identifier = login.ID;
-    await action('openai-codex', () => api.cancelProviderLogin(identifier, lifetime.signal));
+    const providerID = login.Provider;
+    await action(providerID, () =>
+      api.cancelProviderLogin(providerID, identifier, lifetime.signal),
+    );
     if (!lifetime.signal.aborted && login?.ID === identifier) login = null;
   }
   onMount(() => {
@@ -257,32 +270,32 @@
                 {login.Error}
               </p>{/if}
             <Button class="h-11 w-full" disabled={!!busy} onclick={() => void signIn()}
-              >{#if busy === 'openai-codex'}<LoaderCircle
+              >{#if busy === codingPlan.Name}<LoaderCircle
                   class="size-4 animate-spin"
                 />{:else}<LogIn class="size-4" />{/if}{codingPlan.Connected
                 ? 'Sign in again'
                 : 'Sign in with ChatGPT'}</Button
             >
           {/if}
-          {#if errors['openai-codex']}<p
+          {#if errors[codingPlan.Name]}<p
               role="alert"
               class="mt-3 break-words text-sm leading-6 text-destructive"
             >
-              {errors['openai-codex']}
+              {errors[codingPlan.Name]}
             </p>{/if}
           {#if codingPlan.Connected}<Button
               variant="ghost"
               class="mt-3 h-11 text-xs"
               disabled={!!busy}
               onclick={() =>
-                void action('openai-codex', async () => {
+                void action(codingPlan.Name, async () => {
                   clearTimeout(timer);
                   login = null;
-                  await api.disconnectCodingPlan(lifetime.signal);
+                  await api.disconnectCodingPlan(codingPlan.Name, lifetime.signal);
                 })}><Unplug class="size-3.5" />Disconnect coding plan</Button
             >{/if}
           <p class="mt-4 text-xs text-muted-foreground">
-            Models use the <code>openai-codex/</code> prefix. Plan limits still apply.
+            Models use the <code>{codingPlan.Name}/</code> prefix. Plan limits still apply.
           </p>
           <ProviderModelList
             providerID={codingPlan.Name}

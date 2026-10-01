@@ -163,3 +163,48 @@ func TestShellQueryEnablesBashOnTheNextModelRequest(test *testing.T) {
 	}
 	test.Fatal("the shell query did not enable bash in the next request")
 }
+
+func TestNewCatalogModelsKeepToolsUnlessExplicitlyUnsupported(test *testing.T) {
+	for _, capability := range []struct {
+		name, metadata string
+		expectTools    bool
+	}{
+		{"unknown", "", true},
+		{"unsupported", `,"tools":false`, false},
+		{"supported", `,"tools":true`, true},
+	} {
+		test.Run(capability.name, func(test *testing.T) {
+			requests := make(chan atom.Request, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+				if request.URL.Path == "/models" {
+					fmt.Fprintf(responseWriter, `{"data":[{"id":"new-model"%s}]}`, capability.metadata)
+					return
+				}
+				var payload struct {
+					Model string            `json:"model"`
+					Tools []json.RawMessage `json:"tools"`
+				}
+				testutil.RequireNoError(test, json.NewDecoder(request.Body).Decode(&payload))
+				requests <- atom.Request{Model: payload.Model, Tools: make([]atom.ToolSpec, len(payload.Tools))}
+				responseWriter.Header().Set("Content-Type", "text/event-stream")
+				fmt.Fprint(responseWriter, "data: {\"choices\":[{\"delta\":{\"content\":\"done\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+			}))
+			defer server.Close()
+			standardProvider := provider.New(atom.ProviderSpec{Name: "dynamic", APIURL: server.URL, ModelListURL: server.URL + "/models"})
+			_, operationError := standardProvider.Refresh(context.Background())
+			testutil.RequireNoError(test, operationError)
+			testStack := newStack(test)
+			testStack.harnessRuntime.Provider(standardProvider)
+			testutil.RequireNoError(test, testStack.registry.Add(tools.NewSearch(testStack.registry)))
+			session := testStack.instance(test, 2)
+			session.Model = "dynamic/new-model"
+			testutil.RequireNoError(test, testStack.database.Sessions().Save(context.Background(), session))
+			testStack.user(test, session, "use tools if available")
+			testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
+			payload := <-requests
+			if (len(payload.Tools) > 0) != capability.expectTools || payload.Model != "new-model" {
+				test.Fatalf("catalog capability was not honored on the provider wire: %+v", payload)
+			}
+		})
+	}
+}

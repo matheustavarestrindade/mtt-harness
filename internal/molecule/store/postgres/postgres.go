@@ -123,8 +123,15 @@ CREATE TABLE IF NOT EXISTS models (
 	PRIMARY KEY (provider, id)
 );
 ALTER TABLE models ADD COLUMN IF NOT EXISTS name text NOT NULL DEFAULT '';
+-- Legacy false values could mean missing capability metadata. Preserve explicit
+-- false values written after this one-time nullable-column migration.
+ALTER TABLE models ADD COLUMN IF NOT EXISTS tool_support_unknown boolean;
+UPDATE models SET tool_support_unknown = NOT tools WHERE tool_support_unknown IS NULL;
+ALTER TABLE models ALTER COLUMN tool_support_unknown SET DEFAULT false;
+ALTER TABLE models ALTER COLUMN tool_support_unknown SET NOT NULL;
 ALTER TABLE providers ADD COLUMN IF NOT EXISTS protocol text NOT NULL DEFAULT '';
 ALTER TABLE providers ADD COLUMN IF NOT EXISTS authentication text NOT NULL DEFAULT '';
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS model_list_format text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS provider_oauth (
 	provider text PRIMARY KEY,
 	access_token text NOT NULL,

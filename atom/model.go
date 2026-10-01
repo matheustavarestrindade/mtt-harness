@@ -21,23 +21,27 @@ type Cost struct {
 type ModelInfo struct {
 	ID string
 	// Name is an optional display label. Requests and allowlists use ID.
-	Name       string `json:",omitempty"`
-	Level      int
-	Input      []MediaType
-	Output     []MediaType
-	Tools      bool
-	ContextMax int
-	Prices     *Prices
+	Name   string `json:",omitempty"`
+	Level  int
+	Input  []MediaType
+	Output []MediaType
+	Tools  bool
+	// ToolSupportUnknown distinguishes absent catalog metadata from explicit false.
+	// Unknown support permits a tool request; the provider can reject it normally.
+	ToolSupportUnknown bool `json:",omitempty"`
+	ContextMax         int
+	Prices             *Prices
 }
 
 type ProviderSpec struct {
-	Name           string
-	Protocol       string
-	Authentication string
-	APIURL         string
-	ModelListURL   string
-	PriceTableURL  string
-	Interval       time.Duration
+	Name            string
+	Protocol        string
+	Authentication  string
+	APIURL          string
+	ModelListURL    string
+	ModelListFormat string `json:",omitempty"`
+	PriceTableURL   string
+	Interval        time.Duration
 }
 
 type ProviderKey struct {

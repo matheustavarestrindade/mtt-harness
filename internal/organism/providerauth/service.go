@@ -12,7 +12,6 @@ import (
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/openaiauth"
-	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
@@ -60,7 +59,7 @@ func (service *Service) acquire(operationContext context.Context) error {
 
 func (service *Service) release() { <-service.gate }
 
-func (service *Service) Start(operationContext context.Context) (atom.DeviceLogin, error) {
+func (service *Service) Start(operationContext context.Context, providerID string) (atom.DeviceLogin, error) {
 	if operationError := service.acquire(operationContext); operationError != nil {
 		return atom.DeviceLogin{}, operationError
 	}
@@ -77,7 +76,7 @@ func (service *Service) Start(operationContext context.Context) (atom.DeviceLogi
 	}
 	loginContext, cancel := context.WithDeadline(service.context, challenge.ExpiresAt)
 	flow := &loginFlow{cancel: cancel, status: atom.DeviceLogin{
-		ID: rand.Text(), Provider: provider.CodexProvider, VerificationURL: challenge.VerificationURL,
+		ID: rand.Text(), Provider: providerID, VerificationURL: challenge.VerificationURL,
 		UserCode: challenge.UserCode, ExpiresAt: challenge.ExpiresAt, Status: "pending",
 	}}
 	service.flow = flow
@@ -86,23 +85,23 @@ func (service *Service) Start(operationContext context.Context) (atom.DeviceLogi
 	return flow.status, nil
 }
 
-func (service *Service) Status(operationContext context.Context, identifier string) (atom.DeviceLogin, error) {
+func (service *Service) Status(operationContext context.Context, providerID, identifier string) (atom.DeviceLogin, error) {
 	if operationError := service.acquire(operationContext); operationError != nil {
 		return atom.DeviceLogin{}, operationError
 	}
 	defer service.release()
-	if service.flow == nil || service.flow.status.ID != identifier {
+	if service.flow == nil || service.flow.status.ID != identifier || service.flow.status.Provider != providerID {
 		return atom.DeviceLogin{}, ErrLoginNotFound
 	}
 	return service.flow.status, nil
 }
 
-func (service *Service) Cancel(operationContext context.Context, identifier string) error {
+func (service *Service) Cancel(operationContext context.Context, providerID, identifier string) error {
 	if operationError := service.acquire(operationContext); operationError != nil {
 		return operationError
 	}
 	defer service.release()
-	if service.flow == nil || service.flow.status.ID != identifier {
+	if service.flow == nil || service.flow.status.ID != identifier || service.flow.status.Provider != providerID {
 		return ErrLoginNotFound
 	}
 	if service.flow.status.Status != "pending" {
@@ -113,24 +112,24 @@ func (service *Service) Cancel(operationContext context.Context, identifier stri
 	return nil
 }
 
-func (service *Service) Disconnect(operationContext context.Context) error {
+func (service *Service) Disconnect(operationContext context.Context, providerID string) error {
 	if operationError := service.acquire(operationContext); operationError != nil {
 		return operationError
 	}
 	defer service.release()
-	if service.flow != nil {
+	if service.flow != nil && service.flow.status.Provider == providerID {
 		service.flow.cancel()
 		service.flow.status.Status = "cancelled"
 	}
-	return service.secrets.DeleteOAuthCredential(operationContext, provider.CodexProvider)
+	return service.secrets.DeleteOAuthCredential(operationContext, providerID)
 }
 
-func (service *Service) Headers(operationContext context.Context) (http.Header, error) {
+func (service *Service) Headers(operationContext context.Context, providerID string) (http.Header, error) {
 	if operationError := service.acquire(operationContext); operationError != nil {
 		return nil, operationError
 	}
 	defer service.release()
-	credential, operationError := service.secrets.OAuthCredential(operationContext, provider.CodexProvider)
+	credential, operationError := service.secrets.OAuthCredential(operationContext, providerID)
 	if operationError != nil {
 		return nil, operationError
 	}
@@ -142,7 +141,7 @@ func (service *Service) Headers(operationContext context.Context) (http.Header, 
 		if operationError != nil {
 			return nil, operationError
 		}
-		if operationError := service.secrets.SaveOAuthCredential(operationContext, provider.CodexProvider, credential); operationError != nil {
+		if operationError := service.secrets.SaveOAuthCredential(operationContext, providerID, credential); operationError != nil {
 			return nil, operationError
 		}
 	}

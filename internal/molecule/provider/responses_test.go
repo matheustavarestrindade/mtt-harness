@@ -48,7 +48,7 @@ func TestResponsesStreamsToolBeforeCompletionAndKeepsContinuation(test *testing.
 	standard := New(atom.ProviderSpec{Name: "openai", Protocol: "responses", APIURL: server.URL, Authentication: "api_key"})
 	standard.SetKeyResolver(func(context.Context, string, string) (string, error) { return "example-key", nil })
 	stream, operationError := standard.Stream(operationContext, atom.Request{
-		Model: "gpt-6-sol",
+		Model: "example-responses-model",
 		Messages: []atom.Message{
 			{Role: atom.RoleSystem, Content: []atom.Content{{Type: atom.Text, Text: "system instructions"}}},
 			{Role: atom.RoleUser, Content: []atom.Content{{Type: atom.Text, Text: "read file"}}},

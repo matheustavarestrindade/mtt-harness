@@ -39,13 +39,13 @@ func TestLoadFile(test *testing.T) {
 	if configuration.Spec.Interval.Hours() != 12 {
 		test.Fatalf("interval = %v", configuration.Spec.Interval)
 	}
-	if len(configuration.Models) != 1 || configuration.Models[0].Prices == nil || configuration.Models[0].Prices.Input != 2 {
+	if len(configuration.Models) != 1 || configuration.Prices["m1"].Input != 2 {
 		test.Fatalf("models = %+v", configuration.Models)
 	}
 	if len(configuration.Models[0].Input) != 2 || configuration.Models[0].Input[1] != "image" {
 		test.Fatalf("input media = %+v", configuration.Models[0].Input)
 	}
-	if configuration.Models[0].Name != "Example Model" {
-		test.Fatalf("configured model display name = %q", configuration.Models[0].Name)
+	if configuration.Models[0].Name == nil || *configuration.Models[0].Name != "Example Model" {
+		test.Fatalf("configured model display name = %v", configuration.Models[0].Name)
 	}
 }

@@ -68,6 +68,7 @@ export interface Model {
   Input: string[] | null;
   Output: string[] | null;
   Tools: boolean;
+  ToolSupportUnknown?: boolean;
   ContextMax: number;
   Prices: {
     Currency: string;
@@ -85,6 +86,7 @@ export interface Provider {
   Name: string;
   APIURL: string;
   ModelListURL: string;
+  ModelListFormat?: 'openai' | 'codex';
   PriceTableURL: string;
   Interval: number;
 }

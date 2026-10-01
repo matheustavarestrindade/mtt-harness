@@ -160,19 +160,25 @@ Content types are `text`, `image`, `audio`, and `file`. A media item must have d
 | DELETE | `/providers/{id}/key` | none | `200`, `{"status":"deleted"}` | `500` |
 | PUT | `/instances/{id}/providers/{provider}/key` | `{"key":"SECRET"}` | `200`, `{"status":"saved"}` | `400`, `500` |
 | DELETE | `/instances/{id}/providers/{provider}/key` | none | `200`, `{"status":"deleted"}` | `500` |
-| POST | `/providers/openai-codex/auth/device` | none | `202`, `DeviceLogin` | `400`, `502`, `503` |
-| GET | `/providers/openai-codex/auth/device/{login_id}` | none | `200`, `DeviceLogin` | `404`, `503` |
-| DELETE | `/providers/openai-codex/auth/device/{login_id}` | none | `200`, `{"status":"cancelled"}` | `404`, `503` |
-| DELETE | `/providers/openai-codex/auth` | none | `200`, `{"status":"disconnected"}` | `500`, `503` |
+| POST | `/providers/{id}/auth/device` | none | `202`, `DeviceLogin` | `400`, `404`, `502`, `503` |
+| GET | `/providers/{id}/auth/device/{login_id}` | none | `200`, `DeviceLogin` | `400`, `404`, `503` |
+| DELETE | `/providers/{id}/auth/device/{login_id}` | none | `200`, `{"status":"cancelled"}` | `400`, `404`, `503` |
+| DELETE | `/providers/{id}/auth` | none | `200`, `{"status":"disconnected"}` | `400`, `404`, `500`, `503` |
 ```
 
-The provider ID is the provider name. The providers `openai`, `deepseek`, and `openai-codex` have default provider data. The file `providers.json` can override the data or add providers. The API cannot add a provider. A provider route gives model IDs without the provider prefix.
+The provider ID is the provider name. The default data for `openai`, `deepseek`, and `openai-codex` is in `providers.json`. Change the file to change or add providers. A missing or empty file does not add providers.
+
+The API cannot add a provider. A provider route gives model IDs without the provider prefix.
 
 An instance model list uses `provider/model`. An ID without a provider prefix is correct only when one provider has the model ID.
 
 The instance key overrides the harness key. Provider routes do not give secret values. A key handler does not examine if the provider or instance is in the database. A harness key must not be empty. The `DELETE` method removes a harness key. An instance key can be empty.
 
-The API key route does not accept a credential for `openai-codex`. The provider uses device authentication. The refresh route uses the harness provider configuration. For `openai-codex`, the model list comes from configuration. The refresh operation examines the credential. It does not get a model list from OpenAI.
+The API key route does not accept a credential for `openai-codex`. The provider uses device authentication. The refresh route uses the harness provider configuration. For `openai-codex`, the refresh operation gets the model list from the URL in the JSON file. The request uses account authentication. The response format is `codex`.
+
+A correct model list response replaces available models. An empty list removes available models. A request error or an incorrect response keeps the last correct list.
+
+The field `ToolSupportUnknown` is `true` when the response does not give data about tools. Then the harness sends tool definitions. A value of `false` for `tools` in model data removes tool definitions.
 
 The provider list contains providers in the registry and the test provider when available. A previous database provider without a registry entry is not in the response. Provider data includes the fields:
 
@@ -190,7 +196,7 @@ Device authentication uses the response:
 ```typescript
 type DeviceLogin = {
   ID: string; // harness login ID, not the upstream device secret
-  Provider: 'openai-codex';
+  Provider: string; // configured provider ID
   VerificationURL: string;
   UserCode: string;
   ExpiresAt: string; // RFC 3339; device code lasts 15 minutes
@@ -200,6 +206,8 @@ type DeviceLogin = {
 ```
 
 The user opens the OpenAI URL and supplies the code. The server waits for OpenAI authorization and stores the credential. The UI can read login status at an interval of 2 seconds. A new login replaces the previous login.
+
+Device routes use the provider ID from configuration. The authentication method must be `chatgpt`. A login is for one provider. After login, the client can refresh the model list.
 
 The user can cancel a login that is in progress. This does not remove a credential from the database. The route `DELETE /providers/openai-codex/auth` removes the credential.
 
@@ -350,12 +358,13 @@ type Statistics = Usage & {
 type Provider = {
   Name: string; APIURL: string; ModelListURL: string; PriceTableURL: string; Interval: number;
   Protocol: '' | 'responses' | 'chat_completions';
+  ModelListFormat?: 'openai' | 'codex';
   Authentication: '' | 'api_key' | 'chatgpt' | 'none';
   Connected: boolean; ModelCount: number;
 };
 type Model = {
   ID: string; Name?: string; Level: number; Input: string[] | null; Output: string[] | null;
-  Tools: boolean; ContextMax: number;
+  Tools: boolean; ToolSupportUnknown?: boolean; ContextMax: number;
   Prices: null | { Currency: string; Input: number; Output: number; CacheRead: number; CacheWrite: number };
 };
 type PermissionRequest = { ID: string; InstanceID: string; SessionID: string; Target: string; Why: string };

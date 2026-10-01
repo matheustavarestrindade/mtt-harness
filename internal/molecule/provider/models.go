@@ -2,8 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -11,22 +9,14 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
 
+// Refresh replaces availability only after a complete successful catalog fetch.
+// A failed/malformed response leaves the last usable catalog unchanged.
 func (standardProvider *Standard) Refresh(operationContext context.Context) ([]atom.ModelInfo, error) {
-	operationContext, cancel := context.WithTimeout(operationContext, 30*time.Second)
-	defer cancel()
 	if standardProvider.providerSpec.ModelListURL == "" {
-		if standardProvider.Name() == CodexProvider {
-			request, operationError := http.NewRequestWithContext(operationContext, http.MethodGet, standardProvider.providerSpec.APIURL, nil)
-			if operationError != nil {
-				return nil, operationError
-			}
-			if operationError := standardProvider.authenticate(request); operationError != nil {
-				return nil, operationError
-			}
-			return standardProvider.Models(), nil
-		}
-		return nil, errors.New("provider: the model list URL is not in the provider data")
+		return nil, fmt.Errorf("provider %s: model_list_url is not configured; the catalog is static", standardProvider.Name())
 	}
+	operationContext, cancelRefresh := context.WithTimeout(operationContext, 30*time.Second)
+	defer cancelRefresh()
 	prices, operationError := standardProvider.prices(operationContext)
 	if operationError != nil {
 		return nil, operationError
@@ -44,68 +34,36 @@ func (standardProvider *Standard) Refresh(operationContext context.Context) ([]a
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("provider: the model list gives the status %d", response.StatusCode)
+		return nil, fmt.Errorf("provider %s: model list returned HTTP %d", standardProvider.Name(), response.StatusCode)
 	}
-	var list struct {
-		Data []struct {
-			ID      string `json:"id"`
-			Pricing *struct {
-				Prompt          string `json:"prompt"`
-				Completion      string `json:"completion"`
-				InputCacheRead  string `json:"input_cache_read"`
-				InputCacheWrite string `json:"input_cache_write"`
-			} `json:"pricing"`
-		} `json:"data"`
-	}
-	if operationError := json.NewDecoder(response.Body).Decode(&list); operationError != nil {
+	catalog, operationError := decodeModelCatalog(response.Body, standardProvider.providerSpec.ModelListFormat)
+	if operationError != nil {
 		return nil, operationError
 	}
-	previous := map[string]atom.ModelInfo{}
+	cachedByID := map[string]atom.ModelInfo{}
 	for _, model := range standardProvider.Models() {
-		previous[model.ID] = model
-	}
-	// Model-list endpoints often supply only IDs. Restore built-in capability
-	// metadata ahead of stale cache entries, then apply explicit configuration.
-	for _, configuration := range Defaults() {
-		if configuration.Spec.Name != standardProvider.Name() {
-			continue
-		}
-		for _, model := range configuration.Models {
-			previous[model.ID] = model
-		}
+		cachedByID[model.ID] = model
 	}
 	standardProvider.mutex.RLock()
-	for _, model := range standardProvider.configuredModels {
-		previous[model.ID] = model
-	}
+	defaults := standardProvider.modelDefaults
 	standardProvider.mutex.RUnlock()
-	var models []atom.ModelInfo
-	for _, item := range list.Data {
-		if item.ID == "" {
-			continue
+	models := make([]atom.ModelInfo, 0, len(catalog))
+	for _, catalogModel := range catalog {
+		model, cached := cachedByID[catalogModel.ID]
+		if !cached {
+			model = newCatalogModel(catalogModel.ID)
 		}
-		model := atom.ModelInfo{
-			ID:     item.ID,
-			Input:  []atom.MediaType{atom.Text},
-			Output: []atom.MediaType{atom.Text},
-		}
-		if old, found := previous[item.ID]; found {
-			model = old
-		}
-		model.Prices = nil
-		if item.Pricing != nil {
-			model.Prices = &atom.Prices{
-				Currency:   "USD",
-				Input:      perMillion(item.Pricing.Prompt),
-				Output:     perMillion(item.Pricing.Completion),
-				CacheRead:  perMillion(item.Pricing.InputCacheRead),
-				CacheWrite: perMillion(item.Pricing.InputCacheWrite),
-			}
-		}
-		if price, found := prices[item.ID]; found {
+		model = applyModelMetadata(model, defaults)
+		model = applyModelMetadata(model, catalogModel.ModelMetadata)
+		model = standardProvider.configuredModelMetadata(model)
+		model.Prices = catalogModel.Prices
+		if price, configured := prices[model.ID]; configured {
 			model.Prices = &price
 		}
 		models = append(models, model)
+	}
+	if operationError := operationContext.Err(); operationError != nil {
+		return nil, operationError
 	}
 	standardProvider.SetModels(models)
 	return standardProvider.Models(), nil

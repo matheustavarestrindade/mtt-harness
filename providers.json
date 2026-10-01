@@ -8,6 +8,8 @@
   "providers": [
     {
       "name": "openai",
+      "protocol": "responses",
+      "authentication": "api_key",
       "api_url": "https://api.openai.com/v1",
       "model_list_url": "https://api.openai.com/v1/models",
       "refresh_hours": 24,
@@ -26,6 +28,138 @@
           "cache_read": 0.075,
           "cache_write": 0
         }
+      },
+      "model_defaults": {
+        "level": 1
+      },
+      "models": [
+        {
+          "id": "gpt-6-astra",
+          "level": 3,
+          "context_max": 1050000,
+          "tools": true,
+          "input": [
+            "text",
+            "image"
+          ]
+        },
+        {
+          "id": "gpt-6.1-sol",
+          "level": 2,
+          "context_max": 1050000,
+          "tools": true,
+          "input": [
+            "text",
+            "image"
+          ]
+        },
+        {
+          "id": "gpt-6-luna",
+          "level": 1,
+          "context_max": 1050000,
+          "tools": true,
+          "input": [
+            "text",
+            "image"
+          ]
+        },
+        {
+          "id": "gpt-5.5",
+          "level": 3,
+          "context_max": 1050000,
+          "tools": true,
+          "input": [
+            "text",
+            "image"
+          ]
+        },
+        {
+          "id": "gpt-5.4",
+          "level": 2,
+          "context_max": 1050000,
+          "tools": true,
+          "input": [
+            "text",
+            "image"
+          ]
+        },
+        {
+          "id": "gpt-5.4-mini",
+          "level": 1,
+          "context_max": 272000,
+          "tools": true,
+          "input": [
+            "text",
+            "image"
+          ]
+        },
+        {
+          "id": "gpt-4o",
+          "level": 2,
+          "context_max": 128000,
+          "tools": true,
+          "input": [
+            "text",
+            "image"
+          ]
+        },
+        {
+          "id": "gpt-4o-mini",
+          "level": 1,
+          "context_max": 128000,
+          "tools": true,
+          "input": [
+            "text",
+            "image"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "deepseek",
+      "protocol": "responses",
+      "authentication": "api_key",
+      "api_url": "https://api.deepseek.com",
+      "model_list_url": "https://api.deepseek.com/models",
+      "refresh_hours": 24,
+      "model_defaults": {
+        "level": 1
+      },
+      "models": [
+        {
+          "id": "deepseek-flash",
+          "name": "DeepSeek-V4.1-Flash",
+          "level": 1,
+          "context_max": 1000000,
+          "tools": true,
+          "input": [
+            "text",
+            "image"
+          ]
+        },
+        {
+          "id": "deepseek-v4-pro",
+          "name": "DeepSeek-V4-Pro-0813",
+          "level": 2,
+          "context_max": 1000000,
+          "tools": true,
+          "input": [
+            "text"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "openai-codex",
+      "protocol": "responses",
+      "authentication": "chatgpt",
+      "api_url": "https://chatgpt.com/backend-api/codex",
+      "model_list_url": "https://chatgpt.com/backend-api/codex/models?client_version=0.101.0",
+      "model_list_format": "codex",
+      "refresh_hours": 24,
+      "model_defaults": {
+        "level": 1,
+        "tools": true
       },
       "models": []
     }

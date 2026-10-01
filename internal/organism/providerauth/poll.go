@@ -7,7 +7,6 @@ import (
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/openaiauth"
-	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
 )
 
 func (service *Service) poll(operationContext context.Context, flow *loginFlow, challenge openaiauth.DeviceChallenge) {
@@ -44,7 +43,7 @@ func (service *Service) finish(flow *loginFlow, credential atom.OAuthCredential,
 		operationError = service.context.Err()
 	}
 	if operationError == nil {
-		operationError = service.secrets.SaveOAuthCredential(service.context, provider.CodexProvider, credential)
+		operationError = service.secrets.SaveOAuthCredential(service.context, flow.status.Provider, credential)
 	}
 	if operationError == nil {
 		flow.status.Status = "connected"

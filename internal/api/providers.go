@@ -16,14 +16,14 @@ func (server *Server) listProviders(responseWriter http.ResponseWriter, request 
 	for _, registered := range server.gateway.Providers() {
 		specification := providerSpecification(registered)
 		connection := atom.ProviderConnection{ProviderSpec: specification, ModelCount: len(registered.Models()), Connected: true}
-		if specification.Authentication == "chatgpt" {
+		switch specification.Authentication {
+		case "chatgpt":
 			credential, operationError := server.store.Secrets().OAuthCredential(request.Context(), registered.Name())
 			if respondToError(responseWriter, http.StatusInternalServerError, operationError) {
 				return
 			}
 			connection.Connected = credential.AccessToken != "" && credential.RefreshToken != ""
-		}
-		if specification.Authentication == "api_key" {
+		case "api_key":
 			key, operationError := server.store.Secrets().ProviderKey(request.Context(), registered.Name())
 			if respondToError(responseWriter, http.StatusInternalServerError, operationError) {
 				return

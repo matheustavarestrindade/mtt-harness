@@ -2,14 +2,23 @@ package api
 
 import (
 	"net/http"
-
-	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
 )
 
 func (server *Server) supportsDeviceLogin(responseWriter http.ResponseWriter, request *http.Request) bool {
 	responseWriter.Header().Set("Cache-Control", "no-store")
-	if request.PathValue("id") != provider.CodexProvider {
-		writeError(responseWriter, http.StatusBadRequest, "device sign-in is available for openai-codex only")
+	if server.gateway == nil {
+		writeError(responseWriter, http.StatusServiceUnavailable, "provider gateway is not available")
+		return false
+	}
+	registeredProvider, found := server.gateway.Provider(request.PathValue("id"))
+	if !found {
+		writeError(responseWriter, http.StatusNotFound, "provider is not configured")
+		return false
+	}
+	switch providerSpecification(registeredProvider).Authentication {
+	case "chatgpt":
+	default:
+		writeError(responseWriter, http.StatusBadRequest, "provider does not use device authentication")
 		return false
 	}
 	if server.providerAuth == nil {
@@ -23,7 +32,7 @@ func (server *Server) startProviderLogin(responseWriter http.ResponseWriter, req
 	if !server.supportsDeviceLogin(responseWriter, request) {
 		return
 	}
-	login, operationError := server.providerAuth.Start(request.Context())
+	login, operationError := server.providerAuth.Start(request.Context(), request.PathValue("id"))
 	if respondToError(responseWriter, http.StatusBadGateway, operationError) {
 		return
 	}
@@ -34,7 +43,7 @@ func (server *Server) providerLoginStatus(responseWriter http.ResponseWriter, re
 	if !server.supportsDeviceLogin(responseWriter, request) {
 		return
 	}
-	login, operationError := server.providerAuth.Status(request.Context(), request.PathValue("login_id"))
+	login, operationError := server.providerAuth.Status(request.Context(), request.PathValue("id"), request.PathValue("login_id"))
 	if respondToError(responseWriter, http.StatusNotFound, operationError) {
 		return
 	}
@@ -45,7 +54,7 @@ func (server *Server) cancelProviderLogin(responseWriter http.ResponseWriter, re
 	if !server.supportsDeviceLogin(responseWriter, request) {
 		return
 	}
-	if respondToError(responseWriter, http.StatusNotFound, server.providerAuth.Cancel(request.Context(), request.PathValue("login_id"))) {
+	if respondToError(responseWriter, http.StatusNotFound, server.providerAuth.Cancel(request.Context(), request.PathValue("id"), request.PathValue("login_id"))) {
 		return
 	}
 	writeJSON(responseWriter, http.StatusOK, map[string]string{"status": "cancelled"})
@@ -55,7 +64,7 @@ func (server *Server) disconnectProvider(responseWriter http.ResponseWriter, req
 	if !server.supportsDeviceLogin(responseWriter, request) {
 		return
 	}
-	if respondToError(responseWriter, http.StatusInternalServerError, server.providerAuth.Disconnect(request.Context())) {
+	if respondToError(responseWriter, http.StatusInternalServerError, server.providerAuth.Disconnect(request.Context(), request.PathValue("id"))) {
 		return
 	}
 	writeJSON(responseWriter, http.StatusOK, map[string]string{"status": "disconnected"})

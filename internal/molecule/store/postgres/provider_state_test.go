@@ -22,18 +22,18 @@ func TestProviderAuthenticationAndReasoningPersistence(test *testing.T) {
 	if stored.AccessToken != credential.AccessToken || stored.RefreshToken != credential.RefreshToken || !stored.ExpiresAt.Equal(credential.ExpiresAt) || stored.AccountID != credential.AccountID || stored.Residency != credential.Residency {
 		test.Fatal("OAuth credentials did not survive database round trip")
 	}
-	specification := atom.ProviderSpec{Name: identifier, Protocol: "responses", Authentication: "chatgpt", APIURL: "https://example.invalid", Interval: time.Hour}
+	specification := atom.ProviderSpec{Name: identifier, Protocol: "responses", Authentication: "chatgpt", APIURL: "https://example.invalid", ModelListFormat: "codex", Interval: time.Hour}
 	testutil.RequireNoError(test, database.Providers().Save(operationContext, specification))
 	storedSpec, operationError := database.Providers().Get(operationContext, identifier)
 	testutil.RequireNoError(test, operationError)
-	if storedSpec.Protocol != "responses" || storedSpec.Authentication != "chatgpt" {
+	if storedSpec.Protocol != "responses" || storedSpec.Authentication != "chatgpt" || storedSpec.ModelListFormat != "codex" {
 		test.Fatalf("provider metadata = %#v", storedSpec)
 	}
-	model := atom.ModelInfo{ID: "deepseek-flash", Name: "DeepSeek-V4.1-Flash", Tools: true, ContextMax: 1000000}
+	model := atom.ModelInfo{ID: "unclassified-model", Name: "Example model", ToolSupportUnknown: true, ContextMax: 8192}
 	testutil.RequireNoError(test, database.Providers().SaveModels(operationContext, identifier, []atom.ModelInfo{model}))
 	storedModels, operationError := database.Providers().Models(operationContext, identifier)
 	testutil.RequireNoError(test, operationError)
-	if len(storedModels) != 1 || storedModels[0].ID != model.ID || storedModels[0].Name != model.Name || !storedModels[0].Tools {
+	if len(storedModels) != 1 || storedModels[0].ID != model.ID || storedModels[0].Name != model.Name || !storedModels[0].ToolSupportUnknown || storedModels[0].Tools {
 		test.Fatalf("model names or capabilities were lost in storage: %+v", storedModels)
 	}
 	session := atom.Session{ID: atom.SessionID(identifier), InstanceID: identifier, CreatedAt: time.Now()}

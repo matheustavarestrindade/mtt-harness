@@ -1,15 +1,19 @@
 package api
 
 import (
-	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
 	"net/http"
 	"strings"
 )
 
 func (server *Server) saveProviderKey(responseWriter http.ResponseWriter, request *http.Request) {
-	if request.PathValue("id") == provider.CodexProvider {
-		writeError(responseWriter, http.StatusBadRequest, "use ChatGPT device sign-in for the coding plan")
-		return
+	if server.gateway != nil {
+		if registeredProvider, found := server.gateway.Provider(request.PathValue("id")); found {
+			switch providerSpecification(registeredProvider).Authentication {
+			case "chatgpt":
+				writeError(responseWriter, http.StatusBadRequest, "use ChatGPT device sign-in for this provider")
+				return
+			}
+		}
 	}
 	var input struct {
 		Key string `json:"key"`
