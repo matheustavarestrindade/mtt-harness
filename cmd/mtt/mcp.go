@@ -28,7 +28,7 @@ func loadMCP(operationContext context.Context, path string, toolRegistry *regist
 		var failures []error
 		for _, binding := range bindings {
 			failures = append(failures, binding.client.Close())
-			binding.remove()
+			binding.removeRegisteredTools()
 		}
 		return errors.Join(failures...)
 	}
@@ -42,11 +42,11 @@ func loadMCP(operationContext context.Context, path string, toolRegistry *regist
 		}
 		binding := &mcpBinding{client: client, server: server.Name, registry: toolRegistry}
 		bindings = append(bindings, binding)
-		if operationError := binding.refresh(operationContext); operationError != nil {
+		if operationError := binding.refreshRegisteredTools(operationContext); operationError != nil {
 			return nil, errors.Join(operationError, closeAll())
 		}
 		client.OnToolsChanged(func(operationContext context.Context) {
-			if operationError := binding.refresh(operationContext); operationError != nil {
+			if operationError := binding.refreshRegisteredTools(operationContext); operationError != nil {
 				client.ReportError(fmt.Errorf("refresh MCP tools: %w", operationError))
 			}
 		})
@@ -62,7 +62,7 @@ type mcpBinding struct {
 	names    []string
 }
 
-func (binding *mcpBinding) refresh(operationContext context.Context) error {
+func (binding *mcpBinding) refreshRegisteredTools(operationContext context.Context) error {
 	binding.mutex.Lock()
 	defer binding.mutex.Unlock()
 	tools, operationError := binding.client.ListTools(operationContext)
@@ -81,7 +81,7 @@ func (binding *mcpBinding) refresh(operationContext context.Context) error {
 	return nil
 }
 
-func (binding *mcpBinding) remove() {
+func (binding *mcpBinding) removeRegisteredTools() {
 	binding.mutex.Lock()
 	defer binding.mutex.Unlock()
 	for _, name := range binding.names {

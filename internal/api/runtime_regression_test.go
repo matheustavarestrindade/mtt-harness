@@ -32,7 +32,7 @@ func TestInstanceIsolationSettingsTokenAndStopResume(test *testing.T) {
 	testutil.RequireNoError(test, models.Add(provider.NewTest("test")))
 	bus := eventbus.New(runtime)
 	broker := permission.NewBroker()
-	runner := loop.New(runtime, loop.Config{Gateway: models, Registry: registry.New(runtime), Store: database, Bus: bus, Broker: broker, Engine: permission.NewEngine(), Instances: manager})
+	runner := loop.New(runtime, loop.Config{Gateway: models, Registry: registry.New(runtime, nil), Store: database, Bus: bus, Broker: broker, Engine: permission.NewEngine(), Instances: manager})
 	queue := loop.NewQueue(runner)
 	defer queue.Close(operationContext)
 	server := httptest.NewServer(api.New(api.Config{Token: "initial", Store: database, Instances: manager, Gateway: models, Queue: queue, Loop: runner, Bus: bus, Broker: broker}).Handler())

@@ -91,8 +91,8 @@ func (processSupervisor *Supervisor) StartWithTransform(operationContext context
 	}
 	processSupervisor.runningProcesses[handle.identifier] = handle
 	go func() {
-		handle.wait()
-		processSupervisor.retain(handle)
+		handle.waitForCommandExit()
+		processSupervisor.retainCompletedProcess(handle)
 	}()
 	if processSpec.Timeout > 0 {
 		go func() {
@@ -108,7 +108,7 @@ func (processSupervisor *Supervisor) StartWithTransform(operationContext context
 	return handle, nil
 }
 
-func (processSupervisor *Supervisor) retain(handle *Handle) {
+func (processSupervisor *Supervisor) retainCompletedProcess(handle *Handle) {
 	processSupervisor.mutex.Lock()
 	defer processSupervisor.mutex.Unlock()
 	delete(processSupervisor.runningProcesses, handle.identifier)

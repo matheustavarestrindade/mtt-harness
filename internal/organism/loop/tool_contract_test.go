@@ -36,7 +36,11 @@ func TestDiscoveredToolContractsReachProviderRequests(test *testing.T) {
 		} `json:"function"`
 	}
 	type wireRequest struct {
-		Tools []wireTool `json:"tools"`
+		Tools    []wireTool `json:"tools"`
+		Messages []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"messages"`
 	}
 	requests := make(chan wireRequest, 2)
 	var calls atomic.Int32
@@ -67,7 +71,7 @@ func TestDiscoveredToolContractsReachProviderRequests(test *testing.T) {
 	standardProvider.SetModels([]atom.ModelInfo{{ID: "wire-model", Input: []atom.MediaType{atom.Text}, Tools: true, ContextMax: 128000}})
 	testStack.harnessRuntime.Provider(standardProvider)
 	for _, tool := range []harness.Tool{
-		tools.NewSearch(testStack.registry), tools.NewBash(nil), tools.Read{}, tools.Write{},
+		tools.NewSearch(testStack.registry), tools.NewBash(nil), tools.Read{}, tools.Write{}, tools.Replace{},
 		tools.NewProcessOutput(nil), tools.NewProcessKill(nil), &tools.Agent{RunTask: testStack.loop.RunAgentTask}, tools.Finish{},
 		&mcp.Tool{Server: "remote", Spec: mcp.ToolSpec{Name: "lookup", Description: "External lookup", InputSchema: json.RawMessage(`{"type":"object","properties":{"timeout":{"type":"integer","description":"Server timeout in seconds.","default":15}}}`)}},
 	} {
@@ -92,8 +96,29 @@ func TestDiscoveredToolContractsReachProviderRequests(test *testing.T) {
 			}
 		}
 	}
-	if len(definitions) != 9 {
+	for _, message := range payload.Messages {
+		if message.Role != "tool" {
+			continue
+		}
+		var references []map[string]json.RawMessage
+		testutil.RequireNoError(test, json.Unmarshal([]byte(message.Content), &references))
+		for _, reference := range references {
+			if len(reference) != 2 || reference["Name"] == nil || reference["Categories"] == nil {
+				test.Fatalf("provider history contains verbose discovery metadata: %s", message.Content)
+			}
+		}
+	}
+	if len(definitions) != 10 {
 		test.Fatalf("discovered definitions: %v", definitions)
+	}
+	for _, name := range []string{"read", "write", "replace"} {
+		properties := definitions[name].Function.Parameters.Properties
+		if properties["start_line"].Description == "" || properties["end_line"].Description == "" {
+			test.Fatalf("%s line-range instructions did not reach the provider", name)
+		}
+	}
+	if properties := definitions["replace"].Function.Parameters.Properties; properties["mode"].Default != "first" || len(properties["mode"].Enum) != 3 {
+		test.Fatalf("replace mode contract disappeared: %+v", properties)
 	}
 	bashProperties := definitions["bash"].Function.Parameters.Properties
 	if !strings.Contains(bashProperties["timeout"].Description, "milliseconds") || !strings.Contains(bashProperties["interval"].Description, "milliseconds") {
@@ -112,5 +137,74 @@ func TestDiscoveredToolContractsReachProviderRequests(test *testing.T) {
 	external := definitions["mcp__remote__lookup"].Function.Parameters.Properties["timeout"]
 	if external.Description != "Server timeout in seconds." || external.Default != float64(15) {
 		test.Fatalf("MCP metadata changed: %+v", external)
+	}
+}
+
+func TestShellQueryEnablesBashOnTheNextModelRequest(test *testing.T) {
+	testStack := newStack(test,
+		provider.Call("search_tool", `{"query":"shell command exec"}`),
+		provider.Text("done"),
+	)
+	testutil.RequireNoError(test, testStack.registry.Add(tools.NewSearch(testStack.registry)))
+	testutil.RequireNoError(test, testStack.registry.Add(tools.NewBash(nil)))
+	session := testStack.instance(test, 2)
+	testStack.user(test, session, "find the command execution tool")
+	testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
+	if len(testStack.provider.Requests) != 2 {
+		test.Fatalf("discovery did not continue to the next request: %d", len(testStack.provider.Requests))
+	}
+	for _, toolSpec := range testStack.provider.Requests[1].Tools {
+		if toolSpec.Name == "bash" {
+			if toolSpec.Description == "" || len(toolSpec.InputSchema.JSON) == 0 {
+				test.Fatal("compact discovery lost the callable bash instructions or schema")
+			}
+			return
+		}
+	}
+	test.Fatal("the shell query did not enable bash in the next request")
+}
+
+func TestNewCatalogModelsKeepToolsUnlessExplicitlyUnsupported(test *testing.T) {
+	for _, capability := range []struct {
+		name, metadata string
+		expectTools    bool
+	}{
+		{"unknown", "", true},
+		{"unsupported", `,"tools":false`, false},
+		{"supported", `,"tools":true`, true},
+	} {
+		test.Run(capability.name, func(test *testing.T) {
+			requests := make(chan atom.Request, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+				if request.URL.Path == "/models" {
+					fmt.Fprintf(responseWriter, `{"data":[{"id":"new-model"%s}]}`, capability.metadata)
+					return
+				}
+				var payload struct {
+					Model string            `json:"model"`
+					Tools []json.RawMessage `json:"tools"`
+				}
+				testutil.RequireNoError(test, json.NewDecoder(request.Body).Decode(&payload))
+				requests <- atom.Request{Model: payload.Model, Tools: make([]atom.ToolSpec, len(payload.Tools))}
+				responseWriter.Header().Set("Content-Type", "text/event-stream")
+				fmt.Fprint(responseWriter, "data: {\"choices\":[{\"delta\":{\"content\":\"done\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+			}))
+			defer server.Close()
+			standardProvider := provider.New(atom.ProviderSpec{Name: "dynamic", APIURL: server.URL, ModelListURL: server.URL + "/models"})
+			_, operationError := standardProvider.Refresh(context.Background())
+			testutil.RequireNoError(test, operationError)
+			testStack := newStack(test)
+			testStack.harnessRuntime.Provider(standardProvider)
+			testutil.RequireNoError(test, testStack.registry.Add(tools.NewSearch(testStack.registry)))
+			session := testStack.instance(test, 2)
+			session.Model = "dynamic/new-model"
+			testutil.RequireNoError(test, testStack.database.Sessions().Save(context.Background(), session))
+			testStack.user(test, session, "use tools if available")
+			testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
+			payload := <-requests
+			if (len(payload.Tools) > 0) != capability.expectTools || payload.Model != "new-model" {
+				test.Fatalf("catalog capability was not honored on the provider wire: %+v", payload)
+			}
+		})
 	}
 }

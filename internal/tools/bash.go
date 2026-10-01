@@ -25,11 +25,11 @@ func (bashTool *Bash) Name() string {
 }
 
 func (bashTool *Bash) Description() string {
-	return "Run a command with sh -c in the instance workspace. By default, wait for exit and return retained stdout and stderr (last 256 KiB per stream). Set wait=false to return a process ID immediately for process_output or process_kill. timeout and interval are in milliseconds."
+	return "Execute a shell command or script with sh -c in the instance workspace. By default, wait for exit and return retained stdout and stderr (last 256 KiB per stream). Set wait=false to return a process ID immediately for process_output or process_kill. timeout and interval are in milliseconds."
 }
 
 func (bashTool *Bash) Categories() []string {
-	return []string{"process", "command"}
+	return []string{"process", "command", "shell"}
 }
 
 func (bashTool *Bash) InputSchema() atom.Schema {

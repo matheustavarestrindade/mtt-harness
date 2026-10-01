@@ -83,7 +83,7 @@ type toolAccumulator struct {
 	emitted    bool
 }
 
-func parseSSE(operationContext context.Context, body io.ReadCloser, stream *httpStream) {
+func parseChatCompletionEvents(operationContext context.Context, body io.ReadCloser, stream *httpStream) {
 	defer body.Close()
 	defer close(stream.parts)
 	scanner := bufio.NewScanner(body)

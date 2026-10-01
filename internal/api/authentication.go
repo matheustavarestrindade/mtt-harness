@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func (server *Server) auth(next http.Handler) http.Handler {
+func (server *Server) authenticateAPIRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
 		if request.URL.Path == "/health" {
 			next.ServeHTTP(responseWriter, request)

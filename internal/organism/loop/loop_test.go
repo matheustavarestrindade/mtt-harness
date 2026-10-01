@@ -13,6 +13,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/permission"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store/memory"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/toolsearch"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/gateway"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/instances"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/loop"
@@ -80,7 +81,17 @@ func newStack(test *testing.T, script ...[]atom.ResponsePart) *stack {
 	database := memory.New()
 	harnessRuntime := harness.New()
 	bus := eventbus.New(harnessRuntime)
-	toolRegistry := registry.New(harnessRuntime)
+	searchIndex := toolsearch.New(testutil.EmbedderFunc(func(operationContext context.Context, texts []string) ([][]float64, error) {
+		vectors := make([][]float64, len(texts))
+		for position, text := range texts {
+			vectors[position] = []float64{0, 1}
+			if text == "shell command exec" || strings.HasPrefix(text, "Tool: bash\n") {
+				vectors[position] = []float64{1, 0}
+			}
+		}
+		return vectors, nil
+	}), toolsearch.Options{MinimumSimilarity: 0.5})
+	toolRegistry := registry.New(harnessRuntime, searchIndex)
 	engine := permission.NewEngine()
 	broker := permission.NewBroker()
 	models := gateway.New(harnessRuntime)

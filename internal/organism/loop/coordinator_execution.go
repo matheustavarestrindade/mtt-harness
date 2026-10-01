@@ -9,7 +9,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
 
-func (coordinator *sessionCoordinator) startRun() {
+func (coordinator *sessionCoordinator) startQueuedTurn() {
 	message := coordinator.pending[0]
 	coordinator.pending = coordinator.pending[1:]
 	operationContext, cancel := context.WithCancel(context.Background())
@@ -25,7 +25,7 @@ func (coordinator *sessionCoordinator) startRun() {
 			if errors.Is(operationError, context.Canceled) {
 				status = "cancelled"
 			}
-			if eventError := coordinator.loop.emit(completionContext, coordinator.session, atom.EventName("run."+status), map[string]any{"message_id": message.ID, "error": operationError.Error()}); eventError != nil {
+			if eventError := coordinator.loop.emitSessionEvent(completionContext, coordinator.session, atom.EventName("run."+status), map[string]any{"message_id": message.ID, "error": operationError.Error()}); eventError != nil {
 				log.Printf("mtt: record run outcome: %v", eventError)
 			}
 		}

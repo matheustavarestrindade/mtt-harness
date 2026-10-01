@@ -27,7 +27,7 @@ type httpTransport struct {
 	cancel          context.CancelFunc
 }
 
-func startHTTP(specification ServerSpec) (*httpTransport, error) {
+func startHTTPTransport(specification ServerSpec) (*httpTransport, error) {
 	lifecycle, cancel := context.WithCancel(context.Background())
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.ResponseHeaderTimeout = 30 * time.Second
@@ -40,7 +40,7 @@ func (transport *httpTransport) SetProtocolVersion(version string) {
 	transport.protocolVersion = version
 }
 
-func (transport *httpTransport) request(operationContext context.Context, method string, body io.Reader) (*http.Request, error) {
+func (transport *httpTransport) newHTTPRequest(operationContext context.Context, method string, body io.Reader) (*http.Request, error) {
 	request, operationError := http.NewRequestWithContext(operationContext, method, transport.url, body)
 	if operationError != nil {
 		return nil, operationError
@@ -66,7 +66,7 @@ func (transport *httpTransport) Send(operationContext context.Context, data []by
 		return io.EOF
 	default:
 	}
-	request, operationError := transport.request(operationContext, http.MethodPost, bytes.NewReader(data))
+	request, operationError := transport.newHTTPRequest(operationContext, http.MethodPost, bytes.NewReader(data))
 	if operationError != nil {
 		return operationError
 	}
@@ -89,7 +89,7 @@ func (transport *httpTransport) Send(operationContext context.Context, data []by
 		// keeps the SSE connection open. The request context owns this reader.
 		go func() {
 			defer response.Body.Close()
-			if operationError := transport.readSSE(operationContext, response.Body); operationError != nil && operationContext.Err() == nil {
+			if operationError := transport.readServerSentMessages(operationContext, response.Body); operationError != nil && operationContext.Err() == nil {
 				select {
 				case transport.failures <- operationError:
 				default:
@@ -107,12 +107,12 @@ func (transport *httpTransport) Send(operationContext context.Context, data []by
 		return fmt.Errorf("MCP response exceeds 16 MiB")
 	}
 	if len(bytes.TrimSpace(body)) > 0 {
-		transport.push(operationContext, body)
+		transport.enqueueServerMessage(operationContext, body)
 	}
 	return nil
 }
 
-func (transport *httpTransport) readSSE(operationContext context.Context, body io.Reader) error {
+func (transport *httpTransport) readServerSentMessages(operationContext context.Context, body io.Reader) error {
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 64*1024), 16*1024*1024)
 	var data strings.Builder
@@ -129,17 +129,17 @@ func (transport *httpTransport) readSSE(operationContext context.Context, body i
 			continue
 		}
 		if strings.TrimSpace(line) == "" && data.Len() > 0 {
-			transport.push(operationContext, []byte(data.String()))
+			transport.enqueueServerMessage(operationContext, []byte(data.String()))
 			data.Reset()
 		}
 	}
 	if data.Len() > 0 {
-		transport.push(operationContext, []byte(data.String()))
+		transport.enqueueServerMessage(operationContext, []byte(data.String()))
 	}
 	return scanner.Err()
 }
 
-func (transport *httpTransport) push(operationContext context.Context, data []byte) {
+func (transport *httpTransport) enqueueServerMessage(operationContext context.Context, data []byte) {
 	select {
 	case transport.replies <- data:
 	case <-transport.closed:
@@ -165,7 +165,7 @@ func (transport *httpTransport) Receive(operationContext context.Context) ([]byt
 func (transport *httpTransport) StartNotifications() {
 	go func() {
 		for transport.lifecycle.Err() == nil {
-			request, operationError := transport.request(transport.lifecycle, http.MethodGet, nil)
+			request, operationError := transport.newHTTPRequest(transport.lifecycle, http.MethodGet, nil)
 			if operationError != nil {
 				return
 			}
@@ -176,8 +176,8 @@ func (transport *httpTransport) StartNotifications() {
 					return
 				}
 				if response.StatusCode == http.StatusOK && strings.HasPrefix(response.Header.Get("Content-Type"), "text/event-stream") {
-					transport.push(transport.lifecycle, []byte(`{"jsonrpc":"2.0","method":"notifications/tools/list_changed"}`))
-					_ = transport.readSSE(transport.lifecycle, response.Body)
+					transport.enqueueServerMessage(transport.lifecycle, []byte(`{"jsonrpc":"2.0","method":"notifications/tools/list_changed"}`))
+					_ = transport.readServerSentMessages(transport.lifecycle, response.Body)
 				}
 				response.Body.Close()
 			}
@@ -202,7 +202,7 @@ func (transport *httpTransport) Close() error {
 		if session != "" {
 			operationContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
-			if request, operationError := transport.request(operationContext, http.MethodDelete, nil); operationError == nil {
+			if request, operationError := transport.newHTTPRequest(operationContext, http.MethodDelete, nil); operationError == nil {
 				if response, operationError := transport.client.Do(request); operationError == nil {
 					response.Body.Close()
 				}

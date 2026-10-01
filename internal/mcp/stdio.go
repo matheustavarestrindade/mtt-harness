@@ -14,7 +14,7 @@ import (
 )
 
 type stdioTransport struct {
-	cmd        *exec.Cmd
+	command    *exec.Cmd
 	stdin      io.WriteCloser
 	scanner    *bufio.Scanner
 	writeGate  chan struct{}
@@ -22,7 +22,7 @@ type stdioTransport struct {
 	closeError error
 }
 
-func startStdio(serverSpec ServerSpec) (*stdioTransport, error) {
+func startStdioTransport(serverSpec ServerSpec) (*stdioTransport, error) {
 	command := exec.Command(serverSpec.Command, serverSpec.Args...)
 	if len(serverSpec.Env) > 0 {
 		environment := os.Environ()
@@ -55,7 +55,7 @@ func startStdio(serverSpec ServerSpec) (*stdioTransport, error) {
 			}
 		}
 	}()
-	transport := &stdioTransport{cmd: command, stdin: stdin, writeGate: make(chan struct{}, 1)}
+	transport := &stdioTransport{command: command, stdin: stdin, writeGate: make(chan struct{}, 1)}
 	transport.scanner = bufio.NewScanner(stdout)
 	transport.scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	return transport, nil
@@ -107,10 +107,10 @@ func (stdioTransport *stdioTransport) Receive(operationContext context.Context) 
 func (stdioTransport *stdioTransport) Close() error {
 	stdioTransport.closeOnce.Do(func() {
 		_ = stdioTransport.stdin.Close()
-		if stdioTransport.cmd.Process != nil {
-			_ = stdioTransport.cmd.Process.Kill()
+		if stdioTransport.command.Process != nil {
+			_ = stdioTransport.command.Process.Kill()
 		}
-		operationError := stdioTransport.cmd.Wait()
+		operationError := stdioTransport.command.Wait()
 		var exitError *exec.ExitError
 		if operationError != nil && !errors.As(operationError, &exitError) {
 			stdioTransport.closeError = operationError

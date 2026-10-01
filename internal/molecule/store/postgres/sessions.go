@@ -75,14 +75,22 @@ func (sessionStore *sessions) Append(operationContext context.Context, message a
 	content, _ := json.Marshal(message.Content)
 	calls, _ := json.Marshal(message.ToolCalls)
 	var usage any
+	var providerState any
+	if message.ProviderState != nil {
+		data, operationError := json.Marshal(message.ProviderState)
+		if operationError != nil {
+			return operationError
+		}
+		providerState = data
+	}
 	if message.Usage != nil {
 		data, _ := json.Marshal(message.Usage)
 		usage = data
 	}
 	_, operationError := sessionStore.store.pool.Exec(operationContext, `
-		INSERT INTO messages (id, session_id, role, content, tool_calls, tool_call_id, usage, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		message.ID, string(message.SessionID), string(message.Role), content, calls, message.ToolCallID, usage, message.CreatedAt)
+		INSERT INTO messages (id, session_id, role, content, tool_calls, tool_call_id, usage, created_at, provider_state)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		message.ID, string(message.SessionID), string(message.Role), content, calls, message.ToolCallID, usage, message.CreatedAt, providerState)
 	return operationError
 }
 
@@ -98,7 +106,7 @@ func (sessionStore *sessions) DeleteAfter(operationContext context.Context, sess
 
 func (sessionStore *sessions) Messages(operationContext context.Context, sessionID atom.SessionID) ([]atom.Message, error) {
 	rows, operationError := sessionStore.store.pool.Query(operationContext, `
-		SELECT id, session_id, role, content, tool_calls, tool_call_id, usage, created_at
+		SELECT id, session_id, role, content, tool_calls, tool_call_id, usage, created_at, provider_state
 		FROM messages WHERE session_id = $1 ORDER BY seq`, string(sessionID))
 	if operationError != nil {
 		return nil, operationError
@@ -107,14 +115,19 @@ func (sessionStore *sessions) Messages(operationContext context.Context, session
 	var list []atom.Message
 	for rows.Next() {
 		var message atom.Message
-		var content, calls, usage []byte
-		if operationError := rows.Scan(&message.ID, &message.SessionID, &message.Role, &content, &calls, &message.ToolCallID, &usage, &message.CreatedAt); operationError != nil {
+		var content, calls, usage, providerState []byte
+		if operationError := rows.Scan(&message.ID, &message.SessionID, &message.Role, &content, &calls, &message.ToolCallID, &usage, &message.CreatedAt, &providerState); operationError != nil {
 			return nil, operationError
 		}
 		_ = json.Unmarshal(content, &message.Content)
 		_ = json.Unmarshal(calls, &message.ToolCalls)
 		if len(usage) > 0 {
 			_ = json.Unmarshal(usage, &message.Usage)
+		}
+		if len(providerState) > 0 {
+			if operationError := json.Unmarshal(providerState, &message.ProviderState); operationError != nil {
+				return nil, operationError
+			}
 		}
 		list = append(list, message)
 	}

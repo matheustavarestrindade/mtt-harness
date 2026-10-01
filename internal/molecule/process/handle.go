@@ -156,7 +156,7 @@ func (writer outputWriter) Write(data []byte) (int, error) {
 
 // exec.Cmd owns the stdout/stderr copying goroutines and Wait joins them before
 // this method publishes completion. No trailing output can race the exit event.
-func (processHandle *Handle) wait() {
+func (processHandle *Handle) waitForCommandExit() {
 	operationError := processHandle.command.Wait()
 	status := atom.ExitStatus{}
 	if operationError != nil {

@@ -14,13 +14,24 @@ import (
 )
 
 func (standardProvider *Standard) Stream(operationContext context.Context, request atom.Request) (harness.Stream, error) {
+	switch standardProvider.providerSpec.Protocol {
+	case "responses":
+		return standardProvider.streamResponses(operationContext, request)
+	case "", "chat_completions":
+		return standardProvider.streamChatCompletions(operationContext, request)
+	default:
+		return nil, fmt.Errorf("unsupported provider protocol %q", standardProvider.providerSpec.Protocol)
+	}
+}
+
+func (standardProvider *Standard) streamChatCompletions(operationContext context.Context, request atom.Request) (harness.Stream, error) {
 	messages, operationError := encodeMessages(request.Messages)
 	if operationError != nil {
 		return nil, operationError
 	}
 	payload := map[string]any{"model": request.Model, "messages": messages, "stream": true, "stream_options": map[string]any{"include_usage": true}}
 	if len(request.Tools) > 0 {
-		tools, operationError := encodeTools(request.Tools)
+		tools, operationError := encodeFunctionToolDefinitions(request.Tools)
 		if operationError != nil {
 			return nil, operationError
 		}
@@ -43,12 +54,8 @@ func (standardProvider *Standard) Stream(operationContext context.Context, reque
 		return nil, operationError
 	}
 	httpRequest.Header.Set("Content-Type", "application/json")
-	key, operationError := standardProvider.secret(operationContext)
-	if operationError != nil {
+	if operationError := standardProvider.applyAuthenticationHeaders(httpRequest); operationError != nil {
 		return nil, operationError
-	}
-	if key != "" {
-		httpRequest.Header.Set("Authorization", "Bearer "+key)
 	}
 	response, operationError := standardProvider.client.Do(httpRequest)
 	if operationError != nil {
@@ -60,11 +67,11 @@ func (standardProvider *Standard) Stream(operationContext context.Context, reque
 		return nil, fmt.Errorf("provider HTTP status %d: %s", response.StatusCode, strings.TrimSpace(string(data)))
 	}
 	stream := &httpStream{parts: make(chan atom.ResponsePart, 64)}
-	go parseSSE(operationContext, response.Body, stream)
+	go parseChatCompletionEvents(operationContext, response.Body, stream)
 	return stream, nil
 }
 
-func encodeTools(tools []atom.ToolSpec) ([]map[string]any, error) {
+func encodeFunctionToolDefinitions(tools []atom.ToolSpec) ([]map[string]any, error) {
 	var result []map[string]any
 	for _, tool := range tools {
 		var parameters any = map[string]any{"type": "object"}

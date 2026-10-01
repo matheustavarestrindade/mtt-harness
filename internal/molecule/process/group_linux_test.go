@@ -2,10 +2,12 @@ package process
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -44,7 +46,9 @@ func TestKillTerminatesShellDescendants(test *testing.T) {
 		test.Fatal("a descendant kept output pipes open after kill")
 	}
 	data, operationError := os.ReadFile(fmt.Sprintf("/proc/%d/stat", childPID))
-	if os.IsNotExist(operationError) {
+	// Linux can return ESRCH while a disappearing /proc entry is being read,
+	// as well as ENOENT at open time. Both establish that the child is gone.
+	if os.IsNotExist(operationError) || errors.Is(operationError, syscall.ESRCH) {
 		return
 	}
 	testutil.RequireNoError(test, operationError)

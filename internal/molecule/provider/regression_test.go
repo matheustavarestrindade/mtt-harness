@@ -30,7 +30,7 @@ func TestConfiguredPricesOverrideCachedPrices(test *testing.T) {
 
 func TestMediaEncodingPreservesPayloadAndToolPairs(test *testing.T) {
 	contents := []atom.Content{{Type: atom.Text, Text: "text"}, {Type: atom.Image, Data: []byte("image"), MIME: "image/png"}, {Type: atom.Audio, Data: []byte("audio"), MIME: "audio/wav"}, {Type: atom.File, Data: []byte("file"), MIME: "application/pdf", Filename: "report.pdf"}}
-	encoded, operationError := contentOf(contents)
+	encoded, operationError := encodeChatMessageContent(contents)
 	testutil.RequireNoError(test, operationError)
 	parts := encoded.([]map[string]any)
 	for index, kind := range []string{"text", "image_url", "input_audio", "file"} {
@@ -57,7 +57,7 @@ func TestMediaEncodingPreservesPayloadAndToolPairs(test *testing.T) {
 func TestMalformedOrTruncatedProviderStreamFails(test *testing.T) {
 	for _, body := range []string{`data: {bad json}` + "\n", `data: {"choices":[{"delta":{"content":"partial"}}]}` + "\n"} {
 		stream := &httpStream{parts: make(chan atom.ResponsePart, 4)}
-		go parseSSE(context.Background(), io.NopCloser(strings.NewReader(body)), stream)
+		go parseChatCompletionEvents(context.Background(), io.NopCloser(strings.NewReader(body)), stream)
 		for {
 			_, operationError := stream.Recv(context.Background())
 			if operationError != nil {

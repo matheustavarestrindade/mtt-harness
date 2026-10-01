@@ -91,7 +91,7 @@ func (processManager *Manager) Start(operationContext context.Context, processSp
 	processManager.instances[runningProcess.ID()] = session.InstanceID
 	processManager.mutex.Unlock()
 	processManager.observers.Add(1)
-	go processManager.observe(observerContext, session, runningProcess, record)
+	go processManager.observeProcessEvents(observerContext, session, runningProcess, record)
 	return runningProcess, nil
 }
 
@@ -100,7 +100,7 @@ func (processManager *Manager) StopInstance(operationContext context.Context, in
 	starts := processManager.instanceStarts[instanceID]
 	processManager.mutex.Unlock()
 	if starts != nil {
-		if operationError := waitGroup(operationContext, starts); operationError != nil {
+		if operationError := waitForProcessStarts(operationContext, starts); operationError != nil {
 			return 0, operationError
 		}
 	}
@@ -177,7 +177,7 @@ func (processManager *Manager) Close(operationContext context.Context) error {
 	processManager.mutex.Lock()
 	processManager.closing = true
 	processManager.mutex.Unlock()
-	operationError := waitGroup(operationContext, &processManager.starts)
+	operationError := waitForProcessStarts(operationContext, &processManager.starts)
 	operationError = errors.Join(operationError, processManager.supervisor.Close(operationContext))
 	done := make(chan struct{})
 	go func() {
@@ -239,7 +239,7 @@ func (processManager *Manager) reserveStart(operationContext context.Context, in
 	}, nil
 }
 
-func waitGroup(operationContext context.Context, group *sync.WaitGroup) error {
+func waitForProcessStarts(operationContext context.Context, group *sync.WaitGroup) error {
 	done := make(chan struct{})
 	go func() {
 		group.Wait()

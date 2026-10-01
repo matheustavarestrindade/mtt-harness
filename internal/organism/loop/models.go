@@ -20,7 +20,7 @@ func (agentLoop *Loop) resolveModel(instanceID, modelID string) (atom.ModelInfo,
 	return agentLoop.configuration.Gateway.ResolveAllowed(modelID, instance.Spec().Models)
 }
 
-func (agentLoop *Loop) agentModelSchema(session atom.Session, specification atom.ToolSpec) (atom.ToolSpec, error) {
+func (agentLoop *Loop) addAgentModelChoices(session atom.Session, specification atom.ToolSpec) (atom.ToolSpec, error) {
 	var schema map[string]any
 	if operationError := json.Unmarshal(specification.InputSchema.JSON, &schema); operationError != nil {
 		return specification, operationError
@@ -79,12 +79,12 @@ func (agentLoop *Loop) agentModelSchema(session atom.Session, specification atom
 	return specification, nil
 }
 
-func checkMediaTypes(info atom.ModelInfo, messages []atom.Message) error {
-	if len(info.Input) == 0 {
-		info.Input = []atom.MediaType{atom.Text}
+func validateModelMedia(modelInfo atom.ModelInfo, messages []atom.Message) error {
+	if len(modelInfo.Input) == 0 {
+		modelInfo.Input = []atom.MediaType{atom.Text}
 	}
 	allowed := map[atom.MediaType]bool{}
-	for _, media := range info.Input {
+	for _, media := range modelInfo.Input {
 		allowed[media] = true
 	}
 	for _, message := range messages {
@@ -93,7 +93,7 @@ func checkMediaTypes(info atom.ModelInfo, messages []atom.Message) error {
 				continue
 			}
 			if !allowed[item.Type] {
-				return fmt.Errorf("loop: the model %s does not accept the media type %s", info.ID, item.Type)
+				return fmt.Errorf("loop: the model %s does not accept the media type %s", modelInfo.ID, item.Type)
 			}
 		}
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
-func (processManager *Manager) observe(operationContext context.Context, session atom.Session, runningProcess harness.Process, record atom.ProcessRecord) {
+func (processManager *Manager) observeProcessEvents(operationContext context.Context, session atom.Session, runningProcess harness.Process, record atom.ProcessRecord) {
 	defer processManager.observers.Done()
 	defer func() {
 		processManager.mutex.Lock()
@@ -28,7 +28,7 @@ func (processManager *Manager) observe(operationContext context.Context, session
 		select {
 		case event, open := <-events:
 			if !open {
-				if operationError := processManager.finish(operationContext, session, runningProcess, record, true); operationError != nil {
+				if operationError := processManager.recordProcessExit(operationContext, session, runningProcess, record, true); operationError != nil {
 					log.Printf("mtt: process completion: %v", operationError)
 				}
 				return
@@ -51,7 +51,7 @@ func (processManager *Manager) observe(operationContext context.Context, session
 				}
 			}
 		case <-ticks:
-			if operationError := processManager.send(operationContext, session, fmt.Sprintf("process %s: %s", runningProcess.ID(), processManager.tail(runningProcess))); operationError != nil {
+			if operationError := processManager.sendProcessNotification(operationContext, session, fmt.Sprintf("process %s: %s", runningProcess.ID(), processManager.recentProcessOutput(runningProcess))); operationError != nil {
 				log.Printf("mtt: process notification: %v", operationError)
 			}
 		case <-operationContext.Done():
@@ -60,7 +60,7 @@ func (processManager *Manager) observe(operationContext context.Context, session
 	}
 }
 
-func (processManager *Manager) finish(operationContext context.Context, session atom.Session, runningProcess harness.Process, record atom.ProcessRecord, notify bool) error {
+func (processManager *Manager) recordProcessExit(operationContext context.Context, session atom.Session, runningProcess harness.Process, record atom.ProcessRecord, notify bool) error {
 	exit, _ := runningProcess.Wait()
 	record.Status, record.Exit, record.EndedAt = "stopped", &exit, time.Now()
 	if operationError := processManager.store.Processes().Save(operationContext, record); operationError != nil {
@@ -69,9 +69,9 @@ func (processManager *Manager) finish(operationContext context.Context, session 
 	if !notify || (record.Spec.Notify.Mode == atom.NotifyError && exit.Code == 0 && exit.Error == "") {
 		return nil
 	}
-	text := fmt.Sprintf("process %s stopped: %s", runningProcess.ID(), processManager.tail(runningProcess))
+	text := fmt.Sprintf("process %s stopped: %s", runningProcess.ID(), processManager.recentProcessOutput(runningProcess))
 	if exit.Error != "" {
 		text += "\n" + exit.Error
 	}
-	return processManager.send(operationContext, session, text)
+	return processManager.sendProcessNotification(operationContext, session, text)
 }

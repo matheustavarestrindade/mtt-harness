@@ -1,9 +1,9 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"os"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
@@ -16,7 +16,7 @@ func (Write) Name() string {
 }
 
 func (Write) Description() string {
-	return "Create a file or replace all contents of an existing file with the supplied text. Relative paths resolve from the instance workspace. The parent directory must already exist."
+	return "Create or replace an entire file, or replace an inclusive line range in an existing file. Paths resolve from the instance workspace. Range writes keep all other bytes and preserve the block's closing LF/CRLF when non-empty content has no final newline. Parent directories must exist. Edits replace the file atomically and preserve existing permission bits; hard links are not updated."
 }
 
 func (Write) Categories() []string {
@@ -34,7 +34,15 @@ func (Write) InputSchema() atom.Schema {
 			},
 			"content": {
 				"type": "string",
-				"description": "Complete replacement text for the file, not a patch or appended text. An empty string creates or truncates the file to zero bytes."
+				"description": "Replacement text for the whole file or selected lines, without read's line-number prefixes. Empty text deletes the selected lines, or creates/truncates the whole file when no range is supplied. Internal newlines are written as provided."
+			},
+			"start_line": {
+				"type": "integer", "minimum": 1,
+				"description": "First line to replace, 1-based and inclusive. Omitted with end_line means line 1. If either bound is supplied, the file and selected lines must already exist; both omitted means whole-file replacement."
+			},
+			"end_line": {
+				"type": "integer", "minimum": 1,
+				"description": "Last line to replace, inclusive and at least start_line. Omitted with start_line means through EOF. Unlike read, an end beyond EOF is an error. Ranges apply to the current file at execution time."
 			}
 		},
 		"required": ["path", "content"]
@@ -49,6 +57,7 @@ func (Write) Run(operationContext context.Context, call atom.ToolCall) (atom.Too
 	var input struct {
 		Path    string `json:"path"`
 		Content string `json:"content"`
+		lineRange
 	}
 	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "write: the input is not correct"}, operationError
@@ -56,16 +65,37 @@ func (Write) Run(operationContext context.Context, call atom.ToolCall) (atom.Too
 	if operationError := operationContext.Err(); operationError != nil {
 		return atom.ToolResult{}, operationError
 	}
+	if _, _, operationError := input.lineRange.resolveLineBounds(); operationError != nil {
+		return atom.ToolResult{}, operationError
+	}
 	path, operationError := harness.WorkspacePath(operationContext, input.Path)
 	if operationError != nil {
 		return atom.ToolResult{}, operationError
 	}
-	if operationError := os.WriteFile(path, []byte(input.Content), 0o644); operationError != nil {
+	summary, operationError := applyAtomicFileEdit(operationContext, path, !input.hasBounds(), func(original []byte) (fileChange, error) {
+		if !input.hasBounds() {
+			return fileChange{content: []byte(input.Content), summary: "the file is written"}, nil
+		}
+		start, end, operationError := input.resolveByteRange(original)
+		if operationError != nil {
+			return fileChange{}, operationError
+		}
+		replacement := []byte(input.Content)
+		if len(replacement) > 0 && !bytes.HasSuffix(replacement, []byte("\n")) {
+			replacement = append(replacement, closingLineBreak(original[start:end])...)
+		}
+		updated := make([]byte, 0, start+len(replacement)+len(original)-end)
+		updated = append(updated, original[:start]...)
+		updated = append(updated, replacement...)
+		updated = append(updated, original[end:]...)
+		return fileChange{content: updated, summary: "the selected lines are written"}, nil
+	})
+	if operationError != nil {
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
 	}
 	return atom.ToolResult{
 		CallID:  call.ID,
 		Status:  atom.StatusOK,
-		Content: []atom.Content{{Type: atom.Text, Text: "the file is written"}},
+		Content: []atom.Content{{Type: atom.Text, Text: summary}},
 	}, nil
 }

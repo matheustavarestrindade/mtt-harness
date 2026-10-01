@@ -1,12 +1,29 @@
 package api
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 func (server *Server) saveProviderKey(responseWriter http.ResponseWriter, request *http.Request) {
+	if server.gateway != nil {
+		if registeredProvider, found := server.gateway.Provider(request.PathValue("id")); found {
+			switch providerSpecification(registeredProvider).Authentication {
+			case "chatgpt":
+				writeError(responseWriter, http.StatusBadRequest, "use ChatGPT device sign-in for this provider")
+				return
+			}
+		}
+	}
 	var input struct {
 		Key string `json:"key"`
 	}
 	if respondToError(responseWriter, http.StatusBadRequest, readJSON(request, &input)) {
+		return
+	}
+	input.Key = strings.TrimSpace(input.Key)
+	if input.Key == "" {
+		writeError(responseWriter, http.StatusBadRequest, "the API key must not be empty; use DELETE to disconnect")
 		return
 	}
 	if respondToError(responseWriter, http.StatusInternalServerError, server.store.Secrets().SaveProviderKey(request.Context(), request.PathValue("id"), input.Key)) {

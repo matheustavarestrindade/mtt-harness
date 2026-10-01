@@ -31,7 +31,7 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 			modelID = instance.Spec().DefaultModel
 		}
 	}
-	tools, operationError := agentLoop.toolsFor(operationContext, session)
+	tools, operationError := agentLoop.sessionToolDefinitions(operationContext, session)
 	if operationError != nil {
 		return nil, operationError
 	}
@@ -47,20 +47,20 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 	if operationError != nil {
 		return nil, operationError
 	}
-	if operationError := checkMediaTypes(modelInfo, request.Messages); operationError != nil {
+	if operationError := validateModelMedia(modelInfo, request.Messages); operationError != nil {
 		return nil, operationError
 	}
 	verdict, operationError := agentLoop.pipeline.DecideRequest(operationContext, request)
 	if operationError != nil {
 		return nil, operationError
 	}
-	allowed, operationError := agentLoop.allow(operationContext, session, "model.request", verdict)
+	allowed, operationError := agentLoop.resolvePermissionVerdict(operationContext, session, "model.request", verdict)
 	if operationError != nil || !allowed {
 		return nil, operationError
 	}
 	modelID = modelProvider.Name() + "/" + modelInfo.ID
 	request.Model = modelInfo.ID
-	if !modelInfo.Tools {
+	if !modelInfo.Tools && !modelInfo.ToolSupportUnknown {
 		request.Tools = nil
 	}
 	request, operationError = agentLoop.contextBuilder.Fit(operationContext, request, modelInfo, modelProvider)

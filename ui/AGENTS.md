@@ -1,0 +1,17 @@
+# UI contributor rules
+
+- This directory is a standalone HTTP/WebSocket client of the harness API. Do not modify Go code, API contracts, database schema, root runtime configuration, or root Compose services for UI convenience without explicit user permission.
+- Keep UI dependencies, build output, development proxy, fixtures, tests, and documentation in this directory. The Vite proxy adapts browser access; it adds no harness business logic.
+- Use Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`) and TypeScript. Keep transport code, client state, and visual components separate.
+- Use descriptive operation names in application code, such as `sendMessage`, `cancelCurrentTurn`, `loadProvidersAndModels`, and `runProviderAction`. Install the root formatting hook with `../scripts/install-hooks`; it uses this directory's Prettier configuration and dependencies for UI code.
+- Use `src/lib/atoms`, `src/lib/molecules`, and `src/lib/organisms`, with imports pointing downward. Atoms contain wire types, pure helpers, icons, and shadcn primitives under `atoms/ui`. Molecules contain composed controls, HTTP/WebSocket clients, and browser storage. Organisms coordinate state, workflows, navigation, and the workbench. `App.svelte` stays a short entry point.
+- Atoms must not import molecules or organisms. Molecules must not import organisms. `npm run check:layers` verifies these rules, including Svelte script imports. Keep shadcn generation paths aligned with `atoms/ui`.
+- Use lucide-svelte for icons and svelte-sonner for notifications.
+- Visual style: clean black and white using shadcn's neutral palette. The standard slate palette is also acceptable when requested. Do not invent a colored brand theme without explicit user approval. Use shared semantic color tokens, including surfaces, navigation, controls, and notifications; avoid hardcoded accent colors in components.
+- Follow the wire contracts in `../routes.md`. Most domain responses have PascalCase keys; write request DTOs explicitly. Normalize nullable lists at the client boundary.
+- Model selectors must retain all models returned for the connected providers or selected instance. Do not silently hide models based on capability flags. Show the optional model `Name` alongside its `ID`, and always submit the ID.
+- Cancel obsolete reads when the selected session or connection changes. Never let an old request overwrite a newer selection. Dispose timers and sockets when the client disconnects.
+- Render API/model content as text or sanitized markup. Keep the API token in tab-scoped session storage; never put it in frontend environment files, repository fixtures, logs, or persistent URLs.
+- Build mobile-first. Use a drawer for navigation on narrow screens, dynamic viewport height and safe-area padding, labeled controls, visible focus, and scrollable code blocks. Check both 390px mobile and desktop layouts.
+- Do not imply that a UI-only operation deletes server data. Show real API errors and document unsupported features instead of inventing endpoints.
+- Commands: `npm ci`, `npm run check`, `npm run build`, and `npm run test:e2e`. Product documentation follows the root STE rules.

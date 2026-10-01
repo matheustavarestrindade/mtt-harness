@@ -29,7 +29,7 @@ func (messageQueue *Queue) readRecovery(operationContext context.Context) ([]res
 			if operationError := messageQueue.loop.repairToolHistory(operationContext, session); operationError != nil {
 				return nil, operationError
 			}
-			if operationError := messageQueue.loop.emit(operationContext, session, atom.EventName("run.interrupted"), map[string]any{"message_id": entry.Message.ID}); operationError != nil {
+			if operationError := messageQueue.loop.emitSessionEvent(operationContext, session, atom.EventName("run.interrupted"), map[string]any{"message_id": entry.Message.ID}); operationError != nil {
 				return nil, operationError
 			}
 			if operationError := messageQueue.loop.configuration.Store.Queue().Finish(operationContext, entry.Message.ID); operationError != nil {
@@ -62,7 +62,7 @@ func (messageQueue *Queue) controlSessions(command queueCommand, coordinators []
 	results := make(chan error, len(coordinators))
 	for _, coordinator := range coordinators {
 		go func() {
-			_, operationError := coordinator.ask(operationContext, sessionCommand{kind: kind})
+			_, operationError := coordinator.requestSessionCommand(operationContext, sessionCommand{kind: kind})
 			if kind == closeSession {
 				<-coordinator.done
 			}

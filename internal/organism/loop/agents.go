@@ -67,18 +67,18 @@ func (agentLoop *Loop) RunAgentTask(operationContext context.Context, task atom.
 	if operationError := agentLoop.configuration.Store.Sessions().Append(operationContext, taskMessage); operationError != nil {
 		return atom.ToolResult{Status: atom.StatusError, Error: operationError.Error()}, nil
 	}
-	agentLoop.emit(operationContext, parent, atom.EventAgentStart, map[string]any{"session": child.ID, "task": task.Task})
+	agentLoop.emitSessionEvent(operationContext, parent, atom.EventAgentStart, map[string]any{"session": child.ID, "task": task.Task})
 	if operationError := agentLoop.Run(operationContext, child); operationError != nil {
 		return atom.ToolResult{Status: atom.StatusError, Error: operationError.Error()}, nil
 	}
 	if !agentLoop.isFinished(child.ID) {
 		return atom.ToolResult{Status: atom.StatusError, Error: "child agent stopped without calling finish"}, nil
 	}
-	result := agentLoop.popFinished(child.ID)
+	result := agentLoop.takeCompletedAgentResult(child.ID)
 	statistics, _ := agentLoop.configuration.Store.Usage().Session(operationContext, child.ID)
 	text := fmt.Sprintf("result: %s\nusage: input %d, output %d, cache read %d, cache hit rate %.2f",
 		result, statistics.Input, statistics.Output, statistics.CacheRead, statistics.CacheHitRate())
-	agentLoop.emit(operationContext, parent, atom.EventAgentEnd, map[string]any{"session": child.ID})
+	agentLoop.emitSessionEvent(operationContext, parent, atom.EventAgentEnd, map[string]any{"session": child.ID})
 	return atom.ToolResult{
 		CallID:  string(child.ID),
 		Status:  atom.StatusOK,
@@ -86,7 +86,7 @@ func (agentLoop *Loop) RunAgentTask(operationContext context.Context, task atom.
 	}, nil
 }
 
-func (agentLoop *Loop) finish(session atom.Session, call atom.ToolCall) atom.ToolResult {
+func (agentLoop *Loop) finishChildAgent(session atom.Session, call atom.ToolCall) atom.ToolResult {
 	var input struct {
 		Result string `json:"result"`
 	}
@@ -108,7 +108,7 @@ func (agentLoop *Loop) isFinished(session atom.SessionID) bool {
 	return found
 }
 
-func (agentLoop *Loop) popFinished(session atom.SessionID) string {
+func (agentLoop *Loop) takeCompletedAgentResult(session atom.SessionID) string {
 	agentLoop.mutex.Lock()
 	defer agentLoop.mutex.Unlock()
 	result := agentLoop.finished[session]

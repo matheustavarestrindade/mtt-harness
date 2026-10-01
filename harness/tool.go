@@ -17,6 +17,13 @@ type Tool interface {
 	Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error)
 }
 
+// ToolSearchDocumentation optionally adds usage guidance to the embedding
+// document. The tool's description and schema are always indexed. This extra
+// documentation is never included in model tool definitions or search results.
+type ToolSearchDocumentation interface {
+	SearchDocument() string
+}
+
 func (harnessRuntime *Harness) Tool(tool Tool) Unsubscribe {
 	harnessRuntime.mutex.Lock()
 	identifier := harnessRuntime.nextRegistrationID()

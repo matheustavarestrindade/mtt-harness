@@ -26,7 +26,7 @@ func waitForTools(tasks []*toolTask) []atom.ToolResult {
 }
 
 func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, session atom.Session, modelCall *preparedModelCall) (atom.Message, []*toolTask, error) {
-	if operationError := agentLoop.emit(operationContext, session, atom.EventModelCall, map[string]any{"model": modelCall.modelID}); operationError != nil {
+	if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelCall, map[string]any{"model": modelCall.modelID}); operationError != nil {
 		return atom.Message{}, nil, operationError
 	}
 	responseStream, operationError := modelCall.provider.Stream(operationContext, modelCall.request)
@@ -37,6 +37,7 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 	var tasks []*toolTask
 	var content []atom.Content
 	var usage *atom.Usage
+	var providerState *atom.ProviderState
 	for {
 		part, operationError := responseStream.Recv(operationContext)
 		if errors.Is(operationError, io.EOF) {
@@ -47,12 +48,12 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 		}
 		if part.Text != "" {
 			text.WriteString(part.Text)
-			if operationError := agentLoop.emit(operationContext, session, atom.EventModelChunk, map[string]any{"text": part.Text}); operationError != nil {
+			if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelChunk, map[string]any{"text": part.Text}); operationError != nil {
 				return atom.Message{}, tasks, operationError
 			}
 		}
 		if part.ToolCall != nil {
-			if operationError := agentLoop.emit(operationContext, session, atom.EventActionReceived, part.ToolCall); operationError != nil {
+			if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventActionReceived, part.ToolCall); operationError != nil {
 				return atom.Message{}, tasks, operationError
 			}
 			task := &toolTask{call: *part.ToolCall, index: len(tasks), result: make(chan atom.ToolResult, 1)}
@@ -61,10 +62,13 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 			}
 			tasks = append(tasks, task)
 			go func() {
-				task.result <- agentLoop.execute(operationContext, session, task.call)
+				task.result <- agentLoop.executeToolCall(operationContext, session, task.call)
 			}()
 		}
 		content = append(content, part.Content...)
+		if part.ProviderState != nil {
+			providerState = part.ProviderState
+		}
 		if part.Usage != nil {
 			usage = part.Usage
 		}
@@ -83,9 +87,10 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 		ID: newID(), SessionID: session.ID, Role: atom.RoleAssistant,
 		Content:   content,
 		ToolCalls: calls, Usage: usage, CreatedAt: time.Now(),
+		ProviderState: providerState,
 	}
 	if usage != nil {
-		usage.Cost = cost(modelCall.model, usage)
+		usage.Cost = calculateUsageCost(modelCall.model, usage)
 	}
 	return message, tasks, nil
 }
