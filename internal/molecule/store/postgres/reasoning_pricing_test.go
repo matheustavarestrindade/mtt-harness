@@ -18,7 +18,7 @@ func TestReasoningAndPricingSurvivePostgresRoundTrip(test *testing.T) {
 	identifier := fmt.Sprintf("reasoning-%d", time.Now().UnixNano())
 	session := atom.Session{ID: atom.SessionID(identifier), InstanceID: identifier, Model: "fixture/model", ReasoningEffort: "low", CreatedAt: time.Now()}
 	testutil.RequireNoError(test, database.Sessions().Save(operationContext, session))
-	testutil.RequireNoError(test, database.Sessions().SetReasoningEffort(operationContext, session.ID, "high"))
+	testutil.RequireNoError(test, database.Sessions().SetModelSelection(operationContext, session.ID, session.ModelSelection(), atom.SessionModelSelection{Model: session.Model, ReasoningEffort: "high"}))
 	session.Completed = true
 	testutil.RequireNoError(test, database.Sessions().Save(operationContext, session))
 	loaded, operationError := database.Sessions().Get(operationContext, session.ID)

@@ -78,8 +78,7 @@ func TestDiscoveredToolContractsReachProviderRequests(test *testing.T) {
 		testutil.RequireNoError(test, testStack.registry.Add(tool))
 	}
 	session := testStack.instance(test, 2)
-	session.Model = "wire/wire-model"
-	testutil.RequireNoError(test, testStack.database.Sessions().Save(context.Background(), session))
+	testStack.selectModel(test, &session, "wire/wire-model")
 	testStack.user(test, session, "discover the available tools")
 	testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
 	<-requests
@@ -203,8 +202,7 @@ func TestNewCatalogModelsKeepToolsUnlessExplicitlyUnsupported(test *testing.T) {
 			testStack.harnessRuntime.Provider(standardProvider)
 			testutil.RequireNoError(test, testStack.registry.Add(tools.NewSearch(testStack.registry)))
 			session := testStack.instance(test, 2)
-			session.Model = "dynamic/new-model"
-			testutil.RequireNoError(test, testStack.database.Sessions().Save(context.Background(), session))
+			testStack.selectModel(test, &session, "dynamic/new-model")
 			testStack.user(test, session, "use tools if available")
 			testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
 			payload := <-requests

@@ -85,6 +85,7 @@ When an instance stops, the database keeps the configuration and sessions. The a
 |---|---|---|---|---|
 | GET | `/sessions/{id}` | none | `200`, `Session` | `404` |
 | PUT | `/sessions/{id}/reasoning` | `{"effort":"high"}` | `200`, `Session` | `404`, `400`, `409`, `500` |
+| PUT | `/sessions/{id}/model` | `{"model":"provider/model","allow_compaction":false}` | `200`, `Session` | `404`, `400`, `409`, `500` |
 | GET | `/sessions/{id}/messages` | none | `200`, `Message[]` | `500` |
 | POST | `/sessions/{id}/messages` | `{"content":"text"}` or content array | `202`, `AcceptedMessage` | `404`, `400`, `409`, `429`, `500` |
 | GET | `/sessions/{id}/status` | none | `200`, `QueueStatus` | `500` |
@@ -100,6 +101,14 @@ When an instance stops, the database keeps the configuration and sessions. The a
 The database keeps a message in the queue before the API gives `202`. The message goes into history when the turn starts. A session can have 128 messages that wait. The harness limit is 4096 messages that wait or run.
 
 The session input accepts an optional `reasoning_effort` string with `model`. An empty string uses the model default. The model gives the available values in `ReasoningEfforts`. A session change applies to the next model request. It does not stop an active request. The database keeps the selection.
+
+A model change must use the instance model list. The new model must have a context limit. A smaller context limit gives `409` with `code: context_compaction_required`. An unknown previous context limit also gives `409`. After the user accepts context compaction, send `allow_compaction: true` to change the model.
+
+The response gives `current_context_max`, `target_context_max`, and `model` with the error. When the context is too large, the harness removes the initial turn from the request. The database keeps the full message history.
+
+If the selection changed before the request, the API gives `409` with `code: session_selection_changed`. Then read the session again.
+
+If the new model does not have the previous reasoning effort, `ReasoningEffort` becomes an empty string for the model default.
 
 Client input has the role `user`. Background process notifications have the role `runtime`. They use the same queue. The tool with the name `bash` gives output through the tool result group when `wait` is `true`. It does not add a process notification to the queue.
 

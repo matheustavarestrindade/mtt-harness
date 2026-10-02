@@ -43,7 +43,7 @@ export class HarnessConsole {
   private refreshing = false;
   private refreshPending = false;
   private savedMessageIDs = new Set<string>();
-  private reasoningRevision = 0;
+  private selectionRevision = 0;
   private streamFlushTimer: ReturnType<typeof setTimeout> | undefined;
   private pendingText: string[] = [];
   private pendingReasoning: string[] = [];
@@ -98,7 +98,7 @@ export class HarnessConsole {
     clearTimeout(this.refreshTimer);
     this.clearLiveMessage();
     this.savedMessageIDs.clear();
-    this.reasoningRevision++;
+    this.selectionRevision++;
     this.sessionPollTimer = undefined;
     this.refreshTimer = undefined;
     this.sessionReads = new AbortController();
@@ -236,7 +236,7 @@ export class HarnessConsole {
       return;
     }
     this.refreshing = true;
-    const reasoningRevision = this.reasoningRevision;
+    const selectionRevision = this.selectionRevision;
     try {
       const [messages, status, statistics, updatedSession] = await Promise.all([
         api.messages(session.ID, signal),
@@ -248,8 +248,10 @@ export class HarnessConsole {
       this.messages = messages;
       this.session = {
         ...updatedSession,
+        Model:
+          selectionRevision === this.selectionRevision ? updatedSession.Model : this.session.Model,
         ReasoningEffort:
-          reasoningRevision === this.reasoningRevision
+          selectionRevision === this.selectionRevision
             ? updatedSession.ReasoningEffort
             : this.session.ReasoningEffort,
       };
@@ -384,15 +386,29 @@ export class HarnessConsole {
   }
 
   async setReasoningEffort(effort: string) {
+    await this.updateSessionSelection((api, sessionID, signal) =>
+      api.setReasoningEffort(sessionID, effort, signal),
+    );
+  }
+
+  async setSessionModel(model: string, allowCompaction = false) {
+    await this.updateSessionSelection((api, sessionID, signal) =>
+      api.setSessionModel(sessionID, model, allowCompaction, signal),
+    );
+  }
+
+  private async updateSessionSelection(
+    operation: (api: HarnessApi, sessionID: string, signal: AbortSignal) => Promise<Session>,
+  ) {
     const api = this.requireAPIClient();
     const session = this.session;
     const signal = this.sessionReads.signal;
     if (!session) return;
-    this.reasoningRevision++;
+    this.selectionRevision++;
     try {
-      const updatedSession = await api.setReasoningEffort(session.ID, effort, signal);
+      const updatedSession = await operation(api, session.ID, signal);
       if (signal.aborted || this.session?.ID !== session.ID) return;
-      this.reasoningRevision++;
+      this.selectionRevision++;
       this.session = updatedSession;
       this.sessions = this.sessions.map((entry) =>
         entry.ID === session.ID ? updatedSession : entry,

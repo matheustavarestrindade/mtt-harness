@@ -17,6 +17,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly details: Record<string, unknown> = {},
   ) {
     super(message);
     this.name = 'ApiError';
@@ -90,7 +91,13 @@ export class HarnessApi {
         data && typeof data === 'object' && 'error' in data
           ? String(data.error)
           : `Request failed (${response.status}).`;
-      throw new ApiError(detail, response.status);
+      throw new ApiError(
+        detail,
+        response.status,
+        data && typeof data === 'object' && !Array.isArray(data)
+          ? (data as Record<string, unknown>)
+          : {},
+      );
     }
     return data as Value;
   }
@@ -206,6 +213,14 @@ export class HarnessApi {
       `sessions/${encodeURIComponent(sessionID)}/reasoning`,
       'PUT',
       { effort },
+      signal,
+    );
+  }
+  setSessionModel(sessionID: string, model: string, allowCompaction = false, signal?: AbortSignal) {
+    return this.request<Session>(
+      `sessions/${encodeURIComponent(sessionID)}/model`,
+      'PUT',
+      { model, allow_compaction: allowCompaction },
       signal,
     );
   }

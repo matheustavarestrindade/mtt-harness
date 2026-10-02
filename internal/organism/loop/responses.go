@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
 type toolTask struct {
@@ -26,6 +27,8 @@ func waitForTools(tasks []*toolTask) []atom.ToolResult {
 }
 
 func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, session atom.Session, modelCall *preparedModelCall) (atom.Message, []*toolTask, error) {
+	session = modelCall.session
+	operationContext = harness.WithSession(operationContext, session)
 	messageID := newID()
 	if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelCall, map[string]any{"model": modelCall.modelID, "message_id": messageID, "reasoning_effort": modelCall.request.ReasoningEffort}); operationError != nil {
 		return atom.Message{}, nil, operationError

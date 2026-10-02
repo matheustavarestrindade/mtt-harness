@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
@@ -13,14 +14,18 @@ type InstanceStore interface {
 	Delete(operationContext context.Context, identifier string) error
 }
 
+// ErrSessionSelectionChanged means the caller validated a stale selection or
+// the session completed before the change. Read current state before retrying.
+var ErrSessionSelectionChanged = errors.New("session settings changed; read the session and retry")
+
 type SessionStore interface {
-	// Save initializes reasoning effort for a new session. Later changes belong
-	// to SetReasoningEffort so lifecycle saves cannot overwrite a newer selection.
+	// Save initializes a new session's model selection. Lifecycle saves retain
+	// the stored selection; SetModelSelection owns subsequent changes.
 	Save(operationContext context.Context, session atom.Session) error
-	SetReasoningEffort(operationContext context.Context, sessionID atom.SessionID, effort string) error
-	// GetReasoningEffort distinguishes an absent record from a saved default.
-	// Caller-owned sessions without a record retain their supplied effort.
-	GetReasoningEffort(operationContext context.Context, sessionID atom.SessionID) (string, bool, error)
+	SetModelSelection(operationContext context.Context, sessionID atom.SessionID, previous, next atom.SessionModelSelection) error
+	// GetModelSelection distinguishes an absent record from a stored default.
+	// Caller-owned sessions without a record retain their supplied selection.
+	GetModelSelection(operationContext context.Context, sessionID atom.SessionID) (atom.SessionModelSelection, bool, error)
 	Get(operationContext context.Context, sessionID atom.SessionID) (atom.Session, error)
 	Agents(operationContext context.Context, parent atom.SessionID) ([]atom.SessionID, error)
 	List(operationContext context.Context, instanceID string) ([]atom.Session, error)

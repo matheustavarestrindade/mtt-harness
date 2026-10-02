@@ -89,7 +89,7 @@ func TestParsedToolsStartImmediatelyAndReturnOneCompleteBatch(test *testing.T) {
 		releaseStream: make(chan struct{}), requests: make(chan atom.Request, 4),
 	}
 	testStack.harnessRuntime.Provider(modelProvider)
-	session.Model = "batch-model"
+	testStack.selectModel(test, &session, "batch-model")
 	operationContext, cancelOperation := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancelOperation()
 	releaseSlowTool := make(chan struct{})

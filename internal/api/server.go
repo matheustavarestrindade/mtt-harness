@@ -71,6 +71,7 @@ func (server *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /instances/{id}/statistics", server.instanceStatistics)
 	mux.HandleFunc("GET /sessions/{id}", server.getSession)
 	mux.HandleFunc("PUT /sessions/{id}/reasoning", server.setSessionReasoningEffort)
+	mux.HandleFunc("PUT /sessions/{id}/model", server.setSessionModel)
 	mux.HandleFunc("GET /sessions/{id}/messages", server.sessionMessages)
 	mux.HandleFunc("POST /sessions/{id}/messages", server.sendMessage)
 	mux.HandleFunc("POST /sessions/{id}/cancel", server.cancelMessage)

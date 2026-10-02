@@ -2,6 +2,13 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "context compaction",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "removal of complete initial turns from a model request to meet its context limit without changing saved history",
+      "source": "session model selection"
+    },
+    {
       "term": "OpenCode",
       "category": "technical_noun",
       "approved_forms": [],

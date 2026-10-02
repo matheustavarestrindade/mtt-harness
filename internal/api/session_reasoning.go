@@ -42,7 +42,9 @@ func (server *Server) setSessionReasoningEffort(responseWriter http.ResponseWrit
 	if respondToError(responseWriter, http.StatusBadRequest, model.ValidateReasoningEffort(*input.Effort)) {
 		return
 	}
-	if respondToError(responseWriter, http.StatusInternalServerError, server.store.Sessions().SetReasoningEffort(request.Context(), session.ID, *input.Effort)) {
+	selection := session.ModelSelection()
+	selection.ReasoningEffort = *input.Effort
+	if respondToSessionSelectionError(responseWriter, server.store.Sessions().SetModelSelection(request.Context(), session.ID, session.ModelSelection(), selection)) {
 		return
 	}
 	session.ReasoningEffort = *input.Effort

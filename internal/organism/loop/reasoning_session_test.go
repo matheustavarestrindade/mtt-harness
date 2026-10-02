@@ -35,9 +35,10 @@ func TestSavedEffortChangesAtRequestBoundariesAndPublicThinkingPersists(test *te
 	testStack.bus.SetRecorder(testStack.database.Events().Record)
 	testutil.RequireNoError(test, testStack.registry.Add(tools.NewSearch(testStack.registry)))
 	session := testStack.instance(test, 2)
-	testutil.RequireNoError(test, testStack.database.Sessions().SetReasoningEffort(context.Background(), session.ID, "low"))
+	lowSelection := atom.SessionModelSelection{Model: session.Model, ReasoningEffort: "low"}
+	testutil.RequireNoError(test, testStack.database.Sessions().SetModelSelection(context.Background(), session.ID, session.ModelSelection(), lowSelection))
 	harness.Pipe(testStack.harnessRuntime, atom.StageToolResult, func(operationContext context.Context, result atom.ToolResult) (atom.ToolResult, error) {
-		return result, testStack.database.Sessions().SetReasoningEffort(operationContext, session.ID, "high")
+		return result, testStack.database.Sessions().SetModelSelection(operationContext, session.ID, lowSelection, atom.SessionModelSelection{Model: session.Model, ReasoningEffort: "high"})
 	})
 	testStack.user(test, session, "continue after the tool")
 	testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))

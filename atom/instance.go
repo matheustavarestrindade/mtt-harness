@@ -29,3 +29,14 @@ type AgentTask struct {
 	Model           string
 	ReasoningEffort string
 }
+
+// SessionModelSelection is one atomic configuration snapshot. Model and effort
+// must change together so a model cannot receive another model's effort choice.
+type SessionModelSelection struct {
+	Model           string
+	ReasoningEffort string
+}
+
+func (session Session) ModelSelection() SessionModelSelection {
+	return SessionModelSelection{Model: session.Model, ReasoningEffort: session.ReasoningEffort}
+}

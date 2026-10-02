@@ -548,6 +548,16 @@ The API sends `Message.Reasoning` and reasoning text in `model.chunk` events. Th
 
 See `docs/model-catalog.md` for configuration and source documents.
 
+### 6.6 Model Selection
+
+The session model can change during a conversation. The next model request uses the new selection. The change does not stop an active request. The new model must be in the instance model list.
+
+The API accepts a model with the same or a larger context limit. For a smaller context limit, the user must accept context compaction. If the previous context limit is not available, the user must accept context compaction. The new model must have a context limit.
+
+The harness keeps the system messages and the last turn. When the context is too large, the harness removes the initial turn from the request. A turn includes the tool calls and the tool results. The database keeps the full message history. If the last turn is too large, the harness gives an error.
+
+The database changes the model and reasoning effort together. If the new model does not have the previous reasoning effort, the session uses the model default. An operation with a previous selection must read the session again before a change.
+
 ## 7. Stages
 
 The stage values are:
@@ -989,6 +999,7 @@ The initial API paths are:
 - `GET /instances/{id}/models`: read the model list of an instance.
 - `GET /sessions/{id}`: read a session.
 - `PUT /sessions/{id}/reasoning`: set the reasoning effort for a session.
+- `PUT /sessions/{id}/model`: change the model of a session.
 - `GET /sessions/{id}/messages`: read the messages of a session.
 - `POST /sessions/{id}/cancel`: stop the current run.
 - `DELETE /sessions/{id}/queue/{message_id}`: remove a message from the queue.
@@ -1369,8 +1380,8 @@ type InstanceStore interface {
 
 type SessionStore interface {
     Save(operationContext context.Context, session atom.Session) error
-    SetReasoningEffort(operationContext context.Context, sessionID atom.SessionID, effort string) error
-    GetReasoningEffort(operationContext context.Context, sessionID atom.SessionID) (string, bool, error)
+    SetModelSelection(operationContext context.Context, sessionID atom.SessionID, previous, next atom.SessionModelSelection) error
+    GetModelSelection(operationContext context.Context, sessionID atom.SessionID) (atom.SessionModelSelection, bool, error)
     Get(operationContext context.Context, sessionID atom.SessionID) (atom.Session, error)
     Agents(operationContext context.Context, parent atom.SessionID) ([]atom.SessionID, error)
     List(operationContext context.Context, instanceID string) ([]atom.Session, error)

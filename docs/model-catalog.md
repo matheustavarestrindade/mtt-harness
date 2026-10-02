@@ -51,6 +51,20 @@ Responses uses `none` for the value `toggle` in the model catalog. For Chat Comp
 
 Model configuration can supply `reasoning`, `reasoning_efforts`, `default_reasoning_effort`, and `reasoning_summary`. Use `reasoning_summary` only when the model has reasoning summaries. The standard OpenAI configuration selects `auto` for specified reasoning models. The Codex model response gives the available reasoning summary formats.
 
+## Change the Session Model
+
+The route `PUT /sessions/{id}/model` changes the model during a conversation:
+
+```json
+{"model":"provider/model","allow_compaction":false}
+```
+
+The API accepts a model with the same or a larger context limit. For a smaller context limit, the user must accept context compaction. The API gives `409` with the code `context_compaction_required`. After the user accepts context compaction, send the request with `allow_compaction: true`.
+
+The new model must have a context limit. The selection applies to the next model request. When the context is too large, the harness removes the initial turn from the request. The database keeps the full message history. The last turn and system messages stay in the request.
+
+The model and reasoning effort change together. If the new model does not have the previous reasoning effort, the selection uses the model default.
+
 ## Reasoning Text
 
 OpenAI supplies reasoning summaries. DeepSeek supplies reasoning text. The API gives the text in `Message.Reasoning` and in model events. The UI section with the label `Thinking` is closed by default.

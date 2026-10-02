@@ -69,8 +69,7 @@ func TestFileEditFeedbackAndRecoveryReachProviderRequests(test *testing.T) {
 		testutil.RequireNoError(test, testStack.registry.Add(tool))
 	}
 	session := testStack.instance(test, 2)
-	session.Model = "wire/edit-model"
-	testutil.RequireNoError(test, testStack.database.Sessions().Save(context.Background(), session))
+	testStack.selectModel(test, &session, "wire/edit-model")
 	testStack.user(test, session, "create and edit a file")
 	testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
 	if requestCount.Load() != int32(len(calls)+1) {

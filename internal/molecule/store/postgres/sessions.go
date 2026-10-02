@@ -4,21 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
 type sessions struct{ store *Store }
 
-func (sessionStore *sessions) GetReasoningEffort(operationContext context.Context, sessionID atom.SessionID) (string, bool, error) {
-	var effort string
-	operationError := sessionStore.store.pool.QueryRow(operationContext, `SELECT reasoning_effort FROM sessions WHERE id=$1`, string(sessionID)).Scan(&effort)
+func (sessionStore *sessions) GetModelSelection(operationContext context.Context, sessionID atom.SessionID) (atom.SessionModelSelection, bool, error) {
+	var selection atom.SessionModelSelection
+	operationError := sessionStore.store.pool.QueryRow(operationContext, `SELECT model,reasoning_effort FROM sessions WHERE id=$1`, string(sessionID)).Scan(&selection.Model, &selection.ReasoningEffort)
 	if errors.Is(operationError, pgx.ErrNoRows) {
-		return "", false, nil
+		return atom.SessionModelSelection{}, false, nil
 	}
-	return effort, operationError == nil, operationError
+	return selection, operationError == nil, operationError
 }
 
 func (sessionStore *sessions) List(operationContext context.Context, instanceID string) ([]atom.Session, error) {
@@ -45,7 +45,6 @@ func (sessionStore *sessions) Save(operationContext context.Context, session ato
 		ON CONFLICT (id) DO UPDATE SET
 			parent_id = EXCLUDED.parent_id,
 			depth = EXCLUDED.depth,
-			model = EXCLUDED.model,
 			completed = EXCLUDED.completed`,
 		string(session.ID), session.InstanceID, string(session.Parent), session.Depth, session.Model, session.CreatedAt, session.Completed, session.ReasoningEffort)
 	return operationError
@@ -60,13 +59,14 @@ func (sessionStore *sessions) Get(operationContext context.Context, sessionID at
 	return session, operationError
 }
 
-func (sessionStore *sessions) SetReasoningEffort(operationContext context.Context, sessionID atom.SessionID, effort string) error {
-	result, operationError := sessionStore.store.pool.Exec(operationContext, `UPDATE sessions SET reasoning_effort=$2 WHERE id=$1`, string(sessionID), effort)
+func (sessionStore *sessions) SetModelSelection(operationContext context.Context, sessionID atom.SessionID, previous, next atom.SessionModelSelection) error {
+	result, operationError := sessionStore.store.pool.Exec(operationContext, `UPDATE sessions SET model=$2, reasoning_effort=$3
+		WHERE id=$1 AND model=$4 AND reasoning_effort=$5 AND NOT completed`, string(sessionID), next.Model, next.ReasoningEffort, previous.Model, previous.ReasoningEffort)
 	if operationError != nil {
 		return operationError
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("session %q is not in the store", sessionID)
+		return store.ErrSessionSelectionChanged
 	}
 	return nil
 }
