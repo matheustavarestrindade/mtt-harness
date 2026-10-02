@@ -68,6 +68,7 @@ export async function mockHarness(page: Page) {
     ContextMax: 128000,
     Prices: null,
   };
+  const models: Model[] = [model];
   await page.routeWebSocket(/\/api\/sessions\/.*\/events/, (socket) => {
     sockets.push(socket);
   });
@@ -130,7 +131,7 @@ export async function mockHarness(page: Page) {
         return reply({ status: method === 'DELETE' ? 'deleted' : 'saved' });
       }
       if (parts[0] === 'instances' && parts[2] === 'statistics') return reply(workspaceUsage);
-      if (parts[0] === 'instances' && parts[2] === 'models') return reply([model]);
+      if (parts[0] === 'instances' && parts[2] === 'models') return reply(models);
       if (parts[0] === 'instances' && parts[2] === 'sessions') {
         if (method === 'GET')
           return reply(sessions.filter((session) => session.InstanceID === parts[1]));
@@ -138,6 +139,7 @@ export async function mockHarness(page: Page) {
           ID: `session-${++identifier}`,
           InstanceID: parts[1],
           Model: request.postDataJSON().model,
+          ReasoningEffort: request.postDataJSON().reasoning_effort ?? '',
           Parent: '',
           Depth: 0,
           Completed: false,
@@ -150,6 +152,43 @@ export async function mockHarness(page: Page) {
       }
       const session = sessions.find((entry) => entry.ID === parts[1]);
       if (parts[0] === 'sessions' && session) {
+        if (parts.length === 2 && method === 'GET') return reply(session);
+        if (parts[2] === 'model' && method === 'PUT') {
+          const input = request.postDataJSON();
+          const target = models.find((entry) => entry.ID === input.model);
+          const current = models.find((entry) => entry.ID === session.Model);
+          if (!target || target.ContextMax <= 0)
+            return reply({ error: 'Model context size is unavailable' }, 400);
+          if ((!current || target.ContextMax < current.ContextMax) && !input.allow_compaction)
+            return reply(
+              {
+                code: 'context_compaction_required',
+                error: 'The conversation context will be compacted to fit.',
+                model: target.ID,
+                current_context_max: current?.ContextMax ?? 0,
+                target_context_max: target.ContextMax,
+              },
+              409,
+            );
+          session.Model = target.ID;
+          if (
+            !target.Reasoning ||
+            !target.ReasoningEfforts?.includes(session.ReasoningEffort ?? '')
+          )
+            session.ReasoningEffort = '';
+          return reply(session);
+        }
+        if (parts[2] === 'reasoning' && method === 'PUT') {
+          const effort = request.postDataJSON().effort;
+          const current = models.find((entry) => entry.ID === session.Model);
+          if (
+            typeof effort !== 'string' ||
+            (effort && !current?.ReasoningEfforts?.includes(effort))
+          )
+            return reply({ error: 'Unsupported reasoning effort' }, 400);
+          session.ReasoningEffort = effort;
+          return reply(session);
+        }
         if (parts[2] === 'messages' && method === 'GET') return reply(histories.get(session.ID));
         if (parts[2] === 'status')
           return reply({
@@ -224,5 +263,5 @@ export async function mockHarness(page: Page) {
       return reply({ error: `Fixture has no route for ${method} ${path}` }, 404);
     },
   );
-  return { instances, sessions, histories, settings, event };
+  return { instances, sessions, histories, settings, model, models, sessionUsage, running, event };
 }

@@ -18,7 +18,8 @@ func (server *Server) startSession(responseWriter http.ResponseWriter, request *
 		return
 	}
 	var input struct {
-		Model string `json:"model"`
+		Model           string `json:"model"`
+		ReasoningEffort string `json:"reasoning_effort"`
 	}
 	if operationError := readJSON(request, &input); operationError != nil && !errors.Is(operationError, io.EOF) {
 		writeError(responseWriter, http.StatusBadRequest, operationError.Error())
@@ -33,11 +34,15 @@ func (server *Server) startSession(responseWriter http.ResponseWriter, request *
 		return
 	}
 	model = modelProvider.Name() + "/" + modelInfo.ID
+	if respondToError(responseWriter, http.StatusBadRequest, modelInfo.ValidateReasoningEffort(input.ReasoningEffort)) {
+		return
+	}
 	session := atom.Session{
-		ID:         atom.SessionID(newID()),
-		InstanceID: instance.ID(),
-		Model:      model,
-		CreatedAt:  time.Now(),
+		ID:              atom.SessionID(newID()),
+		InstanceID:      instance.ID(),
+		Model:           model,
+		ReasoningEffort: input.ReasoningEffort,
+		CreatedAt:       time.Now(),
 	}
 	if respondToError(responseWriter, http.StatusInternalServerError, server.store.Sessions().Save(request.Context(), session)) {
 		return

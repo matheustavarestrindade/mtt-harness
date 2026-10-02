@@ -5,12 +5,16 @@ import "github.com/matheustavarestrindade/mtt-harness/atom"
 // ModelMetadata preserves omitted fields separately from explicit false/zero
 // overrides. Catalog availability always comes from the remote list when used.
 type ModelMetadata struct {
-	Name       *string          `json:"name,omitempty"`
-	Level      *int             `json:"level,omitempty"`
-	Input      []atom.MediaType `json:"input,omitempty"`
-	Output     []atom.MediaType `json:"output,omitempty"`
-	Tools      *bool            `json:"tools,omitempty"`
-	ContextMax *int             `json:"context_max,omitempty"`
+	Name                   *string          `json:"name,omitempty"`
+	Level                  *int             `json:"level,omitempty"`
+	Input                  []atom.MediaType `json:"input,omitempty"`
+	Output                 []atom.MediaType `json:"output,omitempty"`
+	Tools                  *bool            `json:"tools,omitempty"`
+	ContextMax             *int             `json:"context_max,omitempty"`
+	Reasoning              *bool            `json:"reasoning,omitempty"`
+	ReasoningEfforts       []string         `json:"reasoning_efforts,omitempty"`
+	DefaultReasoningEffort *string          `json:"default_reasoning_effort,omitempty"`
+	ReasoningSummary       *string          `json:"reasoning_summary,omitempty"`
 }
 
 type ModelConfiguration struct {
@@ -37,6 +41,22 @@ func applyModelMetadata(model atom.ModelInfo, metadata ModelMetadata) atom.Model
 	}
 	if metadata.ContextMax != nil {
 		model.ContextMax = *metadata.ContextMax
+	}
+	if metadata.Reasoning != nil {
+		model.Reasoning = *metadata.Reasoning
+		if !model.Reasoning {
+			model.ReasoningEfforts = nil
+			model.DefaultReasoningEffort = ""
+		}
+	}
+	if metadata.ReasoningEfforts != nil {
+		model.ReasoningEfforts = append([]string{}, metadata.ReasoningEfforts...)
+	}
+	if metadata.DefaultReasoningEffort != nil {
+		model.DefaultReasoningEffort = *metadata.DefaultReasoningEffort
+	}
+	if metadata.ReasoningSummary != nil {
+		model.ReasoningSummary = *metadata.ReasoningSummary
 	}
 	return model
 }

@@ -16,7 +16,7 @@ func (builder *Builder) Fit(operationContext context.Context, request atom.Reque
 		return request, nil
 	}
 	reserve := min(1024, model.ContextMax/4)
-	for _, key := range []string{"max_tokens", "max_completion_tokens"} {
+	for _, key := range []string{"max_tokens", "max_completion_tokens", "max_output_tokens"} {
 		if value, found := request.Params[key]; found {
 			data, operationError := json.Marshal(value)
 			if operationError != nil {
@@ -82,6 +82,7 @@ func countTokens(operationContext context.Context, request atom.Request, provide
 	for _, message := range request.Messages {
 		count += 8
 		if message.ProviderState != nil {
+			count += len(message.ProviderState.ChatReasoning)
 			for _, reasoning := range message.ProviderState.Reasoning {
 				count += len(reasoning)
 			}

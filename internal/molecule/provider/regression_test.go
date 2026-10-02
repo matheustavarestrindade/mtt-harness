@@ -42,7 +42,7 @@ func TestMediaEncodingPreservesPayloadAndToolPairs(test *testing.T) {
 		{Role: atom.RoleAssistant, ToolCalls: []atom.ToolCall{{ID: "one", Name: "image", Input: []byte(`{}`)}, {ID: "two", Name: "text", Input: []byte(`{}`)}}},
 		{Role: atom.RoleTool, ToolCallID: "one", Content: contents[1:2]},
 		{Role: atom.RoleTool, ToolCallID: "two", Content: contents[:1]},
-	})
+	}, "fixture")
 	testutil.RequireNoError(test, operationError)
 	if len(messages) != 4 || messages[1]["role"] != "tool" || messages[2]["role"] != "tool" || messages[3]["role"] != "user" {
 		test.Fatalf("media interrupted paired tool replies: %+v", messages)
@@ -57,7 +57,7 @@ func TestMediaEncodingPreservesPayloadAndToolPairs(test *testing.T) {
 func TestMalformedOrTruncatedProviderStreamFails(test *testing.T) {
 	for _, body := range []string{`data: {bad json}` + "\n", `data: {"choices":[{"delta":{"content":"partial"}}]}` + "\n"} {
 		stream := &httpStream{parts: make(chan atom.ResponsePart, 4)}
-		go parseChatCompletionEvents(context.Background(), io.NopCloser(strings.NewReader(body)), stream)
+		go parseChatCompletionEvents(context.Background(), io.NopCloser(strings.NewReader(body)), stream, "fixture")
 		for {
 			_, operationError := stream.Recv(context.Background())
 			if operationError != nil {

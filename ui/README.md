@@ -121,6 +121,18 @@ The usage section shows model calls, input tokens, output tokens, reasoning toke
 
 The API gives usage data for the available history. It does not give subscription limits. The UI shows `Unavailable` when price data is not available.
 
+Select a model name in the provider section to read token prices and reasoning efforts. The session form also shows token prices. A cost estimate has the label `Estimated cost`. A subscription model does not use API token prices.
+
+## Reasoning
+
+The session form has a control with the label `Thinking`. In the message composer, use the button with the label `Session settings` to open the dialog. The dialog has fields with the labels `Model` and `Thinking`. The available reasoning efforts come from the selected model.
+
+To use the model default, select the value with the label `Default`. The database keeps the selection. A change applies to the next model request. The dialog shows the result of a change.
+
+The model control changes the model during the conversation. The same dialog shows a message before a change to a model with a smaller context limit. When the context is too large, the harness removes the initial turn from the request. The database keeps the conversation history. The UI keeps the message draft. Select the button with the label `Switch and compact` to continue.
+
+Model messages can have a section with the label `Thinking`. The section is closed by default. Select the button with the label `Thinking` to read the reasoning text or reasoning summary. The provider supplies the text. The UI can show the text during the model response and after it is in history.
+
 ## Message Display
 
 Model messages use Markdown for headings, lists, hyperlinks, tables, and code blocks. Code blocks have syntax highlighting. The buttons with the labels `Copy code` and `Download source` use the full source text. The UI does not run message code. HTML in message text stays as text.
@@ -135,7 +147,7 @@ Large previews have limits. The source download keeps the full source. The copy 
 
 The UI can make workspaces and sessions. The user can select an instance or session from the navigation. The UI can start a stopped workspace. It can send text, stop a turn, remove a message from the queue, and accept or deny a permission request.
 
-The UI shows message history, tool input, tool results, events, token usage, and cost data. It reads status and history at an interval of 1.5 seconds. A WebSocket event can also cause a new request. The UI shows model messages after the harness puts them in history.
+The UI shows message history, tool input, tool results, events, token usage, and cost data. It reads status and history at an interval of 1.5 seconds. A WebSocket event can also cause a new request. The UI shows model text during the response. Message IDs connect event text to the history.
 
 The UI does not have a file editor, media upload, process terminal, or revert control. See `docs/design.md` for the UI boundary and plans.
 

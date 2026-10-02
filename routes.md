@@ -56,7 +56,7 @@ A list can be `null`. The message, agent, process, and provider handlers give em
 | POST | `/instances/{id}/start` | none | `200`, `Instance` | `404`, `400`, `409`, `500` |
 | GET | `/instances/{id}/models` | none | `200`, `Model[]` or null | `404` |
 | GET | `/instances/{id}/sessions` | none | `200`, `Session[]` | `404`, `500` |
-| POST | `/instances/{id}/sessions` | optional `{"model":"provider/model"}` | `201`, `Session` | `404`, `400`, `500` |
+| POST | `/instances/{id}/sessions` | optional `{"model":"provider/model","reasoning_effort":"high"}` | `201`, `Session` | `404`, `400`, `500` |
 | GET | `/instances/{id}/statistics` | none | `200`, `Statistics` | `500` |
 ```
 
@@ -84,6 +84,8 @@ When an instance stops, the database keeps the configuration and sessions. The a
 | Method | Path | Input | Success | Handler errors |
 |---|---|---|---|---|
 | GET | `/sessions/{id}` | none | `200`, `Session` | `404` |
+| PUT | `/sessions/{id}/reasoning` | `{"effort":"high"}` | `200`, `Session` | `404`, `400`, `409`, `500` |
+| PUT | `/sessions/{id}/model` | `{"model":"provider/model","allow_compaction":false}` | `200`, `Session` | `404`, `400`, `409`, `500` |
 | GET | `/sessions/{id}/messages` | none | `200`, `Message[]` | `500` |
 | POST | `/sessions/{id}/messages` | `{"content":"text"}` or content array | `202`, `AcceptedMessage` | `404`, `400`, `409`, `429`, `500` |
 | GET | `/sessions/{id}/status` | none | `200`, `QueueStatus` | `500` |
@@ -97,6 +99,16 @@ When an instance stops, the database keeps the configuration and sessions. The a
 ```
 
 The database keeps a message in the queue before the API gives `202`. The message goes into history when the turn starts. A session can have 128 messages that wait. The harness limit is 4096 messages that wait or run.
+
+The session input accepts an optional `reasoning_effort` string with `model`. An empty string uses the model default. The model gives the available values in `ReasoningEfforts`. A session change applies to the next model request. It does not stop an active request. The database keeps the selection.
+
+A model change must use the instance model list. The new model must have a context limit. A smaller context limit gives `409` with `code: context_compaction_required`. An unknown previous context limit also gives `409`. After the user accepts context compaction, send `allow_compaction: true` to change the model.
+
+The response gives `current_context_max`, `target_context_max`, and `model` with the error. When the context is too large, the harness removes the initial turn from the request. The database keeps the full message history.
+
+If the selection changed before the request, the API gives `409` with `code: session_selection_changed`. Then read the session again.
+
+If the new model does not have the previous reasoning effort, `ReasoningEffort` becomes an empty string for the model default.
 
 Client input has the role `user`. Background process notifications have the role `runtime`. They use the same queue. The tool with the name `bash` gives output through the tool result group when `wait` is `true`. It does not add a process notification to the queue.
 
@@ -290,8 +302,8 @@ Event payload data:
 |---|---|
 | `turn.start` | null |
 | `turn.end` | `{"status":"completed"}`, `cancelled`, or `error` |
-| `model.call` | `{"model":"provider/model"}` |
-| `model.chunk` | `{"text":"fragment"}` |
+| `model.call` | `{"model":"provider/model","message_id":"ID","reasoning_effort":"high"}` |
+| `model.chunk` | `{"message_id":"ID","text":"fragment"}` or `{"message_id":"ID","reasoning":"text"}` |
 | `action.received` | `ToolCall` |
 | `tool.start` | `ToolCall` |
 | `tool.end` | `{"call":ToolCall,"status":"ok","result":ToolResult}` |
@@ -307,6 +319,8 @@ Event payload data:
 ```
 
 A plugin can use other event IDs and payloads. A constant in `atom/event.go` does not show that a handler sends the event.
+
+The field `message_id` identifies the model message in the history. The client uses the ID to keep one message in the display. Reasoning events contain only reasoning text or reasoning summaries from the provider. The API does not send continuation data.
 
 Process output URL and frame:
 
@@ -333,7 +347,7 @@ type Instance = {
 };
 type Session = {
   ID: string; InstanceID: string; Parent: string; Depth: number;
-  Model: string; CreatedAt: string; Completed: boolean;
+  Model: string; ReasoningEffort?: string; CreatedAt: string; Completed: boolean;
 };
 type Content = {
   Type: 'text' | 'image' | 'audio' | 'file'; Text: string;
@@ -347,9 +361,9 @@ type ToolResult = {
 type Message = {
   ID: string; SessionID: string; Seq: number; Role: 'system' | 'user' | 'assistant' | 'tool' | 'runtime';
   Content: Content[] | null; ToolCalls: ToolCall[] | null; ToolCallID: string;
-  Usage: Usage | null; CreatedAt: string;
+  Usage: Usage | null; Reasoning?: string; CreatedAt: string;
 };
-type Cost = { Currency: string; Value: number };
+type Cost = { Currency: string; Value: number; Estimated?: boolean };
 type Usage = {
   Input: number; CacheRead: number; CacheWrite: number; Output: number;
   Reasoning: number; Cost: Cost | null;
@@ -363,12 +377,21 @@ type Provider = {
   ModelListFormat?: 'openai' | 'codex';
   Authentication: '' | 'api_key' | 'chatgpt' | 'none';
   Connected: boolean; ModelCount: number;
+  MetadataURL?: string; MetadataFormat?: 'models_dev'; MetadataProvider?: string;
+  Billing?: 'tokens' | 'subscription';
 };
 type Model = {
   ID: string; Name?: string; Level: number; Input: string[] | null; Output: string[] | null;
   Tools: boolean; ToolSupportUnknown?: boolean; ContextMax: number;
-  Prices: null | { Currency: string; Input: number; Output: number; CacheRead: number; CacheWrite: number };
+  Reasoning?: boolean; ReasoningEfforts?: string[]; DefaultReasoningEffort?: string;
+  ReasoningSummary?: string; Billing?: 'tokens' | 'subscription';
+  Prices: null | (PriceRates & { Currency: string; Source?: string; Tiers?: PriceTier[] });
 };
+type PriceRates = {
+  Input: number; Output: number; CacheRead: number; CacheWrite: number; Reasoning?: number;
+  CacheReadUnknown?: boolean; CacheWriteUnknown?: boolean;
+};
+type PriceTier = PriceRates & { AboveInputTokens: number };
 type PermissionRequest = { ID: string; InstanceID: string; SessionID: string; Target: string; Why: string };
 type PermissionDecision = { RequestID: string; InstanceID: string; SessionID: string; Target: string; Kind: 'allow' | 'deny'; Scope: 'once' | 'session' | 'always'; CreatedAt: string };
 type ProcessRecord = {
@@ -385,3 +408,5 @@ Model prices apply to 1000000 tokens. The `ContextMax` field is the model token 
 The optional field `Name` is a display label. Model requests use `ID`. For example, `deepseek-flash` is the API ID for `DeepSeek-V4.1-Flash`. The ID `deepseek-v4-pro` refers to `DeepSeek-V4-Pro-0813`. See the [DeepSeek model data](https://api-docs.deepseek.com/quick_start/pricing) for the provider data.
 
 The harness calculates cost from provider usage. It does not calculate cost from the context limit estimate.
+
+The field `Estimated` has the value `true` for a cost estimate or a total with a cost estimate. A price tier uses the full input tokens with cache tokens. Reasoning tokens are part of output tokens. The harness does not calculate token cost estimates for subscription models. A price of 0 is different from price data that is not available.

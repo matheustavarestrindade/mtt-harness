@@ -6,14 +6,44 @@ import (
 	"sort"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
 type sessions struct{ store *Store }
 
+func (sessionStore *sessions) GetModelSelection(operationContext context.Context, sessionID atom.SessionID) (atom.SessionModelSelection, bool, error) {
+	if operationError := operationContext.Err(); operationError != nil {
+		return atom.SessionModelSelection{}, false, operationError
+	}
+	sessionStore.store.mutex.RLock()
+	defer sessionStore.store.mutex.RUnlock()
+	session, found := sessionStore.store.sessions[sessionID]
+	return session.ModelSelection(), found, nil
+}
+
 func (sessionStore *sessions) Save(operationContext context.Context, session atom.Session) error {
 	sessionStore.store.mutex.Lock()
 	defer sessionStore.store.mutex.Unlock()
+	if stored, found := sessionStore.store.sessions[session.ID]; found {
+		session.Model = stored.Model
+		session.ReasoningEffort = stored.ReasoningEffort
+	}
 	sessionStore.store.sessions[session.ID] = session
+	return nil
+}
+
+func (sessionStore *sessions) SetModelSelection(operationContext context.Context, sessionID atom.SessionID, previous, next atom.SessionModelSelection) error {
+	sessionStore.store.mutex.Lock()
+	defer sessionStore.store.mutex.Unlock()
+	if operationError := operationContext.Err(); operationError != nil {
+		return operationError
+	}
+	session, found := sessionStore.store.sessions[sessionID]
+	if !found || session.Completed || session.ModelSelection() != previous {
+		return store.ErrSessionSelectionChanged
+	}
+	session.Model, session.ReasoningEffort = next.Model, next.ReasoningEffort
+	sessionStore.store.sessions[sessionID] = session
 	return nil
 }
 

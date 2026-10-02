@@ -12,29 +12,18 @@
       "authentication": "api_key",
       "api_url": "https://api.openai.com/v1",
       "model_list_url": "https://api.openai.com/v1/models",
+      "metadata_url": "https://models.dev/api.json",
+      "metadata_format": "models_dev",
+      "metadata_provider": "openai",
+      "billing": "tokens",
       "refresh_hours": 24,
-      "prices": {
-        "gpt-4o": {
-          "currency": "USD",
-          "input": 2.5,
-          "output": 10,
-          "cache_read": 1.25,
-          "cache_write": 0
-        },
-        "gpt-4o-mini": {
-          "currency": "USD",
-          "input": 0.15,
-          "output": 0.6,
-          "cache_read": 0.075,
-          "cache_write": 0
-        }
-      },
       "model_defaults": {
         "level": 1
       },
       "models": [
         {
           "id": "gpt-6-astra",
+          "reasoning_summary": "auto",
           "level": 3,
           "context_max": 1050000,
           "tools": true,
@@ -45,6 +34,7 @@
         },
         {
           "id": "gpt-6.1-sol",
+          "reasoning_summary": "auto",
           "level": 2,
           "context_max": 1050000,
           "tools": true,
@@ -55,6 +45,7 @@
         },
         {
           "id": "gpt-6-luna",
+          "reasoning_summary": "auto",
           "level": 1,
           "context_max": 1050000,
           "tools": true,
@@ -65,6 +56,7 @@
         },
         {
           "id": "gpt-5.5",
+          "reasoning_summary": "auto",
           "level": 3,
           "context_max": 1050000,
           "tools": true,
@@ -75,6 +67,7 @@
         },
         {
           "id": "gpt-5.4",
+          "reasoning_summary": "auto",
           "level": 2,
           "context_max": 1050000,
           "tools": true,
@@ -85,6 +78,7 @@
         },
         {
           "id": "gpt-5.4-mini",
+          "reasoning_summary": "auto",
           "level": 1,
           "context_max": 272000,
           "tools": true,
@@ -121,6 +115,10 @@
       "authentication": "api_key",
       "api_url": "https://api.deepseek.com",
       "model_list_url": "https://api.deepseek.com/models",
+      "metadata_url": "https://models.dev/api.json",
+      "metadata_format": "models_dev",
+      "metadata_provider": "deepseek",
+      "billing": "tokens",
       "refresh_hours": 24,
       "model_defaults": {
         "level": 1
@@ -156,10 +154,15 @@
       "api_url": "https://chatgpt.com/backend-api/codex",
       "model_list_url": "https://chatgpt.com/backend-api/codex/models?client_version=0.101.0",
       "model_list_format": "codex",
+      "metadata_url": "https://models.dev/api.json",
+      "metadata_format": "models_dev",
+      "metadata_provider": "openai",
+      "billing": "subscription",
       "refresh_hours": 24,
       "model_defaults": {
         "level": 1,
-        "tools": true
+        "tools": true,
+        "reasoning_summary": "auto"
       },
       "models": []
     }

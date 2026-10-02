@@ -2,6 +2,123 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "context compaction",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "removal of complete initial turns from a model request to meet its context limit without changing saved history",
+      "source": "session model selection"
+    },
+    {
+      "term": "OpenCode",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the coding-agent project that maintains Models.dev",
+      "source": "model catalog integration"
+    },
+    {
+      "term": "Codex",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the OpenAI coding-agent product and its model catalog format",
+      "source": "provider configuration"
+    },
+    {
+      "term": "Chat Completions",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the OpenAI-compatible chat-completions request and stream protocol",
+      "source": "provider configuration"
+    },
+    {
+      "term": "Models.dev",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the public model metadata and price catalog maintained by OpenCode",
+      "source": "model catalog integration"
+    },
+    {
+      "term": "Pi",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the Pi coding-agent harness that also uses Models.dev metadata",
+      "source": "model catalog integration"
+    },
+    {
+      "term": "model catalog",
+      "category": "technical_noun",
+      "approved_forms": [
+        "model catalogs"
+      ],
+      "meaning": "a source of model identifiers, capabilities, and prices",
+      "source": "model catalog integration"
+    },
+    {
+      "term": "metadata source",
+      "category": "technical_noun",
+      "approved_forms": [
+        "metadata sources"
+      ],
+      "meaning": "a configured JSON source that enriches the authoritative provider model list",
+      "source": "model catalog integration"
+    },
+    {
+      "term": "reasoning effort",
+      "category": "technical_noun",
+      "approved_forms": [
+        "reasoning efforts"
+      ],
+      "meaning": "a model-supported setting that controls reasoning work per request",
+      "source": "model reasoning configuration"
+    },
+    {
+      "term": "reasoning summary",
+      "category": "technical_noun",
+      "approved_forms": [
+        "reasoning summaries"
+      ],
+      "meaning": "provider-exposed text that summarizes a model's reasoning",
+      "source": "model reasoning display"
+    },
+    {
+      "term": "reasoning text",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "thinking text explicitly exposed by a provider for client display",
+      "source": "model reasoning display"
+    },
+    {
+      "term": "continuation data",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "private provider state retained for subsequent stateless model requests",
+      "source": "model reasoning persistence"
+    },
+    {
+      "term": "price tier",
+      "category": "technical_noun",
+      "approved_forms": [
+        "price tiers"
+      ],
+      "meaning": "token rates selected by an input-context threshold",
+      "source": "model pricing"
+    },
+    {
+      "term": "cost estimate",
+      "category": "technical_noun",
+      "approved_forms": [
+        "cost estimates"
+      ],
+      "meaning": "a calculated model-call cost based on reported usage and configured rates",
+      "source": "model pricing"
+    },
+    {
+      "term": "billing",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the provider's method for charging API or subscription access",
+      "source": "model pricing"
+    },
+    {
       "term": "unified diff",
       "category": "technical_noun",
       "approved_forms": [

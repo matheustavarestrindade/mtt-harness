@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 ALTER TABLE instances ADD COLUMN IF NOT EXISTS stopped boolean NOT NULL DEFAULT false;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS completed boolean NOT NULL DEFAULT false;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS reasoning_effort text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS messages (
 	id text PRIMARY KEY,
 	session_id text NOT NULL,
@@ -48,6 +49,7 @@ CREATE TABLE IF NOT EXISTS message_queue (
 );
 CREATE INDEX IF NOT EXISTS message_queue_session ON message_queue (session_id, seq);
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS provider_state jsonb;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS reasoning text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS events (
 	seq bigserial PRIMARY KEY,
 	instance_id text NOT NULL,
@@ -88,6 +90,11 @@ CREATE TABLE IF NOT EXISTS usage_records (
 	created_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE permissions ADD COLUMN IF NOT EXISTS instance_id text NOT NULL DEFAULT '';
+-- Earlier harness versions calculated every recorded cost from catalog rates.
+ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS cost_estimated boolean;
+UPDATE usage_records SET cost_estimated = cost_currency <> '' WHERE cost_estimated IS NULL;
+ALTER TABLE usage_records ALTER COLUMN cost_estimated SET DEFAULT false;
+ALTER TABLE usage_records ALTER COLUMN cost_estimated SET NOT NULL;
 ALTER TABLE permissions ADD COLUMN IF NOT EXISTS session_id text NOT NULL DEFAULT '';
 ALTER TABLE permissions ADD COLUMN IF NOT EXISTS target text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS providers (
@@ -123,6 +130,11 @@ CREATE TABLE IF NOT EXISTS models (
 	PRIMARY KEY (provider, id)
 );
 ALTER TABLE models ADD COLUMN IF NOT EXISTS name text NOT NULL DEFAULT '';
+ALTER TABLE models ADD COLUMN IF NOT EXISTS reasoning boolean NOT NULL DEFAULT false;
+ALTER TABLE models ADD COLUMN IF NOT EXISTS reasoning_efforts jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE models ADD COLUMN IF NOT EXISTS default_reasoning_effort text NOT NULL DEFAULT '';
+ALTER TABLE models ADD COLUMN IF NOT EXISTS reasoning_summary text NOT NULL DEFAULT '';
+ALTER TABLE models ADD COLUMN IF NOT EXISTS billing text NOT NULL DEFAULT '';
 -- Legacy false values could mean missing capability metadata. Preserve explicit
 -- false values written after this one-time nullable-column migration.
 ALTER TABLE models ADD COLUMN IF NOT EXISTS tool_support_unknown boolean;
@@ -132,6 +144,10 @@ ALTER TABLE models ALTER COLUMN tool_support_unknown SET NOT NULL;
 ALTER TABLE providers ADD COLUMN IF NOT EXISTS protocol text NOT NULL DEFAULT '';
 ALTER TABLE providers ADD COLUMN IF NOT EXISTS authentication text NOT NULL DEFAULT '';
 ALTER TABLE providers ADD COLUMN IF NOT EXISTS model_list_format text NOT NULL DEFAULT '';
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS metadata_url text NOT NULL DEFAULT '';
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS metadata_format text NOT NULL DEFAULT '';
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS metadata_provider text NOT NULL DEFAULT '';
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS billing text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS provider_oauth (
 	provider text PRIMARY KEY,
 	access_token text NOT NULL,

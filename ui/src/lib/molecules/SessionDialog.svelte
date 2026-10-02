@@ -5,6 +5,8 @@
   import { Button } from '$lib/atoms/ui/button';
   import type { Model } from '$lib/atoms/types';
   import { modelLabel } from '$lib/atoms/format';
+  import ReasoningSelect from './ReasoningSelect.svelte';
+  import ModelPricing from './ModelPricing.svelte';
   let {
     open = $bindable(false),
     models = [],
@@ -16,9 +18,11 @@
     models?: Model[];
     defaultModel?: string;
     busy?: boolean;
-    onCreate: (model: string) => Promise<void>;
+    onCreate: (model: string, effort: string) => Promise<void>;
   } = $props();
   let selectedModel = $state('');
+  let reasoningEffort = $state('');
+  const model = $derived(models.find((model) => model.ID === selectedModel));
   $effect(() => {
     if (open)
       selectedModel =
@@ -27,10 +31,15 @@
         models[0]?.ID ??
         '';
   });
+  $effect(() => {
+    selectedModel;
+    open;
+    reasoningEffort = '';
+  });
 </script>
 
 <Dialog.Root bind:open
-  ><Dialog.Content>
+  ><Dialog.Content class="max-h-[90dvh] overflow-y-auto">
     <Dialog.Header
       ><Dialog.Title>Start a session</Dialog.Title><Dialog.Description
         >A fresh conversation in the current workspace.</Dialog.Description
@@ -40,7 +49,7 @@
       class="space-y-5"
       onsubmit={(event) => {
         event.preventDefault();
-        void onCreate(selectedModel);
+        void onCreate(selectedModel, reasoningEffort);
       }}
     >
       <div class="space-y-2">
@@ -56,6 +65,13 @@
             No available models. Check the provider configuration and this instance's model list.
           </p>{/if}
       </div>
+      <ReasoningSelect
+        {model}
+        value={reasoningEffort}
+        disabled={busy}
+        onChange={(value) => (reasoningEffort = value)}
+      />
+      {#if model}<ModelPricing {model} />{/if}
       <Dialog.Footer
         ><Button class="h-11" type="submit" disabled={busy || !selectedModel}
           >{#if busy}<LoaderCircle class="size-4 animate-spin" />{:else}<MessageSquarePlus

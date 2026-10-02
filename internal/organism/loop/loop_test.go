@@ -147,6 +147,19 @@ func (testStack *stack) user(test *testing.T, session atom.Session, text string)
 	testutil.RequireNoError(test, testStack.database.Sessions().Append(context.Background(), message))
 }
 
+func (testStack *stack) selectModel(test *testing.T, session *atom.Session, modelID string) {
+	test.Helper()
+	previous, found, operationError := testStack.database.Sessions().GetModelSelection(context.Background(), session.ID)
+	testutil.RequireNoError(test, operationError)
+	if !found {
+		test.Fatal("test session was not saved")
+	}
+	next := previous
+	next.Model = modelID
+	testutil.RequireNoError(test, testStack.database.Sessions().SetModelSelection(context.Background(), session.ID, previous, next))
+	session.Model = modelID
+}
+
 func TestLoopRunsToolCall(test *testing.T) {
 	usage := atom.Usage{Input: 1_000_000, Output: 10}
 	testStack := newStack(test,

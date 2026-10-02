@@ -8,11 +8,18 @@
   import { copyToClipboard } from './clipboard';
   import MessageContent from './content/MessageContent.svelte';
   import ToolActivitySection from './ToolActivitySection.svelte';
+  import ThinkingSection from './ThinkingSection.svelte';
   let {
     message,
     tools = [],
     running = false,
-  }: { message: Message; tools?: ToolActivity[]; running?: boolean } = $props();
+    streaming = false,
+  }: {
+    message: Message;
+    tools?: ToolActivity[];
+    running?: boolean;
+    streaming?: boolean;
+  } = $props();
   const text = $derived(messageText(message));
   async function copyText() {
     try {
@@ -55,6 +62,10 @@
       >
     </div>
     <div class="flex min-w-0 flex-col gap-1">
+      {#if message.Role === 'assistant' && message.Reasoning}<ThinkingSection
+          text={message.Reasoning}
+          {streaming}
+        />{/if}
       <MessageContent
         content={message.Content}
         mode={message.Role === 'user' || message.Role === 'runtime' ? 'plain' : 'markdown'}

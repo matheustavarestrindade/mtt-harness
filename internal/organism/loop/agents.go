@@ -38,14 +38,19 @@ func (agentLoop *Loop) RunAgentTask(operationContext context.Context, task atom.
 		}
 	}
 	child := atom.Session{
-		ID:         atom.SessionID(newID()),
-		InstanceID: parent.InstanceID,
-		Parent:     parent.ID,
-		Depth:      depth,
-		Model:      model,
-		CreatedAt:  time.Now(),
+		ID:              atom.SessionID(newID()),
+		InstanceID:      parent.InstanceID,
+		Parent:          parent.ID,
+		Depth:           depth,
+		Model:           model,
+		ReasoningEffort: task.ReasoningEffort,
+		CreatedAt:       time.Now(),
 	}
-	if _, _, operationError := agentLoop.resolveModel(child.InstanceID, child.Model); operationError != nil {
+	modelInfo, _, operationError := agentLoop.resolveModel(child.InstanceID, child.Model)
+	if operationError != nil {
+		return atom.ToolResult{}, operationError
+	}
+	if operationError := modelInfo.ValidateReasoningEffort(child.ReasoningEffort); operationError != nil {
 		return atom.ToolResult{}, operationError
 	}
 	if operationError := agentLoop.configuration.Store.Sessions().Save(operationContext, child); operationError != nil {

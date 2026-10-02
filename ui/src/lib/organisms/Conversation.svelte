@@ -41,11 +41,19 @@
   let feed: HTMLDivElement;
   let following = $state(true);
   let previousSession = '';
-  const entries = $derived(buildConversationEntries(workbench.messages));
+  const entries = $derived(
+    buildConversationEntries(
+      workbench.liveMessage ? [...workbench.messages, workbench.liveMessage] : workbench.messages,
+    ),
+  );
   $effect(() => {
     const sessionID = workbench.session?.ID ?? '';
     const changes =
-      workbench.messages.length + workbench.permissions.length + workbench.receipts.length;
+      workbench.messages.length +
+      workbench.permissions.length +
+      workbench.receipts.length +
+      (workbench.liveMessage?.Reasoning?.length ?? 0) +
+      (workbench.liveMessage?.Content?.[0]?.Text.length ?? 0);
     if (sessionID !== previousSession) {
       previousSession = sessionID;
       following = true;
@@ -78,7 +86,7 @@
             ><LoaderCircle class="size-4 animate-spin" />Loading conversation…</span
           >
         </div>
-      {:else if !workbench.messages.length && !workbench.receipts.length}
+      {:else if !workbench.messages.length && !workbench.receipts.length && !workbench.liveMessage}
         <section class="flex flex-1 flex-col items-center justify-center py-8 text-center sm:py-12">
           <div
             class="quiet-grid mb-6 grid size-28 place-items-center rounded-3xl border border-border/50 bg-muted/30"
@@ -145,6 +153,7 @@
               message={entry.message}
               tools={entry.tools}
               running={workbench.status.running}
+              streaming={entry.message.ID === workbench.liveMessage?.ID}
             />{/each}
           {#each workbench.receipts as receipt (receipt.ID)}<div class="chat-message user-message">
               <div class="mb-1 flex items-center gap-2 text-[10px] text-muted-foreground">

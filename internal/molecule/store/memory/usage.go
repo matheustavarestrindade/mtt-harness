@@ -24,6 +24,7 @@ func (database *Store) sessionTree(root atom.SessionID) map[atom.SessionID]bool 
 func statistics(records []atom.UsageRecord) atom.Statistics {
 	statistics := atom.Statistics{Calls: len(records)}
 	totals := map[string]float64{}
+	estimates := map[string]bool{}
 	for _, record := range records {
 		statistics.Input += record.Usage.Input
 		statistics.CacheRead += record.Usage.CacheRead
@@ -32,6 +33,7 @@ func statistics(records []atom.UsageRecord) atom.Statistics {
 		statistics.Reasoning += record.Usage.Reasoning
 		if record.Usage.Cost != nil {
 			totals[record.Usage.Cost.Currency] += record.Usage.Cost.Value
+			estimates[record.Usage.Cost.Currency] = estimates[record.Usage.Cost.Currency] || record.Usage.Cost.Estimated
 		}
 	}
 	currencies := make([]string, 0, len(totals))
@@ -40,7 +42,7 @@ func statistics(records []atom.UsageRecord) atom.Statistics {
 	}
 	sort.Strings(currencies)
 	for _, currency := range currencies {
-		statistics.Costs = append(statistics.Costs, atom.Cost{Currency: currency, Value: totals[currency]})
+		statistics.Costs = append(statistics.Costs, atom.Cost{Currency: currency, Value: totals[currency], Estimated: estimates[currency]})
 	}
 	if len(statistics.Costs) == 1 {
 		cost := statistics.Costs[0]
