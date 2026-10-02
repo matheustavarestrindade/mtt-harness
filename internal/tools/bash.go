@@ -25,7 +25,7 @@ func (bashTool *Bash) Name() string {
 }
 
 func (bashTool *Bash) Description() string {
-	return "Execute a shell command or script with sh -c in the instance workspace. By default, wait for exit and return retained stdout and stderr (last 256 KiB per stream). Set wait=false to return a process ID immediately for process_output or process_kill. timeout and interval are in milliseconds."
+	return "Execute a shell command or script with sh -c in the instance workspace. By default, wait for exit and return retained stdout and stderr (last 256 KiB per stream) as the tool result, without a separate process notification. Set wait=false to return a process ID immediately for process_output or process_kill and enable background notifications. timeout and interval are in milliseconds."
 }
 
 func (bashTool *Bash) Categories() []string {
@@ -43,17 +43,17 @@ func (bashTool *Bash) InputSchema() atom.Schema {
 			"wait": {
 				"type": "boolean",
 				"default": true,
-				"description": "Wait for process exit and return its retained output. Set false to return the process ID immediately. Cancelling the wait does not stop the process; use process_kill to stop it."
+				"description": "Wait for process exit and return its retained output only as the tool result; no separate session notifications are sent. Set false to return the process ID immediately and use the notify policy. Cancelling the wait does not stop the process; use process_kill to stop it."
 			},
 			"notify": {
 				"type": "string",
-				"enum": ["exit", "error", "interval"],
+				"enum": ["none", "exit", "error", "interval"],
 				"default": "exit",
-				"description": "Session notification policy: exit sends a notification when the process stops; error only reports an error exit; interval sends periodic updates and a final exit notification."
+				"description": "Background notification policy for wait=false: none disables updates; exit sends a runtime update when the process stops; error only reports an error exit; interval sends periodic updates and a final exit update. Ignored when wait=true, which returns output only through the tool result. Default: exit."
 			},
 			"interval": {
 				"type": "integer",
-				"description": "Notification interval in milliseconds (ms). Required and greater than zero when notify is interval; ignored for other modes. For example, 1000 means one second."
+				"description": "Background notification interval in milliseconds (ms). Required and greater than zero when wait=false and notify is interval; ignored when wait=true or for other modes. For example, 1000 means one second."
 			},
 			"timeout": {
 				"type": "integer",
@@ -82,10 +82,16 @@ func (bashTool *Bash) Run(operationContext context.Context, call atom.ToolCall) 
 	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "bash: the input is not correct"}, operationError
 	}
+	waitForExit := input.Wait == nil || *input.Wait
 	processSpec := atom.ProcessSpec{
 		Command: "sh",
 		Args:    []string{"-c", input.Command},
 		Notify:  atom.NotifyPolicy{Mode: atom.NotifyMode(input.Notify)},
+	}
+	// The tool owns foreground output. Set delivery before Start so even an
+	// immediately exiting command cannot queue a duplicate notification.
+	if waitForExit {
+		processSpec.Notify.Mode = atom.NotifyNone
 	}
 	workspace, found := harness.WorkspaceFrom(operationContext)
 	if !found {
@@ -102,11 +108,7 @@ func (bashTool *Bash) Run(operationContext context.Context, call atom.ToolCall) 
 	if operationError != nil {
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
 	}
-	wait := true
-	if input.Wait != nil {
-		wait = *input.Wait
-	}
-	if !wait {
+	if !waitForExit {
 		return atom.ToolResult{
 			CallID:  call.ID,
 			Status:  atom.StatusOK,

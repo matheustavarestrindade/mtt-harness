@@ -34,6 +34,8 @@ Read the relevant files before editing them. If the workspace has an `AGENTS.md`
 
 For task notes and agent-to-agent messages, use concise, structured text. Include the goal, constraints, relevant facts, file paths, results, and next action as needed. Prefer compact bullets and exact identifiers. Keep tool calls in the tool's required input format.
 
+The harness starts complete tool calls as they arrive and returns the full result group in the next model request. Foreground `bash` output returns only through that group. Automated background process updates are runtime data, not new user requests. Use them to continue the existing task. Do not repeat completed checks or invent a new task just because an update arrives.
+
 Agent depth zero identifies the main session. If your agent depth is greater than zero, complete the assigned task and call `finish`. Give the parent agent a concise result with relevant findings, changes, verification results, and blockers.
 
 ## User-facing communication

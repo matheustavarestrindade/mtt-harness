@@ -9,7 +9,6 @@
     Terminal,
     RefreshCw,
     GitBranch,
-    PlugZap,
   } from 'lucide-svelte';
   import { Button } from '$lib/atoms/ui/button';
   import { Separator } from '$lib/atoms/ui/separator';
@@ -19,24 +18,20 @@
   import { shortID, workspaceName } from '$lib/atoms/format';
   let {
     console: workbench,
-    onConnection,
+    onSettings,
     onWorkspace,
     onSession,
     onSelectInstance,
     onSelectSession,
     onRefresh,
-    onProviders,
-    providersOpen = false,
   }: {
     console: HarnessConsole;
-    onConnection: () => void;
+    onSettings: () => void;
     onWorkspace: () => void;
     onSession: () => void;
     onSelectInstance: (instance: Instance) => void;
     onSelectSession: (session: Session) => void;
     onRefresh: () => void;
-    onProviders: () => void;
-    providersOpen?: boolean;
   } = $props();
 </script>
 
@@ -77,9 +72,7 @@
             .instance?.ID === instance.ID
             ? 'bg-accent text-accent-foreground'
             : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
-          aria-current={!providersOpen && workbench.instance?.ID === instance.ID
-            ? 'page'
-            : undefined}
+          aria-current={workbench.instance?.ID === instance.ID ? 'page' : undefined}
           title={instance.Workspace}
           onclick={() => onSelectInstance(instance)}
         >
@@ -120,7 +113,7 @@
             .session?.ID === session.ID
             ? 'bg-accent text-accent-foreground ring-1 ring-inset ring-border'
             : 'text-muted-foreground hover:bg-muted'}"
-          aria-current={!providersOpen && workbench.session?.ID === session.ID ? 'page' : undefined}
+          aria-current={workbench.session?.ID === session.ID ? 'page' : undefined}
           onclick={() => onSelectSession(session)}
         >
           {#if session.Parent}<GitBranch class="size-4 shrink-0" />{:else}<MessageSquare
@@ -141,18 +134,6 @@
       {/each}
     </div>
   </div>
-  <div class="px-3 pb-3">
-    <Button
-      variant={providersOpen ? 'secondary' : 'ghost'}
-      class="h-12 w-full justify-start gap-3 px-3"
-      disabled={workbench.connection !== 'connected'}
-      onclick={onProviders}
-      aria-current={providersOpen ? 'page' : undefined}
-      ><PlugZap class="size-4" /><span class="text-xs font-medium">Providers</span><span
-        class="ml-auto text-[10px] text-muted-foreground">OpenAI · DeepSeek</span
-      ></Button
-    >
-  </div>
   <div class="mx-4 mb-4 rounded-xl border border-border bg-background/35 p-3.5">
     <div class="mb-1.5 flex items-center gap-2 text-xs font-medium">
       <Terminal class="size-3.5 text-primary" />Your tools. Your workspace.
@@ -163,7 +144,7 @@
   </div>
   <button
     class="flex min-h-16 items-center gap-3 border-t border-border px-5 text-left hover:bg-muted"
-    onclick={onConnection}
+    onclick={onSettings}
   >
     <span class="relative grid size-8 place-items-center rounded-full bg-secondary"
       ><Settings2 class="size-4 text-muted-foreground" /><span
@@ -174,7 +155,7 @@
       ></span></span
     >
     <span class="flex-1"
-      ><span class="block text-xs font-medium">Connection settings</span><span
+      ><span class="block text-xs font-medium">Settings</span><span
         class="mt-0.5 block text-[10px] text-muted-foreground"
         >{workbench.connection === 'connected'
           ? 'Harness connected'

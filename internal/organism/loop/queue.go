@@ -45,6 +45,16 @@ func (messageQueue *Queue) Submit(operationContext context.Context, session atom
 }
 
 func (messageQueue *Queue) SubmitContent(operationContext context.Context, session atom.Session, content []atom.Content) (atom.Message, int, error) {
+	return messageQueue.submitContent(operationContext, session, content, atom.RoleUser)
+}
+
+// SubmitRuntimeContent queues background data without attributing it to the
+// user. It uses the same durable admission and lifecycle gates as user input.
+func (messageQueue *Queue) SubmitRuntimeContent(operationContext context.Context, session atom.Session, content []atom.Content) (atom.Message, int, error) {
+	return messageQueue.submitContent(operationContext, session, content, atom.RoleRuntime)
+}
+
+func (messageQueue *Queue) submitContent(operationContext context.Context, session atom.Session, content []atom.Content, role atom.Role) (atom.Message, int, error) {
 	if operationError := validateMessageContent(content); operationError != nil {
 		return atom.Message{}, 0, operationError
 	}
@@ -53,7 +63,7 @@ func (messageQueue *Queue) SubmitContent(operationContext context.Context, sessi
 	for index := range ownedContent {
 		ownedContent[index].Data = append([]byte(nil), content[index].Data...)
 	}
-	message := atom.Message{ID: newID(), SessionID: session.ID, Role: atom.RoleUser, Content: ownedContent, CreatedAt: time.Now()}
+	message := atom.Message{ID: newID(), SessionID: session.ID, Role: role, Content: ownedContent, CreatedAt: time.Now()}
 	coordinator, operationError := messageQueue.coordinator(operationContext, session, true)
 	if operationError != nil {
 		return atom.Message{}, 0, operationError

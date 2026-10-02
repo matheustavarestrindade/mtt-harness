@@ -99,8 +99,9 @@ run(instance, session):
         message = pipe("model.response", stream)
         write(message)
 
-        for task in tasks:
-            result = pipe("tool.result", wait(task))
+        results = wait_all(tasks)                     # tool plan sequence
+        for completed_result in results:
+            result = pipe("tool.result", completed_result)
             write(result)
 
         if tasks is empty:
@@ -115,7 +116,7 @@ Requirements:
 - R4: The loop must start a tool call when the harness reads the full input of the tool call.
 - R5: The loop must run the tool calls of one message at the same time.
 - R6: The loop must write a tool result when the tool call stops.
-- R7: The loop must wait for the tool results before the next model call.
+- R7: The loop must wait for the full tool result group before the next model call. One request must contain the full group.
 - R8: The loop must stop when the model message does not have a tool call.
 - R9: The loop must send the value of a stage through the pipeline of the stage.
 - R10: The harness must run the messages of a session in sequence.
@@ -133,6 +134,8 @@ waiting and running messages for the harness: 4096
 The next program start reads the queue. A message which did not start can continue. The harness writes `run.interrupted` for a turn which cannot continue after the program stops. The harness does not run the tool plan of the turn again.
 
 The event record keeps a tool result when the tool stops. The message record keeps the sequence from the tool plan.
+
+The harness starts a tool when the full input is available during the model stream. A tool result does not start a new model request. The next model request contains the full tool result group. The group includes a tool error or a denied tool result.
 
 ### 4.1 Session Coordinator
 
@@ -457,7 +460,9 @@ Requirements:
 
 ### 6.3 Context Limit
 
-The context limit is `ModelInfo.ContextMax`. The harness keeps the system messages and the last turn. When the context is too large, the harness removes the initial turn from the request. A turn includes the tool calls and the tool results. The database keeps the full message history.
+The context limit is `ModelInfo.ContextMax`. The harness keeps the system messages and the last turn. When the context is too large, the harness removes the initial turn from the request. A turn includes the tool calls and the tool results.
+
+User input or a runtime notification can start a turn. The database keeps the full message history.
 
 If the last turn is too large, the harness gives an error. The harness does not send the request. A provider can implement `TokenCounter` for the token count. The default token estimate uses text bytes and a media allowance. The estimate is not the usage. The provider response gives the usage.
 
@@ -780,13 +785,20 @@ type ProcessWatcher interface {
 
 ### 11.1 Notification Policy
 
-The tool call gives the notification policy for a process. The policy has the mode and the interval. The mode is one of 3 values:
+The tool call gives the notification policy for a background process. The policy has the mode and the interval. The mode is one of 4 values:
 
+- `none`: the harness does not send a notification.
 - `exit`: the harness sends one notification when the process stops.
 - `error`: the harness sends one notification when the process stops with an error status.
 - `interval`: the harness sends one notification at the interval.
 
 The interval is a number of milliseconds. The default mode is `exit`. A notification is a message in the session. Thus, the model reads the notification on the next turn.
+
+The default value of `wait` for `bash` is `true`. The output goes into the tool result group. The process uses mode `none` before it starts. It does not send a notification for the output. The notification parameters apply only when `wait` is `false`.
+
+A runtime notification has the message role `runtime`. It is process data, not a user request or a system instruction. The queue keeps the message role. The UI shows the message as `Runtime`.
+
+The provider request uses the role `user` for the runtime notification. The notification is context data. It is not a system instruction or a tool result. The content gives the message source.
 
 The unit for the `timeout` and `interval` input of `bash` is milliseconds. For example, `timeout: 60000` gives a limit of 60 seconds.
 
@@ -794,7 +806,7 @@ The default timeout is `0`. With `timeout: 0`, the harness does not stop the pro
 
 The default value of `wait` is `true`. A value of `false` gives the process ID immediately. When the user cancels a tool call, the process continues. Use `process_kill` to stop the process.
 
-The `interval` parameter must be a minimum of 1 millisecond when `notify` is `interval`. The mode `exit` or `error` does not use the interval. The mode `interval` also sends a notification when the process stops.
+The `interval` parameter must be a minimum of 1 millisecond when `wait` is `false` and `notify` is `interval`. The values `none`, `exit`, and `error` do not use the interval. The mode `interval` also sends a notification when the process stops.
 
 The process manager keeps the process after the initial turn stops. The process manager writes the exit status with an active database context. Output goes through `process.output` before the output buffer, watchers, and notifications.
 
@@ -809,11 +821,11 @@ Requirements:
 - R101: The harness must have a limit for the output buffer.
 - R102: The harness must stop a process after the timeout.
 - R103: A tool call must give the notification policy of the process.
-- R104: The notification policy must have the mode `exit`, `error`, or `interval`.
+- R104: The notification policy must have the mode `none`, `exit`, `error`, or `interval`.
 - R105: On the mode `exit`, the harness must send a notification when the process stops.
 - R106: On the mode `error`, the harness must send a notification when the process stops with an error status.
 - R107: On the mode `interval`, the harness must send a notification at the interval.
-- R108: The default notification mode must be `exit`.
+- R108: The default notification mode for a background process must be `exit`. A tool which waits for the process must use `none`.
 - R109: The harness must send a process event through the `process.output` stage before the watchers.
 
 ## 12. Agents

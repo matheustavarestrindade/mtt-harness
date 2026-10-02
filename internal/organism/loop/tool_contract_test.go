@@ -127,6 +127,12 @@ func TestDiscoveredToolContractsReachProviderRequests(test *testing.T) {
 	if bashProperties["timeout"].Default != float64(0) || bashProperties["wait"].Default != true || bashProperties["notify"].Default != "exit" {
 		test.Fatalf("bash defaults disappeared: %+v", bashProperties)
 	}
+	if !strings.Contains(bashProperties["wait"].Description, "no separate session notifications") || !strings.Contains(bashProperties["notify"].Description, "wait=false") || !strings.Contains(bashProperties["notify"].Description, "Ignored when wait=true") {
+		test.Fatalf("foreground/background delivery instructions disappeared: %+v", bashProperties)
+	}
+	if !strings.Contains(strings.Join(bashProperties["notify"].Enum, ","), "none") {
+		test.Fatal("the provider definition omitted the background notification opt-out")
+	}
 	modelProperty := definitions["agent"].Function.Parameters.Properties["model"]
 	if !strings.Contains(modelProperty.Description, "instance default model") || !strings.Contains(modelProperty.Description, "Available models:") || len(modelProperty.Enum) != 2 {
 		test.Fatalf("model choices replaced the parameter contract: %+v", modelProperty)

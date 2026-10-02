@@ -6,39 +6,38 @@
     FolderOpen,
     MessageSquarePlus,
     Radio,
-    Cable,
+    Settings2,
     CircleAlert,
     LoaderCircle,
-    ArrowLeft,
   } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
   import { Toaster } from '$lib/atoms/ui/sonner';
   import { Button } from '$lib/atoms/ui/button';
   import * as Sheet from '$lib/atoms/ui/sheet';
   import Navigation from '$lib/organisms/Navigation.svelte';
-  import ConnectionDialog from '$lib/molecules/ConnectionDialog.svelte';
+  import SettingsDialog from '$lib/organisms/SettingsDialog.svelte';
   import WorkspaceDialog from '$lib/molecules/WorkspaceDialog.svelte';
   import SessionDialog from '$lib/molecules/SessionDialog.svelte';
   import ActivityDialog from '$lib/molecules/ActivityDialog.svelte';
   import Conversation from '$lib/organisms/Conversation.svelte';
   import Composer from '$lib/molecules/Composer.svelte';
   import UsageBar from '$lib/molecules/UsageBar.svelte';
-  import ProvidersPanel from '$lib/organisms/ProvidersPanel.svelte';
   import { HarnessConsole } from '$lib/organisms/console.svelte';
   import { ApiError } from '$lib/molecules/api/client';
   import { loadConnection, type ConnectionPreferences } from '$lib/molecules/connection-storage';
   import { shortID, workspaceName } from '$lib/atoms/format';
   import type { Instance, InstanceInput, Session } from '$lib/atoms/types';
+  import type { SettingsSection } from '$lib/atoms/settings';
 
   const workbench = new HarnessConsole();
   let preferences = $state<ConnectionPreferences>({ base: '/api', token: '' });
-  let connectionOpen = $state(false);
+  let settingsOpen = $state(false);
+  let settingsSection = $state<SettingsSection>('general');
   let workspaceOpen = $state(false);
   let workspaceError = $state('');
   let sessionOpen = $state(false);
   let activityOpen = $state(false);
   let menuOpen = $state(false);
-  let providersOpen = $state(false);
   let busy = $state('');
   let sending = $state(false);
   let drafts = $state<Record<string, string>>({});
@@ -57,9 +56,11 @@
         : 'Connect API',
   );
 
-  $effect(() => {
-    if (workbench.connection !== 'connected') providersOpen = false;
-  });
+  function openSettings(section?: SettingsSection) {
+    menuOpen = false;
+    settingsSection = section ?? (workbench.connection === 'connected' ? 'general' : 'connection');
+    settingsOpen = true;
+  }
 
   $effect(() => {
     if (workspaceOpen) workspaceError = '';
@@ -72,7 +73,7 @@
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The operation failed.';
       toast.error(message);
-      if (error instanceof ApiError && error.status === 401) connectionOpen = true;
+      if (error instanceof ApiError && error.status === 401) openSettings('connection');
     } finally {
       if (busy === name) busy = '';
     }
@@ -82,7 +83,7 @@
       await workbench.connect(base, token);
       if (workbench.connection !== 'connected') return;
       preferences = { base, token };
-      connectionOpen = false;
+      settingsOpen = false;
       toast.success('Connected to the harness');
     });
   }
@@ -119,12 +120,10 @@
     });
   }
   function selectInstance(instance: Instance) {
-    providersOpen = false;
     menuOpen = false;
     void runWorkbenchAction('select', () => workbench.selectInstance(instance));
   }
   function selectSession(session: Session) {
-    providersOpen = false;
     menuOpen = false;
     void runWorkbenchAction('select', () => workbench.selectSession(session));
   }
@@ -164,28 +163,18 @@
 {#snippet navigation()}
   <Navigation
     console={workbench}
-    onConnection={() => {
-      menuOpen = false;
-      connectionOpen = true;
-    }}
+    onSettings={() => openSettings()}
     onWorkspace={() => {
-      providersOpen = false;
       menuOpen = false;
       workspaceOpen = true;
     }}
     onSession={() => {
-      providersOpen = false;
       menuOpen = false;
       sessionOpen = true;
     }}
     onSelectInstance={selectInstance}
     onSelectSession={selectSession}
     onRefresh={() => void runWorkbenchAction('refresh', () => workbench.refreshInstances())}
-    {providersOpen}
-    onProviders={() => {
-      menuOpen = false;
-      providersOpen = true;
-    }}
   />
 {/snippet}
 
@@ -210,21 +199,13 @@
           <FolderOpen class="hidden size-4 shrink-0 text-muted-foreground sm:block" /><span
             class="truncate font-medium"
             title={workbench.instance?.Workspace}
-            >{providersOpen
-              ? 'Providers'
-              : workbench.instance
-                ? workspaceName(workbench.instance.Workspace)
-                : 'Workspace'}</span
+            >{workbench.instance ? workspaceName(workbench.instance.Workspace) : 'Workspace'}</span
           ><ChevronRight class="size-3 shrink-0 text-muted-foreground/50" /><span
             class="truncate text-xs text-muted-foreground"
-            >{providersOpen
-              ? 'Connections'
-              : workbench.session
-                ? `Session ${shortID(workbench.session.ID)}`
-                : 'Overview'}</span
+            >{workbench.session ? `Session ${shortID(workbench.session.ID)}` : 'Overview'}</span
           >
         </div>
-        {#if !providersOpen && workbench.session}<p
+        {#if workbench.session}<p
             class="mt-0.5 truncate font-mono text-[10px] text-muted-foreground"
             title={workbench.session.Model}
           >
@@ -235,113 +216,95 @@
         <Button
           variant="ghost"
           class="icon-button gap-2 px-2 text-xs sm:px-3"
-          onclick={() => (connectionOpen = true)}
+          onclick={() => openSettings()}
           title={connectionLabel}
-          aria-label="Connection settings"
+          aria-label="Open settings"
           ><span
             class="hidden size-1.5 rounded-full sm:block {workbench.connection === 'connected'
               ? 'bg-primary'
               : 'bg-muted-foreground'}"
-          ></span><span class="hidden sm:inline">{connectionLabel}</span><Cable
-            class="size-4 sm:hidden"
+          ></span><span class="hidden sm:inline">{connectionLabel}</span><Settings2
+            class="size-4"
           /></Button
         >
-        {#if providersOpen}
-          <Button
-            variant="outline"
-            class="icon-button px-3 text-xs"
-            onclick={() => (providersOpen = false)}
-            aria-label="Back to conversation"
-            ><ArrowLeft class="size-4" /><span class="hidden sm:inline">Back</span></Button
-          >
-        {:else}
-          <Button
-            variant="ghost"
-            size="icon"
-            class="icon-button text-muted-foreground"
-            disabled={!workbench.session}
-            title="Session activity"
-            aria-label="Session activity"
-            onclick={() => (activityOpen = true)}><Radio class="size-4" /></Button
-          ><Button
-            variant="outline"
-            class="icon-button px-3 text-xs"
-            disabled={!workbench.instance || workbench.instance.Stopped}
-            title="New session"
-            onclick={() => (sessionOpen = true)}
-            ><MessageSquarePlus class="size-4" /><span class="hidden sm:inline">New session</span
-            ><span class="sr-only sm:hidden">New session</span></Button
-          >
-        {/if}
+        <Button
+          variant="ghost"
+          size="icon"
+          class="icon-button text-muted-foreground"
+          disabled={!workbench.session}
+          title="Session activity"
+          aria-label="Session activity"
+          onclick={() => (activityOpen = true)}><Radio class="size-4" /></Button
+        ><Button
+          variant="outline"
+          class="icon-button px-3 text-xs"
+          disabled={!workbench.instance || workbench.instance.Stopped}
+          title="New session"
+          onclick={() => (sessionOpen = true)}
+          ><MessageSquarePlus class="size-4" /><span class="hidden sm:inline">New session</span
+          ><span class="sr-only sm:hidden">New session</span></Button
+        >
       </div>
     </header>
     <main class="flex min-h-0 min-w-0 flex-1 flex-col" id="main-content">
-      {#if providersOpen && workbench.connection === 'connected'}
-        <ProvidersPanel
-          api={workbench.providerClient()}
-          onChanged={() => workbench.refreshProviderCatalog()}
-        />
-      {:else}
-        {#if workbench.error}<div
-            role="alert"
-            class="flex shrink-0 items-start gap-2 border-b border-destructive/20 bg-destructive/5 px-4 py-3 text-xs leading-5 text-destructive sm:px-8"
-          >
-            <CircleAlert class="mt-0.5 size-4 shrink-0" /><span class="min-w-0 flex-1 break-words"
-              >{workbench.error}</span
-            ><Button
-              variant="ghost"
-              class="h-11 shrink-0 text-xs"
-              onclick={() => (connectionOpen = true)}>Connection</Button
-            >
-          </div>{/if}
-        {#if workbench.connection === 'connecting'}<div
-            class="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground"
-            role="status"
-          >
-            <LoaderCircle class="size-3.5 animate-spin" />Connecting to your harness…
-          </div>{/if}
-        <Conversation
-          console={workbench}
-          {busy}
-          onConnection={() => (connectionOpen = true)}
-          onWorkspace={() => (workspaceOpen = true)}
-          onSession={() => (sessionOpen = true)}
-          onResume={() => void runWorkbenchAction('resume', () => workbench.resumeInstance())}
-          onCancelQueued={(identifier) =>
-            void runWorkbenchAction(identifier, () => workbench.cancelQueuedMessage(identifier))}
-          onDecision={resolvePermissionRequest}
-          onPrompt={(text) => {
-            if (sessionID) drafts[sessionID] = text;
-          }}
-        />
-        <footer
-          class="shrink-0 bg-background px-3 pt-2 sm:px-8"
-          style="padding-bottom: max(.5rem, env(safe-area-inset-bottom))"
+      {#if workbench.error}<div
+          role="alert"
+          class="flex shrink-0 items-start gap-2 border-b border-destructive/20 bg-destructive/5 px-4 py-3 text-xs leading-5 text-destructive sm:px-8"
         >
-          <div class="mx-auto max-w-4xl">
-            <Composer
-              bind:value={() => drafts[sessionID] ?? '', (value) => (drafts[sessionID] = value)}
-              {disabled}
-              {sending}
-              running={workbench.status.running}
-              cancelling={busy === 'cancel'}
-              onSend={() => void sendDraftMessage()}
-              onCancel={() =>
-                void runWorkbenchAction('cancel', () => workbench.cancelCurrentTurn())}
-            />
-            <div class="mt-1 flex items-center justify-between gap-2">
-              <UsageBar statistics={workbench.statistics} /><span
-                class="hidden shrink-0 text-[10px] text-muted-foreground/65 sm:block"
-                >{workbench.session
-                  ? workbench.streamState === 'live'
-                    ? 'Events connected'
-                    : 'Syncing through the API'
-                  : 'mtt-harness · API client'}</span
-              >
-            </div>
+          <CircleAlert class="mt-0.5 size-4 shrink-0" /><span class="min-w-0 flex-1 break-words"
+            >{workbench.error}</span
+          ><Button
+            variant="ghost"
+            class="h-11 shrink-0 text-xs"
+            onclick={() => openSettings('connection')}>Connection</Button
+          >
+        </div>{/if}
+      {#if workbench.connection === 'connecting'}<div
+          class="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground"
+          role="status"
+        >
+          <LoaderCircle class="size-3.5 animate-spin" />Connecting to your harness…
+        </div>{/if}
+      <Conversation
+        console={workbench}
+        {busy}
+        onConnection={() => openSettings('connection')}
+        onWorkspace={() => (workspaceOpen = true)}
+        onSession={() => (sessionOpen = true)}
+        onResume={() => void runWorkbenchAction('resume', () => workbench.resumeInstance())}
+        onCancelQueued={(identifier) =>
+          void runWorkbenchAction(identifier, () => workbench.cancelQueuedMessage(identifier))}
+        onDecision={resolvePermissionRequest}
+        onPrompt={(text) => {
+          if (sessionID) drafts[sessionID] = text;
+        }}
+      />
+      <footer
+        class="shrink-0 bg-background px-3 pt-2 sm:px-8"
+        style="padding-bottom: max(.5rem, env(safe-area-inset-bottom))"
+      >
+        <div class="mx-auto max-w-4xl">
+          <Composer
+            bind:value={() => drafts[sessionID] ?? '', (value) => (drafts[sessionID] = value)}
+            {disabled}
+            {sending}
+            running={workbench.status.running}
+            cancelling={busy === 'cancel'}
+            onSend={() => void sendDraftMessage()}
+            onCancel={() => void runWorkbenchAction('cancel', () => workbench.cancelCurrentTurn())}
+          />
+          <div class="mt-1 flex items-center justify-between gap-2">
+            <UsageBar statistics={workbench.statistics} /><span
+              class="hidden shrink-0 text-[10px] text-muted-foreground/65 sm:block"
+              >{workbench.session
+                ? workbench.streamState === 'live'
+                  ? 'Events connected'
+                  : 'Syncing through the API'
+                : 'mtt-harness · API client'}</span
+            >
           </div>
-        </footer>
-      {/if}
+        </div>
+      </footer>
     </main>
   </div>
 </div>
@@ -355,18 +318,22 @@
     >{@render navigation()}</Sheet.Content
   ></Sheet.Root
 >
-<ConnectionDialog
-  bind:open={connectionOpen}
+<SettingsDialog
+  bind:open={settingsOpen}
+  bind:section={settingsSection}
+  api={workbench.connection === 'connected' ? workbench.connectedAPIClient() : null}
+  instance={workbench.instance}
+  session={workbench.session}
   initialBase={preferences.base}
   initialToken={preferences.token}
   busy={busy === 'connect'}
   error={workbench.connection === 'error' ? workbench.error : ''}
-  connected={workbench.connection === 'connected'}
   onConnect={connect}
+  onProvidersChanged={() => workbench.refreshProviderCatalog()}
   onDisconnect={() => {
     workbench.disconnect();
     preferences = { base: preferences.base, token: '' };
-    connectionOpen = false;
+    settingsOpen = false;
     toast.info('Disconnected');
   }}
 />

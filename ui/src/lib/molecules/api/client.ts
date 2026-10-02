@@ -11,6 +11,7 @@ import type {
   Session,
   Statistics,
 } from '../../atoms/types';
+import type { RuntimeSettings, RuntimeSettingKey } from '../../atoms/settings';
 
 export class ApiError extends Error {
   constructor(
@@ -216,6 +217,39 @@ export class HarnessApi {
       undefined,
       signal,
     );
+  }
+  harnessStatistics(signal?: AbortSignal) {
+    return this.request<Statistics>('statistics', 'GET', undefined, signal);
+  }
+  instanceStatistics(instanceID: string, signal?: AbortSignal) {
+    return this.request<Statistics>(
+      `instances/${encodeURIComponent(instanceID)}/statistics`,
+      'GET',
+      undefined,
+      signal,
+    );
+  }
+  async settings(instanceID: string, signal?: AbortSignal): Promise<RuntimeSettings> {
+    const prefix = instanceID ? `instances/${encodeURIComponent(instanceID)}/` : '';
+    const values = await this.request<Record<string, string> | null>(
+      `${prefix}settings`,
+      'GET',
+      undefined,
+      signal,
+    );
+    // Only retain editable limits; the settings response can also contain the API token.
+    return {
+      agent_depth_limit: values?.agent_depth_limit,
+      process_limit: values?.process_limit,
+    };
+  }
+  saveSetting(instanceID: string, key: RuntimeSettingKey, value: string, signal?: AbortSignal) {
+    const prefix = instanceID ? `instances/${encodeURIComponent(instanceID)}/` : '';
+    return this.request(`${prefix}settings/${key}`, 'PUT', { value }, signal);
+  }
+  deleteSetting(instanceID: string, key: RuntimeSettingKey, signal?: AbortSignal) {
+    const prefix = instanceID ? `instances/${encodeURIComponent(instanceID)}/` : '';
+    return this.request(`${prefix}settings/${key}`, 'DELETE', undefined, signal);
   }
   sendMessage(sessionID: string, content: string) {
     return this.request<AcceptedMessage>(

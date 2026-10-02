@@ -171,14 +171,11 @@
   });
 </script>
 
-<section
-  aria-label="Provider setup"
-  class="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 sm:px-8 sm:py-8"
->
+<section aria-label="Provider setup" class="min-w-0">
   <div class="mx-auto max-w-5xl">
     <div class="mb-7 flex items-start justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-medium tracking-tight">Providers</h1>
+        <h2 class="text-xl font-medium tracking-tight">Providers</h2>
         <p class="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
           Connect OpenAI or DeepSeek. Keys and account credentials stay in the harness database, not
           in this browser.
@@ -197,7 +194,7 @@
         <LoaderCircle class="size-4 animate-spin" />Loading providers…
       </p>{/if}
     {#if error}<p role="alert" class="mb-4 break-words text-sm text-destructive">{error}</p>{/if}
-    <div class="grid items-start gap-4 xl:grid-cols-2">
+    <div class="grid min-w-0 items-start gap-4">
       {#each keyProviders as provider (provider.Name)}
         <ProviderKeyCard
           {provider}

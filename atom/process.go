@@ -5,6 +5,7 @@ import "time"
 type NotifyMode string
 
 const (
+	NotifyNone     NotifyMode = "none"
 	NotifyExit     NotifyMode = "exit"
 	NotifyError    NotifyMode = "error"
 	NotifyInterval NotifyMode = "interval"

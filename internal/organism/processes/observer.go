@@ -66,7 +66,7 @@ func (processManager *Manager) recordProcessExit(operationContext context.Contex
 	if operationError := processManager.store.Processes().Save(operationContext, record); operationError != nil {
 		return operationError
 	}
-	if !notify || (record.Spec.Notify.Mode == atom.NotifyError && exit.Code == 0 && exit.Error == "") {
+	if !notify || record.Spec.Notify.Mode == atom.NotifyNone || (record.Spec.Notify.Mode == atom.NotifyError && exit.Code == 0 && exit.Error == "") {
 		return nil
 	}
 	text := fmt.Sprintf("process %s stopped: %s", runningProcess.ID(), processManager.recentProcessOutput(runningProcess))

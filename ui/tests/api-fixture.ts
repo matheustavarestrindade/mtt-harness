@@ -6,6 +6,7 @@ import type {
   Model,
   QueueStatus,
   Session,
+  Statistics,
 } from '../src/lib/atoms/types';
 
 // Fixtures use the actual Go response casing, nullable lists and 202 queue
@@ -16,6 +17,45 @@ export async function mockHarness(page: Page) {
   const histories = new Map<string, Message[]>();
   const queued = new Map<string, Message[]>();
   const running = new Set<string>();
+  const settings = new Map<string, Record<string, string>>([
+    ['', { agent_depth_limit: '2', process_limit: '8' }],
+  ]);
+  const sessionUsage: Statistics = {
+    Calls: 1,
+    Input: 20,
+    CacheRead: 0,
+    CacheWrite: 0,
+    Output: 12,
+    Reasoning: 0,
+    Cost: null,
+    Costs: null,
+    CacheHitRate: 0,
+    CacheHitPercentage: 0,
+  };
+  const workspaceUsage: Statistics = {
+    ...sessionUsage,
+    Calls: 4,
+    Input: 1000,
+    CacheRead: 500,
+    CacheWrite: 100,
+    Output: 200,
+    Reasoning: 30,
+    Cost: { Currency: 'USD', Value: 0.125 },
+    Costs: [{ Currency: 'USD', Value: 0.125 }],
+    CacheHitRate: 0.3125,
+    CacheHitPercentage: 31.25,
+  };
+  const harnessUsage: Statistics = {
+    ...workspaceUsage,
+    Calls: 10,
+    Input: 3000,
+    Output: 900,
+    Costs: [
+      { Currency: 'USD', Value: 0.75 },
+      { Currency: 'EUR', Value: 0.5 },
+    ],
+    Cost: null,
+  };
   const sockets: WebSocketRoute[] = [];
   let identifier = 0;
   let sequence = 0;
@@ -78,6 +118,18 @@ export async function mockHarness(page: Page) {
         return reply(instance, 201);
       }
       const parts = path.split('/').filter(Boolean);
+      if (path === '/statistics') return reply(harnessUsage);
+      if (parts[0] === 'settings' || (parts[0] === 'instances' && parts[2] === 'settings')) {
+        const scope = parts[0] === 'settings' ? '' : parts[1];
+        const key = parts[0] === 'settings' ? parts[1] : parts[3];
+        if (method === 'GET') return reply(settings.get(scope) ?? null);
+        const values = { ...settings.get(scope) };
+        if (method === 'PUT') values[key] = request.postDataJSON().value;
+        if (method === 'DELETE') delete values[key];
+        settings.set(scope, values);
+        return reply({ status: method === 'DELETE' ? 'deleted' : 'saved' });
+      }
+      if (parts[0] === 'instances' && parts[2] === 'statistics') return reply(workspaceUsage);
       if (parts[0] === 'instances' && parts[2] === 'models') return reply([model]);
       if (parts[0] === 'instances' && parts[2] === 'sessions') {
         if (method === 'GET')
@@ -106,19 +158,7 @@ export async function mockHarness(page: Page) {
             messages: queued.get(session.ID)?.map((message) => message.ID) ?? null,
             error: '',
           } satisfies QueueStatus);
-        if (parts[2] === 'statistics')
-          return reply({
-            Calls: 1,
-            Input: 20,
-            CacheRead: 0,
-            CacheWrite: 0,
-            Output: 12,
-            Reasoning: 0,
-            Cost: null,
-            Costs: null,
-            CacheHitRate: 0,
-            CacheHitPercentage: 0,
-          });
+        if (parts[2] === 'statistics') return reply(sessionUsage);
         if (parts[2] === 'messages' && method === 'POST') {
           const content = request.postDataJSON().content;
           const message: Message = {
@@ -184,5 +224,5 @@ export async function mockHarness(page: Page) {
       return reply({ error: `Fixture has no route for ${method} ${path}` }, 404);
     },
   );
-  return { instances, sessions, histories, event };
+  return { instances, sessions, histories, settings, event };
 }

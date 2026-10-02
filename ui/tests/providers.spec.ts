@@ -146,7 +146,7 @@ test('offer every available model and submit model IDs rather than display names
   await expect(page.getByRole('region', { name: 'DeepSeek models', exact: true })).toContainText(
     'DeepSeek-V4.1-Flash',
   );
-  await page.getByRole('button', { name: 'Back to conversation' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
   const workspaceModel = page.getByLabel('Default model');
   await expect(workspaceModel.locator('option')).toHaveCount(3);
@@ -176,7 +176,13 @@ async function openProviders(page: Page, mobile: boolean) {
   await page.getByRole('button', { name: 'Connect to API', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   if (mobile) await page.getByRole('button', { name: 'Open navigation' }).click();
-  await page.getByRole('button', { name: /Providers OpenAI/ }).click();
+  if (mobile)
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /^Settings/ })
+      .click();
+  else await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Providers', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Providers', exact: true })).toBeVisible();
 }
 
@@ -225,7 +231,7 @@ test('configure API providers, refresh catalogs, and remove a key', async ({ pag
   expect(fixture.keys.has('openai')).toBe(false);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('providers.png'), fullPage: true });
-  await page.getByRole('button', { name: 'Back to conversation' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
   await expect(page.getByLabel('Default model')).toContainText('deepseek/deepseek-flash');
   await expect(page.getByLabel('Default model')).not.toContainText('openai/gpt-6-luna');

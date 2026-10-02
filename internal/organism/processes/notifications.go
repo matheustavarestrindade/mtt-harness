@@ -28,7 +28,7 @@ func (processManager *Manager) sendProcessNotification(operationContext context.
 	if closing {
 		return nil
 	}
-	content := []atom.Content{{Type: atom.Text, Text: "[process] " + text}}
+	content := []atom.Content{{Type: atom.Text, Text: "[process] Runtime update from a background process, not a new user request.\n" + text}}
 	if notifier != nil {
 		if operationError := notifier(operationContext, session, content); operationError != nil {
 			return operationError
@@ -39,7 +39,7 @@ func (processManager *Manager) sendProcessNotification(operationContext context.
 		if _, operationError := rand.Read(identifier[:]); operationError != nil {
 			return operationError
 		}
-		message := atom.Message{ID: hex.EncodeToString(identifier[:]), SessionID: session.ID, Role: atom.RoleUser, Content: content, CreatedAt: time.Now()}
+		message := atom.Message{ID: hex.EncodeToString(identifier[:]), SessionID: session.ID, Role: atom.RoleRuntime, Content: content, CreatedAt: time.Now()}
 		if operationError := processManager.store.Sessions().Append(operationContext, message); operationError != nil {
 			return operationError
 		}

@@ -4,8 +4,8 @@ package tools
 // embedding index. They are separate from provider requests and tool results.
 func (bashTool *Bash) SearchDocument() string {
 	return `Use this tool to execute shell commands, run scripts, compile a project, or launch a development server in the instance workspace.
-For a short command, call {"command":"go test ./..."}; the tool waits and returns stdout and stderr.
-For a long-running server, call {"command":"npm run dev","wait":false}; then use process_output to read logs or process_kill to stop it.`
+For a short command, call {"command":"go test ./..."}; the tool waits and returns stdout and stderr once as its tool result, with no separate process notification.
+For a long-running server, call {"command":"npm run dev","wait":false}; then use process_output to read logs or process_kill to stop it. Background notification modes are none, exit (default), error, and interval. They are runtime updates, not new user requests.`
 }
 
 func (Read) SearchDocument() string {

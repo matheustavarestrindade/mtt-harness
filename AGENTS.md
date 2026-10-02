@@ -55,7 +55,7 @@ Rules:
 - Treat tool descriptions and JSON Schemas as instructions the model must be able to use without reading implementation code. Describe every input property's purpose, units, defaults, valid choices, and special values such as zero or an empty string where applicable.
 - State material behavior: path resolution, file replacement, output/retention limits, harness IDs versus OS PIDs, blocking/background behavior, and what cancellation actually stops.
 - Preserve descriptions and defaults when adding dynamic schema metadata such as the agent model list. Verify the definition sent in provider requests, not only the static tool declaration.
-- Built-in `bash.timeout` and `bash.interval` are milliseconds. A missing or zero timeout means no automatic process timeout; `wait` defaults to true, `notify` defaults to exit, and interval notifications need a positive interval.
+- Built-in `bash.timeout` and `bash.interval` are milliseconds. A missing or zero timeout means no automatic process timeout; `wait` defaults to true. Foreground calls set notification mode `none` before process start and return output only as tool results. `notify` applies to `wait:false`, defaults to exit, accepts none/exit/error/interval, and interval notifications need a positive interval.
 - MCP descriptions and schemas belong to their servers. Preserve that metadata; do not invent units or defaults for unknown external parameters.
 
 ## Tool Discovery
@@ -154,6 +154,8 @@ docker compose down
 The compose service includes the test provider. Configure OpenAI or DeepSeek in the UI Providers screen, or use the provider-key API. A real provider works without changing Docker flags. Set `MTT_TEST_PROVIDER=false` only to remove the optional test model.
 
 ## Runtime Ownership and Recovery
+
+- Parsed complete tool calls start during model streaming. Wait for the whole tool group before the next model request, with all results in model call order. Process observers must not duplicate foreground output into queued messages. Background updates use `atom.RoleRuntime` and `Queue.SubmitRuntimeContent`, never the user-input submission path. Provider adapters encode runtime data as a lower-priority contextual input, not system instructions or a duplicate tool response.
 
 - Session queue state is channel-owned: `Queue.runDirectory` owns coordinator references and lifecycle gates; `sessionCoordinator.runCommandLoop` owns each session's pending list, active queued turn, admission mode, and terminal error. Send commands instead of accessing that state from other goroutines.
 - Coordinator handlers must not perform database/network I/O, run models/tools, wait for workers, or invoke plugin callbacks. Those operations run in workers and report completion through bounded channels. Replies have capacity one so abandoned callers do not block owners.

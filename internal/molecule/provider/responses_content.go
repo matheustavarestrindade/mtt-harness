@@ -45,7 +45,13 @@ func encodeResponsesAPIInput(messages []atom.Message, providerName string) ([]an
 		// An assistant can consist only of function calls; do not add an empty
 		// assistant message between its reasoning and those calls.
 		if message.Role != atom.RoleAssistant || concatenateContentText(message.Content) != "" || len(message.ToolCalls) == 0 {
-			input = append(input, map[string]any{"role": string(message.Role), "content": content})
+			role := message.Role
+			// Runtime data is a contextual input, never provider instructions or
+			// an extra function_call_output for an already completed invocation.
+			if role == atom.RoleRuntime {
+				role = atom.RoleUser
+			}
+			input = append(input, map[string]any{"role": string(role), "content": content})
 		}
 		for _, call := range message.ToolCalls {
 			input = append(input, map[string]any{"type": "function_call", "call_id": call.ID, "name": call.Name, "arguments": string(call.Input)})

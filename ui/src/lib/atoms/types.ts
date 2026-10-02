@@ -36,7 +36,7 @@ export interface Message {
   ID: string;
   SessionID: string;
   Seq: number;
-  Role: 'system' | 'user' | 'assistant' | 'tool';
+  Role: 'system' | 'user' | 'assistant' | 'tool' | 'runtime';
   Content: Content[] | null;
   ToolCalls: ToolCall[] | null;
   ToolCallID: string;

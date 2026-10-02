@@ -81,13 +81,15 @@ With the default Docker configuration, the host directory `./workspace` is at `/
 
 The directory must be available before a workspace starts. The workspace request does not make a directory. For `/workspace/teste`, first make the host directory `./workspace/teste`. A path such as `/teste` refers to a different directory in the container.
 
-The harness includes the test provider by default in Docker. Open the `Providers` screen to connect OpenAI or DeepSeek. The API contracts are in `../routes.md`.
+The harness includes the test provider by default in Docker. Open `Settings`, then `Providers`, to connect OpenAI or DeepSeek. The API contracts are in `../routes.md`.
 
 ## Provider Connections
 
-Open the `Providers` screen from the sidebar or phone navigation drawer. OpenAI and DeepSeek have API key forms. Supply the key in the field. Select the button with the label `Save API key`. The UI puts the key in the harness database and gets the model list. A refresh error does not remove the key from the database.
+Open the settings dialog from the header, sidebar, or phone navigation drawer. Use the button with the label `Providers`. OpenAI and DeepSeek have API key forms. Supply the key in the field. Select the button with the label `Save API key`. The UI puts the key in the harness database and gets the model list.
 
-For a ChatGPT subscription, use the button with the label `Sign in with ChatGPT`. Open the OpenAI URL and supply the user code. Device-code login in the ChatGPT account settings must be active. The user must supply the code in 15 minutes. Keep the provider screen open to see the result.
+A refresh error does not remove the key from the database.
+
+For a ChatGPT subscription, use the button with the label `Sign in with ChatGPT`. Open the OpenAI URL and supply the user code. Device-code login in the ChatGPT account settings must be active. The user must supply the code in 15 minutes. Keep the provider section open to see the result.
 
 Model IDs use a provider prefix:
 
@@ -97,7 +99,7 @@ DeepSeek API key:      deepseek/MODEL
 ChatGPT subscription: openai-codex/MODEL
 ```
 
-The provider screen shows model IDs from the API. The list changes when the user refreshes model data. The provider section shows a model list error.
+The provider section shows model IDs from the API. The list changes when the user refreshes model data. The provider section shows a model list error.
 
 The workspace form shows the models from providers with a connection. The session form shows the model list from the instance API. The forms show the optional model label with the ID. Requests use the ID.
 
@@ -107,13 +109,35 @@ A ChatGPT subscription does not include OpenAI API key usage. After you connect 
 
 Provider keys and OAuth tokens stay in the harness database. The UI does not keep provider keys in browser storage. The key field becomes empty after the API accepts the key. The button with the label `Disconnect` removes the credential.
 
+## Settings and Usage
+
+The settings dialog has 4 sections: `General`, `Usage`, `Providers`, and `Connection`. The UI keeps the conversation and message draft when the dialog closes. Use the button with the label `Close`, or use the `Escape` key.
+
+The general section sets the agent depth limit and process limit. Select the harness or workspace scope. Supply an integer of 0 or more. Select the button with the label `Save`.
+
+A value of 0 prevents new child agents or processes. An empty field removes the selected setting. The harness then uses the default value.
+
+The usage section shows model calls, input tokens, output tokens, reasoning tokens, cache data, and cost data. Select the harness, workspace, or session scope. Session usage data includes child agents. Select the button with the label `Refresh usage` to get new usage data.
+
+The API gives usage data for the available history. It does not give subscription limits. The UI shows `Unavailable` when price data is not available.
+
+## Message Display
+
+Model messages use Markdown for headings, lists, hyperlinks, tables, and code blocks. Code blocks have syntax highlighting. The buttons with the labels `Copy code` and `Download source` use the full source text. The UI does not run message code. HTML in message text stays as text.
+
+A code block with the format `csv` or `tsv` has a table preview. Use the button with the label `Source` to read the full source text. The tool with the name `read` gives a preview for a CSV file. Data cells can contain CSV delimiters and line breaks.
+
+One card contains a tool call and the related tool result. Open the card to read the input and output. The card shows a new tool result when the API gives the data. The UI shows a tool result in a different card if the tool call is not in the history.
+
+Large previews have limits. The source download keeps the full source. The copy button also keeps the full source. See `docs/messages.md` for the limits and libraries.
+
 ## Functions
 
 The UI can make workspaces and sessions. The user can select an instance or session from the navigation. The UI can start a stopped workspace. It can send text, stop a turn, remove a message from the queue, and accept or deny a permission request.
 
 The UI shows message history, tool input, tool results, events, token usage, and cost data. It reads status and history at an interval of 1.5 seconds. A WebSocket event can also cause a new request. The UI shows model messages after the harness puts them in history.
 
-The UI does not have a file editor, media upload, process terminal, settings editor, or revert control. See `docs/design.md` for the UI boundary and plans.
+The UI does not have a file editor, media upload, process terminal, or revert control. See `docs/design.md` for the UI boundary and plans.
 
 ## UI Compilation
 
@@ -132,7 +156,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The browser tests use API fixtures. The test group includes small screens, large screens, authentication, message input, cancel commands, permissions, and long output. The test server uses port 15173.
+The browser tests use API fixtures. The test group includes small screens, large screens, authentication, message input, cancel commands, permissions, settings, and long output. It also includes Markdown, code blocks, CSV data, and tool results. The test server uses port 15173.
 
 To use a browser executable from the computer:
 

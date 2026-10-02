@@ -55,7 +55,7 @@ func (processManager *Manager) Start(operationContext context.Context, processSp
 	if processSpec.Notify.Mode == "" {
 		processSpec.Notify.Mode = atom.NotifyExit
 	}
-	if processSpec.Notify.Mode != atom.NotifyExit && processSpec.Notify.Mode != atom.NotifyError && processSpec.Notify.Mode != atom.NotifyInterval {
+	if processSpec.Notify.Mode != atom.NotifyNone && processSpec.Notify.Mode != atom.NotifyExit && processSpec.Notify.Mode != atom.NotifyError && processSpec.Notify.Mode != atom.NotifyInterval {
 		return nil, fmt.Errorf("invalid process notification mode")
 	}
 	if processSpec.Notify.Mode == atom.NotifyInterval && processSpec.Notify.Interval <= 0 {

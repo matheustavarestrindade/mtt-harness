@@ -9,7 +9,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
-// Fit removes complete oldest user turns, never individual tool messages.
+// Fit removes complete oldest input turns, never individual tool messages.
 // Persisted history is unchanged. System instructions and the newest turn stay.
 func (builder *Builder) Fit(operationContext context.Context, request atom.Request, model atom.ModelInfo, provider harness.Provider) (atom.Request, error) {
 	if model.ContextMax <= 0 {
@@ -42,28 +42,28 @@ func (builder *Builder) Fit(operationContext context.Context, request atom.Reque
 		if count <= budget {
 			return request, nil
 		}
-		firstUser, nextUser := -1, -1
+		firstTurnIndex, nextTurnIndex := -1, -1
 		for index, message := range request.Messages {
-			if message.Role != atom.RoleUser {
+			if message.Role != atom.RoleUser && message.Role != atom.RoleRuntime {
 				continue
 			}
-			if firstUser < 0 {
-				firstUser = index
+			if firstTurnIndex < 0 {
+				firstTurnIndex = index
 				continue
 			}
-			nextUser = index
+			nextTurnIndex = index
 			break
 		}
-		if nextUser < 0 {
+		if nextTurnIndex < 0 {
 			return request, fmt.Errorf("newest turn and tool schemas exceed the context budget of %d tokens", budget)
 		}
-		kept := append([]atom.Message(nil), request.Messages[:firstUser]...)
-		for _, message := range request.Messages[firstUser:nextUser] {
+		kept := append([]atom.Message(nil), request.Messages[:firstTurnIndex]...)
+		for _, message := range request.Messages[firstTurnIndex:nextTurnIndex] {
 			if message.Role == atom.RoleSystem {
 				kept = append(kept, message)
 			}
 		}
-		request.Messages = append(kept, request.Messages[nextUser:]...)
+		request.Messages = append(kept, request.Messages[nextTurnIndex:]...)
 	}
 }
 

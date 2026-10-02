@@ -98,6 +98,8 @@ When an instance stops, the database keeps the configuration and sessions. The a
 
 The database keeps a message in the queue before the API gives `202`. The message goes into history when the turn starts. A session can have 128 messages that wait. The harness limit is 4096 messages that wait or run.
 
+Client input has the role `user`. Background process notifications have the role `runtime`. They use the same queue. The tool with the name `bash` gives output through the tool result group when `wait` is `true`. It does not add a process notification to the queue.
+
 A full queue gives `429`. A stopped instance or a completed child agent gives `409`. A queue that is closed or a revert operation can also give `409`.
 
 ```json
@@ -343,7 +345,7 @@ type ToolResult = {
   Error: string; Duration: number;
 };
 type Message = {
-  ID: string; SessionID: string; Seq: number; Role: 'system' | 'user' | 'assistant' | 'tool';
+  ID: string; SessionID: string; Seq: number; Role: 'system' | 'user' | 'assistant' | 'tool' | 'runtime';
   Content: Content[] | null; ToolCalls: ToolCall[] | null; ToolCallID: string;
   Usage: Usage | null; CreatedAt: string;
 };

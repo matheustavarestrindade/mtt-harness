@@ -14,6 +14,7 @@
   import { Button } from '$lib/atoms/ui/button';
   import type { HarnessConsole } from '$lib/organisms/console.svelte';
   import { messageText, shortID } from '$lib/atoms/format';
+  import { buildConversationEntries } from '$lib/atoms/transcript';
   import MessageCard from '../molecules/MessageCard.svelte';
   import PermissionCard from '../molecules/PermissionCard.svelte';
   let {
@@ -40,6 +41,7 @@
   let feed: HTMLDivElement;
   let following = $state(true);
   let previousSession = '';
+  const entries = $derived(buildConversationEntries(workbench.messages));
   $effect(() => {
     const sessionID = workbench.session?.ID ?? '';
     const changes =
@@ -139,7 +141,11 @@
         </section>
       {:else}
         <div class="space-y-5">
-          {#each workbench.messages as message (message.ID)}<MessageCard {message} />{/each}
+          {#each entries as entry (entry.message.ID)}<MessageCard
+              message={entry.message}
+              tools={entry.tools}
+              running={workbench.status.running}
+            />{/each}
           {#each workbench.receipts as receipt (receipt.ID)}<div
               class="rounded-xl border border-dashed border-border bg-muted/20 p-4"
             >

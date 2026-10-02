@@ -8,6 +8,7 @@
 - Atoms must not import molecules or organisms. Molecules must not import organisms. `npm run check:layers` verifies these rules, including Svelte script imports. Keep shadcn generation paths aligned with `atoms/ui`.
 - Use lucide-svelte for icons and svelte-sonner for notifications.
 - Visual style: clean black and white using shadcn's neutral palette. The standard slate palette is also acceptable when requested. Do not invent a colored brand theme without explicit user approval. Use shared semantic color tokens, including surfaces, navigation, controls, and notifications; avoid hardcoded accent colors in components.
+- Each tool call and its result share one outer expandable card. Inside that card, use flat Input and Output sections. Do not add nested cards around code, CSV, Markdown, or attachments. Keep embedded content in section presentation.
 - Follow the wire contracts in `../routes.md`. Most domain responses have PascalCase keys; write request DTOs explicitly. Normalize nullable lists at the client boundary.
 - Model selectors must retain all models returned for the connected providers or selected instance. Do not silently hide models based on capability flags. Show the optional model `Name` alongside its `ID`, and always submit the ID.
 - Cancel obsolete reads when the selected session or connection changes. Never let an old request overwrite a newer selection. Dispose timers and sockets when the client disconnects.

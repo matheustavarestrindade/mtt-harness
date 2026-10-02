@@ -85,7 +85,7 @@ func runApplication(configuration config.File) (operationError error) {
 	attachTools(toolRegistry, processManager, agentLoop)
 	messageQueue = loop.NewQueue(agentLoop)
 	processManager.SetNotifier(func(notificationContext context.Context, session atom.Session, content []atom.Content) error {
-		_, _, operationError := messageQueue.SubmitContent(notificationContext, session, content)
+		_, _, operationError := messageQueue.SubmitRuntimeContent(notificationContext, session, content)
 		if errors.Is(operationError, loop.ErrQueueClosed) || errors.Is(operationError, loop.ErrInstanceStopped) {
 			return nil
 		}

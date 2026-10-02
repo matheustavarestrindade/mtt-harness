@@ -9,6 +9,8 @@ const (
 	RoleUser      Role = "user"
 	RoleAssistant Role = "assistant"
 	RoleTool      Role = "tool"
+	// RoleRuntime contains background process data, not a user request or system instruction.
+	RoleRuntime Role = "runtime"
 )
 
 type SessionID string

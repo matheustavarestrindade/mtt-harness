@@ -31,6 +31,12 @@ func encodeMessages(messages []atom.Message) ([]map[string]any, error) {
 			}
 		}
 		item := map[string]any{"role": string(message.Role)}
+		// Chat Completions has no runtime role. Keep background data at user
+		// priority on the wire; its runtime origin remains in stored history and
+		// the notification envelope, not in system instructions or a second tool reply.
+		if message.Role == atom.RoleRuntime {
+			item["role"] = string(atom.RoleUser)
+		}
 		switch message.Role {
 		case atom.RoleTool, atom.RoleAssistant:
 			item["content"] = concatenateContentText(message.Content)

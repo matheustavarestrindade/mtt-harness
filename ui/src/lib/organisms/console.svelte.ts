@@ -145,7 +145,7 @@ export class HarnessConsole {
     if (!signal.aborted) this.instances = instances;
   }
 
-  providerClient(): HarnessApi {
+  connectedAPIClient(): HarnessApi {
     return this.requireAPIClient();
   }
 
