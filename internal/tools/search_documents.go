@@ -17,13 +17,15 @@ Omit the range to read the complete file.`
 func (Write) SearchDocument() string {
 	return `Use this tool to create a file or save new content to an existing file.
 Call {"path":"notes.txt","content":"hello\n"} to write the entire file.
-Provide start_line and end_line to replace or delete complete selected lines while preserving surrounding content.`
+Provide start_line and end_line to replace or delete complete selected lines while preserving surrounding content.
+Success reports the path, creation/change/no-op status, line and byte counts, and a bounded unified diff of the actual edit. A preview limit never truncates the file. On a stale range error, read the current file and update the bounds before retrying.`
 }
 
 func (Replace) SearchDocument() string {
 	return `Use this tool to edit a file by replacing exact literal text, including source code and configuration values.
 Call {"path":"main.go","old_text":"oldName","new_text":"newName","mode":"all"} to replace every non-overlapping occurrence.
-Choose first or last for a single occurrence. Optional line bounds restrict the edit to a selected block.`
+Choose first or last for a single occurrence. Optional line bounds restrict the edit to a selected block.
+Success reports the replacement count and mode with a bounded unified diff. A missing match leaves the file unchanged and explains how to read it again, copy exact text without display line numbers, and correct stale bounds.`
 }
 
 func (processOutputTool *ProcessOutput) SearchDocument() string {

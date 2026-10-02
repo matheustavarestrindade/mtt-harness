@@ -19,7 +19,7 @@ func (Replace) Categories() []string {
 	return []string{"file"}
 }
 func (Replace) Description() string {
-	return "Replace literal, case-sensitive text in an existing file, optionally within a 1-based inclusive line range. Choose first (default), last, or all non-overlapping matches. Matching is not regex-based; matches may span lines but cannot cross the selected range. No match is an error and leaves the file unchanged. Successful edits atomically replace the file and preserve permission bits; hard links are not updated."
+	return "Replace literal, case-sensitive text in an existing file, optionally within a 1-based inclusive line range. Choose first (default), last, or all non-overlapping matches. Matching is not regex-based; matches may span lines but cannot cross the selected range. No match is an error and leaves the file unchanged. Successful edits atomically replace the file and preserve permission bits; hard links are not updated. Reports the replacement count and selected mode." + fileEditFeedbackDescription
 }
 
 func (Replace) InputSchema() atom.Schema {
@@ -50,27 +50,30 @@ func (Replace) Run(operationContext context.Context, call atom.ToolCall) (atom.T
 		lineRange
 	}
 	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
-		return atom.ToolResult{}, operationError
+		return fileEditFailure(call, "replace", input.Path, operationError, "Send valid JSON with path, old_text, and new_text strings, and optional mode and integer line bounds.")
+	}
+	if input.Path == "" {
+		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("path is required"), "Supply a non-empty path to an existing file.")
 	}
 	if input.OldText == "" {
-		return atom.ToolResult{}, fmt.Errorf("replace: old_text must not be empty")
+		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("old_text must not be empty"), "Use read and copy the exact text to replace into old_text, without display line-number prefixes.")
 	}
 	if input.NewText == nil {
-		return atom.ToolResult{}, fmt.Errorf("replace: new_text is required; use an empty string to delete matches")
+		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("new_text is required"), "Supply new_text; use an empty string to delete matches.")
 	}
 	mode := "first"
 	if input.Mode != nil {
 		mode = *input.Mode
 	}
 	if mode != "first" && mode != "last" && mode != "all" {
-		return atom.ToolResult{}, fmt.Errorf("replace: mode must be first, last, or all")
+		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("mode must be first, last, or all"), "Choose a supported mode, or omit mode to replace the first match.")
 	}
 	if _, _, operationError := input.resolveLineBounds(); operationError != nil {
-		return atom.ToolResult{}, operationError
+		return fileEditFailure(call, "replace", input.Path, operationError, "Use read to inspect the current file. Retry with 1-based inclusive line bounds within the file.")
 	}
 	path, operationError := harness.WorkspacePath(operationContext, input.Path)
 	if operationError != nil {
-		return atom.ToolResult{}, operationError
+		return fileEditFailure(call, "replace", input.Path, operationError, "Verify the file path and instance workspace before retrying.")
 	}
 	summary, operationError := applyAtomicFileEdit(operationContext, path, false, func(original []byte) (fileChange, error) {
 		start, end, operationError := input.resolveByteRange(original)
@@ -81,7 +84,7 @@ func (Replace) Run(operationContext context.Context, call atom.ToolCall) (atom.T
 		oldText, newText := []byte(input.OldText), []byte(*input.NewText)
 		count := bytes.Count(selected, oldText)
 		if count == 0 {
-			return fileChange{}, fmt.Errorf("replace: old_text was not found in the selected range")
+			return fileChange{}, fmt.Errorf("old_text was not found in the selected range; the file currently has %d lines", countFileLines(original))
 		}
 		var replacement []byte
 		if mode == "last" {
@@ -102,10 +105,10 @@ func (Replace) Run(operationContext context.Context, call atom.ToolCall) (atom.T
 		updated = append(updated, original[:start]...)
 		updated = append(updated, replacement...)
 		updated = append(updated, original[end:]...)
-		return fileChange{content: updated, summary: fmt.Sprintf("replaced %d match(es)", count)}, nil
+		return fileChange{content: updated, summary: fmt.Sprintf("Replaced %d match(es) using mode %q.", count, mode)}, nil
 	})
 	if operationError != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
+		return fileEditFailure(call, "replace", input.Path, operationError, "Use read to inspect the current file and range. Copy old_text exactly, including case, whitespace, and LF/CRLF; exclude display line-number prefixes. Update stale line bounds. Do not retry the same unmatched text unchanged.")
 	}
 	return atom.ToolResult{CallID: call.ID, Status: atom.StatusOK, Content: []atom.Content{{Type: atom.Text, Text: summary}}}, nil
 }

@@ -7,6 +7,7 @@ require (
 	github.com/gomlx/go-huggingface v0.3.5-0.20260327162928-af20e4f3e7b5
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/knights-analytics/hugot v0.7.0
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 )
 

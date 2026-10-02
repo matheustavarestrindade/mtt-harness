@@ -730,6 +730,18 @@ The tool does not examine the new text again. It does not use a regular expressi
 
 The harness puts file edits to the same resolved path in sequence.
 
+A file edit result gives the resolved path, file status, and number of lines and bytes. The status text is `Created`, `Updated`, or `Unchanged`. The result of `replace` also gives the number of text matches and the mode.
+
+The result has a unified diff preview of the file change. The prefix `-` shows lines which the tool removes. New lines have the prefix `+`. The preview keeps LF and CRLF and shows a last line without LF. The line numbers refer to the full file.
+
+The preview can have 3 lines of context at the start and end of a file change. A preview has a maximum of 200 lines or 16 KiB. The limits apply only to the preview. The file edit writes the full replacement.
+
+The tool removes the same outer text from the diff input but keeps lines of context. The diff input contains previous file content and replacement file content. The maximum total is 256 KiB or 4000 lines. If the diff input is above the limit, the result gives the cause without the preview. Incorrect UTF-8 or NUL bytes also prevent a preview.
+
+The tool makes the unified diff from the previous content and replacement content of the same file edit. It does not read the file again after the file edit. Thus, the result does not show a different file edit.
+
+If a file edit cannot continue, the result gives the cause and steps to continue. The file does not change. For a text match or line range error, use `read` to examine the file. Then set the replacement text and line range from the file data. Do not use the same incorrect input again.
+
 The tool input can be:
 
 ```json
