@@ -23,6 +23,7 @@
   --border: #ffffff1a;
   --input: #ffffff26;
   --ring: #737373;
+  --user-message-accent: #60a5fa;
   --radius: 0.65rem;
 }
 @theme inline {
@@ -46,6 +47,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-user-message-accent: var(--user-message-accent);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -103,8 +105,40 @@
     @apply min-h-11 min-w-11;
   }
   .message-copy {
-    @apply whitespace-pre-wrap break-words text-[14px] leading-7;
+    @apply whitespace-pre-wrap break-words text-[14px] leading-6;
     overflow-wrap: anywhere;
+  }
+  .chat-message {
+    position: relative;
+    min-width: 0;
+  }
+  .conversation-entries > .user-message {
+    margin-block: 0.5rem;
+  }
+  .user-message {
+    border-left: 3px solid var(--user-message-accent);
+    padding-block: 0.25rem;
+    padding-left: 0.75rem;
+  }
+  .message-actions {
+    position: absolute;
+    top: -0.5rem;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding-left: 0.5rem;
+    border-radius: var(--radius);
+    background: var(--background);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+  .chat-message:hover > .message-actions,
+  .chat-message:focus-within > .message-actions {
+    opacity: 1;
+    pointer-events: auto;
   }
   .tool-output {
     @apply max-h-80 overflow-auto rounded-lg bg-black/20 p-3 font-mono text-xs leading-6;
@@ -132,7 +166,7 @@
     font-style: italic;
   }
   .markdown {
-    @apply text-sm leading-7;
+    @apply text-sm leading-6;
     overflow-wrap: anywhere;
   }
   .markdown > :first-child {
@@ -146,7 +180,7 @@
   .markdown ol,
   .markdown blockquote,
   .markdown .markdown-table {
-    margin-block: 1rem;
+    margin-block: 0.625rem;
   }
   .markdown h1,
   .markdown h2,
@@ -155,7 +189,7 @@
   .markdown h5,
   .markdown h6 {
     @apply font-semibold tracking-tight;
-    margin-block: 1.5rem 0.75rem;
+    margin-block: 1rem 0.5rem;
     line-height: 1.4;
   }
   .markdown h1 {

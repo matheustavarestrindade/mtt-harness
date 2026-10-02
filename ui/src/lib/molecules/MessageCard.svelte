@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Bot, User, Copy, Terminal } from 'lucide-svelte';
+  import { Copy } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
   import { Button } from '$lib/atoms/ui/button';
   import type { Message } from '$lib/atoms/types';
@@ -34,44 +34,35 @@
   />
 {:else}
   <article
-    class="min-w-0 {message.Role === 'user'
-      ? 'rounded-2xl border border-border/70 bg-card p-4 sm:p-5'
-      : 'py-3'}"
+    class="chat-message {message.Role === 'user' ? 'user-message' : ''}"
     aria-label={`${message.Role} message`}
   >
-    <header class="mb-3 flex items-center gap-2.5">
-      <span
-        class="grid size-7 shrink-0 place-items-center rounded-lg {message.Role === 'user'
-          ? 'bg-secondary text-muted-foreground'
-          : 'bg-primary/12 text-primary'}"
-        >{#if message.Role === 'user'}<User
-            class="size-3.5"
-          />{:else if message.Role === 'runtime'}<Terminal class="size-3.5" />{:else}<Bot
-            class="size-4"
-          />{/if}</span
-      ><span class="text-xs font-semibold"
-        >{message.Role === 'user'
-          ? 'You'
-          : message.Role === 'runtime'
-            ? 'Runtime'
-            : message.Role === 'system'
-              ? 'System'
-              : 'Assistant'}</span
-      ><time class="text-[10px] text-muted-foreground" datetime={message.CreatedAt}
+    {#if message.Role === 'runtime' || message.Role === 'system'}
+      <p class="mb-1 text-[10px] font-medium text-muted-foreground">
+        {message.Role === 'runtime' ? 'Runtime' : 'System'}
+      </p>
+    {/if}
+    <div class="message-actions">
+      <time class="text-[10px] text-muted-foreground" datetime={message.CreatedAt}
         >{formatTimestamp(message.CreatedAt)}</time
       ><Button
         variant="ghost"
         size="icon"
-        class="icon-button ml-auto text-muted-foreground"
+        class="icon-button text-muted-foreground"
         onclick={copyText}
         aria-label="Copy message"
         title="Copy message"><Copy class="size-3.5" /></Button
       >
-    </header>
-    <MessageContent
-      content={message.Content}
-      mode={message.Role === 'user' || message.Role === 'runtime' ? 'plain' : 'markdown'}
-    />
-    {#each tools as activity (activity.call.ID)}<ToolActivitySection {activity} {running} />{/each}
+    </div>
+    <div class="flex min-w-0 flex-col gap-1">
+      <MessageContent
+        content={message.Content}
+        mode={message.Role === 'user' || message.Role === 'runtime' ? 'plain' : 'markdown'}
+      />
+      {#each tools as activity (activity.call.ID)}<ToolActivitySection
+          {activity}
+          {running}
+        />{/each}
+    </div>
   </article>
 {/if}
