@@ -25,14 +25,14 @@
 </script>
 
 <section
-  class="tool-activity my-3 min-w-0 overflow-hidden rounded-xl border border-border bg-card/40"
+  class="tool-activity min-w-0 overflow-hidden rounded-xl border border-border bg-card/40"
   role="group"
   aria-label={`Tool ${activity.call.Name}`}
   data-call-id={activity.call.ID}
 >
   <button
     type="button"
-    class="flex min-h-12 w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-xs"
+    class="flex min-h-11 w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left text-xs"
     aria-expanded={open}
     onclick={() => (open = !open)}
   >
@@ -48,8 +48,8 @@
     />
   </button>
   {#if open}
-    <div class="min-w-0 space-y-4 border-t border-border/60 px-3 py-4 sm:px-4">
-      {#if unmatched}<p class="mt-3 text-xs text-muted-foreground">
+    <div class="min-w-0 space-y-3 border-t border-border/60 p-2.5">
+      {#if unmatched}<p class="mt-2 text-xs text-muted-foreground">
           The original tool call is not in this history.
         </p>
       {:else}
@@ -62,7 +62,7 @@
           />
         </section>
       {/if}
-      <section aria-label="Tool output" class="min-w-0 border-t border-border/60 pt-4">
+      <section aria-label="Tool output" class="min-w-0 border-t border-border/60 pt-2">
         <h3 class="eyebrow">Output</h3>
         {#if activity.result?.Content?.length}<MessageContent
             content={activity.result.Content}
@@ -70,7 +70,7 @@
             {language}
             embedded
           />
-        {:else}<p class="mt-3 text-xs leading-6 text-muted-foreground">
+        {:else}<p class="mt-2 text-xs leading-5 text-muted-foreground">
             {activity.result
               ? 'No output.'
               : running
@@ -78,7 +78,7 @@
                 : 'No result was recorded for this call.'}
           </p>{/if}
       </section>
-      <p class="mt-3 break-all font-mono text-[10px] text-muted-foreground">
+      <p class="mt-2 break-all font-mono text-[10px] text-muted-foreground">
         Call {activity.call.ID}
       </p>
     </div>

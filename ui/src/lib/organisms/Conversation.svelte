@@ -70,7 +70,7 @@
     aria-label="Conversation"
     tabindex="0"
   >
-    <div class="mx-auto flex min-h-full w-full max-w-4xl flex-col px-4 py-5 sm:px-8 sm:py-8">
+    <div class="mx-auto flex min-h-full w-full max-w-4xl flex-col px-4 py-4 sm:px-6 sm:py-5">
       {#if workbench.loading && !workbench.messages.length}<div
           class="grid flex-1 place-items-center py-16"
         >
@@ -140,16 +140,14 @@
           </p>
         </section>
       {:else}
-        <div class="space-y-5">
+        <div class="conversation-entries flex flex-col gap-1">
           {#each entries as entry (entry.message.ID)}<MessageCard
               message={entry.message}
               tools={entry.tools}
               running={workbench.status.running}
             />{/each}
-          {#each workbench.receipts as receipt (receipt.ID)}<div
-              class="rounded-xl border border-dashed border-border bg-muted/20 p-4"
-            >
-              <div class="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+          {#each workbench.receipts as receipt (receipt.ID)}<div class="chat-message user-message">
+              <div class="mb-1 flex items-center gap-2 text-[10px] text-muted-foreground">
                 <LoaderCircle class="size-3.5 animate-spin" />Message accepted
               </div>
               <p class="message-copy text-foreground/75">{messageText(receipt)}</p>
