@@ -23,7 +23,7 @@
   import Composer from '$lib/molecules/Composer.svelte';
   import UsageBar from '$lib/molecules/UsageBar.svelte';
   import SessionSettingsDialog from '$lib/molecules/SessionSettingsDialog.svelte';
-  import { findSessionModel } from '$lib/atoms/reasoning';
+  import { findSessionModel, reasoningEffortLabel } from '$lib/atoms/reasoning';
   import { HarnessConsole } from '$lib/organisms/console.svelte';
   import { ApiError } from '$lib/molecules/api/client';
   import { loadConnection, type ConnectionPreferences } from '$lib/molecules/connection-storage';
@@ -55,6 +55,9 @@
   let drafts = $state<Record<string, string>>({});
   const sessionID = $derived(workbench.session?.ID ?? '');
   const sessionModel = $derived(findSessionModel(workbench.models, workbench.session?.Model ?? ''));
+  const sessionModelLabel = $derived(
+    `${workbench.session?.Model ?? ''} (${reasoningEffortLabel(workbench.session?.ReasoningEffort || sessionModel?.DefaultReasoningEffort || '')})`,
+  );
   const disabled = $derived(
     workbench.connection !== 'connected' ||
       !workbench.session ||
@@ -299,9 +302,9 @@
         </div>
         {#if workbench.session}<p
             class="mt-0.5 truncate font-mono text-[10px] text-muted-foreground"
-            title={workbench.session.Model}
+            title={sessionModelLabel}
           >
-            {workbench.session.Model}
+            {sessionModelLabel}
           </p>{/if}
       </div>
       <div class="flex shrink-0 items-center gap-1">
