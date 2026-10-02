@@ -21,6 +21,10 @@ func (standardProvider *Standard) Refresh(operationContext context.Context) ([]a
 	if operationError != nil {
 		return nil, operationError
 	}
+	metadata, operationError := standardProvider.loadModelMetadata(operationContext)
+	if operationError != nil {
+		return nil, operationError
+	}
 	request, operationError := http.NewRequestWithContext(operationContext, http.MethodGet, standardProvider.providerSpec.ModelListURL, nil)
 	if operationError != nil {
 		return nil, operationError
@@ -54,11 +58,18 @@ func (standardProvider *Standard) Refresh(operationContext context.Context) ([]a
 			model = newCatalogModel(catalogModel.ID)
 		}
 		model = applyModelMetadata(model, defaults)
+		model = applyModelMetadata(model, metadata[model.ID].ModelMetadata)
 		model = applyModelMetadata(model, catalogModel.ModelMetadata)
 		model = standardProvider.configuredModelMetadata(model)
-		model.Prices = catalogModel.Prices
+		model.Prices = metadata[model.ID].Prices
+		if catalogModel.Prices != nil {
+			model.Prices = catalogModel.Prices
+		}
 		if price, configured := prices[model.ID]; configured {
 			model.Prices = &price
+		}
+		if operationError := model.ValidateReasoningEffort(model.DefaultReasoningEffort); operationError != nil {
+			return nil, operationError
 		}
 		models = append(models, model)
 	}

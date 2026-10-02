@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Model } from '$lib/atoms/types';
+  import ModelPricing from './ModelPricing.svelte';
+  import { reasoningEffortLabel } from '../atoms/reasoning';
 
   let {
     providerID,
@@ -40,10 +42,25 @@
       <ul class="divide-y divide-border">
         {#each models as model}
           <li class="px-3 py-2">
-            {#if model.Name}<span class="mb-1 block break-words text-xs font-medium"
-                >{model.Name}</span
-              >{/if}
-            <code class="block break-all text-xs leading-5">{providerID}/{model.ID}</code>
+            <details>
+              <summary class="min-h-11 cursor-pointer py-1">
+                {#if model.Name}<span class="mb-1 break-words text-xs font-medium"
+                    >{model.Name}</span
+                  >{/if}
+                <code class="block break-all text-xs leading-5">{providerID}/{model.ID}</code>
+              </summary>
+              <div class="space-y-3 py-2">
+                <ModelPricing {model} />
+                {#if model.Reasoning}<p class="text-xs text-muted-foreground">
+                    Thinking: {model.ReasoningEfforts?.length
+                      ? model.ReasoningEfforts.map(reasoningEffortLabel).join(', ')
+                      : 'Provider default'}
+                  </p>{/if}
+                <p class="text-xs text-muted-foreground">
+                  Context: {model.ContextMax ? model.ContextMax.toLocaleString() : 'Not reported'} tokens
+                </p>
+              </div>
+            </details>
           </li>
         {/each}
       </ul>

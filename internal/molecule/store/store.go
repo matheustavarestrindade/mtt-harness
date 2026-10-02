@@ -14,7 +14,13 @@ type InstanceStore interface {
 }
 
 type SessionStore interface {
+	// Save initializes reasoning effort for a new session. Later changes belong
+	// to SetReasoningEffort so lifecycle saves cannot overwrite a newer selection.
 	Save(operationContext context.Context, session atom.Session) error
+	SetReasoningEffort(operationContext context.Context, sessionID atom.SessionID, effort string) error
+	// GetReasoningEffort distinguishes an absent record from a saved default.
+	// Caller-owned sessions without a record retain their supplied effort.
+	GetReasoningEffort(operationContext context.Context, sessionID atom.SessionID) (string, bool, error)
 	Get(operationContext context.Context, sessionID atom.SessionID) (atom.Session, error)
 	Agents(operationContext context.Context, parent atom.SessionID) ([]atom.SessionID, error)
 	List(operationContext context.Context, instanceID string) ([]atom.Session, error)

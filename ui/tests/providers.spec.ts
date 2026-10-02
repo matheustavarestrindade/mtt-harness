@@ -191,12 +191,12 @@ test('configure API providers, refresh catalogs, and remove a key', async ({ pag
   await openProviders(page, testInfo.project.name === 'mobile');
   const openai = page.getByRole('region', { name: 'OpenAI API setup', exact: true });
   await expect(
-    openai.getByRole('region', { name: 'OpenAI model names', exact: true }).getByRole('listitem'),
+    openai.getByRole('region', { name: 'OpenAI model names', exact: true }).locator('summary code'),
   ).toHaveText(['openai/gpt-6-luna', 'openai/gpt-6-sol']);
   await expect(
     page
       .getByRole('region', { name: 'OpenAI coding plan model names', exact: true })
-      .getByRole('listitem'),
+      .locator('summary code'),
   ).toHaveText(['openai-codex/gpt-5.5', 'openai-codex/gpt-6-sol']);
   await expect(
     page.getByRole('region', { name: 'Test provider model names', exact: true }),
@@ -207,7 +207,7 @@ test('configure API providers, refresh catalogs, and remove a key', async ({ pag
   await expect(openai.getByLabel('OpenAI API key')).toHaveValue('');
   expect(fixture.keys.get('openai')).toBe('openai-example-key');
   const deepseek = page.getByRole('region', { name: 'DeepSeek API setup', exact: true });
-  await expect(deepseek.getByRole('listitem')).toHaveText([
+  await expect(deepseek.locator('summary code')).toHaveText([
     'deepseek/deepseek-flash',
     'deepseek/deepseek-v4-pro',
   ]);
@@ -217,7 +217,7 @@ test('configure API providers, refresh catalogs, and remove a key', async ({ pag
   const newModel = `coding-model-${'long-name-'.repeat(15)}`;
   fixture.modelIDs.deepseek = ['deepseek-flash', newModel];
   await deepseek.getByRole('button', { name: 'Refresh models', exact: true }).click();
-  await expect(deepseek.getByRole('listitem')).toHaveText([
+  await expect(deepseek.locator('summary code')).toHaveText([
     'deepseek/deepseek-flash',
     `deepseek/${newModel}`,
   ]);

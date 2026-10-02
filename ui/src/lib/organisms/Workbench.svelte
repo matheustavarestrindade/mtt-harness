@@ -22,6 +22,8 @@
   import Conversation from '$lib/organisms/Conversation.svelte';
   import Composer from '$lib/molecules/Composer.svelte';
   import UsageBar from '$lib/molecules/UsageBar.svelte';
+  import ReasoningSelect from '$lib/molecules/ReasoningSelect.svelte';
+  import { findSessionModel } from '$lib/atoms/reasoning';
   import { HarnessConsole } from '$lib/organisms/console.svelte';
   import { ApiError } from '$lib/molecules/api/client';
   import { loadConnection, type ConnectionPreferences } from '$lib/molecules/connection-storage';
@@ -42,6 +44,7 @@
   let sending = $state(false);
   let drafts = $state<Record<string, string>>({});
   const sessionID = $derived(workbench.session?.ID ?? '');
+  const sessionModel = $derived(findSessionModel(workbench.models, workbench.session?.Model ?? ''));
   const disabled = $derived(
     workbench.connection !== 'connected' ||
       !workbench.session ||
@@ -111,9 +114,9 @@
       if (!workbench.session) sessionOpen = true;
     });
   }
-  async function createSession(model: string) {
+  async function createSession(model: string, effort = '') {
     await runWorkbenchAction('session', async () => {
-      await workbench.createSession(model);
+      await workbench.createSession(model, effort);
       sessionOpen = false;
       menuOpen = false;
       toast.success('Session ready');
@@ -284,6 +287,17 @@
         style="padding-bottom: max(.5rem, env(safe-area-inset-bottom))"
       >
         <div class="mx-auto max-w-4xl">
+          {#if workbench.session && (sessionModel?.Reasoning || workbench.session.ReasoningEffort)}
+            <div class="mb-1">
+              <ReasoningSelect
+                model={sessionModel}
+                value={workbench.session.ReasoningEffort ?? ''}
+                disabled={disabled || busy === 'reasoning'}
+                onChange={(effort) =>
+                  void runWorkbenchAction('reasoning', () => workbench.setReasoningEffort(effort))}
+              />
+            </div>
+          {/if}
           <Composer
             bind:value={() => drafts[sessionID] ?? '', (value) => (drafts[sessionID] = value)}
             {disabled}

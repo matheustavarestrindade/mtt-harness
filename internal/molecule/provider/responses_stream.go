@@ -12,17 +12,21 @@ import (
 )
 
 type responseEvent struct {
-	Type        string          `json:"type"`
-	Delta       string          `json:"delta"`
-	OutputIndex int             `json:"output_index"`
-	Item        json.RawMessage `json:"item"`
-	Response    struct {
+	Type         string          `json:"type"`
+	Delta        string          `json:"delta"`
+	Text         string          `json:"text"`
+	OutputIndex  int             `json:"output_index"`
+	SummaryIndex int             `json:"summary_index"`
+	ContentIndex int             `json:"content_index"`
+	Item         json.RawMessage `json:"item"`
+	Response     struct {
 		Output []json.RawMessage `json:"output"`
 		Usage  *struct {
 			Input        int `json:"input_tokens"`
 			Output       int `json:"output_tokens"`
 			InputDetails struct {
-				Cached int `json:"cached_tokens"`
+				Cached     int `json:"cached_tokens"`
+				CacheWrite int `json:"cache_write_tokens"`
 			} `json:"input_tokens_details"`
 			OutputDetails struct {
 				Reasoning int `json:"reasoning_tokens"`
@@ -36,7 +40,11 @@ type responseItem struct {
 	CallID    string `json:"call_id"`
 	Name      string `json:"name"`
 	Arguments string `json:"arguments"`
-	Content   []struct {
+	Summary   []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"summary"`
+	Content []struct {
 		Type    string `json:"type"`
 		Text    string `json:"text"`
 		Refusal string `json:"refusal"`
@@ -60,6 +68,7 @@ func parseResponsesAPIEvents(operationContext context.Context, body io.ReadClose
 			return false
 		}
 	}
+	reasoning := reasoningStream{send: send}
 	consumeItem := func(raw json.RawMessage, index int, rememberReasoning bool) bool {
 		var item responseItem
 		if operationError := json.Unmarshal(raw, &item); operationError != nil {
@@ -78,6 +87,16 @@ func parseResponsesAPIEvents(operationContext context.Context, body io.ReadClose
 			emittedCalls[item.CallID] = true
 			return send(atom.ResponsePart{ToolIndex: &index, ToolCall: &atom.ToolCall{ID: item.CallID, Name: item.Name, Input: json.RawMessage(item.Arguments)}})
 		case "reasoning":
+			for partIndex, part := range item.Summary {
+				if part.Type == "summary_text" && !reasoning.completePart(reasoningPartKey(index, "summary", partIndex), part.Text) {
+					return false
+				}
+			}
+			for partIndex, part := range item.Content {
+				if part.Type == "reasoning_text" && !reasoning.completePart(reasoningPartKey(index, "content", partIndex), part.Text) {
+					return false
+				}
+			}
 			if rememberReasoning {
 				state.Reasoning = append(state.Reasoning, append(json.RawMessage(nil), raw...))
 			}
@@ -97,6 +116,14 @@ func parseResponsesAPIEvents(operationContext context.Context, body io.ReadClose
 			return false
 		}
 		switch event.Type {
+		case "response.reasoning_summary_text.delta":
+			return reasoning.appendDelta(reasoningPartKey(event.OutputIndex, "summary", event.SummaryIndex), event.Delta)
+		case "response.reasoning_text.delta":
+			return reasoning.appendDelta(reasoningPartKey(event.OutputIndex, "content", event.ContentIndex), event.Delta)
+		case "response.reasoning_summary_text.done":
+			return reasoning.completePart(reasoningPartKey(event.OutputIndex, "summary", event.SummaryIndex), event.Text)
+		case "response.reasoning_text.done":
+			return reasoning.completePart(reasoningPartKey(event.OutputIndex, "content", event.ContentIndex), event.Text)
 		case "response.output_text.delta", "response.refusal.delta":
 			streamedText = true
 			return send(atom.ResponsePart{Text: event.Delta})
@@ -127,11 +154,11 @@ func parseResponsesAPIEvents(operationContext context.Context, body io.ReadClose
 				return false
 			}
 			if usage := event.Response.Usage; usage != nil {
-				if usage.Input < 0 || usage.Output < 0 || usage.InputDetails.Cached < 0 || usage.InputDetails.Cached > usage.Input || usage.OutputDetails.Reasoning < 0 {
+				if usage.Input < 0 || usage.Output < 0 || usage.InputDetails.Cached < 0 || usage.InputDetails.CacheWrite < 0 || usage.InputDetails.Cached+usage.InputDetails.CacheWrite > usage.Input || usage.OutputDetails.Reasoning < 0 || usage.OutputDetails.Reasoning > usage.Output {
 					stream.operationError = fmt.Errorf("invalid Responses token usage")
 					return false
 				}
-				if !send(atom.ResponsePart{Usage: &atom.Usage{Input: usage.Input - usage.InputDetails.Cached, CacheRead: usage.InputDetails.Cached, Output: usage.Output, Reasoning: usage.OutputDetails.Reasoning}}) {
+				if !send(atom.ResponsePart{Usage: &atom.Usage{Input: usage.Input - usage.InputDetails.Cached - usage.InputDetails.CacheWrite, CacheRead: usage.InputDetails.Cached, CacheWrite: usage.InputDetails.CacheWrite, Output: usage.Output, Reasoning: usage.OutputDetails.Reasoning}}) {
 					return false
 				}
 			}

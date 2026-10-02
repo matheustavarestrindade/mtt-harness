@@ -14,16 +14,18 @@ type InstanceSpec struct {
 }
 
 type Session struct {
-	ID         SessionID
-	InstanceID string
-	Parent     SessionID
-	Depth      int
-	Model      string
-	CreatedAt  time.Time
-	Completed  bool
+	ID              SessionID
+	InstanceID      string
+	Parent          SessionID
+	Depth           int
+	Model           string
+	ReasoningEffort string `json:",omitempty"`
+	CreatedAt       time.Time
+	Completed       bool
 }
 
 type AgentTask struct {
-	Task  string
-	Model string
+	Task            string
+	Model           string
+	ReasoningEffort string
 }

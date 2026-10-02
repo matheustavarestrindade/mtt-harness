@@ -187,10 +187,27 @@ export class HarnessApi {
   createInstance(input: InstanceInput) {
     return this.request<Instance>('instances', 'POST', input);
   }
-  createSession(instanceID: string, model: string) {
+  createSession(instanceID: string, model: string, reasoningEffort = '') {
     return this.request<Session>(`instances/${encodeURIComponent(instanceID)}/sessions`, 'POST', {
       model,
+      reasoning_effort: reasoningEffort,
     });
+  }
+  session(sessionID: string, signal?: AbortSignal) {
+    return this.request<Session>(
+      `sessions/${encodeURIComponent(sessionID)}`,
+      'GET',
+      undefined,
+      signal,
+    );
+  }
+  setReasoningEffort(sessionID: string, effort: string, signal?: AbortSignal) {
+    return this.request<Session>(
+      `sessions/${encodeURIComponent(sessionID)}/reasoning`,
+      'PUT',
+      { effort },
+      signal,
+    );
   }
   async messages(sessionID: string, signal?: AbortSignal) {
     return (

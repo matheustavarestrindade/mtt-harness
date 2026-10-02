@@ -72,6 +72,8 @@ A session change cancels previous data requests and event connections. A previou
 
 A new session view reads events from sequence 0. Permission requests and decisions come from the event stream. A new connection after an error uses the last event sequence. Message history from the API is the source for completed responses.
 
+The client uses `message_id` to connect model event text to message history. Reasoning text has a section that is closed by default. The session reasoning effort control uses the values from model data. A previous request must not replace a new selection.
+
 The UI shows model text with Markdown markup. The DOMPurify library removes dangerous markup before display. HTML in message text stays as text. The code block gives the format for syntax highlighting. A media item has a type and filename in the UI. The UI does not run code from model output.
 
 The `transcript.ts` atom uses `ToolCallID` and `ToolCalls[].ID` to connect messages in the same session. The UI keeps the model message sequence. The UI shows a tool result in a different card if the tool call is not in the history. The tool component prepares input and output when the user opens the card.
@@ -91,6 +93,8 @@ Section requests stop when the dialog closes. They also stop when the user selec
 ## Provider Connections
 
 The provider section uses the default OpenAI and DeepSeek configuration. API key forms are molecules. The provider organism controls key requests, model lists, and device login status.
+
+Model data can include token prices and reasoning efforts. The UI shows model data from the API. The UI does not get a model catalog from a different program. A cost estimate has a label. Subscription access does not get an API token price estimate.
 
 The provider `openai-codex` uses OpenAI device authentication. OAuth tokens stay on the server. The UI gets a user code and an OpenAI URL. When the provider section closes, the browser stops status requests. Server authentication can continue for 15 minutes or until the user cancels it.
 

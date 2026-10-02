@@ -11,6 +11,14 @@ The UI uses the libraries in the list:
 
 The dependency versions are in `ui/package-lock.json`. The code is in `ui/src/lib/molecules/content/`.
 
+## Reasoning
+
+The field `Message.Reasoning` contains reasoning text or a reasoning summary from the provider. The section with the label `Thinking` is closed by default. Select the button with the label `Thinking` to read the text. Content views are prepared when the section opens.
+
+The client receives text from `model.chunk` events during the response. The field `message_id` connects event text to message history. A message has one display area. An open reasoning section stays open after the message is in history. The section is closed when the UI starts.
+
+The client prepares event text at an interval of 100 milliseconds. A session change removes previous event text. The API does not send continuation data in messages or events.
+
 ## Markdown and Code
 
 Markdown has headings, lists, hyperlinks, tables, and code blocks. HTML in message text stays as text. The UI uses HTTP and HTTPS hyperlinks. It can also use hyperlinks with the format `mailto`. The UI removes event handlers and executable markup. Code does not run.

@@ -277,6 +277,11 @@ type ModelInfo struct {
     ToolSupportUnknown bool `json:",omitempty"`
     ContextMax int
     Prices     *Prices
+    Reasoning bool `json:",omitempty"`
+    ReasoningEfforts []string `json:",omitempty"`
+    DefaultReasoningEffort string `json:",omitempty"`
+    ReasoningSummary string `json:",omitempty"`
+    Billing string `json:",omitempty"`
 }
 
 type Content struct {
@@ -338,6 +343,12 @@ The model can give the prices of the tokens. The prices are for 1,000,000 tokens
 
 The harness calculates the cost from the usage and the prices. The cost data is optional. Thus, the cost can be empty. The usage has the tokens.
 
+A cost from the provider response replaces a cost estimate. A cost estimate has `Estimated: true`. A total with a cost estimate also has `Estimated: true`. A subscription provider does not get a token cost estimate.
+
+A price tier applies when the full input tokens are above the price tier limit. The price tier applies to the full request. Output tokens include reasoning tokens. The field `Prices.Reasoning` can give a different price for reasoning tokens. The reasoning price replaces the output price for reasoning tokens.
+
+A price of 0 and price data that is not available are different. If the response has cache tokens without price data, the cost is not available. Usage statistics include only costs with price data.
+
 The cache hit rate is the cache read tokens divided by the full input tokens. The full input tokens are the input tokens, the cache read tokens, and the cache write tokens.
 
 ```go
@@ -347,11 +358,28 @@ type Prices struct {
     Output     float64
     CacheRead  float64
     CacheWrite float64
+    CacheReadUnknown bool `json:",omitempty"`
+    CacheWriteUnknown bool `json:",omitempty"`
+    Reasoning *float64 `json:",omitempty"`
+    Tiers []PriceTier `json:",omitempty"`
+    Source string `json:",omitempty"`
+}
+
+type PriceTier struct {
+    AboveInputTokens int
+    Input float64
+    Output float64
+    CacheRead float64
+    CacheWrite float64
+    CacheReadUnknown bool `json:",omitempty"`
+    CacheWriteUnknown bool `json:",omitempty"`
+    Reasoning *float64 `json:",omitempty"`
 }
 
 type Cost struct {
     Currency string
     Value    float64
+    Estimated bool `json:",omitempty"`
 }
 
 type Usage struct {
@@ -381,7 +409,7 @@ Requirements:
 - R34: A provider must give the usage of a model call when the response has the usage.
 - R35: The harness must record the usage of the model messages.
 - R36: The harness must calculate the cost of a model call from the usage and the prices.
-- R37: The harness must not give a cost when the model does not give the prices.
+- R37: The harness must not calculate a cost when the model does not give the prices.
 - R38: The cache hit rate must be the cache read tokens divided by the full input tokens.
 - R39: The statistics must have the input tokens, the output tokens, the cache read tokens, the cache write tokens, the cache hit rate, and the cost.
 - R40: The statistics for different currencies must stay apart.
@@ -405,6 +433,8 @@ The file has one entry for a provider. A missing or empty file does not add prov
 - The default model data. The field is optional.
 - The protocol: `responses` or `chat_completions`.
 - The authentication method: `api_key`, `chatgpt`, or `none`.
+- The metadata source: `metadata_url`, `metadata_format`, and `metadata_provider`. The fields are optional.
+- The billing method: `tokens` or `subscription`. The default is `tokens`.
 
 The harness keeps the provider data, the model lists, and the prices in the database. Thus, the instances read the model data from the database.
 
@@ -415,6 +445,11 @@ A model list endpoint usually gives the model IDs and the limits. A model list e
 - The model list response.
 - The prices in the provider file.
 - A price table in a file or at a URL.
+- A model catalog from Models.dev.
+
+The standard configuration uses the Models.dev JSON API for model data and token prices.
+
+The provider endpoint controls model IDs. Models.dev must not add models to the provider list. The metadata source does not receive provider credentials. An error from the metadata source keeps the last correct model list.
 
 The harness refreshes the model data at the interval. The default interval is 24 hours. The user can refresh the model data from the API. The harness keeps the last model list when the API gives an error.
 
@@ -422,6 +457,7 @@ A model list response can give only IDs. The harness uses model data in the sequ
 
 - Data for a specified model in the JSON file.
 - Data from the model list response.
+- Data from the metadata source.
 - Default data from `model_defaults` in the JSON file.
 - Data from the model cache.
 
@@ -430,6 +466,8 @@ When a model list endpoint is available, the harness uses only the IDs in a corr
 The field `ToolSupportUnknown` is `true` when the response does not give data about tools. Then the harness sends the tool definitions. The provider can reject the request. A value of `false` for `tools` removes tool definitions. The database keeps `ToolSupportUnknown` with `Tools`.
 
 For the `codex` format, the adapter reads the model list URL with account authentication. The response has a `models` array with `slug`, `display_name`, `context_window`, and `input_modalities` fields. The configuration supplies the URL and client version. A source code change is not necessary to change the URL or version.
+
+The Codex response also supplies `supported_reasoning_levels`, `default_reasoning_level`, and `supports_reasoning_summaries`. The adapter uses the data for reasoning effort selection. Token prices from Models.dev do not apply to subscription access.
 
 A provider can use the `Refresher` interface:
 
@@ -495,6 +533,20 @@ Requirements:
 - R189: The provider `openai-codex` must use account authentication, not an API key.
 - R190: The API must not give provider authentication tokens to a client.
 - R191: A tool result request must keep the reasoning data necessary for the provider.
+
+### 6.5 Reasoning
+
+A model supplies the available reasoning efforts in `ReasoningEfforts`. The model name does not supply the values. The field `Session.ReasoningEffort` gives the session selection. An empty string uses the model default. An incorrect selection gives an error before the model request.
+
+A change to the session selection applies at the next model request. The rule also applies after a tool result group. The change does not stop an active model request. A child agent can select `reasoning_effort`. Without a selection, a child agent uses the model default.
+
+The Responses adapter sends `reasoning.effort`. The Chat Completions adapter sends `reasoning_effort`. The field `reasoning_summary` in model configuration selects a reasoning summary format. The value `auto` selects a reasoning summary format from the provider.
+
+A provider can supply reasoning text or a reasoning summary. The database keeps the text in `Message.Reasoning`.
+
+The API sends `Message.Reasoning` and reasoning text in `model.chunk` events. The API does not send `ProviderState`. The adapter keeps continuation data for the same provider.
+
+See `docs/model-catalog.md` for configuration and source documents.
 
 ## 7. Stages
 
@@ -936,6 +988,7 @@ The initial API paths are:
 - `GET /instances/{id}/sessions`: read the sessions of an instance.
 - `GET /instances/{id}/models`: read the model list of an instance.
 - `GET /sessions/{id}`: read a session.
+- `PUT /sessions/{id}/reasoning`: set the reasoning effort for a session.
 - `GET /sessions/{id}/messages`: read the messages of a session.
 - `POST /sessions/{id}/cancel`: stop the current run.
 - `DELETE /sessions/{id}/queue/{message_id}`: remove a message from the queue.
@@ -1316,6 +1369,8 @@ type InstanceStore interface {
 
 type SessionStore interface {
     Save(operationContext context.Context, session atom.Session) error
+    SetReasoningEffort(operationContext context.Context, sessionID atom.SessionID, effort string) error
+    GetReasoningEffort(operationContext context.Context, sessionID atom.SessionID) (string, bool, error)
     Get(operationContext context.Context, sessionID atom.SessionID) (atom.Session, error)
     Agents(operationContext context.Context, parent atom.SessionID) ([]atom.SessionID, error)
     List(operationContext context.Context, instanceID string) ([]atom.Session, error)

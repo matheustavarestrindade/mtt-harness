@@ -50,6 +50,12 @@ func (agentLoop *Loop) addAgentModelChoices(session atom.Session, specification 
 			if model.Prices != nil {
 				description += fmt.Sprintf(", %s input %.6g/output %.6g per million tokens", model.Prices.Currency, model.Prices.Input, model.Prices.Output)
 			}
+			if len(model.ReasoningEfforts) > 0 {
+				description += ", reasoning efforts " + strings.Join(model.ReasoningEfforts, "/")
+			}
+			if model.Billing == "subscription" {
+				description += ", subscription billing"
+			}
 			descriptions = append(descriptions, description)
 		}
 	}

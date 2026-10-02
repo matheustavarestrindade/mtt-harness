@@ -25,6 +25,7 @@ export class HarnessConsole {
   instance = $state<Instance | null>(null);
   session = $state<Session | null>(null);
   messages = $state<Message[]>([]);
+  liveMessage = $state<Message | null>(null);
   receipts = $state<Message[]>([]);
   permissions = $state<PermissionRequest[]>([]);
   events = $state<HarnessEvent[]>([]);
@@ -41,6 +42,11 @@ export class HarnessConsole {
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   private refreshing = false;
   private refreshPending = false;
+  private savedMessageIDs = new Set<string>();
+  private reasoningRevision = 0;
+  private streamFlushTimer: ReturnType<typeof setTimeout> | undefined;
+  private pendingText: string[] = [];
+  private pendingReasoning: string[] = [];
 
   async connect(base: string, token: string) {
     this.disconnect(false);
@@ -90,6 +96,9 @@ export class HarnessConsole {
     this.closeStream = undefined;
     clearTimeout(this.sessionPollTimer);
     clearTimeout(this.refreshTimer);
+    this.clearLiveMessage();
+    this.savedMessageIDs.clear();
+    this.reasoningRevision++;
     this.sessionPollTimer = undefined;
     this.refreshTimer = undefined;
     this.sessionReads = new AbortController();
@@ -227,18 +236,29 @@ export class HarnessConsole {
       return;
     }
     this.refreshing = true;
+    const reasoningRevision = this.reasoningRevision;
     try {
-      const [messages, status, statistics] = await Promise.all([
+      const [messages, status, statistics, updatedSession] = await Promise.all([
         api.messages(session.ID, signal),
         api.status(session.ID, signal),
         api.statistics(session.ID, signal),
+        api.session(session.ID, signal),
       ]);
       if (signal.aborted || this.session?.ID !== session.ID) return;
       this.messages = messages;
+      this.session = {
+        ...updatedSession,
+        ReasoningEffort:
+          reasoningRevision === this.reasoningRevision
+            ? updatedSession.ReasoningEffort
+            : this.session.ReasoningEffort,
+      };
       this.status = { ...status, messages: status.messages ?? [] };
       this.statistics = statistics;
       this.error = '';
       const saved = new Set(messages.map((message) => message.ID));
+      this.savedMessageIDs = saved;
+      if (this.liveMessage && saved.has(this.liveMessage.ID)) this.clearLiveMessage();
       this.receipts = this.receipts.filter(
         (message) =>
           !saved.has(message.ID) && (status.running || status.messages?.includes(message.ID)),
@@ -273,6 +293,34 @@ export class HarnessConsole {
         ? (event.Payload as Record<string, unknown>)
         : {};
     if (
+      (event.Name === 'model.call' || event.Name === 'model.chunk') &&
+      typeof payload.message_id === 'string' &&
+      !this.savedMessageIDs.has(payload.message_id)
+    ) {
+      if (this.liveMessage?.ID !== payload.message_id) {
+        this.clearLiveMessage();
+        this.liveMessage = {
+          ID: payload.message_id,
+          SessionID: event.SessionID,
+          Seq: 0,
+          Role: 'assistant',
+          Content: [],
+          Reasoning: '',
+          ToolCalls: null,
+          ToolCallID: '',
+          Usage: null,
+          CreatedAt: event.Time,
+        };
+      }
+      if (event.Name === 'model.chunk') {
+        if (typeof payload.text === 'string') this.pendingText.push(payload.text);
+        if (typeof payload.reasoning === 'string') this.pendingReasoning.push(payload.reasoning);
+        // Batch DOM/Markdown work rather than rerendering on every token.
+        if (!this.streamFlushTimer)
+          this.streamFlushTimer = setTimeout(() => this.flushModelChunks(), 100);
+      }
+    }
+    if (
       event.Name === 'permission.request' &&
       typeof payload.ID === 'string' &&
       typeof payload.Target === 'string'
@@ -284,7 +332,36 @@ export class HarnessConsole {
       this.permissions = this.permissions.filter((entry) => entry.ID !== payload.RequestID);
     if (['turn.end', 'run.cancelled', 'run.error', 'run.interrupted'].includes(event.Name))
       this.permissions = [];
+    if (['run.cancelled', 'run.error', 'run.interrupted'].includes(event.Name))
+      this.clearLiveMessage();
     if (event.Name !== 'model.chunk') this.scheduleSessionRefresh();
+  }
+
+  private clearLiveMessage() {
+    clearTimeout(this.streamFlushTimer);
+    this.streamFlushTimer = undefined;
+    this.pendingText = [];
+    this.pendingReasoning = [];
+    this.liveMessage = null;
+  }
+
+  private flushModelChunks() {
+    this.streamFlushTimer = undefined;
+    const message = this.liveMessage;
+    if (!message || this.savedMessageIDs.has(message.ID)) {
+      this.clearLiveMessage();
+      return;
+    }
+    const text = (message.Content?.[0]?.Text ?? '') + this.pendingText.join('');
+    this.liveMessage = {
+      ...message,
+      Reasoning: (message.Reasoning ?? '') + this.pendingReasoning.join(''),
+      Content: text
+        ? [{ Type: 'text', Text: text, Data: null, MIME: '', URL: '', Filename: '', AudioID: '' }]
+        : [],
+    };
+    this.pendingText = [];
+    this.pendingReasoning = [];
   }
 
   async createInstance(input: InstanceInput) {
@@ -296,14 +373,33 @@ export class HarnessConsole {
     if (!signal.aborted) await this.selectInstance(instance);
   }
 
-  async createSession(model: string) {
+  async createSession(model: string, reasoningEffort = '') {
     const api = this.requireAPIClient();
     const instance = this.instance;
     if (!instance) throw new Error('Choose a workspace first.');
-    const session = await api.createSession(instance.ID, model);
+    const session = await api.createSession(instance.ID, model, reasoningEffort);
     if (this.api !== api || this.instance?.ID !== instance.ID) return;
     this.sessions = [session, ...this.sessions];
     await this.selectSession(session);
+  }
+
+  async setReasoningEffort(effort: string) {
+    const api = this.requireAPIClient();
+    const session = this.session;
+    const signal = this.sessionReads.signal;
+    if (!session) return;
+    this.reasoningRevision++;
+    try {
+      const updatedSession = await api.setReasoningEffort(session.ID, effort, signal);
+      if (signal.aborted || this.session?.ID !== session.ID) return;
+      this.reasoningRevision++;
+      this.session = updatedSession;
+      this.sessions = this.sessions.map((entry) =>
+        entry.ID === session.ID ? updatedSession : entry,
+      );
+    } catch (failure) {
+      if (!signal.aborted) throw failure;
+    }
   }
 
   async sendMessage(content: string) {

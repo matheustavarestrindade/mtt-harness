@@ -10,10 +10,38 @@ import (
 
 type sessions struct{ store *Store }
 
+func (sessionStore *sessions) GetReasoningEffort(operationContext context.Context, sessionID atom.SessionID) (string, bool, error) {
+	if operationError := operationContext.Err(); operationError != nil {
+		return "", false, operationError
+	}
+	sessionStore.store.mutex.RLock()
+	defer sessionStore.store.mutex.RUnlock()
+	session, found := sessionStore.store.sessions[sessionID]
+	return session.ReasoningEffort, found, nil
+}
+
 func (sessionStore *sessions) Save(operationContext context.Context, session atom.Session) error {
 	sessionStore.store.mutex.Lock()
 	defer sessionStore.store.mutex.Unlock()
+	if stored, found := sessionStore.store.sessions[session.ID]; found {
+		session.ReasoningEffort = stored.ReasoningEffort
+	}
 	sessionStore.store.sessions[session.ID] = session
+	return nil
+}
+
+func (sessionStore *sessions) SetReasoningEffort(operationContext context.Context, sessionID atom.SessionID, effort string) error {
+	sessionStore.store.mutex.Lock()
+	defer sessionStore.store.mutex.Unlock()
+	if operationError := operationContext.Err(); operationError != nil {
+		return operationError
+	}
+	session, found := sessionStore.store.sessions[sessionID]
+	if !found {
+		return errors.New("memory: the session is not in the store")
+	}
+	session.ReasoningEffort = effort
+	sessionStore.store.sessions[sessionID] = session
 	return nil
 }
 

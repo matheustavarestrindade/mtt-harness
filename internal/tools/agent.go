@@ -36,6 +36,11 @@ func (agentTool *Agent) InputSchema() atom.Schema {
 			"model": {
 				"type": "string",
 				"description": "Model ID from the instance's available models, preferably provider/model. A bare ID is accepted only when unambiguous. Omit to select the instance default model, not necessarily the parent's model."
+			},
+			"reasoning_effort": {
+				"type": "string",
+				"default": "",
+				"description": "Thinking effort supported by the selected child model. Omit or use an empty string for that model's default, not the parent's effort. Valid explicit choices are given with the available models; unsupported efforts fail before the child starts."
 			}
 		},
 		"required": ["task"]
@@ -48,8 +53,9 @@ func (agentTool *Agent) Check(operationContext context.Context, call atom.ToolCa
 
 func (agentTool *Agent) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	var input struct {
-		Task  string `json:"task"`
-		Model string `json:"model"`
+		Task            string `json:"task"`
+		Model           string `json:"model"`
+		ReasoningEffort string `json:"reasoning_effort"`
 	}
 	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "agent: the input is not correct"}, operationError
@@ -57,5 +63,5 @@ func (agentTool *Agent) Run(operationContext context.Context, call atom.ToolCall
 	if agentTool.RunTask == nil {
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "agent: the runner is not attached"}, nil
 	}
-	return agentTool.RunTask(operationContext, atom.AgentTask{Task: input.Task, Model: input.Model})
+	return agentTool.RunTask(operationContext, atom.AgentTask{Task: input.Task, Model: input.Model, ReasoningEffort: input.ReasoningEffort})
 }

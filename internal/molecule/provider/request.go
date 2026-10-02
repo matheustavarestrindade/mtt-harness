@@ -25,7 +25,7 @@ func (standardProvider *Standard) Stream(operationContext context.Context, reque
 }
 
 func (standardProvider *Standard) streamChatCompletions(operationContext context.Context, request atom.Request) (harness.Stream, error) {
-	messages, operationError := encodeMessages(request.Messages)
+	messages, operationError := encodeMessages(request.Messages, standardProvider.Name())
 	if operationError != nil {
 		return nil, operationError
 	}
@@ -43,6 +43,9 @@ func (standardProvider *Standard) streamChatCompletions(operationContext context
 			return nil, fmt.Errorf("request parameter %q is reserved", key)
 		}
 		payload[key] = value
+	}
+	if operationError := standardProvider.applyReasoningParameters(payload, request); operationError != nil {
+		return nil, operationError
 	}
 	body, operationError := json.Marshal(payload)
 	if operationError != nil {
@@ -67,7 +70,7 @@ func (standardProvider *Standard) streamChatCompletions(operationContext context
 		return nil, fmt.Errorf("provider HTTP status %d: %s", response.StatusCode, strings.TrimSpace(string(data)))
 	}
 	stream := &httpStream{parts: make(chan atom.ResponsePart, 64)}
-	go parseChatCompletionEvents(operationContext, response.Body, stream)
+	go parseChatCompletionEvents(operationContext, response.Body, stream, standardProvider.Name())
 	return stream, nil
 }
 

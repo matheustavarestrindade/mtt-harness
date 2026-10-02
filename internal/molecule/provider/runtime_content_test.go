@@ -16,7 +16,7 @@ func TestRuntimeDataIsNotSystemInstructionsOrAnExtraToolReply(test *testing.T) {
 		{Role: atom.RoleTool, ToolCallID: "background-call", Content: []atom.Content{{Type: atom.Text, Text: "process started"}}},
 		{Role: atom.RoleRuntime, Content: []atom.Content{{Type: atom.Text, Text: content}}},
 	}
-	chat, operationError := encodeMessages(messages)
+	chat, operationError := encodeMessages(messages, "fixture")
 	testutil.RequireNoError(test, operationError)
 	if len(chat) != 4 || chat[2]["role"] != "tool" || chat[3]["role"] != "user" || chat[3]["content"] != content {
 		test.Fatalf("runtime input has an invalid Chat Completions role or content: %+v", chat)

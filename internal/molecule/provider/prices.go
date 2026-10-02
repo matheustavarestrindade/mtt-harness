@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"strings"
+	"math"
+	"strconv"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
@@ -20,6 +18,10 @@ func (standardProvider *Standard) SetPrices(prices map[string]atom.Prices) {
 		standardProvider.inlinePrices[identifier] = price
 	}
 	for index := range standardProvider.models {
+		if standardProvider.providerSpec.Billing == "subscription" {
+			standardProvider.models[index].Prices = nil
+			continue
+		}
 		if price, found := standardProvider.inlinePrices[standardProvider.models[index].ID]; found {
 			value := price
 			standardProvider.models[index].Prices = &value
@@ -65,35 +67,35 @@ func (standardProvider *Standard) loadConfiguredPrices(operationContext context.
 			CacheWrite: entry.CacheWrite,
 		}
 	}
+	// Local prices are explicit overrides, including explicit zero prices.
+	standardProvider.mutex.RLock()
+	for identifier, price := range standardProvider.inlinePrices {
+		result[identifier] = price
+	}
+	standardProvider.mutex.RUnlock()
+	for identifier, price := range result {
+		if operationError := validatePrices(price); operationError != nil {
+			return nil, fmt.Errorf("price table model %q: %w", identifier, operationError)
+		}
+	}
 	return result, nil
 }
 
 func (standardProvider *Standard) readPriceTable(operationContext context.Context, source string) ([]byte, error) {
-	if !strings.HasPrefix(source, "http://") && !strings.HasPrefix(source, "https://") {
-		return os.ReadFile(source)
-	}
-	request, operationError := http.NewRequestWithContext(operationContext, http.MethodGet, source, nil)
-	if operationError != nil {
-		return nil, operationError
-	}
-	response, operationError := standardProvider.client.Do(request)
-	if operationError != nil {
-		return nil, operationError
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("provider: the price table gives the status %d", response.StatusCode)
-	}
-	return io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	return standardProvider.readCatalogSource(operationContext, source, 1<<20)
 }
 
-func pricePerMillionTokens(value string) float64 {
+func pricePerMillionTokens(value string) (float64, error) {
 	if value == "" {
-		return 0
+		return 0, nil
 	}
-	var number float64
-	if _, operationError := fmt.Sscanf(value, "%f", &number); operationError != nil {
-		return 0
+	number, operationError := strconv.ParseFloat(value, 64)
+	if operationError != nil {
+		return 0, fmt.Errorf("invalid token price: %w", operationError)
 	}
-	return number * 1_000_000
+	number *= 1_000_000
+	if number < 0 || math.IsNaN(number) || math.IsInf(number, 0) {
+		return 0, fmt.Errorf("token prices must be finite and non-negative")
+	}
+	return number, nil
 }

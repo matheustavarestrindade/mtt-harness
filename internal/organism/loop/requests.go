@@ -39,7 +39,16 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 	if operationError != nil {
 		return nil, operationError
 	}
-	request := atom.Request{Model: modelID, Messages: messages, Tools: tools}
+	// This runs in the model worker. A saved selection applies at the next
+	// request boundary, including a continuation after a tool-result batch.
+	effort, saved, operationError := agentLoop.configuration.Store.Sessions().GetReasoningEffort(operationContext, session.ID)
+	if operationError != nil {
+		return nil, operationError
+	}
+	if !saved {
+		effort = session.ReasoningEffort
+	}
+	request := atom.Request{Model: modelID, Messages: messages, Tools: tools, ReasoningEffort: effort}
 	request, operationError = agentLoop.pipeline.Request(operationContext, request)
 	if operationError != nil {
 		return nil, operationError
@@ -52,6 +61,9 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 		return nil, operationError
 	}
 	if operationError := validateModelMedia(modelInfo, request.Messages); operationError != nil {
+		return nil, operationError
+	}
+	if operationError := modelInfo.ValidateReasoningEffort(request.ReasoningEffort); operationError != nil {
 		return nil, operationError
 	}
 	verdict, operationError := agentLoop.pipeline.DecideRequest(operationContext, request)

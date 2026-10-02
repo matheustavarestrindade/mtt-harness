@@ -16,11 +16,13 @@ const (
 type SessionID string
 
 type Message struct {
-	ID            string
-	SessionID     SessionID
-	Seq           int64
-	Role          Role
-	Content       []Content
+	ID        string
+	SessionID SessionID
+	Seq       int64
+	Role      Role
+	Content   []Content
+	// Reasoning is provider-exposed thinking text or a reasoning summary for display.
+	Reasoning     string `json:",omitempty"`
 	ToolCalls     []ToolCall
 	ToolCallID    string
 	Usage         *Usage

@@ -29,7 +29,13 @@
           { label: 'Model calls', value: integer(statistics.Calls) },
           { label: 'Cache hit', value: `${statistics.CacheHitPercentage.toFixed(1)}%` },
           { label: 'Reasoning tokens', value: integer(statistics.Reasoning) },
-          { label: 'Recorded cost', value: costLabel(statistics) },
+          {
+            label:
+              statistics.Cost?.Estimated || statistics.Costs?.some((cost) => cost.Estimated)
+                ? 'Estimated cost'
+                : 'Recorded cost',
+            value: costLabel(statistics),
+          },
         ]
       : [],
   );
@@ -128,7 +134,9 @@
     </dl>
     <p class="mt-5 text-xs leading-5 text-muted-foreground">
       Input includes cached tokens. Reasoning tokens are shown separately and are not added to
-      output. Cost is unavailable when a provider does not report pricing.
+      output. Costs include only calls with available pricing. Catalog estimates can differ from
+      provider bills, including discounts and time-based rates. Subscription usage has no per-token
+      charge estimate.
     </p>
   {/if}
 </section>

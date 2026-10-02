@@ -138,6 +138,7 @@ export async function mockHarness(page: Page) {
           ID: `session-${++identifier}`,
           InstanceID: parts[1],
           Model: request.postDataJSON().model,
+          ReasoningEffort: request.postDataJSON().reasoning_effort ?? '',
           Parent: '',
           Depth: 0,
           Completed: false,
@@ -150,6 +151,14 @@ export async function mockHarness(page: Page) {
       }
       const session = sessions.find((entry) => entry.ID === parts[1]);
       if (parts[0] === 'sessions' && session) {
+        if (parts.length === 2 && method === 'GET') return reply(session);
+        if (parts[2] === 'reasoning' && method === 'PUT') {
+          const effort = request.postDataJSON().effort;
+          if (typeof effort !== 'string' || (effort && !model.ReasoningEfforts?.includes(effort)))
+            return reply({ error: 'Unsupported reasoning effort' }, 400);
+          session.ReasoningEffort = effort;
+          return reply(session);
+        }
         if (parts[2] === 'messages' && method === 'GET') return reply(histories.get(session.ID));
         if (parts[2] === 'status')
           return reply({
@@ -224,5 +233,5 @@ export async function mockHarness(page: Page) {
       return reply({ error: `Fixture has no route for ${method} ${path}` }, 404);
     },
   );
-  return { instances, sessions, histories, settings, event };
+  return { instances, sessions, histories, settings, model, sessionUsage, running, event };
 }
