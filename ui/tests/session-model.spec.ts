@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
 import { connectAndCreate } from './helpers';
 
-test('keep model and thinking below the composer and confirm smaller context switches', async ({
+test('configure the session through its cog and confirm smaller context switches in one dialog', async ({
   page,
 }, testInfo) => {
   const fixture = await mockHarness(page);
@@ -24,40 +24,52 @@ test('keep model and thinking below the composer and confirm smaller context swi
   const model = page.getByLabel('Session model', { exact: true });
   const thinking = page.getByLabel('Thinking effort', { exact: true });
   await composer.fill('Keep this draft');
-  expect((await model.boundingBox())!.y).toBeGreaterThan(
-    (await composer.boundingBox())!.y + (await composer.boundingBox())!.height,
-  );
-  expect((await thinking.boundingBox())!.y).toBeGreaterThan(
-    (await composer.boundingBox())!.y + (await composer.boundingBox())!.height,
-  );
+  const cog = page.getByRole('button', { name: 'Session settings', exact: true });
+  await expect(model).toHaveCount(0);
+  await expect(thinking).toHaveCount(0);
+  await expect(cog).toHaveAttribute('aria-haspopup', 'dialog');
+  await cog.click();
+  await expect(page.getByRole('dialog', { name: 'Session settings', exact: true })).toBeVisible();
   await thinking.selectOption('high');
   await expect(thinking).toHaveValue('high');
   await model.selectOption('test/larger');
   await expect(model).toHaveValue('test/larger');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(1);
   await model.selectOption('test/equal');
   await expect(model).toHaveValue('test/equal');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(1);
   await model.selectOption('test/smaller');
   const confirmation = page.getByRole('dialog');
   await expect(confirmation).toContainText('conversation context will be compacted to fit');
   await expect(confirmation).toContainText('256,000 → 32,000');
   expect(fixture.sessions[0].Model).toBe('test/equal');
   await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(confirmation).toHaveCount(0);
+  await expect(confirmation).toHaveCount(1);
+  await expect(
+    confirmation.getByRole('heading', { name: 'Session settings', exact: true }),
+  ).toBeVisible();
   await expect(model).toHaveValue('test/equal');
   await model.selectOption('test/smaller');
   await confirmation.getByRole('button', { name: 'Switch and compact', exact: true }).click();
-  await expect(confirmation).toHaveCount(0);
+  await expect(confirmation).toHaveCount(1);
   await expect(model).toHaveValue('test/smaller');
   await expect(thinking).toHaveValue('');
   await expect(thinking.locator('option')).toHaveText(['Default', 'Low']);
-  await expect(composer).toHaveValue('Keep this draft');
   if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 700 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: testInfo.outputPath('model-toolbar.png'), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('session-settings.png'), fullPage: true });
+  await confirmation.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(confirmation).toHaveCount(0);
+  await expect(cog).toBeFocused();
+  await expect(model).toHaveCount(0);
+  await expect(thinking).toHaveCount(0);
+  await expect(composer).toHaveValue('Keep this draft');
+  await page.screenshot({ path: testInfo.outputPath('compact-composer.png'), fullPage: true });
   await page.reload();
+  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
   await expect(page.getByLabel('Session model', { exact: true })).toHaveValue('test/smaller');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('retain history and the selected model if a model change fails', async ({ page }) => {
@@ -76,9 +88,11 @@ test('retain history and the selected model if a model change fails', async ({ p
       body: JSON.stringify({ error: 'Cannot change this model' }),
     }),
   );
+  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
   await page.getByLabel('Session model', { exact: true }).selectOption('test/other');
   await expect(page.getByText('Cannot change this model', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Session model', { exact: true })).toHaveValue('test/test-model');
+  await page.keyboard.press('Escape');
   await expect(page.getByRole('article', { name: 'assistant message' })).toContainText(
     'Done. Keep the conversation',
   );

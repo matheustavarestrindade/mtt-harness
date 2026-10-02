@@ -93,12 +93,15 @@ test('use model-specific effort choices and show model prices before creating a 
   };
   await connectAndCreate(page);
   const effort = page.getByLabel('Thinking effort', { exact: true });
+  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
   await expect(effort.locator('option')).toHaveText(['Default (Low)', 'Off', 'Low', 'High']);
   await effort.selectOption('high');
   await expect.poll(() => fixture.sessions[0].ReasoningEffort).toBe('high');
   await expect(effort).toHaveValue('high');
   await page.reload();
+  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
   await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveValue('high');
+  await page.keyboard.press('Escape');
   await page.locator('header').getByRole('button', { name: 'New session', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('region', { name: 'Model pricing' })).toContainText(
@@ -113,6 +116,7 @@ test('use model-specific effort choices and show model prices before creating a 
   await dialog.getByRole('button', { name: 'Create session', exact: true }).click();
   await expect.poll(() => fixture.sessions[1]?.ReasoningEffort).toBe('none');
   await expect(dialog).toHaveCount(0);
+  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
   await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveValue('none');
   await page.getByLabel('Thinking effort', { exact: true }).selectOption('');
   await expect.poll(() => fixture.sessions[1]?.ReasoningEffort).toBe('');
@@ -141,6 +145,7 @@ test('keep an effort selection after an older poll returns and recover from a sa
     await route.fulfill({ contentType: 'application/json', body: snapshot });
   });
   await expect.poll(() => captured).toBe(true);
+  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
   await page.getByLabel('Thinking effort', { exact: true }).selectOption('high');
   await expect.poll(() => fixture.sessions[0].ReasoningEffort).toBe('high');
   releasePoll!();

@@ -15,14 +15,14 @@
   const identifier = $props.id();
 </script>
 
-<div class="flex min-w-0 max-w-full flex-1 items-center gap-2 text-xs">
-  <label for={identifier} class="shrink-0 text-muted-foreground">Model</label>
+<div class="min-w-0 space-y-2">
+  <label for={identifier} class="text-sm font-medium">Model</label>
   <select
     id={identifier}
     aria-label="Session model"
     {value}
     {disabled}
-    class="h-11 min-w-0 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    class="field-select h-11 min-w-0 w-full"
     title="Change the model for the next request. A smaller context requires confirmation."
     onchange={(event) => {
       const selected = event.currentTarget.value;

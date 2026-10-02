@@ -125,9 +125,11 @@ Select a model name in the provider section to read token prices and reasoning e
 
 ## Reasoning
 
-The session form has a control with the label `Thinking`. The fields with the labels `Model` and `Thinking` are below the message composer. The available reasoning efforts come from the selected model. To use the model default, select the value with the label `Default`. The database keeps the selection. A change applies to the next model request.
+The session form has a control with the label `Thinking`. In the message composer, use the button with the label `Session settings` to open the dialog. The dialog has fields with the labels `Model` and `Thinking`. The available reasoning efforts come from the selected model.
 
-The model control changes the model during the conversation. The UI shows a dialog before a change to a model with a smaller context limit. When the context is too large, the harness removes the initial turn from the request. The database keeps the conversation history. The UI keeps the message draft. Select the button with the label `Switch and compact` to continue.
+To use the model default, select the value with the label `Default`. The database keeps the selection. A change applies to the next model request. The dialog shows the result of a change.
+
+The model control changes the model during the conversation. The same dialog shows a message before a change to a model with a smaller context limit. When the context is too large, the harness removes the initial turn from the request. The database keeps the conversation history. The UI keeps the message draft. Select the button with the label `Switch and compact` to continue.
 
 Model messages can have a section with the label `Thinking`. The section is closed by default. Select the button with the label `Thinking` to read the reasoning text or reasoning summary. The provider supplies the text. The UI can show the text during the model response and after it is in history.
 

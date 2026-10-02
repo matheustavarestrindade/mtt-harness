@@ -22,9 +22,7 @@
   import Conversation from '$lib/organisms/Conversation.svelte';
   import Composer from '$lib/molecules/Composer.svelte';
   import UsageBar from '$lib/molecules/UsageBar.svelte';
-  import ReasoningSelect from '$lib/molecules/ReasoningSelect.svelte';
-  import SessionModelSelect from '$lib/molecules/SessionModelSelect.svelte';
-  import ModelChangeDialog from '$lib/molecules/ModelChangeDialog.svelte';
+  import SessionSettingsDialog from '$lib/molecules/SessionSettingsDialog.svelte';
   import { findSessionModel } from '$lib/atoms/reasoning';
   import { HarnessConsole } from '$lib/organisms/console.svelte';
   import { ApiError } from '$lib/molecules/api/client';
@@ -40,7 +38,10 @@
   let workspaceOpen = $state(false);
   let workspaceError = $state('');
   let sessionOpen = $state(false);
-  let modelChangeOpen = $state(false);
+  let sessionSettingsOpen = $state(false);
+  let settingsSessionID = $state('');
+  let sessionSettingsError = $state('');
+  let sessionSettingsNotice = $state('');
   let pendingModel = $state<{
     sessionID: string;
     model: string;
@@ -78,9 +79,16 @@
     if (workspaceOpen) workspaceError = '';
   });
   $effect(() => {
-    if (pendingModel && pendingModel.sessionID !== sessionID) {
-      modelChangeOpen = false;
+    if (sessionSettingsOpen && settingsSessionID !== sessionID) {
+      sessionSettingsOpen = false;
       pendingModel = null;
+    }
+  });
+  $effect(() => {
+    if (!sessionSettingsOpen) {
+      pendingModel = null;
+      sessionSettingsError = '';
+      sessionSettingsNotice = '';
     }
   });
 
@@ -95,6 +103,13 @@
     } finally {
       if (busy === name) busy = '';
     }
+  }
+  function openSessionSettings() {
+    settingsSessionID = sessionID;
+    pendingModel = null;
+    sessionSettingsError = '';
+    sessionSettingsNotice = '';
+    sessionSettingsOpen = true;
   }
   async function connect(base: string, token: string) {
     await runWorkbenchAction('connect', async () => {
@@ -144,19 +159,19 @@
   async function changeSessionModel(model: string, allowCompaction = false) {
     const selectedSession = workbench.session;
     if (!selectedSession) return;
+    sessionSettingsError = '';
+    sessionSettingsNotice = '';
     await runWorkbenchAction('model', async () => {
       try {
         await workbench.setSessionModel(model, allowCompaction);
         if (workbench.session?.ID !== selectedSession.ID) return;
-        modelChangeOpen = false;
         pendingModel = null;
-        toast.success('Model changed', {
-          description:
-            selectedSession.ReasoningEffort && !workbench.session.ReasoningEffort
-              ? 'Thinking uses the new model’s default. The change applies to the next request.'
-              : 'The change applies to the next model request.',
-        });
+        sessionSettingsNotice =
+          selectedSession.ReasoningEffort && !workbench.session.ReasoningEffort
+            ? 'Model updated. Thinking uses the model’s default.'
+            : 'Model updated.';
       } catch (failure) {
+        if (!sessionSettingsOpen || workbench.session?.ID !== selectedSession.ID) return;
         if (
           failure instanceof ApiError &&
           failure.details.code === 'context_compaction_required' &&
@@ -174,10 +189,29 @@
                 ? failure.details.target_context_max
                 : 0,
           };
-          modelChangeOpen = true;
           return;
         }
-        throw failure;
+        showSessionSettingsError(failure);
+      }
+    });
+  }
+  function showSessionSettingsError(failure: unknown) {
+    sessionSettingsError =
+      failure instanceof Error ? failure.message : 'Cannot update this session.';
+    if (failure instanceof ApiError && failure.status === 401) {
+      sessionSettingsOpen = false;
+      openSettings('connection');
+    }
+  }
+  async function changeSessionEffort(effort: string) {
+    sessionSettingsError = '';
+    sessionSettingsNotice = '';
+    await runWorkbenchAction('reasoning', async () => {
+      try {
+        await workbench.setReasoningEffort(effort);
+        sessionSettingsNotice = 'Thinking updated.';
+      } catch (failure) {
+        showSessionSettingsError(failure);
       }
     });
   }
@@ -350,27 +384,9 @@
             cancelling={busy === 'cancel'}
             onSend={() => void sendDraftMessage()}
             onCancel={() => void runWorkbenchAction('cancel', () => workbench.cancelCurrentTurn())}
+            onSettings={workbench.session ? openSessionSettings : undefined}
+            settingsOpen={sessionSettingsOpen}
           />
-          {#if workbench.session}
-            <div
-              aria-label="Conversation model controls"
-              class="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
-            >
-              <SessionModelSelect
-                models={workbench.models}
-                value={sessionModel?.ID ?? workbench.session.Model}
-                disabled={disabled || busy === 'model' || busy === 'reasoning'}
-                onChange={(model) => void changeSessionModel(model)}
-              />
-              <ReasoningSelect
-                model={sessionModel}
-                value={workbench.session.ReasoningEffort ?? ''}
-                disabled={disabled || busy === 'model' || busy === 'reasoning'}
-                onChange={(effort) =>
-                  void runWorkbenchAction('reasoning', () => workbench.setReasoningEffort(effort))}
-              />
-            </div>
-          {/if}
           <div class="mt-1 flex items-center justify-between gap-2">
             <UsageBar statistics={workbench.statistics} /><span
               class="hidden shrink-0 text-[10px] text-muted-foreground/65 sm:block"
@@ -396,12 +412,23 @@
     >{@render navigation()}</Sheet.Content
   ></Sheet.Root
 >
-<ModelChangeDialog
-  bind:open={modelChangeOpen}
-  model={pendingModel?.model ?? ''}
-  currentContext={pendingModel?.currentContext ?? 0}
-  targetContext={pendingModel?.targetContext ?? 0}
-  busy={busy === 'model'}
+<SessionSettingsDialog
+  bind:open={sessionSettingsOpen}
+  models={workbench.models}
+  model={sessionModel}
+  modelID={sessionModel?.ID ?? workbench.session?.Model ?? ''}
+  effort={workbench.session?.ReasoningEffort ?? ''}
+  busy={busy === 'model' || busy === 'reasoning'}
+  {disabled}
+  error={sessionSettingsError}
+  notice={sessionSettingsNotice}
+  {pendingModel}
+  onModelChange={(model) => void changeSessionModel(model)}
+  onEffortChange={(effort) => void changeSessionEffort(effort)}
+  onCancel={() => {
+    pendingModel = null;
+    sessionSettingsError = '';
+  }}
   onConfirm={() => {
     if (pendingModel?.sessionID === sessionID) void changeSessionModel(pendingModel.model, true);
   }}

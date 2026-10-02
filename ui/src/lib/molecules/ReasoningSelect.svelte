@@ -5,11 +5,13 @@
     model,
     value = '',
     disabled = false,
+    stacked = false,
     onChange,
   }: {
     model: Model | undefined;
     value?: string;
     disabled?: boolean;
+    stacked?: boolean;
     onChange: (effort: string) => void;
   } = $props();
   const identifier = $props.id();
@@ -17,12 +19,17 @@
 </script>
 
 {#if model?.Reasoning || value}
-  <div class="flex min-w-0 items-center gap-2 text-xs">
-    <label for={identifier} class="shrink-0 text-muted-foreground">Thinking</label>
+  <div class={stacked ? 'min-w-0 space-y-2' : 'flex min-w-0 items-center gap-2 text-xs'}>
+    <label
+      for={identifier}
+      class={stacked ? 'text-sm font-medium' : 'shrink-0 text-muted-foreground'}>Thinking</label
+    >
     <select
       id={identifier}
       aria-label="Thinking effort"
-      class="h-11 min-w-0 max-w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class={stacked
+        ? 'field-select h-11 min-w-0 w-full'
+        : 'h-11 min-w-0 max-w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring'}
       {value}
       disabled={disabled || !model}
       title="Applies to the next model request. Default uses the model's setting."
