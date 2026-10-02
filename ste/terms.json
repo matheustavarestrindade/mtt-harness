@@ -2,6 +2,38 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "unified diff",
+      "category": "technical_noun",
+      "approved_forms": [
+        "unified diffs"
+      ],
+      "meaning": "a line-based change report with old and new line ranges, context, removals, and additions",
+      "source": "file-edit feedback"
+    },
+    {
+      "term": "diff input",
+      "category": "technical_noun",
+      "approved_forms": [
+        "diff inputs"
+      ],
+      "meaning": "the before and after text windows compared to produce a file-edit change report",
+      "source": "file-edit feedback"
+    },
+    {
+      "term": "UTF-8",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the Unicode encoding used for file text previews",
+      "source": "file-edit feedback"
+    },
+    {
+      "term": "NUL",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "a zero byte that prevents a file-edit text preview",
+      "source": "file-edit feedback"
+    },
+    {
       "term": "role",
       "category": "technical_noun",
       "approved_forms": [

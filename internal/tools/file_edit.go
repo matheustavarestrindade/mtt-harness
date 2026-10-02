@@ -92,7 +92,7 @@ func applyAtomicFileEdit(operationContext context.Context, path string, allowCre
 	if operationError := replaceFileContentsAtomically(operationContext, path, information, change.content); operationError != nil {
 		return "", operationError
 	}
-	return change.summary, nil
+	return describeFileEdit(path, original, change.content, information != nil, change.summary), nil
 }
 
 func replaceFileContentsAtomically(operationContext context.Context, path string, information os.FileInfo, content []byte) error {
