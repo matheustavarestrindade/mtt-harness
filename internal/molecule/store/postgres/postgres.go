@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 ALTER TABLE instances ADD COLUMN IF NOT EXISTS stopped boolean NOT NULL DEFAULT false;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS completed boolean NOT NULL DEFAULT false;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS reasoning_effort text NOT NULL DEFAULT '';
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS messages (
 	id text PRIMARY KEY,
 	session_id text NOT NULL,

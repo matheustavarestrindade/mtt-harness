@@ -40,11 +40,11 @@ Put a variable between braces, for example `{workspace}`. Use the same text as t
 
 The model value is from the session before the pipeline stages run. A plugin can change the model after substitution. In Docker, the system and workspace values are for the container.
 
-For example, `{bash_info}` gives the definition of `bash`. `{read_info}` gives the definition of `read`. `{mcp__server__lookup_info}` gives the definition of the MCP tool `mcp__server__lookup`.
+For example, `{bash_info}` gives the definition of `bash`. `{file_actions_info}` gives the definition of `file_actions`. `{mcp__server__lookup_info}` gives the definition of the MCP tool `mcp__server__lookup`.
 
 A tool definition is JSON with `name`, `description`, `categories`, and `input_schema`. The schema includes parameter descriptions, defaults, and units. The definition of `agent` includes the model list for the instance.
 
-Tool variables do not change the session tool group. The model uses `search_tool` to add tools to the group. Tool permissions and input checks continue to apply.
+Tool variables do not change the session tool group. The initial request has the full definitions of `search_tool` and `file_actions`. The model uses `search_tool` to add other tools to the group. Tool permissions and input checks continue to apply.
 
 The harness gets tool data from the registry for a model request. If a tool in a variable is not in the registry, the turn gives an error before the model call. Other sessions can continue. The rule also applies if an MCP server removes a tool.
 
@@ -61,8 +61,8 @@ Registered tools:
 Command tool instructions:
 {bash_info}
 
-File read instructions:
-{read_info}
+File action instructions:
+{file_actions_info}
 ```
 
 The regular expression for a variable name is:

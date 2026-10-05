@@ -24,6 +24,8 @@
   --input: #ffffff26;
   --ring: #737373;
   --user-message-accent: #60a5fa;
+  --tool-call-accent: #d4a65a;
+  --user-message-background: #1c1c1c;
   --radius: 0.65rem;
 }
 @theme inline {
@@ -48,6 +50,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-user-message-accent: var(--user-message-accent);
+  --color-tool-call-accent: var(--tool-call-accent);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -111,14 +114,35 @@
   .chat-message {
     position: relative;
     min-width: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .assistant-message {
+    --message-surface: var(--background);
+  }
+  .assistant-sections {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .assistant-section {
+    min-width: 0;
+    background: transparent;
+    padding-inline: 0.5rem;
+    border-bottom: 4px solid var(--background);
+  }
+  .activity-toggle {
+    @apply flex min-h-11 min-w-0 items-center gap-1.5 text-left text-xs text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring pointer-fine:min-h-8;
   }
   .conversation-entries > .user-message {
     margin-block: 0.5rem;
   }
   .user-message {
+    --message-surface: var(--user-message-background);
+    background: var(--message-surface);
     border-left: 3px solid var(--user-message-accent);
     padding-block: 0.25rem;
-    padding-left: 0.75rem;
+    padding-inline: 0.5rem;
   }
   .message-actions {
     position: absolute;
@@ -130,7 +154,7 @@
     gap: 0.25rem;
     padding-left: 0.5rem;
     border-radius: var(--radius);
-    background: var(--background);
+    background: var(--message-surface, var(--background));
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms ease;

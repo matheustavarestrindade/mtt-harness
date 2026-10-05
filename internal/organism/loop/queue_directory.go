@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
 // Only runDirectory accesses this map and lifecycle state. It delegates waits,
@@ -13,6 +14,9 @@ type queueDirectory struct {
 	sessions      map[atom.SessionID]*sessionCoordinator
 	stopped       map[string]bool
 	controlling   map[string]bool
+	deleted       map[atom.SessionID]bool
+	deleting      map[string]bool
+	blocked       map[atom.SessionID]bool
 	restoring     bool
 	closing       bool
 	operations    int
@@ -21,7 +25,7 @@ type queueDirectory struct {
 }
 
 func (messageQueue *Queue) runDirectory() {
-	directory := &queueDirectory{queue: messageQueue, sessions: map[atom.SessionID]*sessionCoordinator{}, stopped: map[string]bool{}, controlling: map[string]bool{}}
+	directory := &queueDirectory{queue: messageQueue, sessions: map[atom.SessionID]*sessionCoordinator{}, stopped: map[string]bool{}, controlling: map[string]bool{}, deleted: map[atom.SessionID]bool{}, deleting: map[string]bool{}, blocked: map[atom.SessionID]bool{}}
 	defer close(messageQueue.done)
 	for {
 		select {
@@ -48,16 +52,22 @@ func (directory *queueDirectory) handleDirectoryCommand(command queueCommand) {
 		directory.beginClose(command)
 		return
 	}
-	if directory.closing {
+	// Accepted deletion workers still need their admission fence during shutdown.
+	if directory.closing && command.kind != fenceConversationDeletion {
 		command.respond(queueReply{operationError: ErrQueueClosed})
 		return
 	}
 	if command.kind == findSession {
+		if directory.deleted[command.session.ID] {
+			command.respond(queueReply{operationError: store.ErrSessionDeleted})
+			return
+		}
 		if command.create && directory.restoring {
 			command.respond(queueReply{operationError: ErrSessionBusy})
 			return
 		}
-		if command.create && directory.controlling[command.session.InstanceID] {
+		if command.create && (directory.blocked[command.session.ID] || directory.blocked[command.session.Parent] ||
+			(directory.controlling[command.session.InstanceID] && !directory.deleting[command.session.InstanceID])) {
 			command.respond(queueReply{operationError: ErrSessionBusy})
 			return
 		}
@@ -74,6 +84,28 @@ func (directory *queueDirectory) handleDirectoryCommand(command queueCommand) {
 		return
 	}
 	switch command.kind {
+	case fenceConversationDeletion:
+		if !directory.deleting[command.instanceID] {
+			command.respond(queueReply{operationError: ErrSessionBusy})
+			return
+		}
+		var coordinators []*sessionCoordinator
+		for identifier := range command.protected {
+			directory.blocked[identifier] = true
+			if coordinator := directory.sessions[identifier]; coordinator != nil {
+				coordinators = append(coordinators, coordinator)
+			}
+		}
+		command.respond(queueReply{coordinators: coordinators})
+	case deleteConversation:
+		if directory.controlling[command.instanceID] {
+			command.respond(queueReply{operationError: ErrSessionBusy})
+			return
+		}
+		directory.controlling[command.instanceID] = true
+		directory.deleting[command.instanceID] = true
+		directory.operations++
+		go directory.queue.deleteStoredConversation(command)
 	case restoreQueue:
 		if len(directory.sessions) > 0 {
 			command.respond(queueReply{operationError: ErrSessionBusy})
@@ -142,13 +174,21 @@ func (directory *queueDirectory) handleCompletion(completed directoryCompletion)
 		}
 	} else {
 		delete(directory.controlling, command.instanceID)
+		delete(directory.deleting, command.instanceID)
+		for identifier := range completed.protected {
+			delete(directory.blocked, identifier)
+		}
+		for _, identifier := range completed.deleted {
+			directory.deleted[identifier] = true
+			delete(directory.sessions, identifier)
+		}
 		if command.kind == resumeInstance && completed.operationError == nil {
 			delete(directory.stopped, command.instanceID)
 		}
 	}
-	if directory.closing {
+	if directory.closing && command.kind != deleteConversation {
 		command.respond(queueReply{operationError: ErrQueueClosed})
 		return
 	}
-	command.respond(queueReply{operationError: completed.operationError})
+	command.respond(queueReply{deleted: completed.deleted, operationError: completed.operationError})
 }

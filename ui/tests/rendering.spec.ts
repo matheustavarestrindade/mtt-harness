@@ -70,6 +70,56 @@ test('format Markdown, highlight code, and parse quoted CSV without executing co
   expect(errors).toEqual([]);
 });
 
+test('describe unified file actions and retain the single-read CSV view', async ({ page }) => {
+  const fixture = await mockHarness(page);
+  await connectAndCreate(page);
+  const session = fixture.sessions[0];
+  fixture.histories.set(session.ID, [
+    message(session, 'file-plan', '', {
+      ToolCalls: [
+        {
+          ID: 'unified-read',
+          Name: 'file_actions',
+          Input: { path: 'report.csv', actions: [{ op: 'read' }] },
+        },
+        {
+          ID: 'unified-edit',
+          Name: 'file_actions',
+          Input: {
+            path: 'notes.txt',
+            actions: [
+              { op: 'replace', old_text: 'old', new_text: 'new' },
+              { op: 'append', content: '\ntail' },
+            ],
+            return: { type: 'summary' },
+          },
+        },
+      ],
+    }),
+    message(session, 'file-read-result', 'name,total\nalpha,3', {
+      Role: 'tool',
+      ToolCallID: 'unified-read',
+    }),
+    message(session, 'file-edit-result', 'Updated notes.txt\nActions completed: 2.', {
+      Role: 'tool',
+      ToolCallID: 'unified-edit',
+    }),
+  ]);
+  fixture.event(session, 'turn.end', {});
+  const read = page.locator('[data-call-id="unified-read"]');
+  await read.getByRole('button', { name: /^read · report.csv Result/ }).click();
+  await expect(
+    read
+      .getByRole('region', { name: 'CSV table' })
+      .getByRole('cell', { name: 'alpha', exact: true }),
+  ).toBeVisible();
+  const edit = page.locator('[data-call-id="unified-edit"]');
+  await edit.getByRole('button', { name: /^replace → append · notes.txt Result/ }).click();
+  await expect(edit.getByRole('region', { name: 'CSV table' })).toHaveCount(0);
+  await expect(edit).toContainText('Actions completed: 2.');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test('combine calls and out-of-order results and attach later output to an open section', async ({
   page,
 }, testInfo) => {
@@ -79,7 +129,9 @@ test('combine calls and out-of-order results and attach later output to an open 
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   const session = fixture.sessions[0];
   fixture.histories.set(session.ID, [
+    message(session, 'request', 'Read the report, then run the check.', { Role: 'user' }),
     message(session, 'plan', 'I will read the report and run a check.', {
+      Reasoning: 'I will inspect the file and check the command output.',
       ToolCalls: [
         { ID: 'call-read', Name: 'read', Input: { path: 'report.csv' } },
         { ID: 'call-shell', Name: 'bash', Input: { command: 'exit 1' } },
@@ -97,6 +149,23 @@ test('combine calls and out-of-order results and attach later output to an open 
   await expect(page.getByText('Command failed: exit code 1', { exact: true })).toHaveCount(0);
   await read.getByRole('button', { name: /^read Waiting/ }).click();
   await expect(read).toContainText('Waiting for the tool result');
+  const inputHeading = read.getByRole('heading', { name: 'Input', exact: true });
+  await inputHeading.scrollIntoViewIfNeeded();
+  const headerBounds = await read.getByRole('button', { name: /^read Waiting/ }).boundingBox();
+  const inputBounds = await inputHeading.boundingBox();
+  expect(inputBounds!.y).toBeGreaterThan(headerBounds!.y + headerBounds!.height);
+  expect(
+    await inputHeading.evaluate((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      const visibleElement = document.elementFromPoint(bounds.left + 2, bounds.top + 2);
+      return visibleElement === heading || heading.contains(visibleElement);
+    }),
+  ).toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath('read-expanded.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
   fixture.histories.get(session.ID)!.push(
     message(session, 'result-read', 'Name,Score\nAlice,10\nBob,9', {
       Role: 'tool',

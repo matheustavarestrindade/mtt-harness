@@ -14,7 +14,11 @@ type sessions struct{ store *Store }
 
 func (sessionStore *sessions) GetModelSelection(operationContext context.Context, sessionID atom.SessionID) (atom.SessionModelSelection, bool, error) {
 	var selection atom.SessionModelSelection
-	operationError := sessionStore.store.pool.QueryRow(operationContext, `SELECT model,reasoning_effort FROM sessions WHERE id=$1`, string(sessionID)).Scan(&selection.Model, &selection.ReasoningEffort)
+	var deleted bool
+	operationError := sessionStore.store.pool.QueryRow(operationContext, `SELECT model,reasoning_effort,deleted FROM sessions WHERE id=$1`, string(sessionID)).Scan(&selection.Model, &selection.ReasoningEffort, &deleted)
+	if deleted {
+		return atom.SessionModelSelection{}, false, store.ErrSessionDeleted
+	}
 	if errors.Is(operationError, pgx.ErrNoRows) {
 		return atom.SessionModelSelection{}, false, nil
 	}
@@ -22,7 +26,7 @@ func (sessionStore *sessions) GetModelSelection(operationContext context.Context
 }
 
 func (sessionStore *sessions) List(operationContext context.Context, instanceID string) ([]atom.Session, error) {
-	rows, operationError := sessionStore.store.pool.Query(operationContext, `SELECT id,instance_id,parent_id,depth,model,created_at,completed,reasoning_effort FROM sessions WHERE instance_id=$1 ORDER BY id`, instanceID)
+	rows, operationError := sessionStore.store.pool.Query(operationContext, `SELECT id,instance_id,parent_id,depth,model,created_at,completed,reasoning_effort FROM sessions WHERE instance_id=$1 AND NOT deleted ORDER BY id`, instanceID)
 	if operationError != nil {
 		return nil, operationError
 	}
@@ -39,14 +43,18 @@ func (sessionStore *sessions) List(operationContext context.Context, instanceID 
 }
 
 func (sessionStore *sessions) Save(operationContext context.Context, session atom.Session) error {
-	_, operationError := sessionStore.store.pool.Exec(operationContext, `
+	result, operationError := sessionStore.store.pool.Exec(operationContext, `
+		WITH parent_state AS MATERIALIZED (SELECT deleted FROM sessions WHERE id=$3 FOR SHARE)
 		INSERT INTO sessions (id, instance_id, parent_id, depth, model, created_at, completed, reasoning_effort)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8 WHERE NOT EXISTS (SELECT 1 FROM parent_state WHERE deleted)
 		ON CONFLICT (id) DO UPDATE SET
 			parent_id = EXCLUDED.parent_id,
 			depth = EXCLUDED.depth,
-			completed = EXCLUDED.completed`,
+			completed = EXCLUDED.completed WHERE NOT sessions.deleted`,
 		string(session.ID), session.InstanceID, string(session.Parent), session.Depth, session.Model, session.CreatedAt, session.Completed, session.ReasoningEffort)
+	if operationError == nil && result.RowsAffected() == 0 {
+		return store.ErrSessionDeleted
+	}
 	return operationError
 }
 
@@ -54,14 +62,17 @@ func (sessionStore *sessions) Get(operationContext context.Context, sessionID at
 	var session atom.Session
 	operationError := sessionStore.store.pool.QueryRow(operationContext, `
 		SELECT id, instance_id, parent_id, depth, model, created_at, completed, reasoning_effort
-		FROM sessions WHERE id = $1`, string(sessionID)).
+		FROM sessions WHERE id = $1 AND NOT deleted`, string(sessionID)).
 		Scan(&session.ID, &session.InstanceID, &session.Parent, &session.Depth, &session.Model, &session.CreatedAt, &session.Completed, &session.ReasoningEffort)
+	if errors.Is(operationError, pgx.ErrNoRows) {
+		return atom.Session{}, store.ErrSessionNotFound
+	}
 	return session, operationError
 }
 
 func (sessionStore *sessions) SetModelSelection(operationContext context.Context, sessionID atom.SessionID, previous, next atom.SessionModelSelection) error {
 	result, operationError := sessionStore.store.pool.Exec(operationContext, `UPDATE sessions SET model=$2, reasoning_effort=$3
-		WHERE id=$1 AND model=$4 AND reasoning_effort=$5 AND NOT completed`, string(sessionID), next.Model, next.ReasoningEffort, previous.Model, previous.ReasoningEffort)
+		WHERE id=$1 AND model=$4 AND reasoning_effort=$5 AND NOT completed AND NOT deleted`, string(sessionID), next.Model, next.ReasoningEffort, previous.Model, previous.ReasoningEffort)
 	if operationError != nil {
 		return operationError
 	}
@@ -72,10 +83,10 @@ func (sessionStore *sessions) SetModelSelection(operationContext context.Context
 }
 
 func (sessionStore *sessions) Agents(operationContext context.Context, parent atom.SessionID) ([]atom.SessionID, error) {
-	query := `SELECT id FROM sessions WHERE parent_id = '' ORDER BY id`
+	query := `SELECT id FROM sessions WHERE parent_id = '' AND NOT deleted ORDER BY id`
 	var arguments []any
 	if parent != "" {
-		query = `SELECT id FROM sessions WHERE parent_id = $1 ORDER BY id`
+		query = `SELECT id FROM sessions WHERE parent_id = $1 AND NOT deleted ORDER BY id`
 		arguments = []any{string(parent)}
 	}
 	rows, operationError := sessionStore.store.pool.Query(operationContext, query, arguments...)
@@ -110,10 +121,14 @@ func (sessionStore *sessions) Append(operationContext context.Context, message a
 		data, _ := json.Marshal(message.Usage)
 		usage = data
 	}
-	_, operationError := sessionStore.store.pool.Exec(operationContext, `
+	result, operationError := sessionStore.store.pool.Exec(operationContext, `
+		WITH session_guard AS MATERIALIZED (SELECT deleted FROM sessions WHERE id=$2 FOR SHARE)
 		INSERT INTO messages (id, session_id, role, content, tool_calls, tool_call_id, usage, created_at, provider_state, reasoning)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 WHERE NOT EXISTS (SELECT 1 FROM session_guard WHERE deleted)`,
 		message.ID, string(message.SessionID), string(message.Role), content, calls, message.ToolCallID, usage, message.CreatedAt, providerState, message.Reasoning)
+	if operationError == nil && result.RowsAffected() == 0 {
+		return store.ErrSessionDeleted
+	}
 	return operationError
 }
 

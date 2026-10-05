@@ -24,19 +24,26 @@
     settingsOpen?: boolean;
   } = $props();
   function handleComposerKeydown(event: KeyboardEvent) {
-    // Enter keeps a newline on mobile keyboards. Desktop users have an explicit
-    // modifier shortcut that does not interfere with IME composition.
-    if (
-      event.key === 'Enter' &&
-      (event.metaKey || event.ctrlKey) &&
-      !event.isComposing &&
-      !disabled &&
-      !sending &&
-      value.trim()
-    ) {
+    // IME confirmation is text input, not a request to send the draft.
+    if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
+    if (event.metaKey || event.ctrlKey) {
+      // Command+Enter does not insert a newline consistently across browsers.
       event.preventDefault();
-      onSend();
+      if (disabled) return;
+      const textarea = event.currentTarget as HTMLTextAreaElement;
+      textarea.setRangeText('\n', textarea.selectionStart, textarea.selectionEnd, 'end');
+      textarea.dispatchEvent(
+        new InputEvent('input', {
+          bubbles: true,
+          inputType: 'insertLineBreak',
+          data: '\n',
+        }),
+      );
+      return;
     }
+    if (event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (!event.repeat && !disabled && !sending && value.trim()) onSend();
   }
 </script>
 
@@ -50,6 +57,7 @@
   <label for="message-input" class="sr-only">Message</label>
   <Textarea
     id="message-input"
+    enterkeyhint="send"
     bind:value
     class="min-h-24 max-h-52 resize-none border-0 bg-transparent p-4 text-base shadow-none focus-visible:ring-0 dark:bg-transparent sm:text-sm"
     placeholder={disabled
@@ -68,8 +76,8 @@
           ></span
         >{:else}<span class="flex items-center gap-1.5"
           ><CornerDownLeft class="size-3" /><span class="hidden sm:inline"
-            >Ctrl / ⌘ + Enter to send</span
-          ><span class="sm:hidden">Enter for a new line</span></span
+            >Enter to send · Shift / ⌘ + Enter for a new line</span
+          ><span class="sm:hidden">Enter to send</span></span
         >{/if}</span
     >
     <div class="flex shrink-0 items-center gap-2">

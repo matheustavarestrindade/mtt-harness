@@ -64,6 +64,10 @@ export interface Statistics extends Usage {
   CacheHitRate: number;
   CacheHitPercentage: number;
 }
+export interface SessionDeletion {
+  status: 'deleted';
+  session_ids: string[];
+}
 export interface Model {
   ID: string;
   Name?: string;

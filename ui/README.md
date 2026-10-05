@@ -67,7 +67,7 @@ docker compose down
 
 Open the Docker URL on a phone with Tailscale access to the host. For the local server, open `http://HOST_LAN_IP:5174`. Keep `/api` as the API URL in the browser.
 
-The navigation drawer contains the workspaces and sessions. The message composer stays at the bottom of the screen. The `Enter` key makes a new line. The keys `Ctrl+Enter` and `Command+Enter` send a message.
+The navigation drawer contains the workspaces and sessions. The message composer stays at the bottom of the screen. The `Enter` key sends a message. The keys `Shift+Enter`, `Command+Enter`, and `Ctrl+Enter` make a new line. Text composition does not send a message.
 
 ## A Conversation
 
@@ -137,13 +137,17 @@ Model messages can have a section with the label `Thinking`. The section is clos
 
 Model messages use Markdown for headings, lists, hyperlinks, tables, and code blocks. Code blocks have syntax highlighting. The buttons with the labels `Copy code` and `Download source` use the full source text. The UI does not run message code. HTML in message text stays as text.
 
-A code block with the format `csv` or `tsv` has a table preview. Use the button with the label `Source` to read the full source text. The tool with the name `read` gives a preview for a CSV file. Data cells can contain CSV delimiters and line breaks.
+A code block with the format `csv` or `tsv` has a table preview. Use the button with the label `Source` to read the full source text. A file text result from `file_actions` can have a CSV preview. Previous tool results keep the preview. Data cells can contain CSV delimiters and line breaks.
 
-One card contains a tool call and the related tool result. Open the card to read the input and output. The card shows a new tool result when the API gives the data. The UI shows a tool result in a different card if the tool call is not in the history.
+One section contains a tool call and the related tool result. Open the section to read the input and output. The section shows a new tool result when the API gives the data. The UI shows a tool result in a different section if the tool call is not in the history.
 
 Large previews have limits. The source download keeps the full source. The copy button also keeps the full source. See `docs/messages.md` for the limits and libraries.
 
 ## Functions
+
+Use the button with the label `Delete session` to remove a conversation. The button is adjacent to the session in the navigation. The dialog gives the session ID. Select the button with the label `Delete session` in the dialog to continue. The operation removes the conversation and the child sessions from the server.
+
+Stop active work and remove messages from the queue before session deletion. Stop the processes of the session. Workspace files and usage statistics stay available. The UI keeps the message draft for a different session. The dialog shows an error from session deletion.
 
 The UI can make workspaces and sessions. The user can select an instance or session from the navigation. The UI can start a stopped workspace. It can send text, stop a turn, remove a message from the queue, and accept or deny a permission request.
 

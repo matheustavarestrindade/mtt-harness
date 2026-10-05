@@ -2,6 +2,162 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "session tree",
+      "category": "technical_noun",
+      "approved_forms": [
+        "session trees"
+      ],
+      "meaning": "a conversation session and its descendant agent sessions",
+      "source": "session deletion"
+    },
+    {
+      "term": "session deletion",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "permanent removal of saved conversation data through the session API",
+      "source": "session deletion"
+    },
+    {
+      "term": "child session",
+      "category": "technical_noun",
+      "approved_forms": [
+        "child sessions"
+      ],
+      "meaning": "an agent session with a parent session reference",
+      "source": "session lifecycle"
+    },
+    {
+      "term": "text composition",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "input-method editing of characters before their final insertion into a text field",
+      "source": "composer keyboard handling"
+    },
+    {
+      "term": "process record",
+      "category": "technical_noun",
+      "approved_forms": [
+        "process records"
+      ],
+      "meaning": "stored metadata and lifecycle state for a supervised process",
+      "source": "session deletion"
+    },
+    {
+      "term": "tombstone",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tombstones"
+      ],
+      "meaning": "a retained session identity marker that rejects late writes after conversation deletion",
+      "source": "session deletion and usage accounting"
+    },
+    {
+      "term": "directory entry",
+      "category": "technical_noun",
+      "approved_forms": [
+        "directory entries"
+      ],
+      "meaning": "a direct file, directory, or symbolic-link name returned from a filesystem directory",
+      "source": "unified file tool"
+    },
+    {
+      "term": "hidden directory entry",
+      "category": "technical_noun",
+      "approved_forms": [
+        "hidden directory entries"
+      ],
+      "meaning": "a directory entry whose name begins with a dot",
+      "source": "unified file tool"
+    },
+    {
+      "term": "directory page",
+      "category": "technical_noun",
+      "approved_forms": [
+        "directory pages"
+      ],
+      "meaning": "one bounded list of directory entries returned before a continuation cursor",
+      "source": "unified file tool"
+    },
+    {
+      "term": "error diagnostic",
+      "category": "technical_noun",
+      "approved_forms": [
+        "error diagnostics"
+      ],
+      "meaning": "read-only file or directory output returned with the cause of a failed tool operation",
+      "source": "unified file tool"
+    },
+    {
+      "term": "read action",
+      "category": "technical_noun",
+      "approved_forms": [
+        "read actions"
+      ],
+      "meaning": "the typed read operation in file_actions",
+      "source": "unified file tool"
+    },
+    {
+      "term": "file action",
+      "category": "technical_noun",
+      "approved_forms": [
+        "file actions"
+      ],
+      "meaning": "one typed file or directory operation in the file_actions tool",
+      "source": "unified file tool"
+    },
+    {
+      "term": "directory cursor",
+      "category": "technical_noun",
+      "approved_forms": [
+        "directory cursors"
+      ],
+      "meaning": "an opaque name-based continuation value for a bounded directory listing",
+      "source": "unified file tool"
+    },
+    {
+      "term": "UTF-8 character",
+      "category": "technical_noun",
+      "approved_forms": [
+        "UTF-8 characters"
+      ],
+      "meaning": "one Unicode character encoded as a UTF-8 byte sequence",
+      "source": "bounded file text previews"
+    },
+    {
+      "term": "byte offset",
+      "category": "technical_noun",
+      "approved_forms": [
+        "byte offsets"
+      ],
+      "meaning": "a zero-based position measured in bytes within a file line",
+      "source": "bounded file text previews"
+    },
+    {
+      "term": "truncation notice",
+      "category": "technical_noun",
+      "approved_forms": [
+        "truncation notices"
+      ],
+      "meaning": "tool output metadata identifying the next file position when a preview reaches its output limit",
+      "source": "bounded file text previews"
+    },
+    {
+      "term": "line-number label",
+      "category": "technical_noun",
+      "approved_forms": [
+        "line-number labels"
+      ],
+      "meaning": "a displayed absolute file line number that is not part of the file contents",
+      "source": "bounded file text previews"
+    },
+    {
+      "term": "UI background",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the base interface surface visible behind transparent message sections",
+      "source": "UI message display"
+    },
+    {
       "term": "context compaction",
       "category": "technical_noun",
       "approved_forms": [],

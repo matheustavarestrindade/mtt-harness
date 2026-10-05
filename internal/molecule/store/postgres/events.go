@@ -2,8 +2,12 @@ package postgres
 
 import (
 	"context"
+	"errors"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
 type events struct{ store *Store }
@@ -15,9 +19,13 @@ func (eventStore *events) Append(operationContext context.Context, event atom.Ev
 
 func (eventStore *events) Record(operationContext context.Context, event atom.Event) (atom.Event, error) {
 	operationError := eventStore.store.pool.QueryRow(operationContext, `
+		WITH session_guard AS MATERIALIZED (SELECT deleted FROM sessions WHERE id=$2 FOR SHARE)
 		INSERT INTO events (instance_id, session_id, name, payload, created_at)
-		VALUES ($1, $2, $3, $4, $5) RETURNING seq`,
+		SELECT $1, $2, $3, $4, $5 WHERE NOT EXISTS (SELECT 1 FROM session_guard WHERE deleted) RETURNING seq`,
 		event.InstanceID, string(event.SessionID), string(event.Name), event.Payload, event.Time).Scan(&event.Seq)
+	if errors.Is(operationError, pgx.ErrNoRows) {
+		return event, store.ErrSessionDeleted
+	}
 	return event, operationError
 }
 

@@ -62,6 +62,8 @@ The shadcn-svelte registry gives the buttons, fields, dialogs, sheet, badges, an
 
 The sidebar stays open on large screens. A navigation drawer replaces the sidebar on small screens. The UI controls have labels and keyboard focus. The composer uses the viewport height and safe-area padding. Long output must not increase the document width.
 
+The `Enter` key sends the message. The keys `Shift+Enter`, `Command+Enter`, and `Ctrl+Enter` add a new line. Text composition does not send a message.
+
 ## API Data
 
 Response keys agree with the Go types. For example, an instance has `Workspace` and `DefaultModel`. Request keys use the handler format, such as `workspace` and `default_model`. A `null` collection becomes an empty array in the client.
@@ -70,15 +72,19 @@ A `202` response shows that the queue accepted a message. It is not a model resp
 
 A session change cancels previous data requests and event connections. A previous response must not change the new selected view. The UI does not automatically send a message again after a request error. The API can accept the message before the client receives the error.
 
+The UI sends `DELETE /sessions/{id}` after the user accepts the dialog. The API response gives the IDs of the sessions that the operation removed. The client uses the IDs to remove sessions from the navigation and stop event connections. A previous response must not put the sessions back into the navigation.
+
+The message draft and view of a different session do not change. The dialog shows an error from session deletion.
+
 A new session view reads events from sequence 0. Permission requests and decisions come from the event stream. A new connection after an error uses the last event sequence. Message history from the API is the source for completed responses.
 
 The client uses `message_id` to connect model event text to message history. Reasoning text has a section that is closed by default. The session reasoning effort control uses the values from model data. A previous request must not replace a new selection.
 
 The UI shows model text with Markdown markup. The DOMPurify library removes dangerous markup before display. HTML in message text stays as text. The code block gives the format for syntax highlighting. A media item has a type and filename in the UI. The UI does not run code from model output.
 
-The `transcript.ts` atom uses `ToolCallID` and `ToolCalls[].ID` to connect messages in the same session. The UI keeps the model message sequence. The UI shows a tool result in a different card if the tool call is not in the history. The tool component prepares input and output when the user opens the card.
+The `transcript.ts` atom uses `ToolCallID` and `ToolCalls[].ID` to connect messages in the same session. The UI keeps the model message sequence. The UI shows a tool result in a different section if the tool call is not in the history. The tool component prepares input and output when the user opens the section.
 
-One card contains the input and output sections. The sections have a line between them. Content views in the sections do not have a card container.
+Tool sections, reasoning sections, and model text use the UI background. The sections have a line between them. A different color identifies a tool section. The tool section contains input and output. Content views in the sections do not have a card container.
 
 See `messages.md` for the libraries, content limits, and source buttons.
 

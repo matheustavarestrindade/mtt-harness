@@ -14,6 +14,8 @@ const (
 	stopInstance
 	resumeInstance
 	closeQueue
+	deleteConversation
+	fenceConversationDeletion
 )
 
 type queueCommand struct {
@@ -22,11 +24,14 @@ type queueCommand struct {
 	session          atom.Session
 	create           bool
 	instanceID       string
+	protected        map[atom.SessionID]bool
 	reply            chan queueReply
 }
 
 type queueReply struct {
 	coordinator    *sessionCoordinator
+	coordinators   []*sessionCoordinator
+	deleted        []atom.SessionID
 	operationError error
 }
 
@@ -38,6 +43,8 @@ type restoredSession struct {
 type directoryCompletion struct {
 	command        queueCommand
 	restored       []restoredSession
+	deleted        []atom.SessionID
+	protected      map[atom.SessionID]bool
 	operationError error
 }
 

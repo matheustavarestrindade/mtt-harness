@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
 type permissions struct{ store *Store }
@@ -12,6 +13,9 @@ type permissions struct{ store *Store }
 func (permissionStore *permissions) Save(operationContext context.Context, decision atom.PermissionDecision) error {
 	permissionStore.store.mutex.Lock()
 	defer permissionStore.store.mutex.Unlock()
+	if permissionStore.store.deletedSessions[decision.SessionID] {
+		return store.ErrSessionDeleted
+	}
 	permissionStore.store.permissions[decision.RequestID] = decision
 	return nil
 }

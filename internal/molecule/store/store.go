@@ -18,6 +18,10 @@ type InstanceStore interface {
 // the session completed before the change. Read current state before retrying.
 var ErrSessionSelectionChanged = errors.New("session settings changed; read the session and retry")
 
+var ErrSessionDeleted = errors.New("session has been deleted")
+var ErrSessionNotFound = errors.New("session is not in the store")
+var ErrConversationBusy = errors.New("session or child session has active or queued work; stop it before deleting")
+
 type SessionStore interface {
 	// Save initializes a new session's model selection. Lifecycle saves retain
 	// the stored selection; SetModelSelection owns subsequent changes.
@@ -32,6 +36,9 @@ type SessionStore interface {
 	Append(operationContext context.Context, message atom.Message) error
 	Messages(operationContext context.Context, sessionID atom.SessionID) ([]atom.Message, error)
 	DeleteAfter(operationContext context.Context, sessionID atom.SessionID, messageID string) (int, error)
+	// DeleteConversation removes saved conversation data for a session tree.
+	// ID/parent tombstones and usage records remain; stale writes must fail.
+	DeleteConversation(operationContext context.Context, sessionID atom.SessionID) ([]atom.SessionID, error)
 }
 
 type QueueStore interface {

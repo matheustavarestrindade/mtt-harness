@@ -17,6 +17,9 @@ func (queue *queueStore) Enqueue(operationContext context.Context, message atom.
 	if operationError := operationContext.Err(); operationError != nil {
 		return operationError
 	}
+	if queue.store.deletedSessions[message.SessionID] {
+		return store.ErrSessionDeleted
+	}
 	count := 0
 	for _, entry := range queue.store.queued {
 		if entry.Message.SessionID == message.SessionID && !entry.Running {

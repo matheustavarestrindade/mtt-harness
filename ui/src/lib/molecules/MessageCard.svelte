@@ -21,6 +21,9 @@
     streaming?: boolean;
   } = $props();
   const text = $derived(messageText(message));
+  const hasContent = $derived(
+    (message.Content ?? []).some((content) => content.Type !== 'text' || Boolean(content.Text)),
+  );
   async function copyText() {
     try {
       await copyToClipboard(text);
@@ -41,7 +44,11 @@
   />
 {:else}
   <article
-    class="chat-message {message.Role === 'user' ? 'user-message' : ''}"
+    class="chat-message {message.Role === 'user'
+      ? 'user-message'
+      : message.Role === 'assistant'
+        ? 'assistant-message'
+        : ''}"
     aria-label={`${message.Role} message`}
   >
     {#if message.Role === 'runtime' || message.Role === 'system'}
@@ -61,15 +68,25 @@
         title="Copy message"><Copy class="size-3.5" /></Button
       >
     </div>
-    <div class="flex min-w-0 flex-col gap-1">
+    <div
+      class={message.Role === 'assistant' ? 'assistant-sections' : 'flex min-w-0 flex-col gap-1'}
+    >
       {#if message.Role === 'assistant' && message.Reasoning}<ThinkingSection
           text={message.Reasoning}
           {streaming}
         />{/if}
-      <MessageContent
-        content={message.Content}
-        mode={message.Role === 'user' || message.Role === 'runtime' ? 'plain' : 'markdown'}
-      />
+      {#if hasContent}
+        {#if message.Role === 'assistant'}
+          <section class="assistant-section" aria-label="Assistant response">
+            <MessageContent content={message.Content} mode="markdown" />
+          </section>
+        {:else}
+          <MessageContent
+            content={message.Content}
+            mode={message.Role === 'user' || message.Role === 'runtime' ? 'plain' : 'markdown'}
+          />
+        {/if}
+      {/if}
       {#each tools as activity (activity.call.ID)}<ToolActivitySection
           {activity}
           {running}

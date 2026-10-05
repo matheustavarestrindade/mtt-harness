@@ -28,7 +28,8 @@ func fileEditFailure(call atom.ToolCall, toolName, path string, cause error, rec
 // Feedback uses the exact snapshots owned by the edit gate, never a later read
 // that could describe a different writer's changes. Reporting cannot fail an
 // edit after its rename has committed.
-func describeFileEdit(path string, original, updated []byte, existed bool, action string) string {
+func describeFileEdit(operationContext context.Context, path string, original []byte, change fileChange, existed bool) (string, error) {
+	updated := change.content
 	status := "Updated"
 	unchanged := bytes.Equal(original, updated)
 	if !existed {
@@ -36,14 +37,21 @@ func describeFileEdit(path string, original, updated []byte, existed bool, actio
 	} else if unchanged {
 		status = "Unchanged"
 	}
-	summary := fmt.Sprintf("%s %q\n%s\nLines: %d -> %d. Bytes: %d -> %d.\n", status, path, action, countFileLines(original), countFileLines(updated), len(original), len(updated))
+	summary := fmt.Sprintf("%s %q\n%s\nLines: %d -> %d. Bytes: %d -> %d.\n", status, path, change.summary, countFileLines(original), countFileLines(updated), len(original), len(updated))
+	if change.returnOptions.Type == "lines" || change.returnOptions.Type == "file" {
+		preview, operationError := change.returnOptions.renderFileText(operationContext, updated)
+		if operationError != nil {
+			return "", operationError
+		}
+		return summary + "\n" + preview, nil
+	}
 	if unchanged && existed {
-		return summary + "No content changes; the file already contained the requested text."
+		return summary + "No content changes; the file already contained the requested text.", nil
 	}
 	if unchanged {
-		return summary + "Created an empty file."
+		return summary + "Created an empty file.", nil
 	}
-	return summary + "\n" + renderFileEditDiff(path, original, updated, existed)
+	return summary + "\n" + renderFileEditDiff(path, original, updated, existed, change.returnOptions.diffContextLines()), nil
 }
 
 func countFileLines(content []byte) int {

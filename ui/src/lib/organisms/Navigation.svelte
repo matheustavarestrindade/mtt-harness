@@ -9,6 +9,7 @@
     Terminal,
     RefreshCw,
     GitBranch,
+    Trash2,
   } from 'lucide-svelte';
   import { Button } from '$lib/atoms/ui/button';
   import { Separator } from '$lib/atoms/ui/separator';
@@ -23,6 +24,7 @@
     onSession,
     onSelectInstance,
     onSelectSession,
+    onDeleteSession,
     onRefresh,
   }: {
     console: HarnessConsole;
@@ -31,6 +33,7 @@
     onSession: () => void;
     onSelectInstance: (instance: Instance) => void;
     onSelectSession: (session: Session) => void;
+    onDeleteSession: (session: Session) => void;
     onRefresh: () => void;
   } = $props();
 </script>
@@ -108,29 +111,41 @@
       </p>{/if}
     <div class="space-y-1 pb-5">
       {#each workbench.sessions as session (session.ID)}
-        <button
-          class="flex min-h-14 w-full min-w-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors {workbench
+        <div
+          class="group/session flex min-h-14 w-full min-w-0 items-center rounded-lg pr-1 transition-colors {workbench
             .session?.ID === session.ID
             ? 'bg-accent text-accent-foreground ring-1 ring-inset ring-border'
             : 'text-muted-foreground hover:bg-muted'}"
-          aria-current={workbench.session?.ID === session.ID ? 'page' : undefined}
-          onclick={() => onSelectSession(session)}
         >
-          {#if session.Parent}<GitBranch class="size-4 shrink-0" />{:else}<MessageSquare
-              class="size-4 shrink-0"
-              strokeWidth={1.6}
-            />{/if}
-          <span class="min-w-0 flex-1"
-            ><span class="block truncate text-xs font-medium"
-              >{session.Parent ? 'Agent' : 'Session'} {shortID(session.ID)}</span
-            ><span class="mt-1 block truncate text-[10px] text-muted-foreground"
-              >{session.Model}</span
-            ></span
+          <button
+            class="flex min-h-14 min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left"
+            aria-current={workbench.session?.ID === session.ID ? 'page' : undefined}
+            onclick={() => onSelectSession(session)}
           >
-          {#if workbench.session?.ID === session.ID}<span
-              class="size-1.5 shrink-0 rounded-full bg-primary"
-            ></span>{/if}
-        </button>
+            {#if session.Parent}<GitBranch class="size-4 shrink-0" />{:else}<MessageSquare
+                class="size-4 shrink-0"
+                strokeWidth={1.6}
+              />{/if}
+            <span class="min-w-0 flex-1"
+              ><span class="block truncate text-xs font-medium"
+                >{session.Parent ? 'Agent' : 'Session'} {shortID(session.ID)}</span
+              ><span class="mt-1 block truncate text-[10px] text-muted-foreground"
+                >{session.Model}</span
+              ></span
+            >
+            {#if workbench.session?.ID === session.ID}<span
+                class="size-1.5 shrink-0 rounded-full bg-primary"
+              ></span>{/if}
+          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="icon-button shrink-0 text-muted-foreground hover:text-destructive pointer-fine:opacity-0 pointer-fine:group-hover/session:opacity-100 pointer-fine:group-focus-within/session:opacity-100"
+            aria-label={`Delete session ${shortID(session.ID)}`}
+            title="Delete session"
+            onclick={() => onDeleteSession(session)}><Trash2 class="size-3.5" /></Button
+          >
+        </div>
       {/each}
     </div>
   </div>

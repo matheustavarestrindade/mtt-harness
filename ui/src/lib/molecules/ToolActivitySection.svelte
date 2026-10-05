@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { ChevronDown, Terminal } from 'lucide-svelte';
+  import { ChevronRight } from 'lucide-svelte';
   import type { ToolActivity } from '../atoms/transcript';
   import { fileLanguage } from '../atoms/content';
+  import { plainFileReadPath, toolActivityLabel } from '../atoms/file-actions';
   import MessageContent from './content/MessageContent.svelte';
   import CodeBlock from './content/CodeBlock.svelte';
   let {
@@ -10,45 +11,39 @@
     unmatched = false,
   }: { activity: ToolActivity; running?: boolean; unmatched?: boolean } = $props();
   let open = $state(false);
+  const identifier = $props.id();
+  const label = $derived(toolActivityLabel(activity.call));
   const language = $derived.by(() => {
-    const input = activity.call.Input;
-    if (
-      activity.call.Name !== 'read' ||
-      !input ||
-      typeof input !== 'object' ||
-      !('path' in input) ||
-      typeof input.path !== 'string'
-    )
-      return 'text';
-    return fileLanguage(input.path);
+    const path = plainFileReadPath(activity.call);
+    return path ? fileLanguage(path) : 'text';
   });
 </script>
 
 <section
-  class="tool-activity min-w-0 overflow-hidden rounded-xl border border-border bg-card/40"
+  class="assistant-section tool-activity flex min-w-0 flex-col"
   role="group"
   aria-label={`Tool ${activity.call.Name}`}
   data-call-id={activity.call.ID}
 >
   <button
     type="button"
-    class="flex min-h-11 w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left text-xs"
+    class="activity-toggle w-full shrink-0"
     aria-expanded={open}
+    aria-controls={identifier}
     onclick={() => (open = !open)}
   >
-    <Terminal class="size-3.5 shrink-0 text-muted-foreground" /><span
-      class="min-w-0 flex-1 truncate font-mono font-medium">{activity.call.Name}</span
+    <ChevronRight
+      class="size-3.5 shrink-0 text-tool-call-accent transition-transform {open ? 'rotate-90' : ''}"
+    /><span
+      class="min-w-0 flex-1 truncate font-mono font-medium"
+      title={`${activity.call.Name}: ${label}`}>{label}</span
     >
     <span class="shrink-0 text-[10px] text-muted-foreground"
       >{activity.result ? 'Result' : running ? 'Waiting' : 'No result'}</span
-    ><ChevronDown
-      class="size-3.5 shrink-0 text-muted-foreground transition-transform {open
-        ? 'rotate-180'
-        : ''}"
-    />
+    >
   </button>
   {#if open}
-    <div class="min-w-0 space-y-3 border-t border-border/60 p-2.5">
+    <div id={identifier} class="min-w-0 space-y-3 pt-2 pl-3 pb-2">
       {#if unmatched}<p class="mt-2 text-xs text-muted-foreground">
           The original tool call is not in this history.
         </p>
@@ -62,7 +57,7 @@
           />
         </section>
       {/if}
-      <section aria-label="Tool output" class="min-w-0 border-t border-border/60 pt-2">
+      <section aria-label="Tool output" class="min-w-0 pt-2">
         <h3 class="eyebrow">Output</h3>
         {#if activity.result?.Content?.length}<MessageContent
             content={activity.result.Content}

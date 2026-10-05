@@ -155,19 +155,28 @@ The command inbox has space for 32 commands. A response channel has space for on
 
 The coordinator starts a worker for a model call or a database operation. The worker sends a completion message to the coordinator. The coordinator does not wait for the worker in a command handler. Thus, the coordinator can examine a status request or a `cancelCurrent` command during a database operation.
 
-The mode of the coordinator is one of 5 values:
+The mode of the coordinator is one of 6 values:
 
 - `accepting`: the coordinator can put new messages in the queue.
 - `reverting`: the coordinator cannot put new messages in the queue until the API completes the revert operation.
 - `stopped`: messages can stay in the database, but a new turn cannot start.
 - `failed`: the coordinator keeps an operation error and does not start a new turn.
 - `closing`: the coordinator stops new commands which can start work. The coordinator waits for the workers before it stops.
+- `deleting`: the coordinator stops new input while a worker removes a conversation.
 
 The queue directory keeps the session coordinators. One goroutine changes the directory. A worker runs a database operation or a plugin callback. A command handler must not run a database operation or a plugin callback.
 
-The queue keeps a coordinator until the queue closes. The `Close` operation stops admission, cancels the active workers, and waits until the workers stop. A timeout of the caller does not stop the `Close` operation. The program must close the queue before it closes the database.
+The queue keeps a coordinator until the queue closes or the conversation is removed. The `Close` operation stops admission, cancels the active workers, and waits until the workers stop. A timeout of the caller does not stop the `Close` operation. The program must close the queue before it closes the database.
 
 Postgres transactions keep the database data correct. The memory store continues to use the mutex for the maps of the store. The session command loop does not replace the data interfaces or the permission checks.
+
+The route `DELETE /sessions/{id}` removes a conversation and the child sessions. An active turn, messages in the queue, or a process with status `running` gives `409`. A parent session must stop before the operation removes a child session. New input to other conversations can continue.
+
+A worker removes conversation messages, events, process records, and session permission decisions. The operation keeps usage records. The operation also keeps workspace permission decisions. Workspace files do not change.
+
+The database keeps a tombstone with the session ID and parent session ID. Usage statistics use the IDs. A request cannot use a tombstone ID to put the conversation back into the store.
+
+The queue and loop stop new work for the selected sessions before the database operation. The queue can complete the operation after the caller cancels the request. The database removes the session tree as one transaction. A storage error keeps the conversation. The queue can accept input again after a storage error.
 
 ### 4.2 Startup Prompt
 
@@ -704,7 +713,7 @@ A verdict of `deny` must stop a tool before the harness reads a permission decis
 
 ### 10.2 Find Tools
 
-The harness gives the model the `search_tool` tool. The model starts `search_tool` with a query. The query has a category or text. The result gives only the fields `Name` and `Categories` of a tool.
+The initial model request has the full definitions of `search_tool` and `file_actions`. The model starts `search_tool` with a query to get other tools. The query has a category or text. The result gives only the fields `Name` and `Categories` of a tool.
 
 The harness makes a search document from the tool name, description, categories, and input schema. A tool can also give usage examples through the optional `SearchDocument` method. For semantic search, a model changes the document to a vector. The query uses the same model. Lexical search uses TF-IDF vectors from the same documents.
 
@@ -756,7 +765,7 @@ Requirements:
 - R89: Text queries must put the largest cosine similarity first.
 - R90: Tools with the same cosine similarity value must be in name sequence.
 - R91: Tool discovery must give the same sequence for the same vectors and tool group.
-- R92: The harness must give the `search_tool` tool to the model.
+- R92: The harness must give the `search_tool` and `file_actions` tools to a model that can start tools.
 - R93: The result of `search_tool` must give only `Name` and `Categories` for the found tools.
 - R94: The harness must add the found tools to the tool group of the session.
 - R95: The harness must give the tool group and the `search_tool` tool in the model request.
@@ -766,23 +775,31 @@ Requirements:
 
 The tool description and input schema give the model information about the tool. The input schema must give the purpose of a parameter. A parameter for a duration must have a unit. An optional parameter must have a description of the default behavior. The description must give the meaning of special input data, such as `0` or an empty string.
 
-The tool description must tell the model about the behavior of the tool. For example, `write` replaces the full file content when the input does not give a line range. The process tools use a harness process ID, not a PID from the operating system. The `agent` tool uses the instance default model when the input does not give a model ID.
+The tool description must tell the model about the behavior of the tool. For example, the `write` action replaces the full file content when the input does not give a line range. The process tools use a harness process ID, not a PID from the operating system. The `agent` tool uses the instance default model when the input does not give a model ID.
 
 The model request must keep the parameter descriptions and defaults. A new model list must not replace the parameter descriptions of the `agent` tool. An MCP server gives the descriptions and schemas for the tools of the server. The harness must not add an incorrect unit to an external parameter.
 
 ### 10.4 File Tools
 
-The tools `read`, `write`, and `replace` have optional `start_line` and `end_line` parameters. Line numbers start at 1. The line range includes the start line and the end line. Without `start_line`, the range starts at line 1. Without `end_line`, the range continues to EOF.
+The tool `file_actions` replaces the tools `read`, `write`, and `replace`. One tool call has one `path` and an `actions` array with 1 to 32 items. The field `op` can be `read`, `write`, `replace`, `append`, `prepend`, or `list`. A relative path starts at the instance workspace. The initial model request has the full schema.
 
-The end of a line is LF or EOF. An empty file has 0 lines. The last LF does not make a new line. A start line must be in the file when the input gives a range. The `read` tool stops at EOF when `end_line` is after the last line. The `write` and `replace` tools give an error when a line from the input is not in the file.
+Actions run in input sequence on the same path. An action uses the content and line numbers from the previous action. File edits use temporary content. The actions and selected preview must be correct before the tool replaces the file. The tool uses one rename operation. An error prevents the file change.
 
-The `write` tool replaces the full lines in the range. The other file data does not change. An empty replacement removes the selected lines. Without a range, `write` replaces the full file content or makes a new file. The parent directory must be available.
+The actions `read`, `write`, and `replace` have optional `start_line` and `end_line` parameters. Line numbers start at 1. The line range includes the start line and the end line. Without `start_line`, the range starts at line 1. Without `end_line`, the range continues to EOF.
+
+The end of a line is LF or EOF. An empty file has 0 lines. The last LF does not make a new line. A start line must be in the file when the input gives a range. The `read` action stops at EOF when `end_line` is after the last line. The `write` and `replace` actions give an error when a line from the input is not in the file.
+
+The preview limit for one tool call is 200 lines or 16 KiB of file text. The byte limit includes line-number labels. Status and truncation notices do not use the preview limit. If the selected text is too large, a truncation notice gives `start_line` and `start_byte` for the next read action. The truncation notice is not file content.
+
+A `start_byte` value gives the position in bytes from the start of `start_line`. The default value is 0. The value must select a byte in the line. It must not divide a UTF-8 character. Use `start_byte` from the truncation notice to continue a long line. Other lines start at position 0.
+
+The `write` action replaces the full lines in the range. The other file data does not change. An empty replacement removes the selected lines. Without a range, `write` replaces the full file content or makes a new file. The parent directory must be available.
 
 The last line break of the selected text can be LF or CRLF. The tool keeps the last line break when the replacement has text but does not have a last LF. Internal line breaks in the replacement do not change. Without a range, the tool writes the replacement text without a change.
 
-The `replace` tool finds the text from `old_text` and gives the text from `new_text`. The input `old_text` must not be empty. An empty `new_text` removes the text match. The text must agree in letter case, space characters, and line breaks. The text match must stay in the selected range. The tool gives an error without a file change when it cannot find the text.
+The `replace` action finds the text from `old_text` and gives the text from `new_text`. The input `old_text` must not be empty. An empty `new_text` removes the text match. The text must agree in letter case, space characters, and line breaks. The text match must stay in the selected range. The tool gives an error without a file change when it cannot find the text.
 
-The `replace` tool has 3 mode values:
+The `replace` action has 3 mode values:
 
 - `first`: replace the initial text match in the range. This is the default mode.
 - `last`: replace the last text match in the range.
@@ -790,35 +807,63 @@ The `replace` tool has 3 mode values:
 
 The tool does not examine the new text again. It does not use a regular expression. A file edit uses a temporary file and a rename operation. The file edit keeps the permission bits of the file. A file edit replaces the file at the path. Other hard links keep the previous content.
 
-The harness puts file edits to the same resolved path in sequence.
+The harness puts tool calls for the same resolved path in sequence. Different paths can use different tool calls. The sequence does not include external editors.
+
+The `append` action adds `content` at the end of the file. The `prepend` action adds `content` at the start. They do not add line breaks automatically. The file must be available. A previous `write` action without a line range can make the file in the same tool call.
+
+The `list` action gives directory entries in name sequence. A name which starts with `.` is not removed. The tool does not follow symbolic links. The result gives the name, type, and number of bytes. The default `limit` is 100 directory entries, and the maximum is 200.
+
+A directory cursor gives the position for the next directory page. A `list` action cannot be in a tool call with file actions.
 
 A file edit result gives the resolved path, file status, and number of lines and bytes. The status text is `Created`, `Updated`, or `Unchanged`. The result of `replace` also gives the number of text matches and the mode.
 
-The result has a unified diff preview of the file change. The prefix `-` shows lines which the tool removes. New lines have the prefix `+`. The preview keeps LF and CRLF and shows a last line without LF. The line numbers refer to the full file.
+The model selects the result. A unified diff is not the default. In a unified diff, the prefix `-` shows lines which the tool removes. New lines have the prefix `+`. The preview keeps LF and CRLF and shows a last line without LF. The line numbers refer to the full file.
 
-The preview can have 3 lines of context at the start and end of a file change. A preview has a maximum of 200 lines or 16 KiB. The limits apply only to the preview. The file edit writes the full replacement.
+The limits apply only to the preview. The file edit writes the full replacement.
+
+A tool call with file edits must have a `return` object. The field `return.type` is necessary in the object. Use `return.type` to select the result:
+
+- `summary`: file status, action information, and the number of lines and bytes.
+- `diff`: a unified diff of previous and new content. The default value for `context_lines` is 3. The range is 0 to 100.
+- `read`: new file text, with optional `start_line`, `end_line`, and `start_byte`.
+- `list`: directory entries, with optional `limit` and `cursor`.
+
+A `read` or `list` action also gives output. The model must not select the same output again in `return`. The limit applies to action output and output from `return` together. Without a file edit, the `return` field is optional.
+
+The line range in `return` uses the new file content. It does not select the previous lines to replace. The default start is line 1. The default end is EOF.
+
+The preview uses EOF when `return.end_line` is after the last line. The output limit is 200 lines or 16 KiB.
+
+An incorrect `return` object or start line prevents the file edit. The tool examines the preview before the rename operation. A preview must use the content from the same file edit. The tool does not read the file again to make the preview.
 
 The tool removes the same outer text from the diff input but keeps lines of context. The diff input contains previous file content and replacement file content. The maximum total is 256 KiB or 4000 lines. If the diff input is above the limit, the result gives the cause without the preview. Incorrect UTF-8 or NUL bytes also prevent a preview.
 
 The tool makes the unified diff from the previous content and replacement content of the same file edit. It does not read the file again after the file edit. Thus, the result does not show a different file edit.
 
-If a file edit cannot continue, the result gives the cause and steps to continue. The file does not change. For a text match or line range error, use `read` to examine the file. Then set the replacement text and line range from the file data. Do not use the same incorrect input again.
+Use `on_error.return` to select an error diagnostic for the same path. The type of error diagnostic must be `read` or `list`. It cannot change file content or run the actions again.
+
+After a file edit error, the preview uses previous file content. Temporary content and previews are discarded. The tool status stays `error`, with the action number and cause.
+
+An error diagnostic cannot replace the initial error. Cancellation and incorrect input do not start error diagnostic I/O. The tool call does not change the file. Use the error diagnostic to correct the next action. Do not use the same incorrect input again.
 
 The tool input can be:
 
 ```json
-{"path":"src/main.go","start_line":10,"end_line":30}
-{"path":"src/main.go","start_line":12,"end_line":14,"content":"replacement text"}
-{"path":"src/main.go","old_text":"oldName","new_text":"newName","mode":"all","start_line":10,"end_line":30}
+{"path":"src","actions":[{"op":"list","limit":100}]}
+{"path":"src/main.go","actions":[{"op":"read","start_line":10,"end_line":40}]}
+{"path":"notes.txt","actions":[{"op":"write","content":"hello\n"},{"op":"append","content":"world\n"}],"return":{"type":"read"}}
+{"path":"src/main.go","actions":[{"op":"replace","old_text":"oldName","new_text":"newName","mode":"all"}],"return":{"type":"diff","context_lines":3},"on_error":{"return":{"type":"read","start_line":10,"end_line":50}}}
 ```
 
 ### 10.5 Read Output A/B Test
 
-The process environment variable `MTT_READ_LINE_NUMBERS` selects the output format of `read`. The harness reads the variable when it attaches the tool. The control value is `false` or `0`. If the variable does not have a value, the harness selects the control. The test value is `true` or `1`. An incorrect value prevents a program start.
+The process environment variable `MTT_READ_LINE_NUMBERS` selects the file text format of `file_actions`. The harness reads the variable when it attaches the tool. The control value is `false` or `0`. If the variable does not have a value, the harness selects the control. The test value is `true` or `1`. An incorrect value prevents a program start.
 
-The control output has file text only. The test output has the file line number before the text. For example, a range from line 10 starts with `10: `. The line prefix is output data, not file content. A model must not put the line prefix into a file edit. The tool description gives the active output format to the model.
+The control output gives file text without line-number labels. The test output has the file line number before the text. For example, a range from line 10 starts with `10: `. The line prefix is output data, not file content. A model must not put the line prefix into a file edit. The tool description gives the active output format to the model.
 
-The A/B test does not change the selected lines or the file content. The model, task, and files must be the same for the control and the test. A new process start is necessary to change the output format.
+The A/B test does not change the line range in the tool input or the file content. The byte limit includes the line-number labels. The output can stop at a different byte because of the labels. The tool gives a truncation notice if the selected text is too large. The format applies to actions, `return`, and error diagnostics.
+
+The model, task, and files must be the same for the control and the test. A new process start is necessary to change the output format.
 
 Docker Compose reads the local `.env` file and gives the variable to the harness container. The `.env.example` file gives an example.
 
@@ -998,6 +1043,7 @@ The initial API paths are:
 - `GET /instances/{id}/sessions`: read the sessions of an instance.
 - `GET /instances/{id}/models`: read the model list of an instance.
 - `GET /sessions/{id}`: read a session.
+- `DELETE /sessions/{id}`: remove a conversation and the child sessions.
 - `PUT /sessions/{id}/reasoning`: set the reasoning effort for a session.
 - `PUT /sessions/{id}/model`: change the model of a session.
 - `GET /sessions/{id}/messages`: read the messages of a session.
@@ -1252,9 +1298,18 @@ mtt-harness/
       config.go                # the MCP server file
     tools/
       bash.go
-      read.go
-      write.go
-      replace.go               # literal replacements in file ranges
+      file_actions.go          # the file_actions tool and atomic action chain
+      file_actions_input.go    # action and output validation
+      file_actions_schema.go   # the model-facing input contract
+      file_actions_inspect.go  # read-only actions and error diagnostics
+      file_actions_output.go   # the shared output budget
+      file_directory.go       # bounded directory pages
+      file_mutations.go       # line writes and literal text replacement
+      file_preview.go         # bounded file text and continuation cursors
+      file_diff.go            # bounded unified diff output
+      read.go                 # internal legacy adapter, not registered at startup
+      write.go                # internal legacy adapter, not registered at startup
+      replace.go              # internal legacy adapter, not registered at startup
       line_range.go            # shared line boundary rules
       file_edit.go             # per-path edit ordering and atomic replacement
       search.go                # the `search_tool` tool
@@ -1388,6 +1443,7 @@ type SessionStore interface {
     Append(operationContext context.Context, message atom.Message) error
     Messages(operationContext context.Context, sessionID atom.SessionID) ([]atom.Message, error)
     DeleteAfter(operationContext context.Context, sessionID atom.SessionID, messageID string) (int, error)
+    DeleteConversation(operationContext context.Context, sessionID atom.SessionID) ([]atom.SessionID, error)
 }
 
 type EventStore interface {

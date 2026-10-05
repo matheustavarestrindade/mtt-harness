@@ -84,11 +84,12 @@ When an instance stops, the database keeps the configuration and sessions. The a
 | Method | Path | Input | Success | Handler errors |
 |---|---|---|---|---|
 | GET | `/sessions/{id}` | none | `200`, `Session` | `404` |
+| DELETE | `/sessions/{id}` | none | `200`, `SessionDeletion` | `404`, `409`, `500`, `503` |
 | PUT | `/sessions/{id}/reasoning` | `{"effort":"high"}` | `200`, `Session` | `404`, `400`, `409`, `500` |
 | PUT | `/sessions/{id}/model` | `{"model":"provider/model","allow_compaction":false}` | `200`, `Session` | `404`, `400`, `409`, `500` |
 | GET | `/sessions/{id}/messages` | none | `200`, `Message[]` | `500` |
 | POST | `/sessions/{id}/messages` | `{"content":"text"}` or content array | `202`, `AcceptedMessage` | `404`, `400`, `409`, `429`, `500` |
-| GET | `/sessions/{id}/status` | none | `200`, `QueueStatus` | `500` |
+| GET | `/sessions/{id}/status` | none | `200`, `QueueStatus` | `404`, `500` |
 | POST | `/sessions/{id}/cancel` | none | `200`, `{"status":"cancelled"}` | `409`, `500` |
 | DELETE | `/sessions/{id}/queue/{message_id}` | none | `200`, `{"status":"removed"}` | `404`, `500` |
 | POST | `/sessions/{id}/revert` | `{"message_id":"ID"}` | `200`, `RevertResult` | `404`, `400`, `500` |
@@ -153,6 +154,20 @@ Usage records stay because the model usage occurred. A revert operation changes 
 ```
 
 The `removed` value counts history messages only. A coordinator error during a revert operation gives `500`. A collection route or a status route can give an empty result for an unknown session.
+
+The route `DELETE /sessions/{id}` removes a conversation and the child sessions. The session tree must not have an active turn, messages in the queue, or a process with status `running`. A parent session must stop before the operation removes a child session. The API gives `409` if work must stop first.
+
+The operation removes messages, events, process records, and session permission decisions. It keeps usage records. The operation also keeps workspace permission decisions. Workspace files do not change.
+
+A tombstone keeps the session ID and parent session ID for usage statistics. A request cannot use a tombstone ID to put the conversation back into the store. The API does not show sessions with tombstones in session lists.
+
+The queue stops new input to the selected session tree during session deletion. Other conversations can continue. The queue can complete the operation after the caller cancels the request. A storage error keeps the conversation. The queue can accept input again after a storage error.
+
+```json
+{"status":"deleted","session_ids":["parent-session-id","child-session-id"]}
+```
+
+The field `session_ids` gives the IDs of the sessions that the operation removed. A session that is not available gives `404`. A server without a session queue gives `503`.
 
 Content request example:
 

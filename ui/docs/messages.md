@@ -29,7 +29,7 @@ The copy button uses the full source text. The source download also contains the
 
 ## CSV Data
 
-A code block with the format `csv` or `tsv` has a table view and a source view. A CSV text file can also have a preview. The file read tool uses the file extension to select the content format.
+A code block with the format `csv` or `tsv` has a table view and a source view. A CSV text file can also have a preview. A file text result from `file_actions` uses the file extension to select the content format. The UI shows text for more output or error data. Previous tool results keep the file view.
 
 CSV data cells can contain CSV delimiters, quotation marks, and line breaks. Data cell values stay as text. The header field sets the column names. The UI shows a format error with the source text.
 
@@ -43,12 +43,14 @@ CSV data cells can contain CSV delimiters, quotation marks, and line breaks. Dat
 
 The source download keeps the full text given to the component. The copy button also keeps the full text. A Markdown preview limit does not change the message copy button.
 
-## Tool Cards
+## Tool Sections
 
-One tool card contains the tool call and tool result. The `transcript.ts` atom uses session IDs and tool call IDs to connect them. The UI can receive tool results in a different sequence. The tool call sequence stays the same.
+One tool section contains the tool call and tool result. The `transcript.ts` atom uses session IDs and tool call IDs to connect them. The UI can receive tool results in a different sequence. The tool call sequence stays the same.
 
-The client prepares content views when the user opens a tool card. The card shows input, output, and the value of `ToolCallID`. The same card shows a new tool result. The UI shows a tool result in a different card if the tool call is not in the history.
+For `file_actions`, the section label shows the action sequence and path. The input has the full action data. One tool call has one result section, with the selected action output.
 
-One card contains the input and output sections. The sections have a line between them. Content views in the sections do not have a card container. Copy buttons, source downloads, and CSV views stay available.
+The client prepares content views when the user opens a tool section. The section shows input, output, and the value of `ToolCallID`. The same section shows a new tool result. The UI shows a tool result in a different section if the tool call is not in the history.
+
+Tool sections, reasoning sections, and model text use the UI background. The sections have a line between them. A different color identifies a tool section. The tool section contains input and output. Content views in the sections do not have a card container. Copy buttons, source downloads, and CSV views stay available.
 
 Message history does not include tool status fields. The UI shows the label `Result` when a tool result is available. It does not change error text in the output.

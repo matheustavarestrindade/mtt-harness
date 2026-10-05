@@ -16,7 +16,7 @@ import (
 func searchRegistry(test *testing.T, index toolsearch.Searcher) *registry.Registry {
 	test.Helper()
 	toolRegistry := registry.New(harness.New(), index)
-	for _, tool := range []harness.Tool{NewBash(nil), NewProcessOutput(nil), NewProcessKill(nil), Read{}, Write{}, Replace{}, &Agent{}, Finish{}, NewSearch(toolRegistry)} {
+	for _, tool := range []harness.Tool{NewBash(nil), NewProcessOutput(nil), NewProcessKill(nil), NewFileActions(false), &Agent{}, Finish{}, NewSearch(toolRegistry)} {
 		testutil.RequireNoError(test, toolRegistry.Add(tool))
 	}
 	return toolRegistry
@@ -55,7 +55,8 @@ func TestLexicalDiscoveryWithRealToolDocuments(test *testing.T) {
 	for _, example := range []struct{ query, first string }{
 		{"shell command exec", "bash"},
 		{"retained stdout stderr logs", "process_output"},
-		{"replace literal text matches", "replace"},
+		{"replace literal text matches", "file_actions"},
+		{"list directory entries", "file_actions"},
 		{"delegate a task to a child agent", "agent"},
 	} {
 		test.Run(example.query, func(test *testing.T) {

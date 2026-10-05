@@ -18,6 +18,7 @@
   import SettingsDialog from '$lib/organisms/SettingsDialog.svelte';
   import WorkspaceDialog from '$lib/molecules/WorkspaceDialog.svelte';
   import SessionDialog from '$lib/molecules/SessionDialog.svelte';
+  import DeleteSessionDialog from '$lib/molecules/DeleteSessionDialog.svelte';
   import ActivityDialog from '$lib/molecules/ActivityDialog.svelte';
   import Conversation from '$lib/organisms/Conversation.svelte';
   import Composer from '$lib/molecules/Composer.svelte';
@@ -38,6 +39,10 @@
   let workspaceOpen = $state(false);
   let workspaceError = $state('');
   let sessionOpen = $state(false);
+  let deleteSessionOpen = $state(false);
+  let deleteTarget = $state<Session | null>(null);
+  let deletionError = $state('');
+  let deletingSession = $state(false);
   let sessionSettingsOpen = $state(false);
   let settingsSessionID = $state('');
   let sessionSettingsError = $state('');
@@ -222,6 +227,32 @@
     menuOpen = false;
     void runWorkbenchAction('select', () => workbench.selectSession(session));
   }
+  function requestSessionDeletion(session: Session) {
+    menuOpen = false;
+    deletionError = '';
+    deleteTarget = session;
+    deleteSessionOpen = true;
+  }
+  async function confirmSessionDeletion() {
+    const selected = deleteTarget;
+    if (!selected || deletingSession) return;
+    deletionError = '';
+    deletingSession = true;
+    try {
+      const removed = await workbench.deleteSession(selected);
+      for (const identifier of removed) delete drafts[identifier];
+      deleteSessionOpen = false;
+      if (removed.length) toast.success('Session deleted');
+    } catch (failure) {
+      deletionError = failure instanceof Error ? failure.message : 'Cannot delete this session.';
+      if (failure instanceof ApiError && failure.status === 401) {
+        deleteSessionOpen = false;
+        openSettings('connection');
+      }
+    } finally {
+      deletingSession = false;
+    }
+  }
   async function sendDraftMessage() {
     const identifier = sessionID;
     const content = drafts[identifier] ?? '';
@@ -269,6 +300,7 @@
     }}
     onSelectInstance={selectInstance}
     onSelectSession={selectSession}
+    onDeleteSession={requestSessionDeletion}
     onRefresh={() => void runWorkbenchAction('refresh', () => workbench.refreshInstances())}
   />
 {/snippet}
@@ -469,6 +501,13 @@
   defaultModel={workbench.instance?.DefaultModel ?? ''}
   busy={busy === 'session'}
   onCreate={createSession}
+/>
+<DeleteSessionDialog
+  bind:open={deleteSessionOpen}
+  session={deleteTarget}
+  busy={deletingSession}
+  error={deletionError}
+  onDelete={() => void confirmSessionDeletion()}
 />
 <ActivityDialog bind:open={activityOpen} events={workbench.events} />
 <Toaster theme="dark" closeButton position="top-right" offset="80px" mobileOffset="16px" />

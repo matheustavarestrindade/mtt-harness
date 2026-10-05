@@ -60,6 +60,9 @@ func (server *Server) sendMessage(responseWriter http.ResponseWriter, request *h
 	if errors.Is(operationError, store.ErrQueueFull) {
 		status = http.StatusTooManyRequests
 	}
+	if errors.Is(operationError, store.ErrSessionDeleted) {
+		status = http.StatusNotFound
+	}
 	if errors.Is(operationError, loop.ErrSessionBusy) || errors.Is(operationError, loop.ErrInstanceStopped) || errors.Is(operationError, loop.ErrQueueClosed) {
 		status = http.StatusConflict
 	}
@@ -87,6 +90,10 @@ func (server *Server) cancelMessage(responseWriter http.ResponseWriter, request 
 
 func (server *Server) sessionStatus(responseWriter http.ResponseWriter, request *http.Request) {
 	status, operationError := server.queue.Status(request.Context(), atom.SessionID(request.PathValue("id")))
+	if errors.Is(operationError, store.ErrSessionDeleted) {
+		writeError(responseWriter, http.StatusNotFound, operationError.Error())
+		return
+	}
 	if respondToError(responseWriter, http.StatusInternalServerError, operationError) {
 		return
 	}

@@ -152,6 +152,52 @@ export async function mockHarness(page: Page) {
       }
       const session = sessions.find((entry) => entry.ID === parts[1]);
       if (parts[0] === 'sessions' && session) {
+        if (parts.length === 2 && method === 'DELETE') {
+          const removed = new Set([session.ID]);
+          for (let changed = true; changed;) {
+            changed = false;
+            for (const entry of sessions) {
+              if (
+                entry.InstanceID === session.InstanceID &&
+                entry.Parent &&
+                removed.has(entry.Parent) &&
+                !removed.has(entry.ID)
+              ) {
+                removed.add(entry.ID);
+                changed = true;
+              }
+            }
+          }
+          const protectedIDs = new Set(removed);
+          for (
+            let parent = session.Parent;
+            parent && !protectedIDs.has(parent);
+            parent = sessions.find((entry) => entry.ID === parent)?.Parent ?? ''
+          )
+            protectedIDs.add(parent);
+          if (
+            [...protectedIDs].some(
+              (identifier) => running.has(identifier) || queued.get(identifier)?.length,
+            )
+          ) {
+            return reply(
+              {
+                error:
+                  'session or child session has active or queued work; stop it before deleting',
+              },
+              409,
+            );
+          }
+          for (let index = sessions.length - 1; index >= 0; index--) {
+            if (removed.has(sessions[index].ID)) sessions.splice(index, 1);
+          }
+          for (const identifier of removed) {
+            histories.delete(identifier);
+            queued.delete(identifier);
+            running.delete(identifier);
+          }
+          return reply({ status: 'deleted', session_ids: [...removed] });
+        }
         if (parts.length === 2 && method === 'GET') return reply(session);
         if (parts[2] === 'model' && method === 'PUT') {
           const input = request.postDataJSON();

@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
 type processes struct{ store *Store }
@@ -13,6 +14,9 @@ type processes struct{ store *Store }
 func (processStore *processes) Save(operationContext context.Context, process atom.ProcessRecord) error {
 	processStore.store.mutex.Lock()
 	defer processStore.store.mutex.Unlock()
+	if processStore.store.deletedSessions[process.SessionID] {
+		return store.ErrSessionDeleted
+	}
 	processStore.store.processes[process.ID] = process
 	return nil
 }

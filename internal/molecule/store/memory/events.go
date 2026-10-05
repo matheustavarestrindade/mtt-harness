@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
 type events struct{ store *Store }
@@ -19,6 +20,9 @@ func (eventStore *events) Record(operationContext context.Context, event atom.Ev
 	}
 	eventStore.store.mutex.Lock()
 	defer eventStore.store.mutex.Unlock()
+	if eventStore.store.deletedSessions[event.SessionID] {
+		return event, store.ErrSessionDeleted
+	}
 	eventStore.store.sequenceNumber++
 	event.Seq = eventStore.store.sequenceNumber
 	eventStore.store.events = append(eventStore.store.events, event)

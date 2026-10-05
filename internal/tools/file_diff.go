@@ -18,22 +18,29 @@ const (
 	fileDiffComparisonLines = 4000
 )
 
-func renderFileEditDiff(path string, original, updated []byte, existed bool) string {
+func renderFileEditDiff(path string, original, updated []byte, existed bool, contextLines int) string {
+	return renderFileEditDiffWithin(path, original, updated, existed, contextLines, filePreviewLimits{lines: fileDiffPreviewLines, bytes: fileDiffPreviewBytes})
+}
+
+func renderFileEditDiffWithin(path string, original, updated []byte, existed bool, contextLines int, limits filePreviewLimits) string {
+	if limits.lines <= 0 || limits.bytes <= 0 {
+		return "Diff preview omitted: the shared output budget is exhausted. The full edit succeeded."
+	}
 	if !utf8.Valid(original) || !utf8.Valid(updated) || bytes.IndexByte(original, 0) >= 0 || bytes.IndexByte(updated, 0) >= 0 {
 		return "Diff preview omitted: the before or after content contains non-text data. The full edit succeeded."
 	}
-	before, after, skippedLines := selectFileDiffWindow(original, updated)
+	before, after, skippedLines := selectFileDiffWindow(original, updated, contextLines)
 	if len(before)+len(after) > fileDiffComparisonBytes || countFileLines(before)+countFileLines(after) > fileDiffComparisonLines {
-		return fmt.Sprintf("Diff preview omitted: the changed region exceeds 256 KiB or 4000 combined lines. The full edit succeeded. Use read from line %d to inspect the updated file; an empty file has no readable lines.", skippedLines+1)
+		return fmt.Sprintf("Diff preview omitted: the changed region exceeds 256 KiB or 4000 combined lines. The full edit succeeded. Use file_actions with a read action from line %d to inspect the updated file; an empty file has no readable lines.", skippedLines+1)
 	}
 	beforeLines, afterLines := splitFileDiffLines(before), splitFileDiffLines(after)
-	preview := fileDiffPreview{}
+	preview := fileDiffPreview{limits: limits}
 	previousPath := strconv.Quote(path)
 	if !existed {
 		previousPath = "/dev/null"
 	}
 	preview.append(fmt.Sprintf("--- %s\n+++ %s\n", previousPath, strconv.Quote(path)))
-	for _, group := range difflib.NewMatcher(beforeLines, afterLines).GetGroupedOpCodes(fileDiffContextLines) {
+	for _, group := range difflib.NewMatcher(beforeLines, afterLines).GetGroupedOpCodes(contextLines) {
 		first, last := group[0], group[len(group)-1]
 		preview.append(fmt.Sprintf("@@ -%s +%s @@\n", formatFileDiffRange(skippedLines+first.I1, last.I2-first.I1), formatFileDiffRange(skippedLines+first.J1, last.J2-first.J1)))
 		for _, operation := range group {
@@ -50,20 +57,20 @@ func renderFileEditDiff(path string, original, updated []byte, existed bool) str
 		}
 	}
 	if preview.truncated {
-		return preview.content.String() + "\nDiff preview truncated at 200 lines or 16 KiB. The full edit succeeded. Use read to inspect the remaining content."
+		return preview.content.String() + "\nDiff preview truncated at 200 lines or 16 KiB. The full edit succeeded. Use file_actions with a read action to inspect the remaining content."
 	}
 	return preview.content.String()
 }
 
 // Remove shared outer text before line matching, retaining context and absolute
 // line offsets. A small edit in a large file must not diff the entire file.
-func selectFileDiffWindow(original, updated []byte) ([]byte, []byte, int) {
+func selectFileDiffWindow(original, updated []byte, contextLines int) ([]byte, []byte, int) {
 	sharedPrefix := 0
 	for sharedPrefix < len(original) && sharedPrefix < len(updated) && original[sharedPrefix] == updated[sharedPrefix] {
 		sharedPrefix++
 	}
 	start := bytes.LastIndexByte(original[:sharedPrefix], '\n') + 1
-	for range fileDiffContextLines {
+	for range contextLines {
 		if start == 0 {
 			break
 		}
@@ -75,7 +82,7 @@ func selectFileDiffWindow(original, updated []byte) ([]byte, []byte, int) {
 	}
 	beforeEnd, afterEnd := len(original)-sharedSuffix, len(updated)-sharedSuffix
 	// Finish the line containing the last changed byte, then retain context.
-	for range fileDiffContextLines + 1 {
+	for range contextLines + 1 {
 		newline := bytes.IndexByte(original[beforeEnd:], '\n')
 		if newline < 0 {
 			beforeEnd, afterEnd = len(original), len(updated)
@@ -109,6 +116,7 @@ type fileDiffPreview struct {
 	content   strings.Builder
 	lines     int
 	truncated bool
+	limits    filePreviewLimits
 }
 
 func (preview *fileDiffPreview) append(text string) {
@@ -116,7 +124,7 @@ func (preview *fileDiffPreview) append(text string) {
 		return
 	}
 	lines := strings.Count(text, "\n")
-	if preview.content.Len()+len(text) > fileDiffPreviewBytes || preview.lines+lines > fileDiffPreviewLines {
+	if preview.content.Len()+len(text) > preview.limits.bytes || preview.lines+lines > preview.limits.lines {
 		preview.truncated = true
 		return
 	}

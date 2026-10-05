@@ -9,6 +9,7 @@ import type {
   DeviceLogin,
   QueueStatus,
   Session,
+  SessionDeletion,
   Statistics,
 } from '../../atoms/types';
 import type { RuntimeSettings, RuntimeSettingKey } from '../../atoms/settings';
@@ -204,6 +205,14 @@ export class HarnessApi {
     return this.request<Session>(
       `sessions/${encodeURIComponent(sessionID)}`,
       'GET',
+      undefined,
+      signal,
+    );
+  }
+  deleteSession(sessionID: string, signal?: AbortSignal) {
+    return this.request<SessionDeletion>(
+      `sessions/${encodeURIComponent(sessionID)}`,
+      'DELETE',
       undefined,
       signal,
     );

@@ -1,4 +1,4 @@
-import { HarnessApi } from '../molecules/api/client';
+import { ApiError, HarnessApi } from '../molecules/api/client';
 import { subscribeEvents, type StreamState } from '../molecules/api/events';
 import type {
   HarnessEvent,
@@ -43,6 +43,7 @@ export class HarnessConsole {
   private refreshing = false;
   private refreshPending = false;
   private savedMessageIDs = new Set<string>();
+  private removedSessionIDs = new Set<string>();
   private selectionRevision = 0;
   private streamFlushTimer: ReturnType<typeof setTimeout> | undefined;
   private pendingText: string[] = [];
@@ -83,6 +84,7 @@ export class HarnessConsole {
     this.error = '';
     this.catalogError = '';
     this.instances = [];
+    this.removedSessionIDs.clear();
     this.catalog = [];
     this.models = [];
     this.sessions = [];
@@ -186,9 +188,9 @@ export class HarnessConsole {
         instance.Stopped ? Promise.resolve([]) : api.models(instance.ID, signal),
       ]);
       if (signal.aborted) return;
-      this.sessions = sessions.sort((first, second) =>
-        second.CreatedAt.localeCompare(first.CreatedAt),
-      );
+      this.sessions = sessions
+        .filter((session) => !this.removedSessionIDs.has(session.ID))
+        .sort((first, second) => second.CreatedAt.localeCompare(first.CreatedAt));
       this.models = models;
       const first = this.sessions.find((session) => !session.Parent) ?? this.sessions[0];
       if (first) await this.selectSession(first);
@@ -201,6 +203,7 @@ export class HarnessConsole {
   }
 
   async selectSession(session: Session) {
+    if (this.removedSessionIDs.has(session.ID)) return;
     const api = this.requireAPIClient();
     this.stopSessionObservers();
     this.session = session;
@@ -267,6 +270,26 @@ export class HarnessConsole {
       );
       if (!status.running) this.permissions = [];
     } catch (error) {
+      if (
+        !signal.aborted &&
+        this.session?.ID === session.ID &&
+        error instanceof ApiError &&
+        error.status === 404
+      ) {
+        // Another client may delete the conversation while this one is open.
+        const removed = new Set([session.ID]);
+        for (let changed = true; changed;) {
+          changed = false;
+          for (const entry of this.sessions) {
+            if (entry.Parent && removed.has(entry.Parent) && !removed.has(entry.ID)) {
+              removed.add(entry.ID);
+              changed = true;
+            }
+          }
+        }
+        await this.removeSessionEntries(removed);
+        return;
+      }
       if (!signal.aborted)
         this.error = error instanceof Error ? error.message : 'Cannot sync the session.';
     } finally {
@@ -389,6 +412,26 @@ export class HarnessConsole {
     await this.updateSessionSelection((api, sessionID, signal) =>
       api.setReasoningEffort(sessionID, effort, signal),
     );
+  }
+  async deleteSession(session: Session): Promise<string[]> {
+    const api = this.requireAPIClient();
+    const response = await api.deleteSession(session.ID, this.lifetime.signal);
+    if (this.api !== api) return [];
+    for (const identifier of response.session_ids) this.removedSessionIDs.add(identifier);
+    if (this.instance?.ID === session.InstanceID) {
+      await this.removeSessionEntries(new Set(response.session_ids));
+    }
+    return response.session_ids;
+  }
+
+  private async removeSessionEntries(removed: Set<string>) {
+    for (const identifier of removed) this.removedSessionIDs.add(identifier);
+    this.sessions = this.sessions.filter((entry) => !removed.has(entry.ID));
+    if (!this.session || !removed.has(this.session.ID)) return;
+    this.stopSessionObservers();
+    this.error = '';
+    const next = this.sessions.find((entry) => !entry.Parent) ?? this.sessions[0];
+    if (next) await this.selectSession(next);
   }
 
   async setSessionModel(model: string, allowCompaction = false) {

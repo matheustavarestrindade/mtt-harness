@@ -1,13 +1,10 @@
 package tools
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
-	"strings"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
@@ -27,7 +24,7 @@ func (Read) Name() string {
 }
 
 func (readTool Read) Description() string {
-	description := "Read file text, optionally limited to a 1-based, inclusive line range. Relative paths resolve from the instance workspace. Omit both bounds to read the whole file; prefer a range when only part is needed."
+	description := "Read file text, optionally limited to a 1-based inclusive line range. Relative paths resolve from the instance workspace. Omit both bounds to start at line 1 through EOF. Returned file text is capped at 200 lines or 16 KiB, including display labels, plus a truncation notice. When truncated, use the exact start_line and optional start_byte cursor in the notice to continue without repeating or skipping bytes. Very long lines are paged safely; start_byte is a zero-based byte offset within start_line. Prefer a range when only part is needed."
 	if readTool.lineNumbers {
 		return description + " Each returned line has an absolute file line-number prefix, N: text. These prefixes are display labels, not file content; exclude them from write and replace inputs."
 	}
@@ -53,7 +50,11 @@ func (Read) InputSchema() atom.Schema {
 			},
 			"end_line": {
 				"type": "integer", "minimum": 1,
-				"description": "Last file line to return, inclusive, and at least start_line. Omitted means through EOF. An end beyond EOF is clamped to EOF. A trailing newline does not create an extra empty line."
+				"description": "Last file line to return, inclusive, and at least start_line. Omitted means through EOF. An end beyond EOF is clamped to EOF. The 200-line/16-KiB output cap still applies and gives a continuation cursor. A trailing newline does not create an extra empty line."
+			},
+			"start_byte": {
+				"type": "integer", "minimum": 0, "default": 0,
+				"description": "Zero-based byte offset within start_line only, excluding any displayed line-number prefix. Omitted or zero starts at the line's beginning. Use the exact offset from a truncation notice to continue a long line; it must address a byte in the line without splitting a UTF-8 character. Later lines start at byte zero."
 			}
 		},
 		"required": ["path"]
@@ -67,57 +68,42 @@ func (Read) Check(operationContext context.Context, call atom.ToolCall) atom.Ver
 func (readTool Read) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	var input struct {
 		Path string `json:"path"`
-		lineRange
+		fileTextSelection
 	}
 	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "read: the input is not correct"}, operationError
+		return fileReadFailure(call, input.Path, operationError)
 	}
 	if operationError := operationContext.Err(); operationError != nil {
-		return atom.ToolResult{}, operationError
+		return fileReadFailure(call, input.Path, operationError)
 	}
-	start, end, operationError := input.lineRange.resolveLineBounds()
+	_, _, operationError := input.lineRange.resolveLineBounds()
 	if operationError != nil {
-		return atom.ToolResult{}, operationError
+		return fileReadFailure(call, input.Path, operationError)
+	}
+	if input.Path == "" || input.StartByte < 0 {
+		return fileReadFailure(call, input.Path, fmt.Errorf("path must not be empty and start_byte must be zero or greater"))
 	}
 	path, operationError := harness.WorkspacePath(operationContext, input.Path)
 	if operationError != nil {
-		return atom.ToolResult{}, operationError
+		return fileReadFailure(call, input.Path, operationError)
 	}
 	file, operationError := os.Open(path)
 	if operationError != nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
+		return fileReadFailure(call, input.Path, operationError)
 	}
 	defer file.Close()
-	reader := bufio.NewReader(file)
-	var output strings.Builder
-	lineNumber := 0
-	for {
-		if operationError := operationContext.Err(); operationError != nil {
-			return atom.ToolResult{}, operationError
-		}
-		line, readError := reader.ReadString('\n')
-		if readError != nil && readError != io.EOF {
-			return atom.ToolResult{}, readError
-		}
-		if len(line) > 0 {
-			lineNumber++
-			if lineNumber >= start {
-				if readTool.lineNumbers {
-					fmt.Fprintf(&output, "%d: ", lineNumber)
-				}
-				output.WriteString(line)
-			}
-		}
-		if readError == io.EOF || (end > 0 && lineNumber == end) {
-			break
-		}
-	}
-	if input.hasBounds() && start > lineNumber {
-		return atom.ToolResult{}, fmt.Errorf("start_line %d exceeds the file's %d lines", start, lineNumber)
+	preview, operationError := readFileTextPreview(operationContext, file, input.fileTextSelection, readTool.lineNumbers)
+	if operationError != nil {
+		return fileReadFailure(call, input.Path, operationError)
 	}
 	return atom.ToolResult{
 		CallID:  call.ID,
 		Status:  atom.StatusOK,
-		Content: []atom.Content{{Type: atom.Text, Text: output.String()}},
+		Content: []atom.Content{{Type: atom.Text, Text: preview.render(input.EndLine)}},
 	}, nil
+}
+
+func fileReadFailure(call atom.ToolCall, path string, cause error) (atom.ToolResult, error) {
+	operationError := fmt.Errorf("read %q failed: %w", path, cause)
+	return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
 }
