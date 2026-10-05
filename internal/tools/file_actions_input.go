@@ -12,21 +12,23 @@ const fileActionsMaximum = 32
 const directoryPreviewDefaultEntries = 100
 
 type fileAction struct {
-	Operation string  `json:"op"`
-	Content   *string `json:"content,omitempty"`
-	OldText   *string `json:"old_text,omitempty"`
-	NewText   *string `json:"new_text,omitempty"`
-	Mode      *string `json:"mode,omitempty"`
-	Limit     *int    `json:"limit,omitempty"`
-	Cursor    string  `json:"cursor,omitempty"`
+	Operation string   `json:"op"`
+	Content   *string  `json:"content,omitempty"`
+	OldText   *string  `json:"old_text,omitempty"`
+	NewText   *string  `json:"new_text,omitempty"`
+	Mode      *string  `json:"mode,omitempty"`
+	Limit     *int     `json:"limit,omitempty"`
+	Cursor    string   `json:"cursor,omitempty"`
+	Fields    []string `json:"fields,omitempty"`
 	fileTextSelection
 }
 
 type fileActionOutput struct {
-	Type         string `json:"type"`
-	ContextLines *int   `json:"context_lines,omitempty"`
-	Limit        *int   `json:"limit,omitempty"`
-	Cursor       string `json:"cursor,omitempty"`
+	Type         string   `json:"type"`
+	ContextLines *int     `json:"context_lines,omitempty"`
+	Limit        *int     `json:"limit,omitempty"`
+	Cursor       string   `json:"cursor,omitempty"`
+	Fields       []string `json:"fields,omitempty"`
 	fileTextSelection
 }
 
@@ -36,6 +38,7 @@ type fileActionsInput struct {
 	Return    fileActionOutput
 	mutates   bool
 	directory bool
+	deletes   bool
 }
 
 func decodeFileActionsInput(data []byte) (fileActionsInput, error) {
@@ -59,6 +62,7 @@ func decodeFileActionsInput(data []byte) (fileActionsInput, error) {
 		input.Actions = append(input.Actions, action)
 		input.mutates = input.mutates || action.mutatesFile()
 		input.directory = input.directory || action.Operation == "list"
+		input.deletes = input.deletes || action.Operation == "delete"
 	}
 	if input.directory {
 		for _, action := range input.Actions {
@@ -101,10 +105,11 @@ func decodeFileAction(data []byte) (fileAction, error) {
 		allowed = append(allowed, "old_text", "new_text", "mode", "start_line", "end_line")
 	case "append", "prepend":
 		allowed = append(allowed, "content")
+	case "delete":
 	case "list":
-		allowed = append(allowed, "limit", "cursor")
+		allowed = append(allowed, "limit", "cursor", "fields")
 	default:
-		return action, fmt.Errorf("op must be read, write, replace, append, prepend, or list")
+		return action, fmt.Errorf("op must be read, write, replace, append, prepend, delete, or list")
 	}
 	if operationError := decodeFileActionObject(data, &action, allowed); operationError != nil {
 		return action, operationError
@@ -129,7 +134,7 @@ func decodeFileAction(data []byte) (fileAction, error) {
 		}
 	}
 	if action.Operation == "list" {
-		if operationError := validateDirectoryPreview(action.Limit, action.Cursor); operationError != nil {
+		if operationError := validateDirectoryPreview(action.Limit, action.Cursor, action.Fields); operationError != nil {
 			return action, operationError
 		}
 	}
@@ -149,7 +154,7 @@ func decodeFileActionOutput(data []byte) (fileActionOutput, error) {
 	case "read":
 		allowed = append(allowed, "start_line", "end_line", "start_byte")
 	case "list":
-		allowed = append(allowed, "limit", "cursor")
+		allowed = append(allowed, "limit", "cursor", "fields")
 	default:
 		return output, fmt.Errorf("type must be summary, diff, read, or list")
 	}
@@ -166,7 +171,7 @@ func decodeFileActionOutput(data []byte) (fileActionOutput, error) {
 		return output, fmt.Errorf("start_byte must be zero or greater")
 	}
 	if output.Type == "list" {
-		return output, validateDirectoryPreview(output.Limit, output.Cursor)
+		return output, validateDirectoryPreview(output.Limit, output.Cursor, output.Fields)
 	}
 	return output, nil
 }
@@ -190,7 +195,7 @@ func decodeFileActionObject(data []byte, destination any, allowed []string) erro
 	return json.Unmarshal(data, destination)
 }
 
-func validateDirectoryPreview(limit *int, cursor string) error {
+func validateDirectoryPreview(limit *int, cursor string, fields []string) error {
 	if limit != nil && (*limit < 1 || *limit > filePreviewMaxLines) {
 		return fmt.Errorf("list limit must be between 1 and %d entries", filePreviewMaxLines)
 	}
@@ -200,9 +205,19 @@ func validateDirectoryPreview(limit *int, cursor string) error {
 	if _, operationError := base64.RawURLEncoding.DecodeString(cursor); operationError != nil {
 		return fmt.Errorf("invalid directory cursor: %w", operationError)
 	}
+	seen := make(map[string]bool, len(fields))
+	for _, field := range fields {
+		if !slices.Contains([]string{"size", "permissions", "owner", "group", "modified"}, field) {
+			return fmt.Errorf("unknown listing field %q", field)
+		}
+		if seen[field] {
+			return fmt.Errorf("duplicate listing field %q", field)
+		}
+		seen[field] = true
+	}
 	return nil
 }
 
 func (action fileAction) mutatesFile() bool {
-	return action.Operation == "write" || action.Operation == "replace" || action.Operation == "append" || action.Operation == "prepend"
+	return action.Operation == "write" || action.Operation == "replace" || action.Operation == "append" || action.Operation == "prepend" || action.Operation == "delete"
 }

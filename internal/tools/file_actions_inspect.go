@@ -31,13 +31,17 @@ func (fileTool FileActions) runFileInspections(operationContext context.Context,
 		defer file.Close()
 	}
 	for index, action := range input.Actions {
+		actionResults := results
+		if input.Return.Type != "" {
+			actionResults = newFileActionResults()
+		}
 		var text string
 		var operationError error
 		if action.Operation == "list" {
-			text, operationError = results.list(operationContext, path, action.Limit, action.Cursor)
+			text, operationError = actionResults.list(operationContext, path, action.Limit, action.Cursor, action.Fields)
 		} else {
 			if _, operationError = file.Seek(0, io.SeekStart); operationError == nil {
-				text, operationError = results.read(operationContext, file, action.fileTextSelection, fileTool.lineNumbers)
+				text, operationError = actionResults.read(operationContext, file, action.fileTextSelection, fileTool.lineNumbers)
 			}
 		}
 		if operationError != nil {
@@ -46,9 +50,13 @@ func (fileTool FileActions) runFileInspections(operationContext context.Context,
 		if len(input.Actions) == 1 && input.Return.Type == "" {
 			return text, nil
 		}
-		results.add(fmt.Sprintf("Action %d %s:", index+1, action.Operation), text)
+		if input.Return.Type == "" {
+			results.add(text)
+		}
 	}
 	switch input.Return.Type {
+	case "summary":
+		return "OK", nil
 	case "read":
 		if _, operationError := file.Seek(0, io.SeekStart); operationError != nil {
 			return "", &fileActionFailure{operation: "return read", cause: operationError}
@@ -57,13 +65,13 @@ func (fileTool FileActions) runFileInspections(operationContext context.Context,
 		if operationError != nil {
 			return "", &fileActionFailure{operation: "return read", cause: operationError}
 		}
-		results.add("Return read:", text)
+		return text, nil
 	case "list":
-		text, operationError := results.list(operationContext, path, input.Return.Limit, input.Return.Cursor)
+		text, operationError := results.list(operationContext, path, input.Return.Limit, input.Return.Cursor, input.Return.Fields)
 		if operationError != nil {
 			return "", &fileActionFailure{operation: "return list", cause: operationError}
 		}
-		results.add("Return list:", text)
+		return text, nil
 	}
-	return fmt.Sprintf("Inspected %q; %d actions completed.\n\n%s", path, len(input.Actions), results.text()), nil
+	return results.text(), nil
 }

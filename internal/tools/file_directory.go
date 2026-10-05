@@ -10,6 +10,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 )
 
 // A max heap keeps only the next bounded page while scanning in directory order.
@@ -84,7 +85,7 @@ func collectDirectoryPage(operationContext context.Context, path, cursor string,
 	return entries, nil
 }
 
-func (results *fileActionResults) list(operationContext context.Context, path string, requestedLimit *int, cursor string) (string, error) {
+func (results *fileActionResults) list(operationContext context.Context, path string, requestedLimit *int, cursor string, fields []string) (string, error) {
 	limit := directoryPreviewDefaultEntries
 	if requestedLimit != nil {
 		limit = *requestedLimit
@@ -103,20 +104,8 @@ func (results *fileActionResults) list(operationContext context.Context, path st
 		if returned == limit {
 			break
 		}
-		information, operationError := entry.Info()
-		row := fmt.Sprintf("%q\tunavailable (entry changed during listing)\n", entry.Name())
-		if operationError == nil {
-			kind := "file"
-			switch {
-			case information.Mode()&os.ModeSymlink != 0:
-				kind = "symlink"
-			case information.IsDir():
-				kind = "directory"
-			case !information.Mode().IsRegular():
-				kind = "special"
-			}
-			row = fmt.Sprintf("%q\t%s\t%d bytes\n", entry.Name(), kind, information.Size())
-		} else if !os.IsNotExist(operationError) {
+		row, operationError := formatDirectoryEntry(entry, fields)
+		if operationError != nil {
 			return "", operationError
 		}
 		if output.Len()+len(row) > results.budget.bytes {
@@ -134,4 +123,65 @@ func (results *fileActionResults) list(operationContext context.Context, path st
 		return "(no entries after this cursor)", nil
 	}
 	return output.String(), nil
+}
+
+func directoryEntryKind(mode os.FileMode) string {
+	switch {
+	case mode&os.ModeSymlink != 0:
+		return "L"
+	case mode.IsDir():
+		return "D"
+	case mode.IsRegular():
+		return "F"
+	default:
+		return "S"
+	}
+}
+
+// Default listings need only the name and directory-entry type. Additional stat
+// data is obtained only for requested metadata and never follows a symlink.
+func formatDirectoryEntry(entry os.DirEntry, fields []string) (string, error) {
+	var row strings.Builder
+	fmt.Fprintf(&row, "%s %q", directoryEntryKind(entry.Type()), entry.Name())
+	if len(fields) == 0 {
+		return row.String() + "\n", nil
+	}
+	information, operationError := entry.Info()
+	if operationError != nil && !os.IsNotExist(operationError) {
+		return "", operationError
+	}
+	for _, field := range fields {
+		value := "?"
+		if information != nil {
+			switch field {
+			case "size":
+				value = fmt.Sprint(information.Size())
+			case "permissions":
+				mode := uint32(information.Mode().Perm())
+				if information.Mode()&os.ModeSetuid != 0 {
+					mode |= 04000
+				}
+				if information.Mode()&os.ModeSetgid != 0 {
+					mode |= 02000
+				}
+				if information.Mode()&os.ModeSticky != 0 {
+					mode |= 01000
+				}
+				value = fmt.Sprintf("%04o", mode)
+			case "owner", "group":
+				owner, group, available := fileOwnerIDs(information)
+				if available {
+					if field == "owner" {
+						value = fmt.Sprint(owner)
+					} else {
+						value = fmt.Sprint(group)
+					}
+				}
+			case "modified":
+				value = information.ModTime().UTC().Format(time.RFC3339Nano)
+			}
+		}
+		fmt.Fprintf(&row, "\t%s=%s", field, value)
+	}
+	return row.String() + "\n", nil
 }

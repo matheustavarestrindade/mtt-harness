@@ -785,9 +785,9 @@ The model request must keep the parameter descriptions and defaults. A new model
 
 ### 10.4 File Tools
 
-The tool `file_actions` replaces the tools `read`, `write`, and `replace`. One tool call has one `path` and an `actions` array with 1 to 32 items. The field `op` can be `read`, `write`, `replace`, `append`, `prepend`, or `list`. A relative path starts at the instance workspace. The initial model request has the full schema.
+The tool `file_actions` replaces the tools `read`, `write`, and `replace`. One tool call has one `path` and an `actions` array with 1 to 32 items. The field `op` can be `read`, `write`, `replace`, `append`, `prepend`, `delete`, or `list`. A relative path starts at the instance workspace. The initial model request has the full schema.
 
-Actions run in input sequence on the same path. An action uses the content and line numbers from the previous action. File edits use temporary content. The actions and selected preview must be correct before the tool replaces the file. The tool uses one rename operation. An error prevents the file change.
+Actions run in input sequence on the same path. An action uses the content and line numbers from the previous action. File edits use temporary content. The actions and selected preview must be correct before the tool changes the file. A replacement uses one rename operation. An error prevents the file change.
 
 The actions `read`, `write`, and `replace` have optional `start_line` and `end_line` parameters. Line numbers start at 1. The line range includes the start line and the end line. Without `start_line`, the range starts at line 1. Without `end_line`, the range continues to EOF.
 
@@ -815,11 +815,21 @@ The harness puts tool calls for the same resolved path in sequence. Different pa
 
 The `append` action adds `content` at the end of the file. The `prepend` action adds `content` at the start. They do not add line breaks automatically. The file must be available. A previous `write` action without a line range can make the file in the same tool call.
 
-The `list` action gives directory entries in name sequence. A name which starts with `.` is not removed. The tool does not follow symbolic links. The result gives the name, type, and number of bytes. The default `limit` is 100 directory entries, and the maximum is 200.
+The `list` action gives directory entries in name sequence. A name which starts with `.` is not removed. The tool does not follow symbolic links. The default result gives only a type prefix and name. `F` identifies a file, `D` a directory, `L` a symbolic link, and `S` a different entry type.
+
+The default `limit` is 100 directory entries, and the maximum is 200. The `fields` array can have `size`, `permissions`, `owner`, `group`, or `modified`. The result gives bytes for `size` and an octal mode for `permissions`. The fields `owner` and `group` give UID and GID. The field `modified` gives the file modification time in UTC.
+
+The fields use input sequence. Data that is not available has the value `?`.
 
 A directory cursor gives the position for the next directory page. A `list` action cannot be in a tool call with file actions.
 
-A file edit result gives the resolved path, file status, and number of lines and bytes. The status text is `Created`, `Updated`, or `Unchanged`. The result of `replace` also gives the number of text matches and the mode.
+The `delete` action removes files, symbolic links, and empty directories. It does not remove directory contents or the workspace root. The last symbolic link is not followed. Path checks use the same entry that the tool removes.
+
+A directory or symbolic link removal must use one `delete` action and `return.type` set to `summary`. File removal can be in a file action sequence. The tool examines the selected output before removal.
+
+A file must be available for output with `return.type` set to `read`. A unified diff for file removal has `/dev/null` as the new path.
+
+The result contains only the output selected by the model. It does not add the path, action information, or number of lines and bytes. With `return.type` set to `summary`, the result is `Created`, `Updated`, `Deleted`, `Unchanged`, or `OK`.
 
 The model selects the result. A unified diff is not the default. In a unified diff, the prefix `-` shows lines which the tool removes. New lines have the prefix `+`. The preview keeps LF and CRLF and shows a last line without LF. The line numbers refer to the full file.
 
@@ -827,12 +837,12 @@ The limits apply only to the preview. The file edit writes the full replacement.
 
 A tool call with file edits must have a `return` object. The field `return.type` is necessary in the object. Use `return.type` to select the result:
 
-- `summary`: file status, action information, and the number of lines and bytes.
+- `summary`: one status value.
 - `diff`: a unified diff of previous and new content. The default value for `context_lines` is 3. The range is 0 to 100.
 - `read`: new file text, with optional `start_line`, `end_line`, and `start_byte`.
-- `list`: directory entries, with optional `limit` and `cursor`.
+- `list`: directory entries, with optional `limit`, `cursor`, and `fields`.
 
-A `read` or `list` action also gives output. The model must not select the same output again in `return`. The limit applies to action output and output from `return` together. Without a file edit, the `return` field is optional.
+With `return`, the tool gives only the output from `return`. The tool does not show output from a read action or list action. The output limit applies to `return` only. Without `return`, the tool gives selected file text or directory data. One limit applies to the full output. A file edit must have `return`.
 
 The line range in `return` uses the new file content. It does not select the previous lines to replace. The default start is line 1. The default end is EOF.
 

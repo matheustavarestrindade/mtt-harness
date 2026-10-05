@@ -13,6 +13,7 @@ The actions are:
 - `replace`: replace text matches with mode `first`, `last`, or `all`.
 - `append`: add text at the end of a file.
 - `prepend`: add text at the start of a file.
+- `delete`: remove a file, symbolic link, or empty directory.
 - `list`: show directory entries.
 
 The harness accepts a different path in a different tool call. It can run tools at the same time. The harness puts tool calls for the same resolved path in sequence.
@@ -43,7 +44,26 @@ List a directory:
 }
 ```
 
-The result includes directory entries with a name that starts with `.`. It gives the name, type, and number of bytes for a directory entry. Directory entries are in name sequence with letter case kept.
+The result includes directory entries with a name that starts with `.`. The default result gives only the type and name. `F` identifies a file, `D` a directory, `L` a symbolic link, and `S` a different entry type. Directory entries are in name sequence with letter case kept.
+
+```text
+F "file2.txt"
+D "test-folder"
+```
+
+The optional `fields` array selects more file data. An empty array gives the default result. The result keeps the field sequence from the input:
+
+- `size`: the number of bytes from the file system. A directory value is not the total of the directory contents.
+- `permissions`: the octal mode, with special permission bits.
+- `owner`: the UID.
+- `group`: the GID.
+- `modified`: the file modification time in UTC.
+
+A value of `?` identifies data that is not available. The fields give file data, not permission requests to the user. The tool gets file data only for the selected fields. The same `fields` parameter is available with `return.type` set to `list`.
+
+```json
+{"path":"src","actions":[{"op":"list","fields":["permissions","owner","size"]}]}
+```
 
 The tool does not follow symbolic links. The default limit is 100 directory entries, and the maximum is 200. A directory cursor gives the position for the next directory page.
 
@@ -59,7 +79,7 @@ Read unknown file content only if it changes the file edit decision. This includ
 
 A file edit must have a `return` object. The tool does not select a unified diff automatically. Select the result necessary for the task:
 
-- `summary`: file status, action information, and the number of lines and bytes.
+- `summary`: one status: `Created`, `Updated`, `Deleted`, `Unchanged`, or `OK`.
 - `diff`: a unified diff between previous and new content.
 - `read`: new file text or a line range.
 - `list`: directory entries.
@@ -83,7 +103,7 @@ The `append` and `prepend` actions do not add line breaks automatically. The con
 
 Use `return.type` with the value `summary` when file content is not necessary. Use `read` to examine new text. Do not read the same result again unless more content is necessary.
 
-Read actions give output at a position in the sequence. Output from `return` comes after the sequence. It is more output, not a setting for a previous read action. The model must not get the same content again.
+When `return` is in the input, the result contains only the output from `return`. The tool does not show output from a read action or list action. It does not add a path, action data, number of lines or bytes, or output label. The output limit applies to `return` only.
 
 To add text and examine the new file, put only the file edit in `actions`. The output type is `read`. Do not add a read action for the same new content. For a read action without file edits, `return` is not necessary.
 
@@ -95,11 +115,23 @@ To add text and examine the new file, put only the file edit in `actions`. The o
 }
 ```
 
-A read action in a file edit sequence can show a different line range or the content before a different action. The model must not get the same file text again.
+Without `return`, the tool gives selected file text or directory data in action sequence. One preview limit applies to the full output. A file edit must have `return`.
+
+## File Removal
+
+```json
+{"path":"obsolete.txt","actions":[{"op":"delete"}],"return":{"type":"summary"}}
+```
+
+The `delete` action removes a file, symbolic link, or empty directory. It does not remove the contents of a directory. The tool does not follow symbolic links. The tool cannot remove the instance workspace root. If the path is not available, the tool gives an error.
+
+A directory or symbolic link removal must use one `delete` action and a `summary` result. File removal can be in a sequence with different file actions. The new content is temporary until the actions and selected output are correct. A subsequent `write` action without a line range can make the file again.
+
+For a file, `return.type` can be `diff` to show the previous text with `/dev/null` as the new path. The tool must read the file for a unified diff. A `summary` removal does not read file content. A file text preview after removal gives an error and prevents the removal.
 
 ## Error Output
 
-The tool uses temporary file content for a file edit. The actions and output checks must be correct before the tool replaces the file. An error prevents the file change. A file edit keeps permission bits. Other hard links keep the previous content.
+The tool uses temporary file content for a file edit. The actions and output checks must be correct before the tool replaces or removes the file. An error prevents the file change. A replacement keeps permission bits. Other hard links keep the previous content.
 
 The initial error stops the tool call. The tool does not start the next action or prepare the output from `return`. It does not read the file or directory again. Temporary file content and previews are discarded.
 

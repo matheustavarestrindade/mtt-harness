@@ -63,3 +63,43 @@ func TestPathGuardResolvesMissingFileThroughSymlink(test *testing.T) {
 		test.Fatalf("symlink check: %+v", verdict)
 	}
 }
+
+func TestDeletionPathGuardUsesTheEntryWithoutFollowingItsTarget(test *testing.T) {
+	workspace, outside := test.TempDir(), test.TempDir()
+	target := filepath.Join(outside, "target.txt")
+	testutil.RequireNoError(test, os.WriteFile(target, []byte("outside content"), 0o600))
+	testutil.RequireNoError(test, os.Symlink(target, filepath.Join(workspace, "link")))
+	testutil.RequireNoError(test, os.Symlink(outside, filepath.Join(workspace, "parent-link")))
+	harnessRuntime := harness.New()
+	testutil.RequireNoError(test, (&pathtools.PathGuard{}).Setup(harnessRuntime))
+	operationContext := harness.WithWorkspace(context.Background(), workspace)
+	for _, scenario := range []struct {
+		input  string
+		kind   atom.VerdictKind
+		target string
+	}{
+		{`{"path":"link","actions":[{"op":"delete"}],"return":{"type":"summary"}}`, atom.VerdictAllow, ""},
+		{`{"path":"link","actions":[{"op":"read"}]}`, atom.VerdictAsk, target},
+		{`{"path":"parent-link/target.txt","actions":[{"op":"delete"}],"return":{"type":"summary"}}`, atom.VerdictAsk, target},
+	} {
+		verdict, operationError := harness.Check(operationContext, harnessRuntime, atom.StageToolInput, atom.ToolCall{Name: "file_actions", Input: []byte(scenario.input)})
+		testutil.RequireNoError(test, operationError)
+		if verdict.Kind != scenario.kind || verdict.Target != scenario.target {
+			test.Fatalf("path policy changed the deletion target: %+v", verdict)
+		}
+	}
+	result, operationError := NewFileActions(false).Run(operationContext, atom.ToolCall{Name: "file_actions", Input: []byte(`{"path":"link","actions":[{"op":"read"},{"op":"delete"}],"return":{"type":"summary"}}`)})
+	if operationError == nil || strings.Contains(result.Text(), "outside content") {
+		test.Fatal("mixed deletion chain followed an unchecked final symlink")
+	}
+	content, operationError := os.ReadFile(target)
+	testutil.RequireNoError(test, operationError)
+	if string(content) != "outside content" {
+		test.Fatal("deletion changed the symlink target")
+	}
+	verdict, operationError := harness.Check(operationContext, harnessRuntime, atom.StageToolInput, atom.ToolCall{Name: "mcp__custom", Input: []byte(`{"path":"file.txt","actions":"server-owned format"}`)})
+	testutil.RequireNoError(test, operationError)
+	if verdict.Kind != atom.VerdictAllow {
+		test.Fatal("file action parsing changed an external tool's input")
+	}
+}

@@ -55,7 +55,7 @@ func (failure *fileToolError) Unwrap() error { return failure.cause }
 func (failure *fileToolError) Error() string {
 	operation := "complete file_actions for"
 	switch failure.operation {
-	case "read", "write", "list":
+	case "read", "write", "list", "delete":
 		operation = failure.operation
 	case "replace":
 		operation = "replace text in"
@@ -65,6 +65,8 @@ func (failure *fileToolError) Error() string {
 		operation = "produce the final read of"
 	case "return list":
 		operation = "produce the final listing of"
+	case "return diff":
+		operation = "produce the final diff of"
 	case "commit":
 		operation = "commit changes to"
 	}

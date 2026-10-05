@@ -43,6 +43,9 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 		{ID: "preview", Name: "file_actions", Input: []byte(`{"path":"file.txt","actions":[{"op":"write","content":"one\nthree\n"}],"return":{"type":"read","start_line":2,"end_line":2}}`)},
 		{ID: "large", Name: "file_actions", Input: largeInput},
 		{ID: "continue", Name: "file_actions", Input: []byte(`{"path":"large.txt","actions":[{"op":"read","start_line":201}]}`)},
+		{ID: "list", Name: "file_actions", Input: []byte(`{"path":".","actions":[{"op":"list"}]}`)},
+		{ID: "details", Name: "file_actions", Input: []byte(`{"path":".","actions":[{"op":"list","fields":["size","permissions"]}]}`)},
+		{ID: "delete", Name: "file_actions", Input: []byte(`{"path":"large.txt","actions":[{"op":"delete"}],"return":{"type":"summary"}}`)},
 	}
 	requests := make(chan wireRequest, len(calls)+1)
 	var requestCount atomic.Int32
@@ -106,18 +109,24 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 	}
 	for identifier, fragments := range map[string][]string{
 		"retired":  {`tool "read" is not registered`},
-		"create":   {"Created", "Lines: 0 -> 2"},
+		"create":   {"Created"},
 		"failed":   {"Cannot replace text in", "action 2", `text "absent" was not found`, "Last modified:"},
-		"recover":  {"Updated", "replace: 1 match(es)", "-two\n+three\n"},
-		"preview":  {"Unchanged", "Return read (final file):\nthree\n"},
+		"recover":  {"-two\n+three\n"},
+		"preview":  {"three\n"},
 		"large":    {"Shared file_actions preview budget reached", `"start_line":201`},
 		"continue": {strings.Repeat("row\n", 50)},
+		"list":     {"F \"file.txt\"\n", "F \"large.txt\"\n"},
+		"details":  {"size=10", "permissions="},
+		"delete":   {"Deleted"},
 	} {
 		for _, fragment := range fragments {
 			if !strings.Contains(feedback[identifier], fragment) {
 				test.Fatalf("provider feedback %q lacks %q: %s", identifier, fragment, feedback[identifier])
 			}
 		}
+	}
+	if feedback["create"] != "Created" || feedback["preview"] != "three\n" || feedback["delete"] != "Deleted" || feedback["list"] != "F \"file.txt\"\nF \"large.txt\"\n" || !strings.HasPrefix(feedback["recover"], "--- ") {
+		test.Fatal("provider received unsolicited status, action logs or listing metadata")
 	}
 	if feedback["continue"] != strings.Repeat("row\n", 50) || strings.Contains(feedback["preview"], "@@") || strings.Count(feedback["large"], "row\n") != 200 || strings.Contains(feedback["failed"], "UNCOMMITTED") || strings.Contains(feedback["create"], "+one") {
 		test.Fatal("provider received duplicate/full-file output instead of the selected preview and continuation")
@@ -143,7 +152,7 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 	if returnSchema.Description == "" || returnSchema.Default != nil || strings.Join(returnSchema.Properties["type"].Enum, ",") != "summary,diff,read,list" {
 		test.Fatalf("provider request lost explicit output choices: %s", schemas["file_actions"])
 	}
-	for _, name := range []string{"type", "context_lines", "start_line", "end_line", "start_byte", "limit", "cursor"} {
+	for _, name := range []string{"type", "context_lines", "start_line", "end_line", "start_byte", "limit", "cursor", "fields"} {
 		if returnSchema.Properties[name].Description == "" {
 			test.Fatalf("return.%s has no model-facing instructions", name)
 		}
@@ -159,5 +168,13 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 	testutil.RequireNoError(test, operationError)
 	if string(content) != "one\nthree\n" {
 		test.Fatalf("recovered edit has incorrect file content: %q", content)
+	}
+	information, operationError := os.Stat(filepath.Join(instance.Spec().Workspace, "file.txt"))
+	testutil.RequireNoError(test, operationError)
+	if !strings.Contains(feedback["details"], fmt.Sprintf("F \"file.txt\"\tsize=%d\tpermissions=%04o", information.Size(), information.Mode().Perm())) {
+		test.Fatal("provider received incorrect filesystem metadata")
+	}
+	if _, operationError := os.Stat(filepath.Join(instance.Spec().Workspace, "large.txt")); !os.IsNotExist(operationError) {
+		test.Fatal("delete was not applied")
 	}
 }

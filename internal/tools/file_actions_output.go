@@ -46,11 +46,8 @@ func (results *fileActionResults) read(operationContext context.Context, source 
 	return preview.content + "\n\n[Shared file_actions preview budget reached: 200 lines or 16 KiB including labels. Continuation for this path: " + continuation + ". This notice is not file content.]", nil
 }
 
-func (results *fileActionResults) add(label, text string) {
-	if text == "" {
-		text = "(empty output)"
-	}
-	results.parts = append(results.parts, label+"\n"+text)
+func (results *fileActionResults) add(text string) {
+	results.parts = append(results.parts, text)
 }
 
 func (results *fileActionResults) text() string { return strings.Join(results.parts, "\n\n") }

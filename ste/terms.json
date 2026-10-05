@@ -2,6 +2,52 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "quoted name",
+      "category": "technical_noun",
+      "approved_forms": [
+        "quoted names"
+      ],
+      "meaning": "an escaped directory-entry name shown within quotation marks",
+      "source": "compact directory listing"
+    },
+    {
+      "term": "workspace root",
+      "category": "technical_noun",
+      "approved_forms": [
+        "workspace roots"
+      ],
+      "meaning": "the top directory configured for an instance workspace",
+      "source": "file deletion boundary"
+    },
+    {
+      "term": "UTC",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "Coordinated Universal Time used for filesystem timestamps",
+      "source": "directory metadata"
+    },
+    {
+      "term": "UID",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the numeric filesystem user identifier",
+      "source": "directory metadata"
+    },
+    {
+      "term": "GID",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the numeric filesystem group identifier",
+      "source": "directory metadata"
+    },
+    {
+      "term": "octal mode",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "filesystem permission bits expressed as an octal value",
+      "source": "directory metadata"
+    },
+    {
       "term": "file modification time",
       "category": "technical_noun",
       "approved_forms": [],

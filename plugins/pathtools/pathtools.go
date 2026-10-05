@@ -42,7 +42,24 @@ func (pathGuard *PathGuard) Setup(harnessRuntime *harness.Harness) error {
 		if workspace == "" {
 			return atom.Verdict{}, fmt.Errorf("path check has no instance workspace")
 		}
-		target, operationError := harness.WorkspacePath(operationContext, input.Path)
+		resolvePath := harness.WorkspacePath
+		if call.Name == "file_actions" {
+			var fileInput struct {
+				Actions []struct {
+					Operation string `json:"op"`
+				} `json:"actions"`
+			}
+			if operationError := json.Unmarshal(call.Input, &fileInput); operationError != nil {
+				return atom.Verdict{}, operationError
+			}
+			for _, action := range fileInput.Actions {
+				if action.Operation == "delete" {
+					resolvePath = harness.WorkspaceEntryPath
+					break
+				}
+			}
+		}
+		target, operationError := resolvePath(operationContext, input.Path)
 		if operationError != nil {
 			return atom.Verdict{}, operationError
 		}

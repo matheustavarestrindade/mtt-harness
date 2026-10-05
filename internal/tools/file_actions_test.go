@@ -35,7 +35,7 @@ func TestFileActionsStageAnOrderedChainAndReturnChosenText(test *testing.T) {
 	testutil.RequireNoError(test, operationError)
 	actual, operationError := os.ReadFile(filepath.Join(workspace, "source.txt"))
 	testutil.RequireNoError(test, operationError)
-	if string(actual) != "top\nchanged\nnew\ntail" || !strings.HasSuffix(result.Text(), "2: changed\n3: new\n4: tail") || strings.Contains(result.Text(), "@@") {
+	if string(actual) != "top\nchanged\nnew\ntail" || result.Text() != "2: changed\n3: new\n4: tail" {
 		test.Fatalf("incorrect ordered edit or selected output: %q\n%s", actual, result.Text())
 	}
 }
@@ -54,7 +54,7 @@ func TestFileActionsNeverChooseADiffForTheModel(test *testing.T) {
 	arguments["return"] = map[string]any{"type": "summary"}
 	result, operationError = NewFileActions(false).Run(operationContext, fileCall(test, arguments))
 	testutil.RequireNoError(test, operationError)
-	if strings.Contains(result.Text(), "private file content") || strings.Contains(result.Text(), "@@") || !strings.Contains(result.Text(), "Created") {
+	if result.Text() != "Created" {
 		test.Fatalf("summary leaked unsolicited file content: %s", result.Text())
 	}
 }
@@ -130,10 +130,10 @@ func TestFileActionsShareOnePreviewBudget(test *testing.T) {
 	result, operationError := NewFileActions(false).Run(harness.WithWorkspace(context.Background(), workspace), fileCall(test, map[string]any{
 		"path": "source.txt", "actions": []any{
 			map[string]any{"op": "read", "end_line": 150}, map[string]any{"op": "read", "end_line": 150},
-		}, "return": map[string]any{"type": "read"},
+		},
 	}))
 	testutil.RequireNoError(test, operationError)
-	if strings.Count(result.Text(), "ROW_MARKER") != 200 || !strings.Contains(result.Text(), `"start_line":51`) || !strings.Contains(result.Text(), `"start_line":1`) {
+	if strings.Count(result.Text(), "ROW_MARKER") != 200 || !strings.Contains(result.Text(), `"start_line":51`) {
 		test.Fatalf("read actions bypassed the shared cap: %s", result.Text())
 	}
 }

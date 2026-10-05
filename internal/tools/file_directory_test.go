@@ -39,17 +39,17 @@ func TestFileActionsListPagesUseSortedNamesAndDoNotFollowLinks(test *testing.T) 
 			if row == "" {
 				continue
 			}
-			columns := strings.Split(row, "\t")
-			if len(columns) != 3 {
+			kind, quotedName, found := strings.Cut(row, " ")
+			if !found || strings.Contains(row, "\t") {
 				test.Fatalf("invalid listing row: %q", row)
 			}
-			name, operationError := strconv.Unquote(columns[0])
+			name, operationError := strconv.Unquote(quotedName)
 			testutil.RequireNoError(test, operationError)
 			actual = append(actual, name)
-			if name == "outside-link" && columns[1] != "symlink" {
+			if name == "outside-link" && kind != "L" {
 				test.Fatal("listing followed a symlink target")
 			}
-			if name == "folder" && columns[1] != "directory" {
+			if name == "folder" && kind != "D" {
 				test.Fatal("directory type missing")
 			}
 		}
