@@ -83,7 +83,19 @@ The `append` and `prepend` actions do not add line breaks automatically. The con
 
 Use `return.type` with the value `summary` when file content is not necessary. Use `read` to examine new text. Do not read the same result again unless more content is necessary.
 
-Read actions give output at a position in the sequence. Output from `return` comes after the sequence. The model must not get the same content again.
+Read actions give output at a position in the sequence. Output from `return` comes after the sequence. It is more output, not a setting for a previous read action. The model must not get the same content again.
+
+To add text and examine the new file, put only the file edit in `actions`. The output type is `read`. Do not add a read action for the same new content. For a read action without file edits, `return` is not necessary.
+
+```json
+{
+  "path": "notes.txt",
+  "actions": [{"op": "append", "content": "endfile"}],
+  "return": {"type": "read"}
+}
+```
+
+A read action in a file edit sequence can show a different line range or the content before a different action. The model must not get the same file text again.
 
 ## Error Output
 
