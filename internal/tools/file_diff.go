@@ -31,7 +31,7 @@ func renderFileEditDiffWithin(path string, original, updated []byte, existed boo
 	}
 	before, after, skippedLines := selectFileDiffWindow(original, updated, contextLines)
 	if len(before)+len(after) > fileDiffComparisonBytes || countFileLines(before)+countFileLines(after) > fileDiffComparisonLines {
-		return fmt.Sprintf("Diff preview omitted: the changed region exceeds 256 KiB or 4000 combined lines. The full edit succeeded. Use file_actions with a read action from line %d to inspect the updated file; an empty file has no readable lines.", skippedLines+1)
+		return fmt.Sprintf("Diff preview omitted: the changed region exceeds 256 KiB or 4000 combined lines. The full edit succeeded. Changed region starts at line %d.", skippedLines+1)
 	}
 	beforeLines, afterLines := splitFileDiffLines(before), splitFileDiffLines(after)
 	preview := fileDiffPreview{limits: limits}
@@ -57,7 +57,7 @@ func renderFileEditDiffWithin(path string, original, updated []byte, existed boo
 		}
 	}
 	if preview.truncated {
-		return preview.content.String() + "\nDiff preview truncated at 200 lines or 16 KiB. The full edit succeeded. Use file_actions with a read action to inspect the remaining content."
+		return preview.content.String() + "\nDiff preview truncated at 200 lines or 16 KiB. The full edit succeeded."
 	}
 	return preview.content.String()
 }

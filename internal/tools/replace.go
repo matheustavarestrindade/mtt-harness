@@ -49,37 +49,37 @@ func (Replace) Run(operationContext context.Context, call atom.ToolCall) (atom.T
 		lineRange
 	}
 	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
-		return fileEditFailure(call, "replace", input.Path, operationError, "Send valid JSON with path, old_text, and new_text strings, and optional mode and integer line bounds.")
+		return fileEditFailure(call, "replace", input.Path, operationError)
 	}
 	if input.Path == "" {
-		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("path is required"), "Supply a non-empty path to an existing file.")
+		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("path is required"))
 	}
 	if input.OldText == "" {
-		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("old_text must not be empty"), "Use read and copy the exact text to replace into old_text, without display line-number prefixes.")
+		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("old_text must not be empty"))
 	}
 	if input.NewText == nil {
-		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("new_text is required"), "Supply new_text; use an empty string to delete matches.")
+		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("new_text is required"))
 	}
 	mode := "first"
 	if input.Mode != nil {
 		mode = *input.Mode
 	}
 	if mode != "first" && mode != "last" && mode != "all" {
-		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("mode must be first, last, or all"), "Choose a supported mode, or omit mode to replace the first match.")
+		return fileEditFailure(call, "replace", input.Path, fmt.Errorf("mode must be first, last, or all"))
 	}
 	if _, _, operationError := input.resolveLineBounds(); operationError != nil {
-		return fileEditFailure(call, "replace", input.Path, operationError, "Use read to inspect the current file. Retry with 1-based inclusive line bounds within the file.")
+		return fileEditFailure(call, "replace", input.Path, operationError)
 	}
 	path, operationError := harness.WorkspacePath(operationContext, input.Path)
 	if operationError != nil {
-		return fileEditFailure(call, "replace", input.Path, operationError, "Verify the file path and instance workspace before retrying.")
+		return fileEditFailure(call, "replace", input.Path, operationError)
 	}
 	summary, operationError := applyAtomicFileEdit(operationContext, path, false, func(original []byte) (fileChange, error) {
 		updated, count, operationError := replaceFileText(original, input.OldText, *input.NewText, mode, input.lineRange)
 		return fileChange{content: updated, summary: fmt.Sprintf("Replaced %d match(es) using mode %q.", count, mode)}, operationError
 	})
 	if operationError != nil {
-		return fileEditFailure(call, "replace", input.Path, operationError, "Use read to inspect the current file and range. Copy old_text exactly, including case, whitespace, and LF/CRLF; exclude display line-number prefixes. Update stale line bounds. Do not retry the same unmatched text unchanged.")
+		return fileEditFailure(call, "replace", input.Path, operationError)
 	}
 	return atom.ToolResult{CallID: call.ID, Status: atom.StatusOK, Content: []atom.Content{{Type: atom.Text, Text: summary}}}, nil
 }

@@ -3,7 +3,6 @@ package tools
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -13,7 +12,7 @@ import (
 )
 
 // FileActions is the model-facing file interface. One path gate owns a complete
-// chain and its diagnostic snapshot; separate paths can run concurrently.
+// chain and its file snapshots; separate paths can run concurrently.
 type FileActions struct{ lineNumbers bool }
 
 func NewFileActions(lineNumbers bool) *FileActions { return &FileActions{lineNumbers: lineNumbers} }
@@ -26,7 +25,7 @@ func (FileActions) Check(context.Context, atom.ToolCall) atom.Verdict {
 func (fileTool FileActions) Description() string {
 	description := "Read files, list directories, write, replace exact text, append or prepend using one ordered action chain on one workspace-resolved path. Edits require an explicit return choice: summary, diff, or read. Never returns a diff by default. " +
 		"Request each file state/range only once. A read/list action already contributes its own output; return adds a separate final preview and does not replace or deduplicate action output. For an edit followed by final-text inspection, put only the edits in actions and choose return.type=read. Do not also append op=read for the same final content: that prints it twice and consumes the shared preview budget twice. For read/list-only calls, use the action and omit return. Explicit reads in an editing chain are for deliberately distinct intermediate states or ranges, not to enable return. " +
-		"Each action sees prior staged changes. A preliminary read call is not required when the relevant content is already known or the literal edit does not depend on existing content. Append/prepend supplied text or try a known exact replacement directly; select return read/diff for inspection and on_error read for missing context if it fails. Read first only when unknown structure, formatting, targets, or line positions affect the edit. All edits commit once by atomic rename, or none commit on failure; permission bits are preserved and other hard links keep old contents. Read/list actions and selected return output share a 200-line/16-KiB preview budget plus compact status/continuation notices. on_error may read or list the same path for diagnosis, but cannot mutate, retry, or hide failure. Failed chains discard intermediate previews and diagnose the original file snapshot. A directory list gives direct children sorted by name, entry types and byte sizes, with an opaque continuation cursor. Full edit content is never truncated."
+		"Each action sees prior staged changes. A preliminary read call is not required when the relevant content is already known or the literal edit does not depend on existing content. Append/prepend supplied text or try a known exact replacement directly; select return read/diff for inspection. Read first only when unknown structure, formatting, targets, or line positions affect the edit. All edits commit once by atomic rename, or none commit on failure; permission bits are preserved and other hard links keep old contents. The first failure stops the call immediately: no later actions, final preview, diagnostic reads/listing or retries run. Failed calls discard all intermediate output and report one factual error identifying the failed operation and cause, with observed last-modified time when available. on_error is not a supported input. Read/list actions and selected return output share a 200-line/16-KiB preview budget plus compact status/continuation metadata. A directory list gives direct children sorted by name, entry types and byte sizes, with an opaque continuation cursor. Full edit content is never truncated."
 	if fileTool.lineNumbers {
 		return description + " Read previews have absolute line-number display labels; labels and notices are not file content."
 	}
@@ -34,26 +33,26 @@ func (fileTool FileActions) Description() string {
 }
 
 type fileActionSnapshot struct {
-	content []byte
-	exists  bool
-	loaded  bool
+	content     []byte
+	exists      bool
+	information os.FileInfo
 }
 
 func (fileTool FileActions) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	input, operationError := decodeFileActionsInput(call.Input)
 	if operationError != nil {
-		return fileActionsFailure(call, input.Path, operationError, "")
+		return failedFileOperation(call, input.Path, "", operationError, nil)
 	}
 	if operationError := operationContext.Err(); operationError != nil {
-		return fileActionsFailure(call, input.Path, operationError, "")
+		return failedFileOperation(call, input.Path, "", operationError, nil)
 	}
 	path, operationError := harness.WorkspacePath(operationContext, input.Path)
 	if operationError != nil {
-		return fileActionsFailure(call, input.Path, operationError, "")
+		return failedFileOperation(call, input.Path, "", operationError, nil)
 	}
 	release, operationError := acquireFileEdit(operationContext, path)
 	if operationError != nil {
-		return fileActionsFailure(call, path, operationError, "")
+		return failedFileOperation(call, path, "", operationError, nil)
 	}
 	defer release()
 	var snapshot fileActionSnapshot
@@ -61,52 +60,39 @@ func (fileTool FileActions) Run(operationContext context.Context, call atom.Tool
 	if input.mutates {
 		output, operationError = fileTool.runFileActionTransaction(operationContext, path, input, &snapshot)
 	} else {
-		output, operationError = fileTool.runFileInspections(operationContext, path, input)
+		output, operationError = fileTool.runFileInspections(operationContext, path, input, &snapshot)
 	}
 	if operationError == nil {
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusOK, Content: []atom.Content{{Type: atom.Text, Text: output}}}, nil
 	}
-	diagnostic := ""
-	if input.OnError.Type != "" && operationContext.Err() == nil && !errors.Is(operationError, context.Canceled) && !errors.Is(operationError, context.DeadlineExceeded) {
-		diagnostic = fileTool.renderFileActionRecovery(operationContext, path, input.OnError, snapshot)
-	}
-	return fileActionsFailure(call, path, operationError, diagnostic)
-}
-
-func fileActionsFailure(call atom.ToolCall, path string, cause error, diagnostic string) (atom.ToolResult, error) {
-	operationError := fmt.Errorf("file_actions %q failed: %w\nThis call committed no file changes. Correct the failed action using available context or the diagnostic. Read/list only if information needed for the correction is still missing.", path, cause)
-	result := atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}
-	if diagnostic != "" {
-		result.Content = []atom.Content{{Type: atom.Text, Text: diagnostic}}
-	}
-	return result, operationError
+	return failedFileOperation(call, path, "", operationError, snapshot.information)
 }
 
 func (fileTool FileActions) runFileActionTransaction(operationContext context.Context, path string, input fileActionsInput, snapshot *fileActionSnapshot) (string, error) {
 	information, operationError := os.Stat(path)
+	snapshot.information = information
 	if operationError != nil && !os.IsNotExist(operationError) {
-		return "", operationError
+		return "", &fileActionFailure{index: 1, operation: input.Actions[0].Operation, cause: operationError}
 	}
 	if information != nil {
 		if !information.Mode().IsRegular() {
-			return "", fmt.Errorf("file actions require a regular file; use list to inspect a directory")
+			return "", &fileActionFailure{index: 1, operation: input.Actions[0].Operation, cause: fmt.Errorf("target is not a regular file")}
 		}
 		snapshot.content, operationError = os.ReadFile(path)
 		if operationError != nil {
-			return "", operationError
+			return "", &fileActionFailure{index: 1, operation: input.Actions[0].Operation, cause: operationError}
 		}
 		snapshot.exists = true
 	}
-	snapshot.loaded = true
 	current, exists := snapshot.content, snapshot.exists
 	results := newFileActionResults()
 	var summaries []string
 	for index, action := range input.Actions {
 		if operationError := operationContext.Err(); operationError != nil {
-			return "", operationError
+			return "", &fileActionFailure{index: index + 1, operation: action.Operation, cause: operationError}
 		}
 		if !exists && !(action.Operation == "write" && !action.hasBounds()) {
-			return "", &fileActionFailure{index: index + 1, operation: action.Operation, cause: fmt.Errorf("target file does not exist; create it with a whole-file write first: %w", os.ErrNotExist)}
+			return "", &fileActionFailure{index: index + 1, operation: action.Operation, cause: os.ErrNotExist}
 		}
 		var summary string
 		switch action.Operation {
@@ -142,7 +128,7 @@ func (fileTool FileActions) runFileActionTransaction(operationContext context.Co
 	case "read":
 		text, operationError := results.read(operationContext, bytes.NewReader(current), input.Return.fileTextSelection, fileTool.lineNumbers)
 		if operationError != nil {
-			return "", fmt.Errorf("return read: %w", operationError)
+			return "", &fileActionFailure{operation: "return read", cause: operationError}
 		}
 		results.add("Return read (final file):", text)
 	case "diff":
@@ -162,7 +148,7 @@ func (fileTool FileActions) runFileActionTransaction(operationContext context.Co
 	}
 	if changed {
 		if operationError := replaceFileContentsAtomically(operationContext, path, information, current); operationError != nil {
-			return "", operationError
+			return "", &fileActionFailure{operation: "commit", cause: operationError}
 		}
 	}
 	status := "Updated"

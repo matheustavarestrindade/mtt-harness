@@ -128,7 +128,7 @@ func (results *fileActionResults) list(operationContext context.Context, path st
 	}
 	results.consume(output.String())
 	if returned < len(entries) {
-		return output.String() + fmt.Sprintf("\n[Directory page limited to %d entries and the shared 200-line/16-KiB budget. Continue on the same path with file_actions actions:[{\"op\":\"list\",\"cursor\":%q}].]\n", limit, cursor), nil
+		return output.String() + fmt.Sprintf("\n[Directory page limited to %d entries and the shared 200-line/16-KiB budget. Continuation for this path: {\"cursor\":%q}.]\n", limit, cursor), nil
 	}
 	if returned == 0 {
 		return "(no entries after this cursor)", nil

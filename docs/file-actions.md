@@ -53,7 +53,7 @@ A `list` action cannot be in the same tool call as a file action. The tool call 
 
 File content can be available from the user, previous messages, or tool output. Use available content for the file edit. A new read action is not necessary if the information for the file edit is available.
 
-For supplied text at the end or start of a file, use `append` or `prepend`. A `replace` action can use text from the user or previous tool output. The tool examines the text match before the file replacement. Use `return` to examine the new content. Use `on_error` to get error diagnostics if the file edit gives an error.
+For supplied text at the end or start of a file, use `append` or `prepend`. A `replace` action can use text from the user or previous tool output. The tool examines the text match before the file replacement. Use `return` to examine the new content.
 
 Read unknown file content only if it changes the file edit decision. This includes file structure, line numbers, and text format. A short preview is not the full file. If the file has changed, get the necessary new content. After the file edit, do the checks necessary for the task.
 
@@ -101,9 +101,11 @@ A read action in a file edit sequence can show a different line range or the con
 
 The tool uses temporary file content for a file edit. The actions and output checks must be correct before the tool replaces the file. An error prevents the file change. A file edit keeps permission bits. Other hard links keep the previous content.
 
-The optional `on_error.return` gives an error diagnostic for the same path. The type must be `read` or `list`. It cannot change file content or run the actions again.
+The initial error stops the tool call. The tool does not start the next action or prepare the output from `return`. It does not read the file or directory again. Temporary file content and previews are discarded.
 
-The error diagnostic uses previous file content. The error status and initial cause stay in the result. An error diagnostic cannot replace the initial error.
+The result gives only the operation, action number, path, and cause of the error. The tool does not give steps to correct the error. The model selects the next action.
+
+The result gives a preview of `old_text` if a text match is not available. A long value has a maximum preview of 160 bytes. The result can also give the file modification time. The time comes from file data available before the error. Error output does not cause a new file operation.
 
 ```json
 {
@@ -111,14 +113,11 @@ The error diagnostic uses previous file content. The error status and initial ca
   "actions": [
     {"op": "replace", "old_text": "oldName", "new_text": "newName", "mode": "all"}
   ],
-  "return": {"type": "diff", "context_lines": 3},
-  "on_error": {
-    "return": {"type": "read", "start_line": 10, "end_line": 50}
-  }
+  "return": {"type": "diff", "context_lines": 3}
 }
 ```
 
-Incorrect input and cancellation do not start error diagnostic I/O. The error diagnostic gives content for the next action. Get more file content only when necessary. An action sequence cannot make a new model decision internally.
+The tool does not accept `on_error`. Incorrect input and cancellation give only the error. An action sequence cannot make a new model decision internally.
 
 ## Output Limits
 
@@ -126,6 +125,6 @@ Preview data in one tool call has a total limit of 200 lines or 16 KiB. The limi
 
 A file truncation notice gives the next `start_line` and, for a long line, `start_byte`. The byte position starts at 0 within the line. Use the position from the result. It must not divide a UTF-8 character. A directory truncation notice gives a directory cursor for the next list action.
 
-The format applies to actions, `return`, and error diagnostics. Labels and truncation notices are not file content. The setting is `MTT_READ_LINE_NUMBERS`.
+The format applies to actions and `return`. Labels and truncation notices are not file content. A truncation notice gives a position, not a new instruction. The setting is `MTT_READ_LINE_NUMBERS`.
 
 The tool removes the same outer text from the diff input but keeps lines of context. The diff input contains previous file content and replacement file content. The maximum total is 256 KiB or 4000 lines. If the diff input is above the limit, the result gives the cause without the preview. Incorrect UTF-8 or NUL bytes also prevent a preview.

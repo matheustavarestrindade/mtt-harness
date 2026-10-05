@@ -34,31 +34,17 @@ type fileActionsInput struct {
 	Path      string
 	Actions   []fileAction
 	Return    fileActionOutput
-	OnError   fileActionOutput
 	mutates   bool
 	directory bool
 }
-
-type fileActionFailure struct {
-	index     int
-	operation string
-	cause     error
-}
-
-func (failure *fileActionFailure) Error() string {
-	return fmt.Sprintf("action %d (%s): %v", failure.index, failure.operation, failure.cause)
-}
-
-func (failure *fileActionFailure) Unwrap() error { return failure.cause }
 
 func decodeFileActionsInput(data []byte) (fileActionsInput, error) {
 	var envelope struct {
 		Path    string            `json:"path"`
 		Actions []json.RawMessage `json:"actions"`
 		Return  json.RawMessage   `json:"return"`
-		OnError json.RawMessage   `json:"on_error"`
 	}
-	if operationError := decodeFileActionObject(data, &envelope, []string{"path", "actions", "return", "on_error"}); operationError != nil {
+	if operationError := decodeFileActionObject(data, &envelope, []string{"path", "actions", "return"}); operationError != nil {
 		return fileActionsInput{}, operationError
 	}
 	input := fileActionsInput{Path: envelope.Path}
@@ -82,33 +68,20 @@ func decodeFileActionsInput(data []byte) (fileActionsInput, error) {
 		}
 	}
 	if len(envelope.Return) > 0 {
-		output, operationError := decodeFileActionOutput(envelope.Return, false)
+		output, operationError := decodeFileActionOutput(envelope.Return)
 		if operationError != nil {
 			return input, fmt.Errorf("return: %w", operationError)
 		}
 		input.Return = output
 	}
 	if input.mutates && input.Return.Type == "" {
-		return input, fmt.Errorf("edits require an explicit return: choose summary, diff, or read; a diff is never automatic")
+		return input, fmt.Errorf("edits require an explicit return; return is missing")
 	}
 	if input.Return.Type == "diff" && !input.mutates {
 		return input, fmt.Errorf("return.type diff requires at least one mutation action")
 	}
 	if input.Return.Type == "list" && !input.directory || input.Return.Type == "read" && input.directory {
 		return input, fmt.Errorf("the return type must match the target: read for a file, list for a directory")
-	}
-	if len(envelope.OnError) > 0 {
-		var recovery struct {
-			Return json.RawMessage `json:"return"`
-		}
-		if operationError := decodeFileActionObject(envelope.OnError, &recovery, []string{"return"}); operationError != nil {
-			return input, fmt.Errorf("on_error: %w", operationError)
-		}
-		output, operationError := decodeFileActionOutput(recovery.Return, true)
-		if operationError != nil {
-			return input, fmt.Errorf("on_error.return: %w", operationError)
-		}
-		input.OnError = output
 	}
 	return input, nil
 }
@@ -144,7 +117,7 @@ func decodeFileAction(data []byte) (fileAction, error) {
 	}
 	if action.Operation == "write" || action.Operation == "append" || action.Operation == "prepend" {
 		if action.Content == nil {
-			return action, fmt.Errorf("content is required, including an empty string for deletion or an empty file")
+			return action, fmt.Errorf("content is required")
 		}
 	}
 	if action.Operation == "replace" {
@@ -163,7 +136,7 @@ func decodeFileAction(data []byte) (fileAction, error) {
 	return action, nil
 }
 
-func decodeFileActionOutput(data []byte, recovery bool) (fileActionOutput, error) {
+func decodeFileActionOutput(data []byte) (fileActionOutput, error) {
 	var output fileActionOutput
 	if operationError := json.Unmarshal(data, &output); operationError != nil {
 		return output, operationError
@@ -182,9 +155,6 @@ func decodeFileActionOutput(data []byte, recovery bool) (fileActionOutput, error
 	}
 	if operationError := decodeFileActionObject(data, &output, allowed); operationError != nil {
 		return output, operationError
-	}
-	if recovery && output.Type != "read" && output.Type != "list" {
-		return output, fmt.Errorf("error recovery can only read or list the same path; it cannot mutate or retry")
 	}
 	if output.ContextLines != nil && (*output.ContextLines < 0 || *output.ContextLines > 100) {
 		return output, fmt.Errorf("context_lines must be between 0 and 100")
@@ -214,7 +184,7 @@ func decodeFileActionObject(data []byte, destination any, allowed []string) erro
 			return fmt.Errorf("%s is not valid for this operation", name)
 		}
 		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-			return fmt.Errorf("%s cannot be null; omit optional fields instead", name)
+			return fmt.Errorf("%s cannot be null", name)
 		}
 	}
 	return json.Unmarshal(data, destination)
@@ -225,7 +195,7 @@ func validateDirectoryPreview(limit *int, cursor string) error {
 		return fmt.Errorf("list limit must be between 1 and %d entries", filePreviewMaxLines)
 	}
 	if len(cursor) > 512 {
-		return fmt.Errorf("invalid directory cursor; use the cursor returned by list")
+		return fmt.Errorf("directory cursor exceeds the 512-byte limit")
 	}
 	if _, operationError := base64.RawURLEncoding.DecodeString(cursor); operationError != nil {
 		return fmt.Errorf("invalid directory cursor: %w", operationError)

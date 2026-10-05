@@ -17,8 +17,8 @@ Chain known edits in order on one staged file, then commit once: {"path":"notes.
 Append fully specified text and inspect the result without a preliminary read: {"path":"log.txt","actions":[{"op":"append","content":"\nNext entry\n"}],"return":{"type":"read"}}. Append/prepend are literal and add no implicit separators. Read an edge first only if unknown formatting or syntax changes the required text.
 For edit-and-inspect, use only the mutations in actions and return.type=read. Do not add a trailing read action of the same final file/range: that emits the content twice and spends the preview budget twice. An explicit read in an editing chain is only for a deliberately different intermediate state or range.
 Edits require an explicit output choice. return summary gives compact status without file contents; return diff with context_lines selects a net unified diff; return read selects final text using start_line/end_line. A diff is never automatic. Read actions and return output share 200 lines/16 KiB with exact continuation cursors.
-Recover with context: {"path":"src/main.go","actions":[{"op":"replace","old_text":"oldName","new_text":"newName","mode":"all"}],"return":{"type":"diff","context_lines":3},"on_error":{"return":{"type":"read","start_line":10,"end_line":50}}}.
-If any action or final preview fails, no edits commit. Error recovery is read-only and reports the original snapshot and failure. Reuse content from instructions, prior reads, edit previews and diagnostics. A known exact replacement can be tried directly; its match check and on_error preview provide correction context if necessary. Only read first when missing content affects the edit. A preplanned chain cannot make new model decisions from an intermediate read.`
+Replace known text: {"path":"src/main.go","actions":[{"op":"replace","old_text":"oldName","new_text":"newName","mode":"all"}],"return":{"type":"diff","context_lines":3}}.
+The first failure stops all further execution. No later action, final output, diagnostic read/list or retry runs, and no edits commit. Only the failed operation, its cause and observed file modification time (when available) are returned. Missing-text errors include a bounded excerpt of the target text. Reuse content from instructions, prior reads and edit previews. A known exact replacement can be tried directly. Only read first when missing content affects the edit. A preplanned chain cannot make new model decisions from an intermediate read.`
 }
 
 func (Read) SearchDocument() string {
@@ -41,7 +41,7 @@ func (Replace) SearchDocument() string {
 	return `Use this tool to edit a file by replacing exact literal text, including source code and configuration values.
 Call {"path":"main.go","old_text":"oldName","new_text":"newName","mode":"all"} to replace every non-overlapping occurrence.
 Choose first or last for a single occurrence. Optional line bounds restrict the edit to a selected block.
-Success reports the replacement count and mode with a bounded unified diff. A missing match leaves the file unchanged and explains how to read it again, copy exact text without display line numbers, and correct stale bounds.`
+Success reports the replacement count and mode with a bounded unified diff. A missing match leaves the file unchanged and identifies the missing text and selected range.`
 }
 
 func (processOutputTool *ProcessOutput) SearchDocument() string {

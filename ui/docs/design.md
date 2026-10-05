@@ -84,7 +84,9 @@ The UI shows model text with Markdown markup. The DOMPurify library removes dang
 
 The `transcript.ts` atom uses `ToolCallID` and `ToolCalls[].ID` to connect messages in the same session. The UI keeps the model message sequence. The UI shows a tool result in a different section if the tool call is not in the history. The tool component prepares input and output when the user opens the section.
 
-Tool sections, reasoning sections, and model text use the UI background. The sections have a line between them. A different color identifies a tool section. The tool section contains input and output. Content views in the sections do not have a card container.
+Tool sections, reasoning sections, and model text use the UI background. The sections have a line between them. A different color identifies a tool section. When a tool section opens, one panel contains input and output. The panel has a background color and border. Input and output have a line between them.
+
+Content views in the panel do not have a card container.
 
 See `messages.md` for the libraries, content limits, and source buttons.
 

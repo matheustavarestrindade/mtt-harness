@@ -104,6 +104,5 @@ func (readTool Read) Run(operationContext context.Context, call atom.ToolCall) (
 }
 
 func fileReadFailure(call atom.ToolCall, path string, cause error) (atom.ToolResult, error) {
-	operationError := fmt.Errorf("read %q failed: %w", path, cause)
-	return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
+	return failedFileOperation(call, path, "read", cause, nil)
 }

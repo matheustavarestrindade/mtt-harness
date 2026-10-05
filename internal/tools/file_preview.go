@@ -43,7 +43,7 @@ func (preview fileTextPreview) render(endLine *int) string {
 		continuation += fmt.Sprintf(`,"end_line":%d`, *endLine)
 	}
 	continuation += "}"
-	return preview.content + "\n\n[File text preview truncated at 200 lines or 16 KiB, including display labels. Continue with read on the same path using " + continuation + ". This notice is not file content.]"
+	return preview.content + "\n\n[File text preview truncated at 200 lines or 16 KiB, including display labels. Next file position: " + continuation + ". This notice is not file content.]"
 }
 
 // readFileTextPreview buffers only the output allowance and a small reader
@@ -155,7 +155,7 @@ func readPreviewLine(operationContext context.Context, reader *bufio.Reader, sta
 			fragment = fragment[int(skipped):]
 		}
 		if len(output) == 0 && len(fragment) > 0 && startByte > 0 && !utf8.RuneStart(fragment[0]) {
-			return nil, false, fmt.Errorf("start_byte %d splits a UTF-8 character; use the exact offset from the previous truncation notice", startByte)
+			return nil, false, fmt.Errorf("start_byte %d splits a UTF-8 character", startByte)
 		}
 		available := maximumBytes - len(output)
 		if len(fragment) > available {
@@ -165,7 +165,7 @@ func readPreviewLine(operationContext context.Context, reader *bufio.Reader, sta
 		output = append(output, fragment...)
 		if !errors.Is(readError, bufio.ErrBufferFull) {
 			if startByte > 0 && startByte >= lineBytes {
-				return nil, false, fmt.Errorf("start_byte %d is outside this line's %d bytes; use the continuation cursor or start_byte 0", startByte, lineBytes)
+				return nil, false, fmt.Errorf("start_byte %d is outside this line's %d bytes", startByte, lineBytes)
 			}
 			return output, false, nil
 		}

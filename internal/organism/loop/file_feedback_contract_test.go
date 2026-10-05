@@ -19,7 +19,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/tools"
 )
 
-func TestFileEditFeedbackAndRecoveryReachProviderRequests(test *testing.T) {
+func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 	type wireRequest struct {
 		Messages []struct {
 			Role       string `json:"role"`
@@ -38,7 +38,7 @@ func TestFileEditFeedbackAndRecoveryReachProviderRequests(test *testing.T) {
 	calls := []atom.ToolCall{
 		{ID: "retired", Name: "read", Input: []byte(`{"path":"file.txt"}`)},
 		{ID: "create", Name: "file_actions", Input: []byte(`{"path":"file.txt","actions":[{"op":"write","content":"one\ntwo\n"}],"return":{"type":"summary"}}`)},
-		{ID: "failed", Name: "file_actions", Input: []byte(`{"path":"file.txt","actions":[{"op":"append","content":"UNCOMMITTED\n"},{"op":"replace","old_text":"absent","new_text":"three"}],"return":{"type":"summary"},"on_error":{"return":{"type":"read"}}}`)},
+		{ID: "failed", Name: "file_actions", Input: []byte(`{"path":"file.txt","actions":[{"op":"append","content":"UNCOMMITTED\n"},{"op":"replace","old_text":"absent","new_text":"three"},{"op":"read","start_line":999}],"return":{"type":"read","start_line":999}}`)},
 		{ID: "recover", Name: "file_actions", Input: []byte(`{"path":"file.txt","actions":[{"op":"replace","old_text":"two","new_text":"three"}],"return":{"type":"diff","context_lines":0}}`)},
 		{ID: "preview", Name: "file_actions", Input: []byte(`{"path":"file.txt","actions":[{"op":"write","content":"one\nthree\n"}],"return":{"type":"read","start_line":2,"end_line":2}}`)},
 		{ID: "large", Name: "file_actions", Input: largeInput},
@@ -105,9 +105,9 @@ func TestFileEditFeedbackAndRecoveryReachProviderRequests(test *testing.T) {
 		}
 	}
 	for identifier, fragments := range map[string][]string{
-		"retired":  {"read is retired", "file_actions", "actions array"},
+		"retired":  {`tool "read" is not registered`},
 		"create":   {"Created", "Lines: 0 -> 2"},
-		"failed":   {"action 2 (replace)", "old_text was not found", "This call committed no file changes", "Recovery read", "one\ntwo\n"},
+		"failed":   {"Cannot replace text in", "action 2", `text "absent" was not found`, "Last modified:"},
 		"recover":  {"Updated", "replace: 1 match(es)", "-two\n+three\n"},
 		"preview":  {"Unchanged", "Return read (final file):\nthree\n"},
 		"large":    {"Shared file_actions preview budget reached", `"start_line":201`},
@@ -121,6 +121,11 @@ func TestFileEditFeedbackAndRecoveryReachProviderRequests(test *testing.T) {
 	}
 	if feedback["continue"] != strings.Repeat("row\n", 50) || strings.Contains(feedback["preview"], "@@") || strings.Count(feedback["large"], "row\n") != 200 || strings.Contains(feedback["failed"], "UNCOMMITTED") || strings.Contains(feedback["create"], "+one") {
 		test.Fatal("provider received duplicate/full-file output instead of the selected preview and continuation")
+	}
+	for _, unexpected := range []string{"Recovery", "Correct", "Use ", "Read/list", "999", "one\ntwo\n"} {
+		if strings.Contains(feedback["failed"], unexpected) {
+			test.Fatalf("provider received more than the failed operation: %s", feedback["failed"])
+		}
 	}
 	var actionSchema struct {
 		Properties map[string]json.RawMessage `json:"properties"`
@@ -143,7 +148,7 @@ func TestFileEditFeedbackAndRecoveryReachProviderRequests(test *testing.T) {
 			test.Fatalf("return.%s has no model-facing instructions", name)
 		}
 	}
-	if !strings.Contains(definitions["file_actions"], "Never returns a diff by default") || actionSchema.Properties["on_error"] == nil || actionSchema.Properties["actions"] == nil {
+	if !strings.Contains(definitions["file_actions"], "Never returns a diff by default") || actionSchema.Properties["on_error"] != nil || actionSchema.Properties["actions"] == nil {
 		test.Fatalf("provider definition lost file-action instructions: %s", schemas["file_actions"])
 	}
 	instance, found := testStack.instances.Get(session.InstanceID)

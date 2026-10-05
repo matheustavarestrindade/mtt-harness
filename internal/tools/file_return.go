@@ -76,7 +76,7 @@ func (options fileReturnOptions) renderFileText(operationContext context.Context
 	selection := fileTextSelection{lineRange: options.lineRange}
 	preview, operationError := readFileTextPreview(operationContext, bytes.NewReader(updated), selection, true)
 	if operationError != nil {
-		return "", fmt.Errorf("return preview for the updated file: %w; correct the return range or choose return.type file or diff", operationError)
+		return "", fmt.Errorf("return preview for the updated file: %w", operationError)
 	}
 	if preview.firstLine == 0 {
 		return "Updated file is empty (0 lines).", nil

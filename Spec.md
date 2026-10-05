@@ -844,11 +844,11 @@ The tool removes the same outer text from the diff input but keeps lines of cont
 
 The tool makes the unified diff from the previous content and replacement content of the same file edit. It does not read the file again after the file edit. Thus, the result does not show a different file edit.
 
-Use `on_error.return` to select an error diagnostic for the same path. The type of error diagnostic must be `read` or `list`. It cannot change file content or run the actions again.
+The initial error stops the tool call. The tool does not start the next action, prepare the output from `return`, or read the file again. Temporary content and previews are discarded. The file does not change. The tool does not accept `on_error`.
 
-After a file edit error, the preview uses previous file content. Temporary content and previews are discarded. The tool status stays `error`, with the action number and cause.
+The tool status stays `error`. The result gives the operation, action number, path, and cause. It can also give the file modification time from data available before the error. The result gives a preview of `old_text` if a text match is not available. The maximum preview for a long value is 160 bytes.
 
-An error diagnostic cannot replace the initial error. Cancellation and incorrect input do not start error diagnostic I/O. The tool call does not change the file. Use the error diagnostic to correct the next action. Do not use the same incorrect input again.
+Tool results give data, not steps for a different action. Error output does not cause a new file operation. The model selects the next action. The file text, command output, and MCP data do not change.
 
 The tool input can be:
 
@@ -856,7 +856,7 @@ The tool input can be:
 {"path":"src","actions":[{"op":"list","limit":100}]}
 {"path":"src/main.go","actions":[{"op":"read","start_line":10,"end_line":40}]}
 {"path":"notes.txt","actions":[{"op":"write","content":"hello\n"},{"op":"append","content":"world\n"}],"return":{"type":"read"}}
-{"path":"src/main.go","actions":[{"op":"replace","old_text":"oldName","new_text":"newName","mode":"all"}],"return":{"type":"diff","context_lines":3},"on_error":{"return":{"type":"read","start_line":10,"end_line":50}}}
+{"path":"src/main.go","actions":[{"op":"replace","old_text":"oldName","new_text":"newName","mode":"all"}],"return":{"type":"diff","context_lines":3}}
 ```
 
 ### 10.5 Read Output A/B Test
@@ -865,7 +865,7 @@ The process environment variable `MTT_READ_LINE_NUMBERS` selects the file text f
 
 The control output gives file text without line-number labels. The test output has the file line number before the text. For example, a range from line 10 starts with `10: `. The line prefix is output data, not file content. A model must not put the line prefix into a file edit. The tool description gives the active output format to the model.
 
-The A/B test does not change the line range in the tool input or the file content. The byte limit includes the line-number labels. The output can stop at a different byte because of the labels. The tool gives a truncation notice if the selected text is too large. The format applies to actions, `return`, and error diagnostics.
+The A/B test does not change the line range in the tool input or the file content. The byte limit includes the line-number labels. The output can stop at a different byte because of the labels. The tool gives a truncation notice if the selected text is too large. The format applies to actions and `return`.
 
 The model, task, and files must be the same for the control and the test. A new process start is necessary to change the output format.
 
@@ -1305,7 +1305,8 @@ mtt-harness/
       file_actions.go          # the file_actions tool and atomic action chain
       file_actions_input.go    # action and output validation
       file_actions_schema.go   # the model-facing input contract
-      file_actions_inspect.go  # read-only actions and error diagnostics
+      file_actions_inspect.go  # read-only file and directory actions
+      file_failure.go          # factual errors and observed file metadata
       file_actions_output.go   # the shared output budget
       file_directory.go       # bounded directory pages
       file_mutations.go       # line writes and literal text replacement

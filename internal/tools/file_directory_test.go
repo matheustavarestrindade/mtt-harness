@@ -73,13 +73,13 @@ func TestFileActionsListPagesUseSortedNamesAndDoNotFollowLinks(test *testing.T) 
 	}
 }
 
-func TestFileActionsCanDiagnoseADirectoryTarget(test *testing.T) {
+func TestFileActionsDirectoryFailureDoesNotReturnAListing(test *testing.T) {
 	workspace := test.TempDir()
 	testutil.RequireNoError(test, os.WriteFile(filepath.Join(workspace, "existing.txt"), nil, 0o600))
 	result, operationError := NewFileActions(false).Run(harness.WithWorkspace(context.Background(), workspace), fileCall(test, map[string]any{
-		"path": ".", "actions": []any{map[string]any{"op": "write", "content": "wrong target"}}, "return": map[string]any{"type": "summary"}, "on_error": map[string]any{"return": map[string]any{"type": "list"}},
+		"path": ".", "actions": []any{map[string]any{"op": "write", "content": "wrong target"}}, "return": map[string]any{"type": "summary"},
 	}))
-	if operationError == nil || !strings.Contains(result.Error, "regular file") || !strings.Contains(result.Text(), "existing.txt") {
-		test.Fatalf("directory recovery missing: %+v", result)
+	if operationError == nil || !strings.Contains(result.Error, "regular file") || strings.Contains(result.Text(), "existing.txt") || len(result.Content) != 0 {
+		test.Fatalf("directory failure returned other data: %+v", result)
 	}
 }

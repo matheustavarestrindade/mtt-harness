@@ -61,24 +61,24 @@ func TestFileEditFeedbackDescribesCommittedContent(test *testing.T) {
 	}
 }
 
-func TestFileEditFailuresExplainRecoveryWithoutChangingTheFile(test *testing.T) {
+func TestFileEditFailuresReportFactsWithoutChangingTheFile(test *testing.T) {
 	for _, scenario := range []struct {
 		name      string
 		tool      harness.Tool
 		input     string
 		fragments []string
 	}{
-		{"no match", Replace{}, `{"path":"file.txt","old_text":"missing","new_text":"new"}`, []string{"old_text was not found", "3 lines", "Use read", "case, whitespace, and LF/CRLF", "Do not retry"}},
-		{"stale range", Write{}, `{"path":"file.txt","content":"new","end_line":8}`, []string{"end_line 8 exceeds", "3 lines", "read", "fresh read"}},
-		{"invalid range", Replace{}, `{"path":"file.txt","old_text":"one","new_text":"new","start_line":0}`, []string{"start_line must be at least 1", "read", "1-based"}},
-		{"missing content", Write{}, `{"path":"file.txt"}`, []string{"content are required", "content string"}},
-		{"empty old text", Replace{}, `{"path":"file.txt","old_text":"","new_text":"new"}`, []string{"old_text must not be empty", "read", "exact text"}},
-		{"missing new text", Replace{}, `{"path":"file.txt","old_text":"one"}`, []string{"new_text is required", "empty string to delete"}},
-		{"invalid mode", Replace{}, `{"path":"file.txt","old_text":"one","new_text":"new","mode":"random"}`, []string{"mode must be first, last, or all", "omit mode"}},
-		{"missing file", Replace{}, `{"path":"absent.txt","old_text":"one","new_text":"new"}`, []string{"no such file", "existing file"}},
-		{"missing directory", Write{}, `{"path":"absent/file.txt","content":"new"}`, []string{"no such file", "parent directory"}},
-		{"directory", Write{}, `{"path":".","content":"new"}`, []string{"regular file", "read"}},
-		{"malformed JSON", Write{}, `{"path":"file.txt","content":`, []string{"unexpected end", "valid JSON"}},
+		{"no match", Replace{}, `{"path":"file.txt","old_text":"missing","new_text":"new"}`, []string{`text "missing" was not found`, "3 lines"}},
+		{"stale range", Write{}, `{"path":"file.txt","content":"new","end_line":8}`, []string{"end_line 8 exceeds", "3 lines"}},
+		{"invalid range", Replace{}, `{"path":"file.txt","old_text":"one","new_text":"new","start_line":0}`, []string{"start_line must be at least 1"}},
+		{"missing content", Write{}, `{"path":"file.txt"}`, []string{"content are required"}},
+		{"empty old text", Replace{}, `{"path":"file.txt","old_text":"","new_text":"new"}`, []string{"old_text must not be empty"}},
+		{"missing new text", Replace{}, `{"path":"file.txt","old_text":"one"}`, []string{"new_text is required"}},
+		{"invalid mode", Replace{}, `{"path":"file.txt","old_text":"one","new_text":"new","mode":"random"}`, []string{"mode must be first, last, or all"}},
+		{"missing file", Replace{}, `{"path":"absent.txt","old_text":"one","new_text":"new"}`, []string{"file does not exist"}},
+		{"missing directory", Write{}, `{"path":"absent/file.txt","content":"new"}`, []string{"file does not exist"}},
+		{"directory", Write{}, `{"path":".","content":"new"}`, []string{"regular file"}},
+		{"malformed JSON", Write{}, `{"path":"file.txt","content":`, []string{"unexpected end"}},
 	} {
 		test.Run(scenario.name, func(test *testing.T) {
 			workspace := test.TempDir()
@@ -89,7 +89,7 @@ func TestFileEditFailuresExplainRecoveryWithoutChangingTheFile(test *testing.T) 
 			if operationError == nil || result.Status != atom.StatusError || result.CallID != "failed-edit" || result.Error != operationError.Error() {
 				test.Fatalf("failure lost its envelope or cause: %+v, %v", result, operationError)
 			}
-			for _, expected := range append(scenario.fragments, "This call did not change the file") {
+			for _, expected := range scenario.fragments {
 				if !strings.Contains(result.Text(), expected) {
 					test.Fatalf("failure lacks %q: %s", expected, result.Text())
 				}
@@ -108,12 +108,12 @@ func TestFileEditFailurePreservesCancellationAndPermissionCauses(test *testing.T
 	operationContext, cancelOperation := context.WithCancel(harness.WithWorkspace(context.Background(), workspace))
 	cancelOperation()
 	result, operationError := (Write{}).Run(operationContext, fileCall(test, map[string]any{"path": "new.txt", "content": "new"}))
-	if !errors.Is(operationError, context.Canceled) || !strings.Contains(result.Error, "cancelled") || result.Status != atom.StatusError {
+	if !errors.Is(operationError, context.Canceled) || !strings.Contains(result.Error, "canceled") || result.Status != atom.StatusError {
 		test.Fatalf("cancellation lost its cause or feedback: %+v, %v", result, operationError)
 	}
-	result, operationError = fileEditFailure(atom.ToolCall{ID: "permission"}, "write", "file.txt", &os.PathError{Op: "open", Path: "file.txt", Err: os.ErrPermission}, "")
-	if !errors.Is(operationError, os.ErrPermission) || !strings.Contains(result.Error, "permission error") || !strings.Contains(result.Error, "read") {
-		test.Fatalf("permission error lost its cause or recovery: %+v, %v", result, operationError)
+	result, operationError = fileEditFailure(atom.ToolCall{ID: "permission"}, "write", "file.txt", &os.PathError{Op: "open", Path: "file.txt", Err: os.ErrPermission})
+	if !errors.Is(operationError, os.ErrPermission) || result.Error != `Cannot write "file.txt": permission denied` {
+		test.Fatalf("permission error lost its cause or repeated wrappers: %+v, %v", result, operationError)
 	}
 }
 

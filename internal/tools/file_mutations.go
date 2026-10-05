@@ -33,7 +33,7 @@ func replaceFileText(original []byte, oldText, newText, mode string, selection l
 	oldBytes, newBytes := []byte(oldText), []byte(newText)
 	count := bytes.Count(selected, oldBytes)
 	if count == 0 {
-		return nil, 0, fmt.Errorf("old_text was not found in the selected range; the file currently has %d lines", countFileLines(original))
+		return nil, 0, &fileTextNotFoundError{text: oldText, lineCount: countFileLines(original)}
 	}
 	var replacement []byte
 	if mode == "last" {

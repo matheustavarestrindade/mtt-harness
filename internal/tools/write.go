@@ -62,31 +62,31 @@ func (Write) Run(operationContext context.Context, call atom.ToolCall) (atom.Too
 		lineRange
 	}
 	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
-		return fileEditFailure(call, "write", input.Path, operationError, "Send valid JSON with path and content strings, and optional integer line bounds.")
+		return fileEditFailure(call, "write", input.Path, operationError)
 	}
 	if input.Path == "" || input.Content == nil {
-		return fileEditFailure(call, "write", input.Path, fmt.Errorf("path and content are required"), "Supply a non-empty path and a content string. Use an empty content string only to create an empty file or delete content.")
+		return fileEditFailure(call, "write", input.Path, fmt.Errorf("path and content are required"))
 	}
 	returnOptions, operationError := parseFileReturnOptions(input.Return)
 	if operationError != nil {
-		return fileEditFailure(call, "write", input.Path, operationError, "Correct return settings, or omit return for the default diff. Use return.type lines for updated-file ranges and surrounding for a context size.")
+		return fileEditFailure(call, "write", input.Path, operationError)
 	}
 	if operationError := operationContext.Err(); operationError != nil {
-		return fileEditFailure(call, "write", input.Path, operationError, "Use read before another edit.")
+		return fileEditFailure(call, "write", input.Path, operationError)
 	}
 	if _, _, operationError := input.lineRange.resolveLineBounds(); operationError != nil {
-		return fileEditFailure(call, "write", input.Path, operationError, "Use read to inspect the current file. Retry with 1-based inclusive line bounds within the file.")
+		return fileEditFailure(call, "write", input.Path, operationError)
 	}
 	path, operationError := harness.WorkspacePath(operationContext, input.Path)
 	if operationError != nil {
-		return fileEditFailure(call, "write", input.Path, operationError, "Verify the file path and instance workspace before retrying.")
+		return fileEditFailure(call, "write", input.Path, operationError)
 	}
 	summary, operationError := applyAtomicFileEdit(operationContext, path, !input.hasBounds(), func(original []byte) (fileChange, error) {
 		updated, description, operationError := writeFileContent(original, *input.Content, input.lineRange)
 		return fileChange{content: updated, summary: description, returnOptions: returnOptions}, operationError
 	})
 	if operationError != nil {
-		return fileEditFailure(call, "write", input.Path, operationError, "Verify the path and use read to inspect the current file. Update the content or line bounds from that fresh read before retrying.")
+		return fileEditFailure(call, "write", input.Path, operationError)
 	}
 	return atom.ToolResult{
 		CallID:  call.ID,

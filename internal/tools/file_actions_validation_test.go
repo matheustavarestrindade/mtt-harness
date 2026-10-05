@@ -14,7 +14,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/testutil"
 )
 
-func TestFileActionsRejectIncompatibleFieldsAndUnsafeRecovery(test *testing.T) {
+func TestFileActionsRejectIncompatibleFields(test *testing.T) {
 	for _, encoded := range []string{
 		`{"path":"file.txt","actions":[]}`,
 		`{"path":"file.txt","actions":[{"op":"read","content":"ignored"}]}`,

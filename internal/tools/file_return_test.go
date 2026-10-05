@@ -94,7 +94,7 @@ func TestInvalidWriteReturnNeverChangesTheFile(test *testing.T) {
 			path := filepath.Join(workspace, "source.txt")
 			testutil.RequireNoError(test, os.WriteFile(path, []byte("original\nsecond\n"), 0o600))
 			result, operationError := (Write{}).Run(harness.WithWorkspace(context.Background(), workspace), fileCall(test, map[string]any{"path": "source.txt", "content": "new", "return": json.RawMessage(options)}))
-			if operationError == nil || result.Status != atom.StatusError || !strings.Contains(result.Text(), "did not change the file") {
+			if operationError == nil || result.Status != atom.StatusError || len(result.Content) != 0 || result.Text() != result.Error {
 				test.Fatalf("bad preview did not fail safely: %v, %s", operationError, result.Text())
 			}
 			actual, operationError := os.ReadFile(path)

@@ -2,6 +2,40 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "file modification time",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the observed filesystem timestamp for the last change to a file's content",
+      "source": "file action failure data"
+    },
+    {
+      "term": "panel",
+      "category": "technical_noun",
+      "approved_forms": [
+        "panels"
+      ],
+      "meaning": "a UI region containing related content or controls",
+      "source": "expanded tool output display"
+    },
+    {
+      "term": "background color",
+      "category": "technical_noun",
+      "approved_forms": [
+        "background colors"
+      ],
+      "meaning": "the color of a UI surface behind its content",
+      "source": "expanded tool output display"
+    },
+    {
+      "term": "border",
+      "category": "technical_noun",
+      "approved_forms": [
+        "borders"
+      ],
+      "meaning": "a visible line at the edge of a UI region",
+      "source": "expanded tool output display"
+    },
+    {
       "term": "English text",
       "category": "technical_noun",
       "approved_forms": [],

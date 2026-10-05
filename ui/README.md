@@ -119,7 +119,7 @@ A value of 0 prevents new child agents or processes. An empty field removes the 
 
 The usage section shows model calls, input tokens, output tokens, reasoning tokens, cache data, and cost data. Select the harness, workspace, or session scope. Session usage data includes child agents. Select the button with the label `Refresh usage` to get new usage data.
 
-The API gives usage data for the available history. It does not give subscription limits. The UI shows `Unavailable` when price data is not available.
+The API gives usage data for the available history. It does not give subscription limits. The UI shows `0.0` cost for a new conversation without model usage. The UI shows `Unavailable` when usage has occurred but price data is not available.
 
 Select a model name in the provider section to read token prices and reasoning efforts. The session form also shows token prices. A cost estimate has the label `Estimated cost`. A subscription model does not use API token prices.
 

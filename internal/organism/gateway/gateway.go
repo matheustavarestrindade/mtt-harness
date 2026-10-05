@@ -62,7 +62,7 @@ func (modelGateway *Gateway) Resolve(identifier string) (atom.ModelInfo, harness
 				continue
 			}
 			if selectedProvider != nil {
-				return atom.ModelInfo{}, nil, fmt.Errorf("model %q is ambiguous; use provider/model", identifier)
+				return atom.ModelInfo{}, nil, fmt.Errorf("model %q is ambiguous across providers", identifier)
 			}
 			selected, selectedProvider = model, provider
 		}
