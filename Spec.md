@@ -198,6 +198,10 @@ The template accepts the variables:
 
 Tool data comes from the registry for a model call. For example, `{bash_info}` gives the full tool definition of `bash`. The `agent` definition includes the instance model list. Tool variables do not change the session tool group. The model uses tool discovery to add tools to the group.
 
+The default template gives tool discovery and selection rules. The model must read the full tool description and input schema before a tool call. The tool definition gives the rules for the operation. The template does not give a different file action procedure.
+
+Messages to the user follow ISO 24495-1. The message must contain necessary information that the user can find and use. English text also follows ASD-STE100. The model uses the chat language that the user selects. Messages to other agents stay short.
+
 Use 2 braces before and after the variable name for literal text. For example, `{{workspace}}` gives `{workspace}`. Substitution occurs one time. JSON braces do not change. If a tool in a variable is not in the registry, the turn gives an error before the model call.
 
 See `docs/start-prompt.md` for variable rules and Docker configuration.

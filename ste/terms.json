@@ -2,6 +2,38 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "English text",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "text in English to which the startup prompt applies ASD-STE100 wording rules",
+      "source": "startup prompt communication guidance"
+    },
+    {
+      "term": "chat language",
+      "category": "technical_noun",
+      "approved_forms": [
+        "chat languages"
+      ],
+      "meaning": "the natural language selected by the user for conversation replies",
+      "source": "startup prompt communication guidance"
+    },
+    {
+      "term": "ISO 24495-1",
+      "category": "technical_noun",
+      "approved_forms": [
+        "ISO 24495-1:2023"
+      ],
+      "meaning": "the plain-language standard for reader-focused content, organization, wording, and usability",
+      "source": "startup prompt communication guidance"
+    },
+    {
+      "term": "ASD-STE100",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the Simplified Technical English specification used for English technical wording",
+      "source": "startup prompt communication guidance"
+    },
+    {
       "term": "session tree",
       "category": "technical_noun",
       "approved_forms": [

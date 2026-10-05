@@ -13,6 +13,8 @@
 
 Product documents (`Spec.md`, and later the files in `docs/`) use ASD-STE100 Simplified Technical English.
 
+The default model prompt applies ISO 24495-1 plain-language principles to user-facing communication, together with ASD-STE100 for English. Replies must be relevant, findable, understandable, and usable for the user's task. Match the user's language, preserve technical identifiers, and keep compact agent notes distinct from user-facing replies.
+
 Check a product document with:
 
 ```sh
@@ -54,6 +56,7 @@ Rules:
 
 - Treat tool descriptions and JSON Schemas as instructions the model must be able to use without reading implementation code. Describe every input property's purpose, units, defaults, valid choices, and special values such as zero or an empty string where applicable.
 - State material behavior: path resolution, file replacement, output/retention limits, harness IDs versus OS PIDs, blocking/background behavior, and what cancellation actually stops.
+- The startup prompt describes current discovery and tool-priority policy. Keep tool-specific operation/parameter instructions in the complete registry-provided description and schema, not a second hand-maintained walkthrough. Do not include retired-tool migration notes in a new session's startup prompt. Consult loaded definitions; discover missing definitions before use.
 - Preserve descriptions and defaults when adding dynamic schema metadata such as the agent model list. Verify the definition sent in provider requests, not only the static tool declaration.
 - Built-in `bash.timeout` and `bash.interval` are milliseconds. A missing or zero timeout means no automatic process timeout; `wait` defaults to true. Foreground calls set notification mode `none` before process start and return output only as tool results. `notify` applies to `wait:false`, defaults to exit, accepts none/exit/error/interval, and interval notifications need a positive interval.
 - MCP descriptions and schemas belong to their servers. Preserve that metadata; do not invent units or defaults for unknown external parameters.
@@ -77,7 +80,7 @@ Rules:
 - File read/write/replace actions use optional 1-based inclusive `start_line` / `end_line`; omitted start means 1 and omitted end means EOF. Reads clamp oversized ends; edits reject out-of-file bounds. A trailing LF adds no phantom line and an empty file has zero lines. Range writes preserve the selected closing LF/CRLF when non-empty replacement lacks LF; empty content deletes the range. Whole-file writes create/replace verbatim. Append/prepend require a file (or an earlier whole-file write) and never add implicit newlines.
 - Replace uses literal case-sensitive old_text/new_text and mode first|last|all (default first). Matches cannot cross range bounds. All mode processes non-overlapping original matches without searching inserted content again. A missing match fails the whole chain.
 - All preview data in one call shares 200 lines/16 KiB including display labels, plus bounded status/continuation notices. File reads stream bounded fragments even when skipping long lines or byte offsets. Long-line continuation uses start_line/start_byte (zero-based file bytes within that line). Preserve UTF-8 and progress. Directory lists include direct/hidden entries sorted by case-sensitive name, types and sizes without following symlinks; limit defaults to 100, maximum 200, and the opaque cursor resumes by name. Keep listing memory bounded to a page, not all directory entries.
-- Diff comparison caps remain 256 KiB/4000 combined lines after trimming equal outer content; non-text data receives an omission notice. Limits never truncate edits. Validate/prepare output from the exact snapshots before rename; reporting must not reread or turn a committed edit into an error. The startup prompt teaches explicit output selection and discourages redundant follow-up reads. See docs/file-actions.md.
+- Diff comparison caps remain 256 KiB/4000 combined lines after trimming equal outer content; non-text data receives an omission notice. Limits never truncate edits. Validate/prepare output from the exact snapshots before rename; reporting must not reread or turn a committed edit into an error. The tool definition explains explicit output selection; the startup prompt directs the model to that definition and discourages redundant reads. See docs/file-actions.md.
 - Control variant: unset `MTT_READ_LINE_NUMBERS` or set it to `false` / `0`. Treatment: set it to `true` / `1`, which returns `N: text` with absolute file line numbers. Labels are not file content. The flag is not a model input; changing it requires restarting the harness.
 - Put `MTT_READ_LINE_NUMBERS=true` in `.env` for treatment, or `MTT_READ_LINE_NUMBERS=false` for control, then run `docker compose up --build`. For a new checkout, copy `.env.example` to `.env`. Compose loads the file automatically and forwards the flag; an exported shell value takes precedence. Keep model, prompts, files, and other settings identical between benchmark variants.
 
