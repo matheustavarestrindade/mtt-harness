@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowUp, Square, CornerDownLeft, LoaderCircle } from 'lucide-svelte';
+  import { ArrowUp, Square, CornerDownLeft, LoaderCircle, Settings } from 'lucide-svelte';
   import { Button } from '$lib/atoms/ui/button';
   import { Textarea } from '$lib/atoms/ui/textarea';
   let {
@@ -10,6 +10,8 @@
     cancelling = false,
     onSend,
     onCancel,
+    onSettings,
+    settingsOpen = false,
   }: {
     value?: string;
     disabled?: boolean;
@@ -18,21 +20,30 @@
     cancelling?: boolean;
     onSend: () => void;
     onCancel: () => void;
+    onSettings?: () => void;
+    settingsOpen?: boolean;
   } = $props();
   function handleComposerKeydown(event: KeyboardEvent) {
-    // Enter keeps a newline on mobile keyboards. Desktop users have an explicit
-    // modifier shortcut that does not interfere with IME composition.
-    if (
-      event.key === 'Enter' &&
-      (event.metaKey || event.ctrlKey) &&
-      !event.isComposing &&
-      !disabled &&
-      !sending &&
-      value.trim()
-    ) {
+    // IME confirmation is text input, not a request to send the draft.
+    if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
+    if (event.metaKey || event.ctrlKey) {
+      // Command+Enter does not insert a newline consistently across browsers.
       event.preventDefault();
-      onSend();
+      if (disabled) return;
+      const textarea = event.currentTarget as HTMLTextAreaElement;
+      textarea.setRangeText('\n', textarea.selectionStart, textarea.selectionEnd, 'end');
+      textarea.dispatchEvent(
+        new InputEvent('input', {
+          bubbles: true,
+          inputType: 'insertLineBreak',
+          data: '\n',
+        }),
+      );
+      return;
     }
+    if (event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (!event.repeat && !disabled && !sending && value.trim()) onSend();
   }
 </script>
 
@@ -46,6 +57,7 @@
   <label for="message-input" class="sr-only">Message</label>
   <Textarea
     id="message-input"
+    enterkeyhint="send"
     bind:value
     class="min-h-24 max-h-52 resize-none border-0 bg-transparent p-4 text-base shadow-none focus-visible:ring-0 dark:bg-transparent sm:text-sm"
     placeholder={disabled
@@ -57,16 +69,29 @@
     onkeydown={handleComposerKeydown}
   />
   <div class="flex min-h-14 items-center justify-between gap-2 px-3 pb-3">
-    <span class="pl-1 text-[10px] text-muted-foreground"
+    <span class="min-w-0 flex-1 pl-1 text-[10px] text-muted-foreground"
       >{#if running}<span class="flex items-center gap-1.5"
-          ><span class="size-1.5 rounded-full bg-primary"></span>New messages join the queue</span
+          ><span class="size-1.5 shrink-0 rounded-full bg-primary"></span><span class="truncate"
+            >New messages join the queue</span
+          ></span
         >{:else}<span class="flex items-center gap-1.5"
           ><CornerDownLeft class="size-3" /><span class="hidden sm:inline"
-            >Ctrl / ⌘ + Enter to send</span
-          ><span class="sm:hidden">Enter for a new line</span></span
+            >Enter to send · Shift / ⌘ + Enter for a new line</span
+          ><span class="sm:hidden">Enter to send</span></span
         >{/if}</span
     >
-    <div class="flex items-center gap-2">
+    <div class="flex shrink-0 items-center gap-2">
+      {#if onSettings}<Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          class="icon-button text-muted-foreground hover:text-foreground"
+          aria-label="Session settings"
+          title="Session settings"
+          aria-haspopup="dialog"
+          aria-expanded={settingsOpen}
+          onclick={onSettings}><Settings class="size-4" /></Button
+        >{/if}
       {#if running}<Button
           class="h-11 gap-2"
           variant="outline"

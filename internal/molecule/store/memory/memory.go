@@ -11,6 +11,7 @@ type Store struct {
 	mutex            sync.RWMutex
 	instances        map[string]atom.InstanceSpec
 	sessions         map[atom.SessionID]atom.Session
+	deletedSessions  map[atom.SessionID]bool
 	messages         map[atom.SessionID][]atom.Message
 	events           []atom.Event
 	sequenceNumber   uint64
@@ -30,6 +31,7 @@ func New() *Store {
 	return &Store{
 		instances:        map[string]atom.InstanceSpec{},
 		sessions:         map[atom.SessionID]atom.Session{},
+		deletedSessions:  map[atom.SessionID]bool{},
 		messages:         map[atom.SessionID][]atom.Message{},
 		processes:        map[string]atom.ProcessRecord{},
 		permissions:      map[string]atom.PermissionDecision{},

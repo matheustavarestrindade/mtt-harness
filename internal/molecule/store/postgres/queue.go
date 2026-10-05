@@ -24,6 +24,15 @@ func (queue *queueStore) Enqueue(operationContext context.Context, message atom.
 	if _, operationError := transaction.Exec(operationContext, `SELECT pg_advisory_xact_lock(672790428)`); operationError != nil {
 		return operationError
 	}
+	var deleted bool
+	if operationError := transaction.QueryRow(operationContext, `WITH session_guard AS MATERIALIZED (
+		SELECT deleted FROM sessions WHERE id=$1 FOR SHARE
+	) SELECT EXISTS(SELECT 1 FROM session_guard WHERE deleted)`, string(message.SessionID)).Scan(&deleted); operationError != nil {
+		return operationError
+	}
+	if deleted {
+		return store.ErrSessionDeleted
+	}
 	var count, total int
 	if operationError := transaction.QueryRow(operationContext, `SELECT COUNT(*) FILTER (WHERE session_id=$1 AND NOT running), COUNT(*) FROM message_queue`, string(message.SessionID)).Scan(&count, &total); operationError != nil {
 		return operationError

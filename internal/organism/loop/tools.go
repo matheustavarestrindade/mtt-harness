@@ -61,6 +61,11 @@ func (agentLoop *Loop) runValidatedToolCall(operationContext context.Context, se
 	}
 	tool, found := agentLoop.configuration.Registry.Get(call.Name)
 	if !found {
+		if call.Name == "read" || call.Name == "write" || call.Name == "replace" {
+			if _, unified := agentLoop.configuration.Registry.Get("file_actions"); unified {
+				return failedToolResult(call, fmt.Errorf("%s is retired; use file_actions with path and an actions array containing op %q. Its current schema is loaded; edits require an explicit return choice", call.Name, call.Name))
+			}
+		}
 		return failedToolResult(call, errors.New("loop: the tool is not in the registry"))
 	}
 	if operationError := schema.Validate(tool.InputSchema().JSON, call.Input); operationError != nil {
@@ -126,10 +131,16 @@ func (agentLoop *Loop) sessionToolDefinitions(operationContext context.Context, 
 	for _, toolSpec := range specifications {
 		names[toolSpec.Name] = true
 	}
-	if !names["search_tool"] {
-		if tool, found := agentLoop.configuration.Registry.Get("search_tool"); found {
+	// Basic file access and discovery start with full current definitions. Old
+	// session groups above are resolved from the registry, so retired names drop
+	// out naturally while stored historical calls/results remain untouched.
+	for _, name := range []string{"search_tool", "file_actions"} {
+		if names[name] {
+			continue
+		}
+		if tool, found := agentLoop.configuration.Registry.Get(name); found {
 			specifications = append(specifications, describeTool(tool))
-			names["search_tool"] = true
+			names[name] = true
 		}
 	}
 	if session.Depth > 0 && !names["finish"] {

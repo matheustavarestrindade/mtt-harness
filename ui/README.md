@@ -67,7 +67,7 @@ docker compose down
 
 Open the Docker URL on a phone with Tailscale access to the host. For the local server, open `http://HOST_LAN_IP:5174`. Keep `/api` as the API URL in the browser.
 
-The navigation drawer contains the workspaces and sessions. The message composer stays at the bottom of the screen. The `Enter` key makes a new line. The keys `Ctrl+Enter` and `Command+Enter` send a message.
+The navigation drawer contains the workspaces and sessions. The message composer stays at the bottom of the screen. The `Enter` key sends a message. The keys `Shift+Enter`, `Command+Enter`, and `Ctrl+Enter` make a new line. Text composition does not send a message.
 
 ## A Conversation
 
@@ -121,21 +121,37 @@ The usage section shows model calls, input tokens, output tokens, reasoning toke
 
 The API gives usage data for the available history. It does not give subscription limits. The UI shows `Unavailable` when price data is not available.
 
+Select a model name in the provider section to read token prices and reasoning efforts. The session form also shows token prices. A cost estimate has the label `Estimated cost`. A subscription model does not use API token prices.
+
+## Reasoning
+
+The session form has a control with the label `Thinking`. In the message composer, use the button with the label `Session settings` to open the dialog. The dialog has fields with the labels `Model` and `Thinking`. The available reasoning efforts come from the selected model.
+
+To use the model default, select the value with the label `Default`. The database keeps the selection. A change applies to the next model request. The dialog shows the result of a change.
+
+The model control changes the model during the conversation. The same dialog shows a message before a change to a model with a smaller context limit. When the context is too large, the harness removes the initial turn from the request. The database keeps the conversation history. The UI keeps the message draft. Select the button with the label `Switch and compact` to continue.
+
+Model messages can have a section with the label `Thinking`. The section is closed by default. Select the button with the label `Thinking` to read the reasoning text or reasoning summary. The provider supplies the text. The UI can show the text during the model response and after it is in history.
+
 ## Message Display
 
 Model messages use Markdown for headings, lists, hyperlinks, tables, and code blocks. Code blocks have syntax highlighting. The buttons with the labels `Copy code` and `Download source` use the full source text. The UI does not run message code. HTML in message text stays as text.
 
-A code block with the format `csv` or `tsv` has a table preview. Use the button with the label `Source` to read the full source text. The tool with the name `read` gives a preview for a CSV file. Data cells can contain CSV delimiters and line breaks.
+A code block with the format `csv` or `tsv` has a table preview. Use the button with the label `Source` to read the full source text. A file text result from `file_actions` can have a CSV preview. Previous tool results keep the preview. Data cells can contain CSV delimiters and line breaks.
 
-One card contains a tool call and the related tool result. Open the card to read the input and output. The card shows a new tool result when the API gives the data. The UI shows a tool result in a different card if the tool call is not in the history.
+One section contains a tool call and the related tool result. Open the section to read the input and output. The section shows a new tool result when the API gives the data. The UI shows a tool result in a different section if the tool call is not in the history.
 
 Large previews have limits. The source download keeps the full source. The copy button also keeps the full source. See `docs/messages.md` for the limits and libraries.
 
 ## Functions
 
+Use the button with the label `Delete session` to remove a conversation. The button is adjacent to the session in the navigation. The dialog gives the session ID. Select the button with the label `Delete session` in the dialog to continue. The operation removes the conversation and the child sessions from the server.
+
+Stop active work and remove messages from the queue before session deletion. Stop the processes of the session. Workspace files and usage statistics stay available. The UI keeps the message draft for a different session. The dialog shows an error from session deletion.
+
 The UI can make workspaces and sessions. The user can select an instance or session from the navigation. The UI can start a stopped workspace. It can send text, stop a turn, remove a message from the queue, and accept or deny a permission request.
 
-The UI shows message history, tool input, tool results, events, token usage, and cost data. It reads status and history at an interval of 1.5 seconds. A WebSocket event can also cause a new request. The UI shows model messages after the harness puts them in history.
+The UI shows message history, tool input, tool results, events, token usage, and cost data. It reads status and history at an interval of 1.5 seconds. A WebSocket event can also cause a new request. The UI shows model text during the response. Message IDs connect event text to the history.
 
 The UI does not have a file editor, media upload, process terminal, or revert control. See `docs/design.md` for the UI boundary and plans.
 

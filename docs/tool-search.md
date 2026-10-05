@@ -32,6 +32,8 @@ The result identifies tools:
 
 The loop gets tool definitions from the registry for the next model request. It gives full descriptions and schemas there.
 
+The initial request includes the full definitions of `search_tool` and `file_actions`. File reads, directory data, and file edits use `file_actions`. The model selects the actions and output format. The registry does not have the previous file tools.
+
 A full name selects a tool directly. A category without query text gives tools in name sequence. Vectors are not necessary for a full name or category. The default result limit is 10. The maximum is 50.
 
 ## Configuration

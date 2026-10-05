@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
 type processes struct{ store *Store }
@@ -16,15 +17,19 @@ func (processStore *processes) Save(operationContext context.Context, record ato
 		data, _ := json.Marshal(record.Exit)
 		exit = data
 	}
-	_, operationError := processStore.store.pool.Exec(operationContext, `
+	result, operationError := processStore.store.pool.Exec(operationContext, `
+		WITH session_guard AS MATERIALIZED (SELECT deleted FROM sessions WHERE id=$3 FOR SHARE)
 		INSERT INTO processes (id, instance_id, session_id, spec, pid, status, exit, started_at, ended_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9 WHERE NOT EXISTS (SELECT 1 FROM session_guard WHERE deleted)
 		ON CONFLICT (id) DO UPDATE SET
 			pid = EXCLUDED.pid,
 			status = EXCLUDED.status,
 			exit = EXCLUDED.exit,
 			ended_at = EXCLUDED.ended_at`,
 		record.ID, record.InstanceID, string(record.SessionID), specification, record.PID, record.Status, exit, record.StartedAt, record.EndedAt)
+	if operationError == nil && result.RowsAffected() == 0 {
+		return store.ErrSessionDeleted
+	}
 	return operationError
 }
 

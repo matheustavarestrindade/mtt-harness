@@ -15,6 +15,7 @@ export interface Session {
   Parent: string;
   Depth: number;
   Model: string;
+  ReasoningEffort?: string;
   CreatedAt: string;
   Completed: boolean;
 }
@@ -38,6 +39,7 @@ export interface Message {
   Seq: number;
   Role: 'system' | 'user' | 'assistant' | 'tool' | 'runtime';
   Content: Content[] | null;
+  Reasoning?: string;
   ToolCalls: ToolCall[] | null;
   ToolCallID: string;
   Usage: Usage | null;
@@ -46,6 +48,7 @@ export interface Message {
 export interface Cost {
   Currency: string;
   Value: number;
+  Estimated?: boolean;
 }
 export interface Usage {
   Input: number;
@@ -61,6 +64,10 @@ export interface Statistics extends Usage {
   CacheHitRate: number;
   CacheHitPercentage: number;
 }
+export interface SessionDeletion {
+  status: 'deleted';
+  session_ids: string[];
+}
 export interface Model {
   ID: string;
   Name?: string;
@@ -70,13 +77,33 @@ export interface Model {
   Tools: boolean;
   ToolSupportUnknown?: boolean;
   ContextMax: number;
+  Reasoning?: boolean;
+  ReasoningEfforts?: string[];
+  DefaultReasoningEffort?: string;
+  ReasoningSummary?: string;
+  Billing?: 'tokens' | 'subscription' | '';
   Prices: {
     Currency: string;
     Input: number;
     Output: number;
     CacheRead: number;
     CacheWrite: number;
+    CacheReadUnknown?: boolean;
+    CacheWriteUnknown?: boolean;
+    Reasoning?: number;
+    Source?: string;
+    Tiers?: PriceTier[];
   } | null;
+}
+export interface PriceTier {
+  AboveInputTokens: number;
+  Input: number;
+  Output: number;
+  CacheRead: number;
+  CacheWrite: number;
+  CacheReadUnknown?: boolean;
+  CacheWriteUnknown?: boolean;
+  Reasoning?: number;
 }
 export interface Provider {
   Protocol?: string;
@@ -89,6 +116,10 @@ export interface Provider {
   ModelListFormat?: 'openai' | 'codex';
   PriceTableURL: string;
   Interval: number;
+  MetadataURL?: string;
+  MetadataFormat?: string;
+  MetadataProvider?: string;
+  Billing?: 'tokens' | 'subscription' | '';
 }
 
 export interface DeviceLogin {

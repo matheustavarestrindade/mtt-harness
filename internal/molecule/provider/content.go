@@ -9,7 +9,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
 
-func encodeMessages(messages []atom.Message) ([]map[string]any, error) {
+func encodeMessages(messages []atom.Message, providerName string) ([]map[string]any, error) {
 	var result []map[string]any
 	var attachments []atom.Content
 	flushAttachments := func() error {
@@ -40,6 +40,9 @@ func encodeMessages(messages []atom.Message) ([]map[string]any, error) {
 		switch message.Role {
 		case atom.RoleTool, atom.RoleAssistant:
 			item["content"] = concatenateContentText(message.Content)
+			if message.Role == atom.RoleAssistant && message.ProviderState != nil && message.ProviderState.Provider == providerName && message.ProviderState.ChatReasoning != "" {
+				item["reasoning_content"] = message.ProviderState.ChatReasoning
+			}
 			if message.Role == atom.RoleTool {
 				item["tool_call_id"] = message.ToolCallID
 			}

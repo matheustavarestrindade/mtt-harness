@@ -7,16 +7,21 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
 type permissions struct{ store *Store }
 
 func (permissionStore *permissions) Save(operationContext context.Context, decision atom.PermissionDecision) error {
-	_, operationError := permissionStore.store.pool.Exec(operationContext, `
+	result, operationError := permissionStore.store.pool.Exec(operationContext, `
+		WITH session_guard AS MATERIALIZED (SELECT deleted FROM sessions WHERE id=$6 FOR SHARE)
 		INSERT INTO permissions (request_id, kind, scope, created_at, instance_id, session_id, target)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		SELECT $1, $2, $3, $4, $5, $6, $7 WHERE NOT EXISTS (SELECT 1 FROM session_guard WHERE deleted)
 		ON CONFLICT (request_id) DO UPDATE SET kind = EXCLUDED.kind, scope = EXCLUDED.scope`,
 		decision.RequestID, string(decision.Kind), string(decision.Scope), decision.CreatedAt, decision.InstanceID, string(decision.SessionID), decision.Target)
+	if operationError == nil && result.RowsAffected() == 0 {
+		return store.ErrSessionDeleted
+	}
 	return operationError
 }
 

@@ -12,7 +12,7 @@ func attachTools(toolRegistry *registry.Registry, processManager *processes.Mana
 	lineNumbers, operationError := readLineNumbersExperiment()
 	requireStartupSuccess(operationError, "configure read line-number experiment")
 	for _, tool := range []harness.Tool{
-		tools.NewBash(processManager), tools.NewRead(lineNumbers), tools.Write{}, tools.Replace{}, tools.NewSearch(toolRegistry),
+		tools.NewBash(processManager), tools.NewFileActions(lineNumbers), tools.NewSearch(toolRegistry),
 		tools.NewProcessOutput(processManager), tools.NewProcessKill(processManager),
 		tools.Finish{}, &tools.Agent{RunTask: agentLoop.RunAgentTask},
 	} {

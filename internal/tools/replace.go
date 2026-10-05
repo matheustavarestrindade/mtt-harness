@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -76,36 +75,8 @@ func (Replace) Run(operationContext context.Context, call atom.ToolCall) (atom.T
 		return fileEditFailure(call, "replace", input.Path, operationError, "Verify the file path and instance workspace before retrying.")
 	}
 	summary, operationError := applyAtomicFileEdit(operationContext, path, false, func(original []byte) (fileChange, error) {
-		start, end, operationError := input.resolveByteRange(original)
-		if operationError != nil {
-			return fileChange{}, operationError
-		}
-		selected := original[start:end]
-		oldText, newText := []byte(input.OldText), []byte(*input.NewText)
-		count := bytes.Count(selected, oldText)
-		if count == 0 {
-			return fileChange{}, fmt.Errorf("old_text was not found in the selected range; the file currently has %d lines", countFileLines(original))
-		}
-		var replacement []byte
-		if mode == "last" {
-			index := bytes.LastIndex(selected, oldText)
-			replacement = append(replacement, selected[:index]...)
-			replacement = append(replacement, newText...)
-			replacement = append(replacement, selected[index+len(oldText):]...)
-			count = 1
-		} else {
-			limit := -1
-			if mode == "first" {
-				limit = 1
-				count = 1
-			}
-			replacement = bytes.Replace(selected, oldText, newText, limit)
-		}
-		updated := make([]byte, 0, start+len(replacement)+len(original)-end)
-		updated = append(updated, original[:start]...)
-		updated = append(updated, replacement...)
-		updated = append(updated, original[end:]...)
-		return fileChange{content: updated, summary: fmt.Sprintf("Replaced %d match(es) using mode %q.", count, mode)}, nil
+		updated, count, operationError := replaceFileText(original, input.OldText, *input.NewText, mode, input.lineRange)
+		return fileChange{content: updated, summary: fmt.Sprintf("Replaced %d match(es) using mode %q.", count, mode)}, operationError
 	})
 	if operationError != nil {
 		return fileEditFailure(call, "replace", input.Path, operationError, "Use read to inspect the current file and range. Copy old_text exactly, including case, whitespace, and LF/CRLF; exclude display line-number prefixes. Update stale line bounds. Do not retry the same unmatched text unchanged.")

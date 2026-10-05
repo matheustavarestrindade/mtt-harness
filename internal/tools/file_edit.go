@@ -11,8 +11,9 @@ import (
 )
 
 type fileChange struct {
-	content []byte
-	summary string
+	content       []byte
+	summary       string
+	returnOptions fileReturnOptions
 }
 
 type fileEditGate struct {
@@ -86,13 +87,20 @@ func applyAtomicFileEdit(operationContext context.Context, path string, allowCre
 	if operationError != nil {
 		return "", operationError
 	}
+	// Prepare the bounded return value before commit. Invalid post-write ranges
+	// cannot produce a failed call after changing the file, and no later writer
+	// can replace the bytes used by this response.
+	feedback, operationError := describeFileEdit(operationContext, path, original, change, information != nil)
+	if operationError != nil {
+		return "", operationError
+	}
 	if operationError := operationContext.Err(); operationError != nil {
 		return "", operationError
 	}
 	if operationError := replaceFileContentsAtomically(operationContext, path, information, change.content); operationError != nil {
 		return "", operationError
 	}
-	return describeFileEdit(path, original, change.content, information != nil, change.summary), nil
+	return feedback, nil
 }
 
 func replaceFileContentsAtomically(operationContext context.Context, path string, information os.FileInfo, content []byte) error {

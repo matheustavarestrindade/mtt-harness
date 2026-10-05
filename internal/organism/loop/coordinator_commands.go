@@ -17,6 +17,8 @@ const (
 	stopSession
 	resumeSession
 	closeSession
+	prepareSessionDeletion
+	releaseSessionDeletion
 )
 
 // A command gets exactly one reply. The single-slot reply channel lets a

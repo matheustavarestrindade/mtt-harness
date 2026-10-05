@@ -41,8 +41,10 @@ type sseChunk struct {
 	} `json:"error"`
 	Choices []struct {
 		Delta struct {
-			Content string `json:"content"`
-			Audio   *struct {
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+			Reasoning        string `json:"reasoning"`
+			Audio            *struct {
 				ID         string `json:"id"`
 				Data       string `json:"data"`
 				Transcript string `json:"transcript"`
@@ -83,7 +85,7 @@ type toolAccumulator struct {
 	emitted    bool
 }
 
-func parseChatCompletionEvents(operationContext context.Context, body io.ReadCloser, stream *httpStream) {
+func parseChatCompletionEvents(operationContext context.Context, body io.ReadCloser, stream *httpStream, providerName string) {
 	defer body.Close()
 	defer close(stream.parts)
 	scanner := bufio.NewScanner(body)
@@ -91,6 +93,7 @@ func parseChatCompletionEvents(operationContext context.Context, body io.ReadClo
 	accumulators := map[int]*toolAccumulator{}
 	complete := false
 	audioID := ""
+	var reasoningText strings.Builder
 	send := func(part atom.ResponsePart) bool {
 		select {
 		case stream.parts <- part:
@@ -122,6 +125,16 @@ func parseChatCompletionEvents(operationContext context.Context, body io.ReadClo
 		for _, choice := range chunk.Choices {
 			if choice.FinishReason != nil {
 				complete = true
+			}
+			reasoning := choice.Delta.ReasoningContent
+			if reasoning == "" {
+				reasoning = choice.Delta.Reasoning
+			}
+			if reasoning != "" {
+				reasoningText.WriteString(reasoning)
+				if !send(atom.ResponsePart{Reasoning: reasoning}) {
+					return
+				}
 			}
 			if choice.Delta.Content != "" {
 				if !send(atom.ResponsePart{Text: choice.Delta.Content}) {
@@ -191,7 +204,7 @@ func parseChatCompletionEvents(operationContext context.Context, body io.ReadClo
 				Output:     chunk.Usage.CompletionTokens,
 				Reasoning:  chunk.Usage.CompletionTokensDetails.ReasoningTokens,
 			}
-			if usage.Input < 0 || usage.Output < 0 || usage.CacheRead < 0 || usage.CacheWrite < 0 {
+			if usage.Input < 0 || usage.Output < 0 || usage.CacheRead < 0 || usage.CacheWrite < 0 || usage.Reasoning < 0 || usage.Reasoning > usage.Output {
 				stream.operationError = fmt.Errorf("invalid negative token usage")
 				return
 			}
@@ -213,5 +226,8 @@ func parseChatCompletionEvents(operationContext context.Context, body io.ReadClo
 			stream.operationError = fmt.Errorf("incomplete tool call %q", accumulator.name)
 			return
 		}
+	}
+	if reasoningText.Len() > 0 {
+		send(atom.ResponsePart{ProviderState: &atom.ProviderState{Provider: providerName, ChatReasoning: reasoningText.String()}})
 	}
 }

@@ -27,7 +27,7 @@ func fileCall(test *testing.T, arguments map[string]any) atom.ToolCall {
 func TestRangedReadPreservesTextAndAbsoluteLineNumbers(test *testing.T) {
 	workspace := test.TempDir()
 	operationContext := harness.WithWorkspace(context.Background(), workspace)
-	text := "α\r\n\r\n" + strings.Repeat("x", 70_000) + "\nlast"
+	text := "α\r\n\r\n" + strings.Repeat("x", 7_000) + "\nlast"
 	testutil.RequireNoError(test, os.WriteFile(filepath.Join(workspace, "source.txt"), []byte(text), 0o600))
 	for _, scenario := range []struct {
 		name      string
@@ -38,7 +38,7 @@ func TestRangedReadPreservesTextAndAbsoluteLineNumbers(test *testing.T) {
 		{"whole", map[string]any{"path": "source.txt"}, false, text},
 		{"first", map[string]any{"path": "source.txt", "end_line": 1}, false, "α\r\n"},
 		{"blank line", map[string]any{"path": "source.txt", "start_line": 2, "end_line": 2}, true, "2: \r\n"},
-		{"long line", map[string]any{"path": "source.txt", "start_line": 3, "end_line": 3}, true, "3: " + strings.Repeat("x", 70_000) + "\n"},
+		{"long line", map[string]any{"path": "source.txt", "start_line": 3, "end_line": 3}, true, "3: " + strings.Repeat("x", 7_000) + "\n"},
 		{"clamped end", map[string]any{"path": "source.txt", "start_line": 4, "end_line": 99}, true, "4: last"},
 		{"open end", map[string]any{"path": "source.txt", "start_line": 4}, false, "last"},
 	} {

@@ -31,9 +31,15 @@
       >{statistics ? `${statistics.CacheHitPercentage.toFixed(1)}%` : '—'}</span
     ></span
   >
-  <span class="flex items-center gap-1.5"
+  <span
+    class="flex items-center gap-1.5"
+    title={statistics?.Cost?.Estimated || statistics?.Costs?.some((cost) => cost.Estimated)
+      ? 'Estimated cost from catalog prices'
+      : 'Recorded cost'}
     ><Coins class="size-3" /><span class="font-mono text-foreground/80"
-      >{costLabel(statistics)}</span
+      >{statistics?.Cost?.Estimated || statistics?.Costs?.some((cost) => cost.Estimated)
+        ? '≈ '
+        : ''}{costLabel(statistics)}</span
     ></span
   >
 </div>

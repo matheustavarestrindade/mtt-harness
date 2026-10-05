@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
@@ -17,25 +19,36 @@ type Config struct {
 }
 
 type fileEntry struct {
-	Name            string               `json:"name"`
-	Protocol        string               `json:"protocol"`
-	Authentication  string               `json:"authentication"`
-	APIURL          string               `json:"api_url"`
-	ModelListURL    string               `json:"model_list_url"`
-	ModelListFormat string               `json:"model_list_format"`
-	PriceTableURL   string               `json:"price_table_url"`
-	RefreshHours    int                  `json:"refresh_hours"`
-	Prices          map[string]filePrice `json:"prices"`
-	Models          []ModelConfiguration `json:"models"`
-	ModelDefaults   ModelMetadata        `json:"model_defaults"`
+	Name             string               `json:"name"`
+	Protocol         string               `json:"protocol"`
+	Authentication   string               `json:"authentication"`
+	APIURL           string               `json:"api_url"`
+	ModelListURL     string               `json:"model_list_url"`
+	ModelListFormat  string               `json:"model_list_format"`
+	PriceTableURL    string               `json:"price_table_url"`
+	RefreshHours     int                  `json:"refresh_hours"`
+	Prices           map[string]filePrice `json:"prices"`
+	Models           []ModelConfiguration `json:"models"`
+	ModelDefaults    ModelMetadata        `json:"model_defaults"`
+	MetadataURL      string               `json:"metadata_url"`
+	MetadataFormat   string               `json:"metadata_format"`
+	MetadataProvider string               `json:"metadata_provider"`
+	Billing          string               `json:"billing"`
 }
 
 type filePrice struct {
-	Currency   string  `json:"currency"`
-	Input      float64 `json:"input"`
-	Output     float64 `json:"output"`
-	CacheRead  float64 `json:"cache_read"`
-	CacheWrite float64 `json:"cache_write"`
+	Currency   string          `json:"currency"`
+	Input      float64         `json:"input"`
+	Output     float64         `json:"output"`
+	CacheRead  float64         `json:"cache_read"`
+	CacheWrite float64         `json:"cache_write"`
+	Reasoning  *float64        `json:"reasoning"`
+	Tiers      []filePriceTier `json:"tiers"`
+}
+
+type filePriceTier struct {
+	AboveInputTokens int `json:"input_tokens_above"`
+	catalogRates
 }
 
 type fileConfig struct {
@@ -72,12 +85,22 @@ func LoadFile(path string) ([]Config, error) {
 			if currency == "" {
 				currency = "USD"
 			}
-			prices[modelID] = atom.Prices{Currency: currency, Input: price.Input, Output: price.Output, CacheRead: price.CacheRead, CacheWrite: price.CacheWrite}
+			value := atom.Prices{Currency: currency, Input: price.Input, Output: price.Output, CacheRead: price.CacheRead, CacheWrite: price.CacheWrite, Reasoning: price.Reasoning, Source: path}
+			for _, tier := range price.Tiers {
+				value.Tiers = append(value.Tiers, atom.PriceTier{AboveInputTokens: tier.AboveInputTokens,
+					Input: catalogRateOr(tier.Input, value.Input), Output: catalogRateOr(tier.Output, value.Output),
+					CacheRead: catalogRateOr(tier.CacheRead, value.CacheRead), CacheWrite: catalogRateOr(tier.CacheWrite, value.CacheWrite), Reasoning: tier.Reasoning})
+			}
+			if operationError := validatePrices(value); operationError != nil {
+				return nil, fmt.Errorf("provider %s model %s: %w", entry.Name, modelID, operationError)
+			}
+			prices[modelID] = value
 		}
 		configurations = append(configurations, Config{
 			Spec: atom.ProviderSpec{Name: entry.Name, Protocol: entry.Protocol, Authentication: entry.Authentication,
 				APIURL: entry.APIURL, ModelListURL: entry.ModelListURL, ModelListFormat: entry.ModelListFormat,
-				PriceTableURL: entry.PriceTableURL, Interval: time.Duration(entry.RefreshHours) * time.Hour},
+				PriceTableURL: entry.PriceTableURL, Interval: time.Duration(entry.RefreshHours) * time.Hour,
+				MetadataURL: entry.MetadataURL, MetadataFormat: entry.MetadataFormat, MetadataProvider: entry.MetadataProvider, Billing: entry.Billing},
 			Prices: prices, Models: entry.Models, ModelDefaults: entry.ModelDefaults,
 		})
 	}
@@ -110,6 +133,17 @@ func validateProviderEntry(entry fileEntry) error {
 	if entry.RefreshHours < 0 {
 		return fmt.Errorf("provider refresh interval cannot be negative")
 	}
+	if entry.MetadataURL != "" && (entry.MetadataFormat != "models_dev" || entry.MetadataProvider == "") {
+		return fmt.Errorf("provider %s: metadata_url requires metadata_format models_dev and metadata_provider", entry.Name)
+	}
+	if entry.MetadataURL == "" && (entry.MetadataFormat != "" || entry.MetadataProvider != "") {
+		return fmt.Errorf("provider %s: metadata_url is required with metadata settings", entry.Name)
+	}
+	switch entry.Billing {
+	case "", "tokens", "subscription":
+	default:
+		return fmt.Errorf("provider %s: billing must be tokens or subscription", entry.Name)
+	}
 	if operationError := validateModelMetadata(entry.ModelDefaults); operationError != nil {
 		return operationError
 	}
@@ -132,6 +166,23 @@ func validateModelMetadata(metadata ModelMetadata) error {
 	}
 	if metadata.Level != nil && *metadata.Level < 0 {
 		return fmt.Errorf("model level cannot be negative")
+	}
+	seenEfforts := map[string]bool{}
+	for _, effort := range metadata.ReasoningEfforts {
+		if strings.TrimSpace(effort) == "" || effort != strings.TrimSpace(effort) || seenEfforts[effort] {
+			return fmt.Errorf("reasoning_efforts must contain unique non-empty values")
+		}
+		seenEfforts[effort] = true
+	}
+	if metadata.DefaultReasoningEffort != nil && *metadata.DefaultReasoningEffort != "" && metadata.ReasoningEfforts != nil && !slices.Contains(metadata.ReasoningEfforts, *metadata.DefaultReasoningEffort) {
+		return fmt.Errorf("default_reasoning_effort must be one of reasoning_efforts")
+	}
+	if metadata.ReasoningSummary != nil {
+		switch *metadata.ReasoningSummary {
+		case "", "auto", "concise", "detailed":
+		default:
+			return fmt.Errorf("reasoning_summary must be empty, auto, concise, or detailed")
+		}
 	}
 	for _, mediaType := range append(append([]atom.MediaType{}, metadata.Input...), metadata.Output...) {
 		switch mediaType {

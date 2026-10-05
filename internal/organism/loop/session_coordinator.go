@@ -16,25 +16,27 @@ const (
 	sessionStopped
 	sessionFailed
 	sessionClosing
+	sessionDeleting
 )
 
 // run exclusively owns the mutable state below. I/O workers receive value
 // copies and report completion; they never mutate the coordinator's fields.
 type sessionCoordinator struct {
-	loop        *Loop
-	session     atom.Session
-	commands    chan sessionCommand
-	completed   chan operationCompletion
-	runFinished chan runCompletion
-	done        chan struct{}
-	mode        sessionMode
-	pending     []atom.Message
-	mutations   []sessionCommand
-	working     *sessionOperation
-	active      *runningTurn
-	revert      *sessionCommand
-	waiters     []sessionCommand
-	lastError   string
+	loop           *Loop
+	session        atom.Session
+	commands       chan sessionCommand
+	completed      chan operationCompletion
+	runFinished    chan runCompletion
+	done           chan struct{}
+	mode           sessionMode
+	beforeDeletion sessionMode
+	pending        []atom.Message
+	mutations      []sessionCommand
+	working        *sessionOperation
+	active         *runningTurn
+	revert         *sessionCommand
+	waiters        []sessionCommand
+	lastError      string
 }
 
 func newSessionCoordinator(agentLoop *Loop, session atom.Session, pending []atom.Message, stopped bool) *sessionCoordinator {
@@ -69,6 +71,8 @@ func (coordinator *sessionCoordinator) handleSessionCommand(command sessionComma
 		return
 	}
 	switch command.kind {
+	case prepareSessionDeletion, releaseSessionDeletion:
+		coordinator.handleDeletion(command)
 	case readStatus:
 		identifiers := make([]string, 0, len(coordinator.pending))
 		for _, message := range coordinator.pending {
@@ -93,7 +97,7 @@ func (coordinator *sessionCoordinator) handleSessionCommand(command sessionComma
 			command.respond(sessionReply{operationError: ErrQueueClosed})
 			return
 		}
-		if coordinator.mode == sessionReverting || len(coordinator.waiters) > 0 {
+		if coordinator.mode == sessionReverting || coordinator.mode == sessionDeleting || len(coordinator.waiters) > 0 {
 			command.respond(sessionReply{operationError: ErrSessionBusy})
 			return
 		}
@@ -109,7 +113,7 @@ func (coordinator *sessionCoordinator) handleMutation(command sessionCommand) {
 		command.respond(sessionReply{operationError: ErrQueueClosed})
 		return
 	}
-	if coordinator.mode == sessionReverting || coordinator.mode == sessionFailed {
+	if coordinator.mode == sessionReverting || coordinator.mode == sessionFailed || coordinator.mode == sessionDeleting {
 		command.respond(sessionReply{operationError: ErrSessionBusy})
 		return
 	}
@@ -148,7 +152,7 @@ func (coordinator *sessionCoordinator) handleRevert(command sessionCommand) {
 		command.respond(sessionReply{operationError: ErrQueueClosed})
 		return
 	}
-	if coordinator.mode == sessionReverting || coordinator.mode == sessionStopped {
+	if coordinator.mode == sessionReverting || coordinator.mode == sessionStopped || coordinator.mode == sessionDeleting {
 		command.respond(sessionReply{operationError: ErrSessionBusy})
 		return
 	}

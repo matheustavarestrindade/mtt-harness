@@ -152,7 +152,7 @@ func TestStartupPromptReachesProviderWireFormats(test *testing.T) {
 			standardProvider.SetModels([]atom.ModelInfo{{ID: "wire-model", Tools: true}})
 			testStack.harnessRuntime.Provider(standardProvider)
 			session := testStack.instance(test, 2)
-			session.Model = "wire/wire-model"
+			testStack.selectModel(test, &session, "wire/wire-model")
 			testStack.user(test, session, "hello")
 			testutil.RequireNoError(test, testStack.loop.Run(context.Background(), session))
 			payload := <-payloads

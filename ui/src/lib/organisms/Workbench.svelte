@@ -18,10 +18,13 @@
   import SettingsDialog from '$lib/organisms/SettingsDialog.svelte';
   import WorkspaceDialog from '$lib/molecules/WorkspaceDialog.svelte';
   import SessionDialog from '$lib/molecules/SessionDialog.svelte';
+  import DeleteSessionDialog from '$lib/molecules/DeleteSessionDialog.svelte';
   import ActivityDialog from '$lib/molecules/ActivityDialog.svelte';
   import Conversation from '$lib/organisms/Conversation.svelte';
   import Composer from '$lib/molecules/Composer.svelte';
   import UsageBar from '$lib/molecules/UsageBar.svelte';
+  import SessionSettingsDialog from '$lib/molecules/SessionSettingsDialog.svelte';
+  import { findSessionModel, reasoningEffortLabel } from '$lib/atoms/reasoning';
   import { HarnessConsole } from '$lib/organisms/console.svelte';
   import { ApiError } from '$lib/molecules/api/client';
   import { loadConnection, type ConnectionPreferences } from '$lib/molecules/connection-storage';
@@ -36,12 +39,30 @@
   let workspaceOpen = $state(false);
   let workspaceError = $state('');
   let sessionOpen = $state(false);
+  let deleteSessionOpen = $state(false);
+  let deleteTarget = $state<Session | null>(null);
+  let deletionError = $state('');
+  let deletingSession = $state(false);
+  let sessionSettingsOpen = $state(false);
+  let settingsSessionID = $state('');
+  let sessionSettingsError = $state('');
+  let sessionSettingsNotice = $state('');
+  let pendingModel = $state<{
+    sessionID: string;
+    model: string;
+    currentContext: number;
+    targetContext: number;
+  } | null>(null);
   let activityOpen = $state(false);
   let menuOpen = $state(false);
   let busy = $state('');
   let sending = $state(false);
   let drafts = $state<Record<string, string>>({});
   const sessionID = $derived(workbench.session?.ID ?? '');
+  const sessionModel = $derived(findSessionModel(workbench.models, workbench.session?.Model ?? ''));
+  const sessionModelLabel = $derived(
+    `${workbench.session?.Model ?? ''} (${reasoningEffortLabel(workbench.session?.ReasoningEffort || sessionModel?.DefaultReasoningEffort || '')})`,
+  );
   const disabled = $derived(
     workbench.connection !== 'connected' ||
       !workbench.session ||
@@ -65,6 +86,19 @@
   $effect(() => {
     if (workspaceOpen) workspaceError = '';
   });
+  $effect(() => {
+    if (sessionSettingsOpen && settingsSessionID !== sessionID) {
+      sessionSettingsOpen = false;
+      pendingModel = null;
+    }
+  });
+  $effect(() => {
+    if (!sessionSettingsOpen) {
+      pendingModel = null;
+      sessionSettingsError = '';
+      sessionSettingsNotice = '';
+    }
+  });
 
   async function runWorkbenchAction(name: string, operation: () => Promise<void>) {
     busy = name;
@@ -77,6 +111,13 @@
     } finally {
       if (busy === name) busy = '';
     }
+  }
+  function openSessionSettings() {
+    settingsSessionID = sessionID;
+    pendingModel = null;
+    sessionSettingsError = '';
+    sessionSettingsNotice = '';
+    sessionSettingsOpen = true;
   }
   async function connect(base: string, token: string) {
     await runWorkbenchAction('connect', async () => {
@@ -111,9 +152,9 @@
       if (!workbench.session) sessionOpen = true;
     });
   }
-  async function createSession(model: string) {
+  async function createSession(model: string, effort = '') {
     await runWorkbenchAction('session', async () => {
-      await workbench.createSession(model);
+      await workbench.createSession(model, effort);
       sessionOpen = false;
       menuOpen = false;
       toast.success('Session ready');
@@ -123,9 +164,94 @@
     menuOpen = false;
     void runWorkbenchAction('select', () => workbench.selectInstance(instance));
   }
+  async function changeSessionModel(model: string, allowCompaction = false) {
+    const selectedSession = workbench.session;
+    if (!selectedSession) return;
+    sessionSettingsError = '';
+    sessionSettingsNotice = '';
+    await runWorkbenchAction('model', async () => {
+      try {
+        await workbench.setSessionModel(model, allowCompaction);
+        if (workbench.session?.ID !== selectedSession.ID) return;
+        pendingModel = null;
+        sessionSettingsNotice =
+          selectedSession.ReasoningEffort && !workbench.session.ReasoningEffort
+            ? 'Model updated. Thinking uses the model’s default.'
+            : 'Model updated.';
+      } catch (failure) {
+        if (!sessionSettingsOpen || workbench.session?.ID !== selectedSession.ID) return;
+        if (
+          failure instanceof ApiError &&
+          failure.details.code === 'context_compaction_required' &&
+          workbench.session?.ID === selectedSession.ID
+        ) {
+          pendingModel = {
+            sessionID: selectedSession.ID,
+            model: typeof failure.details.model === 'string' ? failure.details.model : model,
+            currentContext:
+              typeof failure.details.current_context_max === 'number'
+                ? failure.details.current_context_max
+                : 0,
+            targetContext:
+              typeof failure.details.target_context_max === 'number'
+                ? failure.details.target_context_max
+                : 0,
+          };
+          return;
+        }
+        showSessionSettingsError(failure);
+      }
+    });
+  }
+  function showSessionSettingsError(failure: unknown) {
+    sessionSettingsError =
+      failure instanceof Error ? failure.message : 'Cannot update this session.';
+    if (failure instanceof ApiError && failure.status === 401) {
+      sessionSettingsOpen = false;
+      openSettings('connection');
+    }
+  }
+  async function changeSessionEffort(effort: string) {
+    sessionSettingsError = '';
+    sessionSettingsNotice = '';
+    await runWorkbenchAction('reasoning', async () => {
+      try {
+        await workbench.setReasoningEffort(effort);
+        sessionSettingsNotice = 'Thinking updated.';
+      } catch (failure) {
+        showSessionSettingsError(failure);
+      }
+    });
+  }
   function selectSession(session: Session) {
     menuOpen = false;
     void runWorkbenchAction('select', () => workbench.selectSession(session));
+  }
+  function requestSessionDeletion(session: Session) {
+    menuOpen = false;
+    deletionError = '';
+    deleteTarget = session;
+    deleteSessionOpen = true;
+  }
+  async function confirmSessionDeletion() {
+    const selected = deleteTarget;
+    if (!selected || deletingSession) return;
+    deletionError = '';
+    deletingSession = true;
+    try {
+      const removed = await workbench.deleteSession(selected);
+      for (const identifier of removed) delete drafts[identifier];
+      deleteSessionOpen = false;
+      if (removed.length) toast.success('Session deleted');
+    } catch (failure) {
+      deletionError = failure instanceof Error ? failure.message : 'Cannot delete this session.';
+      if (failure instanceof ApiError && failure.status === 401) {
+        deleteSessionOpen = false;
+        openSettings('connection');
+      }
+    } finally {
+      deletingSession = false;
+    }
   }
   async function sendDraftMessage() {
     const identifier = sessionID;
@@ -174,6 +300,7 @@
     }}
     onSelectInstance={selectInstance}
     onSelectSession={selectSession}
+    onDeleteSession={requestSessionDeletion}
     onRefresh={() => void runWorkbenchAction('refresh', () => workbench.refreshInstances())}
   />
 {/snippet}
@@ -207,9 +334,9 @@
         </div>
         {#if workbench.session}<p
             class="mt-0.5 truncate font-mono text-[10px] text-muted-foreground"
-            title={workbench.session.Model}
+            title={sessionModelLabel}
           >
-            {workbench.session.Model}
+            {sessionModelLabel}
           </p>{/if}
       </div>
       <div class="flex shrink-0 items-center gap-1">
@@ -292,6 +419,8 @@
             cancelling={busy === 'cancel'}
             onSend={() => void sendDraftMessage()}
             onCancel={() => void runWorkbenchAction('cancel', () => workbench.cancelCurrentTurn())}
+            onSettings={workbench.session ? openSessionSettings : undefined}
+            settingsOpen={sessionSettingsOpen}
           />
           <div class="mt-1 flex items-center justify-between gap-2">
             <UsageBar statistics={workbench.statistics} /><span
@@ -318,6 +447,27 @@
     >{@render navigation()}</Sheet.Content
   ></Sheet.Root
 >
+<SessionSettingsDialog
+  bind:open={sessionSettingsOpen}
+  models={workbench.models}
+  model={sessionModel}
+  modelID={sessionModel?.ID ?? workbench.session?.Model ?? ''}
+  effort={workbench.session?.ReasoningEffort ?? ''}
+  busy={busy === 'model' || busy === 'reasoning'}
+  {disabled}
+  error={sessionSettingsError}
+  notice={sessionSettingsNotice}
+  {pendingModel}
+  onModelChange={(model) => void changeSessionModel(model)}
+  onEffortChange={(effort) => void changeSessionEffort(effort)}
+  onCancel={() => {
+    pendingModel = null;
+    sessionSettingsError = '';
+  }}
+  onConfirm={() => {
+    if (pendingModel?.sessionID === sessionID) void changeSessionModel(pendingModel.model, true);
+  }}
+/>
 <SettingsDialog
   bind:open={settingsOpen}
   bind:section={settingsSection}
@@ -351,6 +501,13 @@
   defaultModel={workbench.instance?.DefaultModel ?? ''}
   busy={busy === 'session'}
   onCreate={createSession}
+/>
+<DeleteSessionDialog
+  bind:open={deleteSessionOpen}
+  session={deleteTarget}
+  busy={deletingSession}
+  error={deletionError}
+  onDelete={() => void confirmSessionDeletion()}
 />
 <ActivityDialog bind:open={activityOpen} events={workbench.events} />
 <Toaster theme="dark" closeButton position="top-right" offset="80px" mobileOffset="16px" />

@@ -60,7 +60,7 @@ func TestPluginRegistrationsReachExecutionAndEvents(test *testing.T) {
 	session := testStack.instance(test, 2)
 	dynamic := provider.NewTest("dynamic", provider.Call("plugin_tool", `{}`), provider.Text("done"))
 	testStack.harnessRuntime.Provider(dynamic)
-	session.Model = "dynamic-model"
+	testStack.selectModel(test, &session, "dynamic-model")
 	var calls int64
 	var events atomic.Int32
 	testStack.harnessRuntime.Tool(&fakeTool{name: "plugin_tool", counter: &calls})
@@ -120,7 +120,7 @@ func TestCompleteToolStartsBeforeModelEOF(test *testing.T) {
 	session := testStack.instance(test, 2)
 	gated := &gatedProvider{started: make(chan struct{})}
 	testStack.harnessRuntime.Provider(gated)
-	session.Model = "gated-model"
+	testStack.selectModel(test, &session, "gated-model")
 	testutil.RequireNoError(test, testStack.registry.Add(&fakeTool{name: "early", run: func(context.Context, atom.ToolCall) (atom.ToolResult, error) {
 		close(gated.started)
 		return atom.ToolResult{Status: atom.StatusOK}, nil

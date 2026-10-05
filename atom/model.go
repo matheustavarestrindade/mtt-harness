@@ -6,16 +6,36 @@ import (
 )
 
 type Prices struct {
-	Currency   string
-	Input      float64
-	Output     float64
-	CacheRead  float64
-	CacheWrite float64
+	Currency          string
+	Input             float64
+	Output            float64
+	CacheRead         float64
+	CacheWrite        float64
+	CacheReadUnknown  bool `json:",omitempty"`
+	CacheWriteUnknown bool `json:",omitempty"`
+	// Reasoning is an optional separate rate; nil uses the output rate.
+	Reasoning *float64    `json:",omitempty"`
+	Tiers     []PriceTier `json:",omitempty"`
+	Source    string      `json:",omitempty"`
+}
+
+// PriceTier applies to the whole request when its input-token total exceeds
+// AboveInputTokens. Input includes cache reads and cache writes.
+type PriceTier struct {
+	AboveInputTokens  int
+	Input             float64
+	Output            float64
+	CacheRead         float64
+	CacheWrite        float64
+	CacheReadUnknown  bool     `json:",omitempty"`
+	CacheWriteUnknown bool     `json:",omitempty"`
+	Reasoning         *float64 `json:",omitempty"`
 }
 
 type Cost struct {
-	Currency string
-	Value    float64
+	Currency  string
+	Value     float64
+	Estimated bool `json:",omitempty"`
 }
 
 type ModelInfo struct {
@@ -28,20 +48,29 @@ type ModelInfo struct {
 	Tools  bool
 	// ToolSupportUnknown distinguishes absent catalog metadata from explicit false.
 	// Unknown support permits a tool request; the provider can reject it normally.
-	ToolSupportUnknown bool `json:",omitempty"`
-	ContextMax         int
-	Prices             *Prices
+	ToolSupportUnknown     bool `json:",omitempty"`
+	ContextMax             int
+	Prices                 *Prices
+	Reasoning              bool     `json:",omitempty"`
+	ReasoningEfforts       []string `json:",omitempty"`
+	DefaultReasoningEffort string   `json:",omitempty"`
+	ReasoningSummary       string   `json:",omitempty"`
+	Billing                string   `json:",omitempty"`
 }
 
 type ProviderSpec struct {
-	Name            string
-	Protocol        string
-	Authentication  string
-	APIURL          string
-	ModelListURL    string
-	ModelListFormat string `json:",omitempty"`
-	PriceTableURL   string
-	Interval        time.Duration
+	Name             string
+	Protocol         string
+	Authentication   string
+	APIURL           string
+	ModelListURL     string
+	ModelListFormat  string `json:",omitempty"`
+	PriceTableURL    string
+	Interval         time.Duration
+	MetadataURL      string `json:",omitempty"`
+	MetadataFormat   string `json:",omitempty"`
+	MetadataProvider string `json:",omitempty"`
+	Billing          string `json:",omitempty"`
 }
 
 type ProviderKey struct {
@@ -96,14 +125,17 @@ func (statistics Statistics) MarshalJSON() ([]byte, error) {
 }
 
 type Request struct {
-	Model    string
-	Messages []Message
-	Tools    []ToolSpec
-	Params   map[string]any
+	Model           string
+	Messages        []Message
+	Tools           []ToolSpec
+	Params          map[string]any
+	ReasoningEffort string `json:",omitempty"`
 }
 
 type ResponsePart struct {
-	Text          string
+	Text string
+	// Reasoning contains only provider-exposed text or summaries, never encrypted state.
+	Reasoning     string `json:",omitempty"`
 	Content       []Content
 	ToolIndex     *int
 	ToolCall      *ToolCall
@@ -116,4 +148,6 @@ type ResponsePart struct {
 type ProviderState struct {
 	Provider  string
 	Reasoning []json.RawMessage
+	// ChatReasoning is replayed only to the originating chat-completions provider.
+	ChatReasoning string `json:",omitempty"`
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
 type toolTask struct {
@@ -26,7 +27,10 @@ func waitForTools(tasks []*toolTask) []atom.ToolResult {
 }
 
 func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, session atom.Session, modelCall *preparedModelCall) (atom.Message, []*toolTask, error) {
-	if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelCall, map[string]any{"model": modelCall.modelID}); operationError != nil {
+	session = modelCall.session
+	operationContext = harness.WithSession(operationContext, session)
+	messageID := newID()
+	if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelCall, map[string]any{"model": modelCall.modelID, "message_id": messageID, "reasoning_effort": modelCall.request.ReasoningEffort}); operationError != nil {
 		return atom.Message{}, nil, operationError
 	}
 	responseStream, operationError := modelCall.provider.Stream(operationContext, modelCall.request)
@@ -34,6 +38,7 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 		return atom.Message{}, nil, operationError
 	}
 	var text strings.Builder
+	var reasoning strings.Builder
 	var tasks []*toolTask
 	var content []atom.Content
 	var usage *atom.Usage
@@ -48,7 +53,13 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 		}
 		if part.Text != "" {
 			text.WriteString(part.Text)
-			if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelChunk, map[string]any{"text": part.Text}); operationError != nil {
+			if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelChunk, map[string]any{"text": part.Text, "message_id": messageID}); operationError != nil {
+				return atom.Message{}, tasks, operationError
+			}
+		}
+		if part.Reasoning != "" {
+			reasoning.WriteString(part.Reasoning)
+			if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelChunk, map[string]any{"reasoning": part.Reasoning, "message_id": messageID}); operationError != nil {
 				return atom.Message{}, tasks, operationError
 			}
 		}
@@ -84,8 +95,9 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 		content = append([]atom.Content{{Type: atom.Text, Text: text.String()}}, content...)
 	}
 	message := atom.Message{
-		ID: newID(), SessionID: session.ID, Role: atom.RoleAssistant,
+		ID: messageID, SessionID: session.ID, Role: atom.RoleAssistant,
 		Content:   content,
+		Reasoning: reasoning.String(),
 		ToolCalls: calls, Usage: usage, CreatedAt: time.Now(),
 		ProviderState: providerState,
 	}

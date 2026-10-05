@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,7 +16,7 @@ func (Write) Name() string {
 }
 
 func (Write) Description() string {
-	return "Create or replace an entire file, or replace an inclusive line range in an existing file. Paths resolve from the instance workspace. Range writes keep all other bytes and preserve the block's closing LF/CRLF when non-empty content has no final newline. Parent directories must exist. Edits replace the file atomically and preserve existing permission bits; hard links are not updated." + fileEditFeedbackDescription
+	return "Create or replace an entire file, or replace an inclusive line range in an existing file. Paths resolve from the instance workspace. Range writes keep all other bytes and preserve the block's closing LF/CRLF when non-empty content has no final newline. Parent directories must exist. Edits replace the file atomically and preserve existing permission bits; hard links are not updated. Returns status, resolved path, and before/after line and byte counts. Use return to choose unified diff-only hunks, a diff with surrounding context, an updated-file line range, or the updated file; omitted means a diff with 3 context lines. File/range previews have absolute line-number labels, not file content. All previews stop at 200 lines or 16 KiB of displayed text plus status/truncation notices; file/range previews provide an exact read continuation cursor. Diff comparison regions above 256 KiB or 4000 combined lines, or non-text data, receive an omission notice. Preview limits never limit the edit. Invalid return options or ranges fail before writing; failures explain the cause and recovery."
 }
 
 func (Write) Categories() []string {
@@ -35,7 +34,7 @@ func (Write) InputSchema() atom.Schema {
 			},
 			"content": {
 				"type": "string",
-				"description": "Replacement text for the whole file or selected lines, without read's line-number prefixes. Empty text deletes the selected lines, or creates/truncates the whole file when no range is supplied. Internal newlines are written as provided."
+				"description": "Replacement text for the whole file or selected lines, without read/preview line-number prefixes or truncation notices. Empty text deletes the selected lines, or creates/truncates the whole file when no range is supplied. Internal newlines are written as provided."
 			},
 			"start_line": {
 				"type": "integer", "minimum": 1,
@@ -44,7 +43,8 @@ func (Write) InputSchema() atom.Schema {
 			"end_line": {
 				"type": "integer", "minimum": 1,
 				"description": "Last line to replace, inclusive and at least start_line. Omitted with start_line means through EOF. Unlike read, an end beyond EOF is an error. Ranges apply to the current file at execution time."
-			}
+			},
+			"return": ` + fileReturnInputSchema + `
 		},
 		"required": ["path", "content"]
 	}`)
@@ -56,8 +56,9 @@ func (Write) Check(operationContext context.Context, call atom.ToolCall) atom.Ve
 
 func (Write) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
 	var input struct {
-		Path    string  `json:"path"`
-		Content *string `json:"content"`
+		Path    string          `json:"path"`
+		Content *string         `json:"content"`
+		Return  json.RawMessage `json:"return"`
 		lineRange
 	}
 	if operationError := json.Unmarshal(call.Input, &input); operationError != nil {
@@ -65,6 +66,10 @@ func (Write) Run(operationContext context.Context, call atom.ToolCall) (atom.Too
 	}
 	if input.Path == "" || input.Content == nil {
 		return fileEditFailure(call, "write", input.Path, fmt.Errorf("path and content are required"), "Supply a non-empty path and a content string. Use an empty content string only to create an empty file or delete content.")
+	}
+	returnOptions, operationError := parseFileReturnOptions(input.Return)
+	if operationError != nil {
+		return fileEditFailure(call, "write", input.Path, operationError, "Correct return settings, or omit return for the default diff. Use return.type lines for updated-file ranges and surrounding for a context size.")
 	}
 	if operationError := operationContext.Err(); operationError != nil {
 		return fileEditFailure(call, "write", input.Path, operationError, "Use read before another edit.")
@@ -77,22 +82,8 @@ func (Write) Run(operationContext context.Context, call atom.ToolCall) (atom.Too
 		return fileEditFailure(call, "write", input.Path, operationError, "Verify the file path and instance workspace before retrying.")
 	}
 	summary, operationError := applyAtomicFileEdit(operationContext, path, !input.hasBounds(), func(original []byte) (fileChange, error) {
-		if !input.hasBounds() {
-			return fileChange{content: []byte(*input.Content), summary: "Whole-file write."}, nil
-		}
-		start, end, operationError := input.resolveByteRange(original)
-		if operationError != nil {
-			return fileChange{}, operationError
-		}
-		replacement := []byte(*input.Content)
-		if len(replacement) > 0 && !bytes.HasSuffix(replacement, []byte("\n")) {
-			replacement = append(replacement, closingLineBreak(original[start:end])...)
-		}
-		updated := make([]byte, 0, start+len(replacement)+len(original)-end)
-		updated = append(updated, original[:start]...)
-		updated = append(updated, replacement...)
-		updated = append(updated, original[end:]...)
-		return fileChange{content: updated, summary: fmt.Sprintf("Replaced lines %d-%d of the original file.", countFileLines(original[:start])+1, countFileLines(original[:end]))}, nil
+		updated, description, operationError := writeFileContent(original, *input.Content, input.lineRange)
+		return fileChange{content: updated, summary: description, returnOptions: returnOptions}, operationError
 	})
 	if operationError != nil {
 		return fileEditFailure(call, "write", input.Path, operationError, "Verify the path and use read to inspect the current file. Update the content or line bounds from that fresh read before retrying.")

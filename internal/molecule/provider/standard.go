@@ -81,6 +81,11 @@ func (standardProvider *Standard) SetModels(models []atom.ModelInfo) {
 	defer standardProvider.mutex.Unlock()
 	standardProvider.models = append([]atom.ModelInfo(nil), models...)
 	for index := range standardProvider.models {
+		standardProvider.models[index].Billing = standardProvider.providerSpec.Billing
+		if standardProvider.providerSpec.Billing == "subscription" {
+			standardProvider.models[index].Prices = nil
+			continue
+		}
 		if price, found := standardProvider.inlinePrices[standardProvider.models[index].ID]; found {
 			priceCopy := price
 			standardProvider.models[index].Prices = &priceCopy
