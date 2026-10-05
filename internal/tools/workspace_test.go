@@ -103,3 +103,19 @@ func TestDeletionPathGuardUsesTheEntryWithoutFollowingItsTarget(test *testing.T)
 		test.Fatal("file action parsing changed an external tool's input")
 	}
 }
+
+func TestPathGuardChecksEveryBatchTarget(test *testing.T) {
+	workspace, outside := test.TempDir(), test.TempDir()
+	harnessRuntime := harness.New()
+	testutil.RequireNoError(test, (&pathtools.PathGuard{}).Setup(harnessRuntime))
+	operationContext := harness.WithWorkspace(context.Background(), workspace)
+	for _, operation := range []string{"write", "delete"} {
+		call := fileCall(test, map[string]any{"paths": []string{"inside", filepath.Join(outside, "one"), filepath.Join(outside, "two")}, "actions": []any{map[string]any{"op": operation}}, "return": map[string]any{"type": "summary"}})
+		call.Name = "file_actions"
+		verdict, operationError := harness.Check(operationContext, harnessRuntime, atom.StageToolInput, call)
+		testutil.RequireNoError(test, operationError)
+		if verdict.Kind != atom.VerdictAsk || !strings.Contains(verdict.Target, filepath.Join(outside, "one")) || !strings.Contains(verdict.Target, filepath.Join(outside, "two")) {
+			test.Fatalf("batch target bypassed path approval: %+v", verdict)
+		}
+	}
+}

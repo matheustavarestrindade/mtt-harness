@@ -2,6 +2,51 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "batch",
+      "category": "technical_noun",
+      "approved_forms": [
+        "batches"
+      ],
+      "meaning": "a group of filesystem targets receiving one shared file-action request",
+      "source": "multi-file actions"
+    },
+    {
+      "term": "path gate",
+      "category": "technical_noun",
+      "approved_forms": [
+        "path gates"
+      ],
+      "meaning": "the synchronization gate owning operations on one resolved filesystem path",
+      "source": "file edit coordination"
+    },
+    {
+      "term": "target index",
+      "category": "technical_noun",
+      "approved_forms": [
+        "target indexes"
+      ],
+      "meaning": "a one-based position in the file_actions target path array",
+      "source": "multi-file feedback"
+    },
+    {
+      "term": "status count",
+      "category": "technical_noun",
+      "approved_forms": [
+        "status counts"
+      ],
+      "meaning": "the number of file-action targets with a given completion status",
+      "source": "multi-file summaries"
+    },
+    {
+      "term": "tool catalog",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tool catalogs"
+      ],
+      "meaning": "a compact list of registered tool names and categories",
+      "source": "tool discovery"
+    },
+    {
       "term": "quoted name",
       "category": "technical_noun",
       "approved_forms": [

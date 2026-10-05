@@ -19,8 +19,7 @@ func openFileActionReader(path string) (*os.File, os.FileInfo, error) {
 	return file, information, operationError
 }
 
-func (fileTool FileActions) runFileInspections(operationContext context.Context, path string, input fileActionsInput, snapshot *fileActionSnapshot) (string, error) {
-	results := newFileActionResults()
+func (fileTool FileActions) runFileInspections(operationContext context.Context, path string, input fileActionsInput, snapshot *fileActionSnapshot, results *fileActionResults) (string, error) {
 	var file *os.File
 	if !input.directory {
 		var operationError error

@@ -2,9 +2,9 @@
 
 ## One File Interface
 
-The tool `file_actions` gives file text, file edits, and directory data. The full schema is in the initial model request. It replaces the tools `read`, `write`, and `replace`.
+The tool `file_actions` gives file text, file edits, and directory data. Use `search_tool` to get the full definition before the initial file action. The next model request has the full schema. A definition that is available can be used again.
 
-One tool call has one path and an array of 1 to 32 actions. A relative path starts at the instance workspace. Actions run in sequence. An action uses the content from the previous action.
+One tool call has `path` or an array of 1 to 32 `paths`. The input must not have the 2 fields together. One array of 1 to 32 actions applies to the paths. A relative path starts at the instance workspace. An action uses the content from the previous action for the selected path.
 
 The actions are:
 
@@ -17,6 +17,26 @@ The actions are:
 - `list`: show directory entries.
 
 The harness accepts a different path in a different tool call. It can run tools at the same time. The harness puts tool calls for the same resolved path in sequence.
+
+## Path Batches
+
+The model can supply text and actions one time for a batch of files:
+
+```json
+{
+  "paths": ["src/a.go", "src/b.go"],
+  "actions": [{"op":"replace","old_text":"oldName","new_text":"newName","mode":"all"}],
+  "return": {"type":"summary"}
+}
+```
+
+The same actions and output selection apply to the paths, in input sequence. The actions can be `append`, `prepend`, `write`, `delete`, `read`, or `list`. The input paths must resolve to different paths. Paths for file edits must not contain other selected paths.
+
+The tool prepares content, output, and temporary files for the paths before the initial commit. An error before the initial commit prevents file edits. A path has one commit. A commit error stops new file edits. Files from previous commits do not change after the error.
+
+The error gives the path with the error and the target indexes for previous commits. Target indexes start at 1 in the input array.
+
+For a batch, a `read` or `list` result has a short path label. A unified diff gives the file path. A `summary` result gives status counts, such as `Updated 2`. One output limit applies to the paths together. A truncation notice can give the next target index.
 
 ## File Text and Directory Data
 
@@ -103,7 +123,7 @@ The `append` and `prepend` actions do not add line breaks automatically. The con
 
 Use `return.type` with the value `summary` when file content is not necessary. Use `read` to examine new text. Do not read the same result again unless more content is necessary.
 
-When `return` is in the input, the result contains only the output from `return`. The tool does not show output from a read action or list action. It does not add a path, action data, number of lines or bytes, or output label. The output limit applies to `return` only.
+When `return` is in the input, the result contains only the output from `return`. The tool does not show output from a read action or list action. For one path, it does not add a path, action data, number of lines or bytes, or output label. The output limit applies to `return` only.
 
 To add text and examine the new file, put only the file edit in `actions`. The output type is `read`. Do not add a read action for the same new content. For a read action without file edits, `return` is not necessary.
 
@@ -131,9 +151,9 @@ For a file, `return.type` can be `diff` to show the previous text with `/dev/nul
 
 ## Error Output
 
-The tool uses temporary file content for a file edit. The actions and output checks must be correct before the tool replaces or removes the file. An error prevents the file change. A replacement keeps permission bits. Other hard links keep the previous content.
+The tool uses temporary file content for a file edit. The actions and output checks must be correct for the paths before the initial commit. An error before the initial commit prevents file edits. A replacement keeps permission bits. Other hard links keep the previous content.
 
-The initial error stops the tool call. The tool does not start the next action or prepare the output from `return`. It does not read the file or directory again. Temporary file content and previews are discarded.
+The initial error stops the tool call. The tool does not start the next action or prepare more output. It does not read the file or directory again. Temporary file content and previews are discarded. An error from the commit gives the target indexes for previous commits. Files from previous commits do not change after the error.
 
 The result gives only the operation, action number, path, and cause of the error. The tool does not give steps to correct the error. The model selects the next action.
 

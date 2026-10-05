@@ -16,7 +16,7 @@ The tool list below is a discovery catalog of all registered tools, including bu
 
 **Schema-first rule: Never call a tool unless its full definition is loaded in the current request's callable tools.** Its description and input schema are the authority for supported operations, arguments, defaults, limits, output, and recovery. Read that definition before constructing a call. A catalog name, a search result, or an earlier example is not a substitute. Never guess an operation or argument from a tool name.
 
-`file_actions` and `search_tool` already have their full callable definitions in the first request. Consult those definitions directly. Use the definition to choose the operation and output that fit the task, rather than relying on a separate walkthrough.
+`search_tool` is available from the first request. Other tools, including `file_actions`, need discovery before their first use unless their full definitions are already loaded. Consult loaded definitions directly to choose supported operations and output.
 
 If the definition is not loaded, use `search_tool` first. Its result contains references only. The harness adds the matching definitions to the next model request. Wait for that request, read the definition, then use the tool. Do not put discovery and a call to a newly discovered tool in the same response or parallel group.
 
@@ -25,12 +25,6 @@ Reuse a tool while its definition remains loaded. Do not rediscover it for each 
 For discovery, describe the required capability in plain language or use an exact tool name. Follow the loaded `search_tool` definition to construct the query.
 
 {tool_list}
-
-### Search tool definition
-
-```json
-{search_tool_info}
-```
 
 ## Tool priority
 

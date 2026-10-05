@@ -717,7 +717,7 @@ A verdict of `deny` must stop a tool before the harness reads a permission decis
 
 ### 10.2 Find Tools
 
-The initial model request has the full definitions of `search_tool` and `file_actions`. The model starts `search_tool` with a query to get other tools. The query has a category or text. The result gives only the fields `Name` and `Categories` of a tool.
+The initial model request has the full definition of `search_tool`. The model starts `search_tool` with a query to get other tools. The query can select `file_actions`. The query has a category or text. The result gives only the fields `Name` and `Categories` of a tool. Child agents also have the `finish` tool.
 
 The harness makes a search document from the tool name, description, categories, and input schema. A tool can also give usage examples through the optional `SearchDocument` method. For semantic search, a model changes the document to a vector. The query uses the same model. Lexical search uses TF-IDF vectors from the same documents.
 
@@ -769,7 +769,7 @@ Requirements:
 - R89: Text queries must put the largest cosine similarity first.
 - R90: Tools with the same cosine similarity value must be in name sequence.
 - R91: Tool discovery must give the same sequence for the same vectors and tool group.
-- R92: The harness must give the `search_tool` and `file_actions` tools to a model that can start tools.
+- R92: The harness must give `search_tool` to a model that can start tools. The model must get `file_actions` through tool discovery.
 - R93: The result of `search_tool` must give only `Name` and `Categories` for the found tools.
 - R94: The harness must add the found tools to the tool group of the session.
 - R95: The harness must give the tool group and the `search_tool` tool in the model request.
@@ -785,9 +785,13 @@ The model request must keep the parameter descriptions and defaults. A new model
 
 ### 10.4 File Tools
 
-The tool `file_actions` replaces the tools `read`, `write`, and `replace`. One tool call has one `path` and an `actions` array with 1 to 32 items. The field `op` can be `read`, `write`, `replace`, `append`, `prepend`, `delete`, or `list`. A relative path starts at the instance workspace. The initial model request has the full schema.
+The tool `file_actions` replaces the tools `read`, `write`, and `replace`. One tool call has `path` or an array of 1 to 32 `paths`, and an `actions` array with 1 to 32 items. The field `op` can be `read`, `write`, `replace`, `append`, `prepend`, `delete`, or `list`. A relative path starts at the instance workspace. The full schema is available after tool discovery.
 
-Actions run in input sequence on the same path. An action uses the content and line numbers from the previous action. File edits use temporary content. The actions and selected preview must be correct before the tool changes the file. A replacement uses one rename operation. An error prevents the file change.
+The same actions and output selection apply to the paths in input sequence. An action uses the content and line numbers from the previous action for the selected path. File edits use temporary content. The tool prepares content, output, and temporary files for the paths before the initial commit. An error before the initial commit prevents file edits.
+
+Paths with the same resolved value give an error. Paths for file edits must not contain other selected paths. The harness uses path gates in name sequence. The input sequence does not change the sequence of the path gates.
+
+A replacement uses one rename operation. A file has one commit. A commit error stops new file edits. Files from previous commits do not change after the error. The error gives the target indexes for previous commits. The initial target index is 1.
 
 The actions `read`, `write`, and `replace` have optional `start_line` and `end_line` parameters. Line numbers start at 1. The line range includes the start line and the end line. Without `start_line`, the range starts at line 1. Without `end_line`, the range continues to EOF.
 
@@ -829,7 +833,9 @@ A directory or symbolic link removal must use one `delete` action and `return.ty
 
 A file must be available for output with `return.type` set to `read`. A unified diff for file removal has `/dev/null` as the new path.
 
-The result contains only the output selected by the model. It does not add the path, action information, or number of lines and bytes. With `return.type` set to `summary`, the result is `Created`, `Updated`, `Deleted`, `Unchanged`, or `OK`.
+The result contains only the output selected by the model. For one path, it does not add the path, action information, or number of lines and bytes. With `return.type` set to `summary`, the result is `Created`, `Updated`, `Deleted`, `Unchanged`, or `OK`.
+
+For a batch, the file text and directory data have short path labels. A `summary` result gives status counts. A unified diff has the file path. One preview limit applies to the paths together.
 
 The model selects the result. A unified diff is not the default. In a unified diff, the prefix `-` shows lines which the tool removes. New lines have the prefix `+`. The preview keeps LF and CRLF and shows a last line without LF. The line numbers refer to the full file.
 
@@ -854,7 +860,7 @@ The tool removes the same outer text from the diff input but keeps lines of cont
 
 The tool makes the unified diff from the previous content and replacement content of the same file edit. It does not read the file again after the file edit. Thus, the result does not show a different file edit.
 
-The initial error stops the tool call. The tool does not start the next action, prepare the output from `return`, or read the file again. Temporary content and previews are discarded. The file does not change. The tool does not accept `on_error`.
+The initial error stops the tool call. The tool does not start the next action or read the file again. Temporary content and previews are discarded. An error before the initial commit prevents file edits. An error from the commit gives the target indexes for previous commits. The tool does not accept `on_error`.
 
 The tool status stays `error`. The result gives the operation, action number, path, and cause. It can also give the file modification time from data available before the error. The result gives a preview of `old_text` if a text match is not available. The maximum preview for a long value is 160 bytes.
 

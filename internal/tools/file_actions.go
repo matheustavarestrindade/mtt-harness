@@ -9,8 +9,8 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
 
-// FileActions is the model-facing file interface. One path gate owns a complete
-// chain and its file snapshots; separate paths can run concurrently.
+// FileActions stages an action chain for one or several targets under path gates.
+// Targets prepare together; filesystem commits remain atomic per target.
 type FileActions struct{ lineNumbers bool }
 
 func NewFileActions(lineNumbers bool) *FileActions { return &FileActions{lineNumbers: lineNumbers} }
@@ -21,9 +21,9 @@ func (FileActions) Check(context.Context, atom.ToolCall) atom.Verdict {
 }
 
 func (fileTool FileActions) Description() string {
-	description := "Read, list, write, replace, append, prepend or delete using one ordered action chain on one workspace-resolved path. Edits require an explicit return choice: summary, diff, or read. Never returns a diff by default. " +
-		"Return only the selected output. When return is present, it is the entire successful response: read gives final file text, diff gives the net diff, list gives directory entries, summary gives one compact status. No path banners, action logs, line/byte totals or Return labels accompany read/diff/list. Read/list actions still execute, but their intermediate output is suppressed when return is present. Without return, read/list actions emit only their requested data. For edit-and-inspect, use mutation actions and return.type=read; no preparatory or trailing read is needed for already known content. " +
-		"Each action sees prior staged changes. Read first only when unknown structure, formatting, targets, or line positions affect the edit. Replacements commit by atomic rename; a final deletion uses unlink/rmdir after validation. Failed calls commit nothing, stop immediately and return only the failed operation, cause and observed modification time when available. No diagnostic reads or retries run. Permission bits are preserved for replacements. Deleting a file leaves other hard links intact. delete removes regular files, symbolic links themselves, or empty directories; directories and symbolic links require a standalone delete with return summary. Deletion never follows the final link, never removes a directory recursively, and cannot remove the workspace root. return read requires a final file to exist. " +
+	description := "Read, list, write, replace, append, prepend or delete with one shared action chain on path or paths. Use paths to apply identical operations/text to up to 32 targets without repeating tool calls or content. Supply exactly one of path or paths. Edits require explicit return: summary, diff, or read. Never returns a diff by default. " +
+		"Return only the selected output. With return, read gives final text, diff the net changes, list directory entries, summary a compact status. Single-target calls have no path banner, action log, line/byte totals or Return label. Multiple targets have the compact labels/counts described below. Intermediate read/list output is suppressed when return is present. Without return, inspections emit only requested data. For edit-and-inspect, use mutation actions and return.type=read; no preparatory or trailing read is needed for already known content. " +
+		"Each target sees the ordered chain independently. All targets and selected output are prepared before any commit, under canonically ordered path gates. Preparation failures change nothing. Commits run in target order and are atomic per file, not across the batch: a commit failure stops later targets and reports the failed target and already committed target indexes. No automatic diagnostic reads, retries or rollback of committed targets run. Multiple-target read/list output uses short path labels; summary combines status counts. Do not repeat a whole batch blindly after a partial commit. Read first only when missing facts affect an edit. Replacements preserve permissions; deletion leaves other hard links intact. delete removes files, links themselves, or empty directories. Directory/link deletion requires a standalone delete with return summary. Never recursive, never follows the final link, never removes the workspace root. return read requires a final file. " +
 		"Listings default to compact rows: F means regular file, D directory, L symbolic link, S other entry, followed by the quoted name. Metadata is opt-in through fields: size (bytes), permissions (octal mode), owner/group (numeric IDs), modified (UTC time). No metadata is added by default. Direct children, including hidden entries, are sorted by case-sensitive name without following symlinks. All returned previews share 200 lines/16 KiB, plus bounded factual continuation metadata. Full edits are never truncated."
 	if fileTool.lineNumbers {
 		return description + " Read previews have absolute line-number display labels; labels and notices are not file content."
@@ -45,31 +45,10 @@ func (fileTool FileActions) Run(operationContext context.Context, call atom.Tool
 	if operationError := operationContext.Err(); operationError != nil {
 		return failedFileOperation(call, input.Path, "", operationError, nil)
 	}
-	path, operationError := resolveFileActionPath(operationContext, input)
-	if operationError != nil {
-		return failedFileOperation(call, input.Path, "", operationError, nil)
-	}
-	release, operationError := acquireFileEdit(operationContext, path)
-	if operationError != nil {
-		return failedFileOperation(call, path, "", operationError, nil)
-	}
-	defer release()
-	var snapshot fileActionSnapshot
-	var output string
-	if len(input.Actions) == 1 && input.Actions[0].Operation == "delete" {
-		output, operationError = fileTool.runFileDeletion(operationContext, path, input, &snapshot)
-	} else if input.mutates {
-		output, operationError = fileTool.runFileActionTransaction(operationContext, path, input, &snapshot)
-	} else {
-		output, operationError = fileTool.runFileInspections(operationContext, path, input, &snapshot)
-	}
-	if operationError == nil {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusOK, Content: []atom.Content{{Type: atom.Text, Text: output}}}, nil
-	}
-	return failedFileOperation(call, path, "", operationError, snapshot.information)
+	return fileTool.runFileActionTargets(operationContext, call, input)
 }
 
-func (fileTool FileActions) runFileActionTransaction(operationContext context.Context, path string, input fileActionsInput, snapshot *fileActionSnapshot) (string, error) {
+func (fileTool FileActions) prepareFileActionTransaction(operationContext context.Context, path string, input fileActionsInput, snapshot *fileActionSnapshot, results *fileActionResults, plan *fileActionPlan) (string, error) {
 	statPath := os.Stat
 	if input.deletes {
 		statPath = os.Lstat
@@ -90,7 +69,6 @@ func (fileTool FileActions) runFileActionTransaction(operationContext context.Co
 		snapshot.exists = true
 	}
 	current, exists := snapshot.content, snapshot.exists
-	results := newFileActionResults()
 	for index, action := range input.Actions {
 		if operationError := operationContext.Err(); operationError != nil {
 			return "", &fileActionFailure{index: index + 1, operation: action.Operation, cause: operationError}
@@ -150,18 +128,24 @@ func (fileTool FileActions) runFileActionTransaction(operationContext context.Co
 			}
 			output = renderFileStateDiffWithin(path, snapshot.content, current, snapshot.exists, exists, contextLines, results.budget)
 		}
+		results.consume(output)
 	}
 	if operationError := operationContext.Err(); operationError != nil {
 		return "", operationError
 	}
-	if changed {
-		if exists {
-			operationError = replaceFileContentsAtomically(operationContext, path, information, current)
-		} else {
-			operationError = os.Remove(path)
-		}
+	if changed && exists {
+		replacement, operationError := prepareFileReplacement(operationContext, path, information, current)
 		if operationError != nil {
-			return "", &fileActionFailure{operation: "commit", cause: operationError}
+			return "", &fileActionFailure{operation: "prepare commit", cause: operationError}
+		}
+		plan.commit = replacement.commit
+		plan.discard = replacement.discard
+	} else if changed {
+		plan.commit = func(operationContext context.Context) error {
+			if operationError := operationContext.Err(); operationError != nil {
+				return operationError
+			}
+			return os.Remove(path)
 		}
 	}
 	return output, nil

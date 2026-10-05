@@ -9,6 +9,7 @@ import (
 )
 
 const fileActionsMaximum = 32
+const fileActionsMaximumPaths = 32
 const directoryPreviewDefaultEntries = 100
 
 type fileAction struct {
@@ -34,6 +35,7 @@ type fileActionOutput struct {
 
 type fileActionsInput struct {
 	Path      string
+	Paths     []string
 	Actions   []fileAction
 	Return    fileActionOutput
 	mutates   bool
@@ -43,16 +45,37 @@ type fileActionsInput struct {
 
 func decodeFileActionsInput(data []byte) (fileActionsInput, error) {
 	var envelope struct {
-		Path    string            `json:"path"`
+		Path    *string           `json:"path"`
+		Paths   []string          `json:"paths"`
 		Actions []json.RawMessage `json:"actions"`
 		Return  json.RawMessage   `json:"return"`
 	}
-	if operationError := decodeFileActionObject(data, &envelope, []string{"path", "actions", "return"}); operationError != nil {
+	if operationError := decodeFileActionObject(data, &envelope, []string{"path", "paths", "actions", "return"}); operationError != nil {
 		return fileActionsInput{}, operationError
 	}
-	input := fileActionsInput{Path: envelope.Path}
-	if input.Path == "" || len(envelope.Actions) < 1 || len(envelope.Actions) > fileActionsMaximum {
-		return input, fmt.Errorf("path and 1-%d actions are required", fileActionsMaximum)
+	input := fileActionsInput{Paths: envelope.Paths}
+	if envelope.Path != nil {
+		input.Path = *envelope.Path
+		if envelope.Paths != nil {
+			return input, fmt.Errorf("path and paths cannot be combined")
+		}
+		input.Paths = []string{input.Path}
+	}
+	if len(input.Paths) < 1 || len(input.Paths) > fileActionsMaximumPaths {
+		return input, fmt.Errorf("one path or 1-%d paths are required", fileActionsMaximumPaths)
+	}
+	seen := make(map[string]bool, len(input.Paths))
+	for _, path := range input.Paths {
+		if path == "" {
+			return input, fmt.Errorf("paths must not be empty")
+		}
+		if seen[path] {
+			return input, fmt.Errorf("duplicate path %q", path)
+		}
+		seen[path] = true
+	}
+	if len(envelope.Actions) < 1 || len(envelope.Actions) > fileActionsMaximum {
+		return input, fmt.Errorf("1-%d actions are required", fileActionsMaximum)
 	}
 	for index, encoded := range envelope.Actions {
 		action, operationError := decodeFileAction(encoded)
@@ -67,7 +90,7 @@ func decodeFileActionsInput(data []byte) (fileActionsInput, error) {
 	if input.directory {
 		for _, action := range input.Actions {
 			if action.Operation != "list" {
-				return input, fmt.Errorf("one call has one target: list actions cannot be mixed with file actions")
+				return input, fmt.Errorf("list actions cannot be mixed with file actions")
 			}
 		}
 	}

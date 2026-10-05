@@ -125,10 +125,9 @@ func (agentLoop *Loop) sessionToolDefinitions(operationContext context.Context, 
 	for _, toolSpec := range specifications {
 		names[toolSpec.Name] = true
 	}
-	// Basic file access and discovery start with full current definitions. Old
-	// session groups above are resolved from the registry, so retired names drop
-	// out naturally while stored historical calls/results remain untouched.
-	for _, name := range []string{"search_tool", "file_actions"} {
+	// Discovery is the bootstrap capability. Other definitions enter a session
+	// through discovery and always resolve against the current registry.
+	for _, name := range []string{"search_tool"} {
 		if names[name] {
 			continue
 		}

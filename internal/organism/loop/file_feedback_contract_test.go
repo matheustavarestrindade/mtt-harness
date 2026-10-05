@@ -36,6 +36,7 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 	largeInput, operationError := json.Marshal(map[string]any{"path": "large.txt", "actions": []any{map[string]any{"op": "write", "content": strings.Repeat("row\n", 250)}}, "return": map[string]any{"type": "read"}})
 	testutil.RequireNoError(test, operationError)
 	calls := []atom.ToolCall{
+		{ID: "discover", Name: "search_tool", Input: []byte(`{"query":"file_actions"}`)},
 		{ID: "retired", Name: "read", Input: []byte(`{"path":"file.txt"}`)},
 		{ID: "create", Name: "file_actions", Input: []byte(`{"path":"file.txt","actions":[{"op":"write","content":"one\ntwo\n"}],"return":{"type":"summary"}}`)},
 		{ID: "failed", Name: "file_actions", Input: []byte(`{"path":"file.txt","actions":[{"op":"append","content":"UNCOMMITTED\n"},{"op":"replace","old_text":"absent","new_text":"three"},{"op":"read","start_line":999}],"return":{"type":"read","start_line":999}}`)},
@@ -46,6 +47,9 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 		{ID: "list", Name: "file_actions", Input: []byte(`{"path":".","actions":[{"op":"list"}]}`)},
 		{ID: "details", Name: "file_actions", Input: []byte(`{"path":".","actions":[{"op":"list","fields":["size","permissions"]}]}`)},
 		{ID: "delete", Name: "file_actions", Input: []byte(`{"path":"large.txt","actions":[{"op":"delete"}],"return":{"type":"summary"}}`)},
+		{ID: "batch-create", Name: "file_actions", Input: []byte(`{"paths":["a.txt","b.txt"],"actions":[{"op":"write","content":"shared\n"}],"return":{"type":"summary"}}`)},
+		{ID: "batch-append", Name: "file_actions", Input: []byte(`{"paths":["a.txt","b.txt"],"actions":[{"op":"append","content":"tail\n"}],"return":{"type":"summary"}}`)},
+		{ID: "batch-delete", Name: "file_actions", Input: []byte(`{"paths":["a.txt","b.txt"],"actions":[{"op":"delete"}],"return":{"type":"summary"}}`)},
 	}
 	requests := make(chan wireRequest, len(calls)+1)
 	var requestCount atomic.Int32
@@ -103,21 +107,27 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 			definitions[definition.Function.Name] = definition.Function.Description
 			schemas[definition.Function.Name] = definition.Function.Parameters
 		}
-		if requestIndex == 0 && schemas["file_actions"] == nil {
-			test.Fatal("file_actions schema was not present in the first request")
+		if requestIndex == 0 && schemas["file_actions"] != nil {
+			test.Fatal("file_actions schema was sent before discovery")
+		}
+		if requestIndex == 1 && schemas["file_actions"] == nil {
+			test.Fatal("file_actions schema was not loaded after discovery")
 		}
 	}
 	for identifier, fragments := range map[string][]string{
-		"retired":  {`tool "read" is not registered`},
-		"create":   {"Created"},
-		"failed":   {"Cannot replace text in", "action 2", `text "absent" was not found`, "Last modified:"},
-		"recover":  {"-two\n+three\n"},
-		"preview":  {"three\n"},
-		"large":    {"Shared file_actions preview budget reached", `"start_line":201`},
-		"continue": {strings.Repeat("row\n", 50)},
-		"list":     {"F \"file.txt\"\n", "F \"large.txt\"\n"},
-		"details":  {"size=10", "permissions="},
-		"delete":   {"Deleted"},
+		"retired":      {`tool "read" is not registered`},
+		"create":       {"Created"},
+		"failed":       {"Cannot replace text in", "action 2", `text "absent" was not found`, "Last modified:"},
+		"recover":      {"-two\n+three\n"},
+		"preview":      {"three\n"},
+		"large":        {"Shared file_actions preview budget reached", `"start_line":201`},
+		"continue":     {strings.Repeat("row\n", 50)},
+		"list":         {"F \"file.txt\"\n", "F \"large.txt\"\n"},
+		"details":      {"size=10", "permissions="},
+		"delete":       {"Deleted"},
+		"batch-create": {"Created 2"},
+		"batch-append": {"Updated 2"},
+		"batch-delete": {"Deleted 2"},
 	} {
 		for _, fragment := range fragments {
 			if !strings.Contains(feedback[identifier], fragment) {
@@ -159,6 +169,9 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 	}
 	if !strings.Contains(definitions["file_actions"], "Never returns a diff by default") || actionSchema.Properties["on_error"] != nil || actionSchema.Properties["actions"] == nil {
 		test.Fatalf("provider definition lost file-action instructions: %s", schemas["file_actions"])
+	}
+	if actionSchema.Properties["paths"] == nil {
+		test.Fatal("provider schema has no multi-target input")
 	}
 	instance, found := testStack.instances.Get(session.InstanceID)
 	if !found {

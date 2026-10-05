@@ -40,17 +40,12 @@ func TestShippedStartupTemplateUsesSupportedVariables(test *testing.T) {
 			return []atom.ToolReference{{Name: searchTool.Name(), Categories: searchTool.Categories()}}
 		},
 		ToolInfo: func(name string) (atom.ToolSpec, error) {
-			if name != searchTool.Name() {
-				test.Fatalf("shipped template references an unexpected tool: %q", name)
-			}
-			return atom.ToolSpec{
-				Name: searchTool.Name(), Description: searchTool.Description(),
-				Categories: searchTool.Categories(), InputSchema: searchTool.InputSchema(),
-			}, nil
+			test.Fatalf("default prompt expanded a full tool definition: %s", name)
+			return atom.ToolSpec{}, nil
 		},
 	})
 	testutil.RequireNoError(test, operationError)
-	if strings.Contains(rendered, "{search_tool_info}") || !strings.Contains(rendered, `"name": "search_tool"`) {
-		test.Fatal("shipped template did not include the search tool definition")
+	if strings.Contains(rendered, "{search_tool_info}") || strings.Contains(rendered, "input_schema") || !strings.Contains(rendered, "- search_tool") {
+		test.Fatal("shipped template did not keep tool metadata in the callable definitions")
 	}
 }

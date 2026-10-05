@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -38,7 +39,7 @@ func resolveFileActionPath(operationContext context.Context, input fileActionsIn
 
 // A standalone delete does not read file contents unless a diff is requested.
 // os.Remove is one unlink/rmdir operation; non-empty directories stay intact.
-func (fileTool FileActions) runFileDeletion(operationContext context.Context, path string, input fileActionsInput, snapshot *fileActionSnapshot) (string, error) {
+func (fileTool FileActions) prepareFileDeletion(operationContext context.Context, path string, input fileActionsInput, snapshot *fileActionSnapshot, results *fileActionResults, plan *fileActionPlan) (string, error) {
 	information, operationError := os.Lstat(path)
 	snapshot.information = information
 	if operationError != nil {
@@ -46,6 +47,23 @@ func (fileTool FileActions) runFileDeletion(operationContext context.Context, pa
 	}
 	if !information.Mode().IsRegular() && !information.IsDir() && information.Mode()&os.ModeSymlink == 0 {
 		return "", &fileActionFailure{index: 1, operation: "delete", cause: fmt.Errorf("target is not a regular file, symbolic link, or empty directory")}
+	}
+	if information.IsDir() {
+		directory, operationError := os.Open(path)
+		if operationError != nil {
+			return "", &fileActionFailure{index: 1, operation: "delete", cause: operationError}
+		}
+		entries, readError := directory.ReadDir(1)
+		closeError := directory.Close()
+		if readError != nil && readError != io.EOF {
+			return "", &fileActionFailure{index: 1, operation: "delete", cause: readError}
+		}
+		if closeError != nil {
+			return "", &fileActionFailure{index: 1, operation: "delete", cause: closeError}
+		}
+		if len(entries) > 0 {
+			return "", &fileActionFailure{index: 1, operation: "delete", cause: fmt.Errorf("directory is not empty")}
+		}
 	}
 	output := "Deleted"
 	switch input.Return.Type {
@@ -63,13 +81,20 @@ func (fileTool FileActions) runFileDeletion(operationContext context.Context, pa
 		if input.Return.ContextLines != nil {
 			contextLines = *input.Return.ContextLines
 		}
-		output = renderFileStateDiffWithin(path, original, nil, true, false, contextLines, newFileActionResults().budget)
+		output = renderFileStateDiffWithin(path, original, nil, true, false, contextLines, results.budget)
+		results.consume(output)
 	}
 	if operationError := operationContext.Err(); operationError != nil {
 		return "", &fileActionFailure{index: 1, operation: "delete", cause: operationError}
 	}
-	if operationError := os.Remove(path); operationError != nil {
-		return "", &fileActionFailure{index: 1, operation: "delete", cause: operationError}
+	plan.commit = func(operationContext context.Context) error {
+		if operationError := operationContext.Err(); operationError != nil {
+			return operationError
+		}
+		if operationError := os.Remove(path); operationError != nil {
+			return &fileActionFailure{index: 1, operation: "delete", cause: operationError}
+		}
+		return nil
 	}
 	return output, nil
 }
