@@ -2,6 +2,117 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "task update",
+      "category": "technical_noun",
+      "approved_forms": [
+        "task updates"
+      ],
+      "meaning": "one partial update of the persisted session task state",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "task title",
+      "category": "technical_noun",
+      "approved_forms": [
+        "task titles"
+      ],
+      "meaning": "the short title of a TODO item or DOING object",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "task status",
+      "category": "technical_noun",
+      "approved_forms": [
+        "task statuses"
+      ],
+      "meaning": "the pending, in_progress, done or cancelled state of a TODO item",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "task state snapshot",
+      "category": "technical_noun",
+      "approved_forms": [
+        "task state snapshots"
+      ],
+      "meaning": "the latest bounded task state rendered as reference data for one model request",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "task state",
+      "category": "technical_noun",
+      "approved_forms": [
+        "task states"
+      ],
+      "meaning": "the per-session TODO items, DOING activity and server-owned update metadata",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "task tracking",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the optional recording of work items and current activity for a session",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "task item",
+      "category": "technical_noun",
+      "approved_forms": [
+        "task items"
+      ],
+      "meaning": "a TODO entry with a stable ID, title and progress status",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "TODO",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the list of session work items and their progress states",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "DOING",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the nullable title and description of a session's current activity",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "response counter",
+      "category": "technical_noun",
+      "approved_forms": [
+        "response counters"
+      ],
+      "meaning": "the persisted count of completed model responses since the latest task-state update",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "task reminder",
+      "category": "technical_noun",
+      "approved_forms": [
+        "task reminders"
+      ],
+      "meaning": "a request-local system instruction to refresh active task state",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "progress panel",
+      "category": "technical_noun",
+      "approved_forms": [
+        "progress panels"
+      ],
+      "meaning": "the UI region that displays current task activity and item statuses",
+      "source": "persistent task tracking"
+    },
+    {
+      "term": "revision",
+      "category": "technical_noun",
+      "approved_forms": [
+        "revisions"
+      ],
+      "meaning": "a monotonically increasing version of one session's task state",
+      "source": "persistent task tracking"
+    },
+    {
       "term": "glob matcher",
       "category": "technical_noun",
       "approved_forms": [

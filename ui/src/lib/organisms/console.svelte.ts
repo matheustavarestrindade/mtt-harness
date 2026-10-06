@@ -10,6 +10,7 @@ import type {
   QueueStatus,
   Session,
   Statistics,
+  TaskState,
 } from '../atoms/types';
 import { saveConnection, forgetConnection } from '../molecules/connection-storage';
 
@@ -31,6 +32,8 @@ export class HarnessConsole {
   events = $state<HarnessEvent[]>([]);
   status = $state<QueueStatus>(idleStatus());
   statistics = $state<Statistics | null>(null);
+  taskState = $state<TaskState | null>(null);
+  taskStateError = $state('');
   loading = $state(false);
   streamState = $state<StreamState>('closed');
   private api: HarnessApi | null = null;
@@ -112,6 +115,8 @@ export class HarnessConsole {
     this.permissions = [];
     this.events = [];
     this.statistics = null;
+    this.taskState = null;
+    this.taskStateError = '';
     this.status = idleStatus();
     this.streamState = 'closed';
     this.loading = false;
@@ -240,12 +245,20 @@ export class HarnessConsole {
     }
     this.refreshing = true;
     const selectionRevision = this.selectionRevision;
+    const taskRevision = this.taskState?.Revision ?? -1;
     try {
-      const [messages, status, statistics, updatedSession] = await Promise.all([
+      const [messages, status, statistics, updatedSession, tasks] = await Promise.all([
         api.messages(session.ID, signal),
         api.status(session.ID, signal),
         api.statistics(session.ID, signal),
         api.session(session.ID, signal),
+        api.taskState(session.ID, signal).then(
+          (state) => ({ state, error: '' }),
+          (error: unknown) => ({
+            state: null,
+            error: error instanceof Error ? error.message : 'Cannot load task progress.',
+          }),
+        ),
       ]);
       if (signal.aborted || this.session?.ID !== session.ID) return;
       this.messages = messages;
@@ -260,6 +273,8 @@ export class HarnessConsole {
       };
       this.status = { ...status, messages: status.messages ?? [] };
       this.statistics = statistics;
+      if (tasks.state) this.applyTaskState(tasks.state);
+      else if (taskRevision === (this.taskState?.Revision ?? -1)) this.taskStateError = tasks.error;
       this.error = '';
       const saved = new Set(messages.map((message) => message.ID));
       this.savedMessageIDs = saved;
@@ -318,6 +333,14 @@ export class HarnessConsole {
         ? (event.Payload as Record<string, unknown>)
         : {};
     if (
+      event.Name === 'task_state.updated' &&
+      typeof payload.SessionID === 'string' &&
+      typeof payload.Revision === 'number' &&
+      Array.isArray(payload.Todo)
+    ) {
+      this.applyTaskState(payload as unknown as TaskState);
+    }
+    if (
       (event.Name === 'model.call' || event.Name === 'model.chunk') &&
       typeof payload.message_id === 'string' &&
       !this.savedMessageIDs.has(payload.message_id)
@@ -368,6 +391,14 @@ export class HarnessConsole {
     this.pendingText = [];
     this.pendingReasoning = [];
     this.liveMessage = null;
+  }
+
+  private applyTaskState(state: TaskState) {
+    if (state.SessionID !== this.session?.ID || this.removedSessionIDs.has(state.SessionID)) return;
+    if (!Number.isSafeInteger(state.Revision) || state.Revision < (this.taskState?.Revision ?? -1))
+      return;
+    this.taskState = { ...state, Todo: state.Todo ?? [] };
+    this.taskStateError = '';
   }
 
   private flushModelChunks() {

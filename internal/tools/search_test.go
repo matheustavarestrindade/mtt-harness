@@ -16,7 +16,7 @@ import (
 func searchRegistry(test *testing.T, index toolsearch.Searcher) *registry.Registry {
 	test.Helper()
 	toolRegistry := registry.New(harness.New(), index)
-	for _, tool := range []harness.Tool{NewBash(nil), NewProcessOutput(nil), NewProcessKill(nil), NewFileActions(false), &Agent{}, Finish{}, NewSearch(toolRegistry)} {
+	for _, tool := range []harness.Tool{NewBash(nil), NewProcessOutput(nil), NewProcessKill(nil), NewFileActions(false), TaskState{}, &Agent{}, Finish{}, NewSearch(toolRegistry)} {
 		testutil.RequireNoError(test, toolRegistry.Add(tool))
 	}
 	return toolRegistry

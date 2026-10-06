@@ -52,6 +52,7 @@ func (sessionStore *sessions) DeleteConversation(operationContext context.Contex
 		session.Model, session.ReasoningEffort, session.Completed = "", "", true
 		database.sessions[identifier] = session
 		delete(database.messages, identifier)
+		delete(database.taskStates, identifier)
 	}
 	remainingEvents := make([]atom.Event, 0, len(database.events))
 	for _, event := range database.events {

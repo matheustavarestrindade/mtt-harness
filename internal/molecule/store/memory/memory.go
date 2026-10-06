@@ -12,6 +12,7 @@ type Store struct {
 	instances        map[string]atom.InstanceSpec
 	sessions         map[atom.SessionID]atom.Session
 	deletedSessions  map[atom.SessionID]bool
+	taskStates       map[atom.SessionID]atom.TaskState
 	messages         map[atom.SessionID][]atom.Message
 	events           []atom.Event
 	sequenceNumber   uint64
@@ -32,6 +33,7 @@ func New() *Store {
 		instances:        map[string]atom.InstanceSpec{},
 		sessions:         map[atom.SessionID]atom.Session{},
 		deletedSessions:  map[atom.SessionID]bool{},
+		taskStates:       map[atom.SessionID]atom.TaskState{},
 		messages:         map[atom.SessionID][]atom.Message{},
 		processes:        map[string]atom.ProcessRecord{},
 		permissions:      map[string]atom.PermissionDecision{},
@@ -50,6 +52,7 @@ func (database *Store) Instances() store.InstanceStore {
 func (database *Store) Sessions() store.SessionStore {
 	return &sessions{database}
 }
+func (database *Store) TaskStates() store.TaskStateStore { return &taskStates{database} }
 func (database *Store) Events() store.EventStore {
 	return &events{database}
 }

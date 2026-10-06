@@ -217,6 +217,30 @@ Requirements:
 - R198: The context limit must include the system message from the template.
 - R199: Provider adapters must not add default system instructions.
 
+### 4.3 Task State
+
+The `task_state` tool keeps a TODO list and a `DOING` object for a session. Task tracking is optional. Tool discovery supplies the full definition before a tool call.
+
+A task item has an ID, task title, and task status. Status values are `pending`, `in_progress`, `done`, and `cancelled`. A task update changes a task item by ID. A new ID adds a task item to the end of the list. A field that is not in the task update does not change.
+
+The `DOING` object has a short task title and a description of the work. The value can be `null`. One tool call can change TODO and `DOING` together. The database makes the task update in one transaction.
+
+The tool keeps task items with status `done` or `cancelled` while a task item has status `pending` or `in_progress`. The tool removes content from the 2 fields when the last task item becomes `done` or `cancelled`. The input `{"todo":[],"doing":null}` also removes content from the 2 fields. An empty list with a new `DOING` object can start a task without a TODO list.
+
+Postgres keeps task state, revision, time, and a response counter in `session_task_state`. Task state for a child session does not change task state for the parent session. The operation to read task state does not write a row. A task update with an error does not change the data. The limits are 32 task items, 64 bytes for an ID, and 160 characters for a task title.
+
+The `DOING` object has a limit of 120 characters for the task title and 1200 for the description.
+
+The harness increases the response counter after the model completes a response with active task state. Stream chunks and tool calls do not increase the response counter. A task update puts the response counter at 0. The rule also applies when the text does not change. The response counter uses the revision from the model request and does not increase for a different revision.
+
+At a response counter of 3, the next request gives a task reminder. The task reminder tells the model to use `task_state` before other work. If the tool definition is not available, tool discovery comes first. The task reminder does not stop other tools. It stays in model requests until a task update puts the response counter at 0.
+
+The loop adds a task state snapshot before context and request stages. Task text is data, not system instructions. The context limit includes the data and task reminder. The task state snapshot and task reminder are not written to the database.
+
+Cancellation or a turn error removes content from `DOING` and keeps TODO. Revert removes task state with the history change. Session deletion removes task state and prevents new task updates. After a child agent completes a task, the loop removes task state for the child session. The API and `task_state.updated` event give the revision to the client.
+
+See `docs/task-state.md`.
+
 ## 5. Instances
 
 A user starts an instance with a workspace directory. The harness gives an ID to the instance. The instance start request gives:
@@ -1023,6 +1047,7 @@ Postgres is the default database. The tables are:
 
 - `instances`
 - `sessions`
+- `session_task_state`
 - `messages`
 - `tool_calls`
 - `tool_results`
@@ -1071,6 +1096,7 @@ The initial API paths are:
 - `GET /instances/{id}/sessions`: read the sessions of an instance.
 - `GET /instances/{id}/models`: read the model list of an instance.
 - `GET /sessions/{id}`: read a session.
+- `GET /sessions/{id}/task-state`: read the task state for the session.
 - `DELETE /sessions/{id}`: remove a conversation and the child sessions.
 - `PUT /sessions/{id}/reasoning`: set the reasoning effort for a session.
 - `PUT /sessions/{id}/model`: change the model of a session.
@@ -1479,6 +1505,13 @@ type EventStore interface {
     Append(operationContext context.Context, event atom.Event) error
     Record(operationContext context.Context, event atom.Event) (atom.Event, error)
     Since(operationContext context.Context, instanceID string, sequenceNumber uint64) ([]atom.Event, error)
+}
+
+type TaskStateStore interface {
+    Get(operationContext context.Context, sessionID atom.SessionID) (atom.TaskState, error)
+    Update(operationContext context.Context, sessionID atom.SessionID, update atom.TaskStateUpdate) (atom.TaskState, error)
+    RecordResponse(operationContext context.Context, sessionID atom.SessionID, revision int64) error
+    Pause(operationContext context.Context, sessionID atom.SessionID) (atom.TaskState, bool, error)
 }
 
 type ProcessStore interface {

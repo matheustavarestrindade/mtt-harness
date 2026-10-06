@@ -137,6 +137,9 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 	defer func() {
 		completionContext, stop := context.WithTimeout(context.WithoutCancel(operationContext), 5*time.Second)
 		defer stop()
+		if operationError == nil && session.Parent != "" {
+			operationError = agentLoop.clearFinishedTaskState(completionContext, session)
+		}
 		status := "completed"
 		if operationError != nil {
 			status = "error"
@@ -144,6 +147,7 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 				status = "cancelled"
 			}
 			operationError = errors.Join(operationError, agentLoop.repairToolHistory(completionContext, session))
+			operationError = errors.Join(operationError, agentLoop.pauseTaskState(completionContext, session))
 		}
 		if session.Parent != "" {
 			session.Completed = true
@@ -180,7 +184,7 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 		calls := message.ToolCalls
 		if len(calls) == 0 {
 			cancelRound()
-			return nil
+			return agentLoop.recordTaskStateResponse(operationContext, session, modelCall)
 		}
 		results := waitForTools(tasks)
 		cancelRound()
@@ -189,6 +193,9 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 		}
 		if operationError := agentLoop.saveToolResults(operationContext, session, calls, results); operationError != nil {
 			return operation.WrapError(operationError, "save tool results")
+		}
+		if operationError := agentLoop.recordTaskStateResponse(operationContext, session, modelCall); operationError != nil {
+			return operation.WrapError(operationError, "record task state response")
 		}
 		if agentLoop.isFinished(session.ID) {
 			return nil

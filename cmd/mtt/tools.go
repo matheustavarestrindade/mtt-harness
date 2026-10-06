@@ -15,6 +15,7 @@ func attachTools(toolRegistry *registry.Registry, processManager *processes.Mana
 		tools.NewBash(processManager), tools.NewFileActions(lineNumbers), tools.NewSearch(toolRegistry),
 		tools.NewProcessOutput(processManager), tools.NewProcessKill(processManager),
 		tools.Finish{}, &tools.Agent{RunTask: agentLoop.RunAgentTask},
+		tools.TaskState{Update: agentLoop.UpdateTaskState},
 	} {
 		requireStartupSuccess(toolRegistry.Add(tool), "register tool "+tool.Name())
 	}

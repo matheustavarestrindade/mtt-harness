@@ -23,6 +23,7 @@
   import Conversation from '$lib/organisms/Conversation.svelte';
   import Composer from '$lib/molecules/Composer.svelte';
   import UsageBar from '$lib/molecules/UsageBar.svelte';
+  import TaskProgress from '$lib/molecules/TaskProgress.svelte';
   import SessionSettingsDialog from '$lib/molecules/SessionSettingsDialog.svelte';
   import { findSessionModel, reasoningEffortLabel } from '$lib/atoms/reasoning';
   import { HarnessConsole } from '$lib/organisms/console.svelte';
@@ -411,6 +412,10 @@
         style="padding-bottom: max(.5rem, env(safe-area-inset-bottom))"
       >
         <div class="mx-auto max-w-4xl">
+          {#key sessionID}<TaskProgress
+              state={workbench.taskState}
+              error={workbench.taskStateError}
+            />{/key}
           <Composer
             bind:value={() => drafts[sessionID] ?? '', (value) => (drafts[sessionID] = value)}
             {disabled}

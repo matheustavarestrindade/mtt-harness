@@ -11,6 +11,7 @@ import type {
   Session,
   SessionDeletion,
   Statistics,
+  TaskState,
 } from '../../atoms/types';
 import type { RuntimeSettings, RuntimeSettingKey } from '../../atoms/settings';
 
@@ -105,6 +106,15 @@ export class HarnessApi {
 
   async instances(signal?: AbortSignal) {
     return (await this.request<Instance[] | null>('instances', 'GET', undefined, signal)) ?? [];
+  }
+  async taskState(sessionID: string, signal?: AbortSignal): Promise<TaskState> {
+    const state = await this.request<TaskState>(
+      `sessions/${encodeURIComponent(sessionID)}/task-state`,
+      'GET',
+      undefined,
+      signal,
+    );
+    return { ...state, Todo: state.Todo ?? [] };
   }
   async sessions(instanceID: string, signal?: AbortSignal) {
     return (
