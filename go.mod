@@ -3,6 +3,7 @@ module github.com/matheustavarestrindade/mtt-harness
 go 1.26
 
 require (
+	github.com/bmatcuk/doublestar/v4 v4.10.2
 	github.com/coder/websocket v1.8.15
 	github.com/gomlx/go-huggingface v0.3.5-0.20260327162928-af20e4f3e7b5
 	github.com/jackc/pgx/v5 v5.7.6

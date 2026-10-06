@@ -46,6 +46,8 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 		{ID: "continue", Name: "file_actions", Input: []byte(`{"path":"large.txt","actions":[{"op":"read","start_line":201}]}`)},
 		{ID: "list", Name: "file_actions", Input: []byte(`{"path":".","actions":[{"op":"list"}]}`)},
 		{ID: "details", Name: "file_actions", Input: []byte(`{"path":".","actions":[{"op":"list","fields":["size","permissions"]}]}`)},
+		{ID: "glob", Name: "file_actions", Input: []byte(`{"path":".","actions":[{"op":"glob","pattern":"**/*.txt","exclude":["large.txt"]}]}`)},
+		{ID: "glob-return", Name: "file_actions", Input: []byte(`{"path":".","actions":[{"op":"list"}],"return":{"type":"glob","pattern":"file.*","fields":["size"]}}`)},
 		{ID: "delete", Name: "file_actions", Input: []byte(`{"path":"large.txt","actions":[{"op":"delete"}],"return":{"type":"summary"}}`)},
 		{ID: "batch-create", Name: "file_actions", Input: []byte(`{"paths":["a.txt","b.txt"],"actions":[{"op":"write","content":"shared\n"}],"return":{"type":"summary"}}`)},
 		{ID: "batch-append", Name: "file_actions", Input: []byte(`{"paths":["a.txt","b.txt"],"actions":[{"op":"append","content":"tail\n"}],"return":{"type":"summary"}}`)},
@@ -124,6 +126,8 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 		"continue":     {strings.Repeat("row\n", 50)},
 		"list":         {"F \"file.txt\"\n", "F \"large.txt\"\n"},
 		"details":      {"size=10", "permissions="},
+		"glob":         {"F \"file.txt\"\n"},
+		"glob-return":  {"F \"file.txt\"\tsize=10\n"},
 		"delete":       {"Deleted"},
 		"batch-create": {"Created 2"},
 		"batch-append": {"Updated 2"},
@@ -135,7 +139,7 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 			}
 		}
 	}
-	if feedback["create"] != "Created" || feedback["preview"] != "three\n" || feedback["delete"] != "Deleted" || feedback["list"] != "F \"file.txt\"\nF \"large.txt\"\n" || !strings.HasPrefix(feedback["recover"], "--- ") {
+	if feedback["create"] != "Created" || feedback["preview"] != "three\n" || feedback["delete"] != "Deleted" || feedback["list"] != "F \"file.txt\"\nF \"large.txt\"\n" || feedback["glob"] != "F \"file.txt\"\n" || feedback["glob-return"] != "F \"file.txt\"\tsize=10\n" || !strings.HasPrefix(feedback["recover"], "--- ") {
 		test.Fatal("provider received unsolicited status, action logs or listing metadata")
 	}
 	if feedback["continue"] != strings.Repeat("row\n", 50) || strings.Contains(feedback["preview"], "@@") || strings.Count(feedback["large"], "row\n") != 200 || strings.Contains(feedback["failed"], "UNCOMMITTED") || strings.Contains(feedback["create"], "+one") {
@@ -159,10 +163,10 @@ func TestFileEditFeedbackAndFailuresReachProviderRequests(test *testing.T) {
 		} `json:"properties"`
 	}
 	testutil.RequireNoError(test, json.Unmarshal(actionSchema.Properties["return"], &returnSchema))
-	if returnSchema.Description == "" || returnSchema.Default != nil || strings.Join(returnSchema.Properties["type"].Enum, ",") != "summary,diff,read,list" {
+	if returnSchema.Description == "" || returnSchema.Default != nil || strings.Join(returnSchema.Properties["type"].Enum, ",") != "summary,diff,read,list,glob" {
 		test.Fatalf("provider request lost explicit output choices: %s", schemas["file_actions"])
 	}
-	for _, name := range []string{"type", "context_lines", "start_line", "end_line", "start_byte", "limit", "cursor", "fields"} {
+	for _, name := range []string{"type", "context_lines", "start_line", "end_line", "start_byte", "limit", "cursor", "fields", "pattern", "exclude", "kind"} {
 		if returnSchema.Properties[name].Description == "" {
 			test.Fatalf("return.%s has no model-facing instructions", name)
 		}

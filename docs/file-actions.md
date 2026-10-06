@@ -15,6 +15,7 @@ The actions are:
 - `prepend`: add text at the start of a file.
 - `delete`: remove a file, symbolic link, or empty directory.
 - `list`: show directory entries.
+- `glob`: find directory entries with a glob pattern.
 
 The harness accepts a different path in a different tool call. It can run tools at the same time. The harness puts tool calls for the same resolved path in sequence.
 
@@ -30,7 +31,7 @@ The model can supply text and actions one time for a batch of files:
 }
 ```
 
-The same actions and output selection apply to the paths, in input sequence. The actions can be `append`, `prepend`, `write`, `delete`, `read`, or `list`. The input paths must resolve to different paths. Paths for file edits must not contain other selected paths.
+The same actions and output selection apply to the paths, in input sequence. The actions can be `append`, `prepend`, `write`, `delete`, `read`, `list`, or `glob`. The input paths must resolve to different paths. Paths for file edits must not contain other selected paths.
 
 The tool prepares content, output, and temporary files for the paths before the initial commit. An error before the initial commit prevents file edits. A path has one commit. A commit error stops new file edits. Files from previous commits do not change after the error.
 
@@ -87,7 +88,38 @@ A value of `?` identifies data that is not available. The fields give file data,
 
 The tool does not follow symbolic links. The default limit is 100 directory entries, and the maximum is 200. A directory cursor gives the position for the next directory page.
 
-A `list` action cannot be in the same tool call as a file action. The tool call has one file path or directory path.
+Directory actions `list` and `glob` cannot be in the same tool call as file text actions or file edits. A directory action uses the selected path as a directory.
+
+## Glob Patterns
+
+The `glob` action uses the Go library [Doublestar v4.10.2](https://github.com/bmatcuk/doublestar/tree/v4.10.2). The library has an MIT license. The library gives the glob matcher. The harness controls directory traversal and the result limit. It does not follow symbolic links.
+
+```json
+{
+  "path": ".",
+  "actions": [{
+    "op": "glob",
+    "pattern": "**/*.{go,md}",
+    "exclude": ["**/.git/**", "**/vendor/**"]
+  }]
+}
+```
+
+The glob pattern uses `/` between path components. A glob match must agree in letter case. `*` and `?` apply to one path component. The component `**` applies to 0 or more path components.
+
+Character classes and brace alternatives are available. The escape character is `\`.
+
+The glob pattern starts at the selected directory. The result contains relative paths, not file text. The result does not contain the selected directory. File edits use paths that the model selects, not automatic glob matches.
+
+The `pattern` parameter is necessary and has a limit of 1024 characters. The `exclude` array has a maximum of 16 glob patterns. The tool does not examine a directory with a glob match in `exclude`.
+
+A name which starts with `.` is not removed automatically. The tool does not read `.gitignore`.
+
+The default value of `kind` is `file` for regular files. Other values are `directory`, `link`, and `all`. A symbolic link is not followed. The default result gives only the type and relative path. The optional `fields` have the same meanings as for `list`.
+
+The default `limit` is 100 glob matches, and the maximum is 200. One 200-line/16-KiB limit applies to the selected directories together. The result uses path sequence with letter case kept. A glob cursor continues the same directory and values of `pattern`, `exclude`, and `kind`. The maximum glob cursor length is 32768 bytes.
+
+The `return` field is not necessary for a glob action. With `return.type` set to `glob`, the `return` object must have `pattern`. The parameters `exclude`, `kind`, `limit`, `cursor`, and `fields` are optional. Only the output from `return` is shown.
 
 ## Output Types
 

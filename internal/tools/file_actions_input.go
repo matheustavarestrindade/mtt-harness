@@ -21,6 +21,7 @@ type fileAction struct {
 	Limit     *int     `json:"limit,omitempty"`
 	Cursor    string   `json:"cursor,omitempty"`
 	Fields    []string `json:"fields,omitempty"`
+	fileGlobOptions
 	fileTextSelection
 }
 
@@ -30,6 +31,7 @@ type fileActionOutput struct {
 	Limit        *int     `json:"limit,omitempty"`
 	Cursor       string   `json:"cursor,omitempty"`
 	Fields       []string `json:"fields,omitempty"`
+	fileGlobOptions
 	fileTextSelection
 }
 
@@ -84,13 +86,13 @@ func decodeFileActionsInput(data []byte) (fileActionsInput, error) {
 		}
 		input.Actions = append(input.Actions, action)
 		input.mutates = input.mutates || action.mutatesFile()
-		input.directory = input.directory || action.Operation == "list"
+		input.directory = input.directory || action.Operation == "list" || action.Operation == "glob"
 		input.deletes = input.deletes || action.Operation == "delete"
 	}
 	if input.directory {
 		for _, action := range input.Actions {
-			if action.Operation != "list" {
-				return input, fmt.Errorf("list actions cannot be mixed with file actions")
+			if action.Operation != "list" && action.Operation != "glob" {
+				return input, fmt.Errorf("directory discovery actions cannot be mixed with file actions")
 			}
 		}
 	}
@@ -107,8 +109,8 @@ func decodeFileActionsInput(data []byte) (fileActionsInput, error) {
 	if input.Return.Type == "diff" && !input.mutates {
 		return input, fmt.Errorf("return.type diff requires at least one mutation action")
 	}
-	if input.Return.Type == "list" && !input.directory || input.Return.Type == "read" && input.directory {
-		return input, fmt.Errorf("the return type must match the target: read for a file, list for a directory")
+	if (input.Return.Type == "list" || input.Return.Type == "glob") && !input.directory || input.Return.Type == "read" && input.directory {
+		return input, fmt.Errorf("return read requires file actions; return list/glob requires directory discovery actions")
 	}
 	return input, nil
 }
@@ -131,8 +133,10 @@ func decodeFileAction(data []byte) (fileAction, error) {
 	case "delete":
 	case "list":
 		allowed = append(allowed, "limit", "cursor", "fields")
+	case "glob":
+		allowed = append(allowed, "pattern", "exclude", "kind", "limit", "cursor", "fields")
 	default:
-		return action, fmt.Errorf("op must be read, write, replace, append, prepend, delete, or list")
+		return action, fmt.Errorf("op must be read, write, replace, append, prepend, delete, list, or glob")
 	}
 	if operationError := decodeFileActionObject(data, &action, allowed); operationError != nil {
 		return action, operationError
@@ -161,6 +165,11 @@ func decodeFileAction(data []byte) (fileAction, error) {
 			return action, operationError
 		}
 	}
+	if action.Operation == "glob" {
+		if operationError := action.validateGlobOptions(action.Limit, action.Cursor, action.Fields); operationError != nil {
+			return action, operationError
+		}
+	}
 	return action, nil
 }
 
@@ -178,8 +187,10 @@ func decodeFileActionOutput(data []byte) (fileActionOutput, error) {
 		allowed = append(allowed, "start_line", "end_line", "start_byte")
 	case "list":
 		allowed = append(allowed, "limit", "cursor", "fields")
+	case "glob":
+		allowed = append(allowed, "pattern", "exclude", "kind", "limit", "cursor", "fields")
 	default:
-		return output, fmt.Errorf("type must be summary, diff, read, or list")
+		return output, fmt.Errorf("type must be summary, diff, read, list, or glob")
 	}
 	if operationError := decodeFileActionObject(data, &output, allowed); operationError != nil {
 		return output, operationError
@@ -195,6 +206,9 @@ func decodeFileActionOutput(data []byte) (fileActionOutput, error) {
 	}
 	if output.Type == "list" {
 		return output, validateDirectoryPreview(output.Limit, output.Cursor, output.Fields)
+	}
+	if output.Type == "glob" {
+		return output, output.validateGlobOptions(output.Limit, output.Cursor, output.Fields)
 	}
 	return output, nil
 }

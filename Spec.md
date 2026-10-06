@@ -785,7 +785,7 @@ The model request must keep the parameter descriptions and defaults. A new model
 
 ### 10.4 File Tools
 
-The tool `file_actions` replaces the tools `read`, `write`, and `replace`. One tool call has `path` or an array of 1 to 32 `paths`, and an `actions` array with 1 to 32 items. The field `op` can be `read`, `write`, `replace`, `append`, `prepend`, `delete`, or `list`. A relative path starts at the instance workspace. The full schema is available after tool discovery.
+The tool `file_actions` replaces the tools `read`, `write`, and `replace`. One tool call has `path` or an array of 1 to 32 `paths`, and an `actions` array with 1 to 32 items. The field `op` can be `read`, `write`, `replace`, `append`, `prepend`, `delete`, `list`, or `glob`. A relative path starts at the instance workspace. The full schema is available after tool discovery.
 
 The same actions and output selection apply to the paths in input sequence. An action uses the content and line numbers from the previous action for the selected path. File edits use temporary content. The tool prepares content, output, and temporary files for the paths before the initial commit. An error before the initial commit prevents file edits.
 
@@ -825,7 +825,15 @@ The default `limit` is 100 directory entries, and the maximum is 200. The `field
 
 The fields use input sequence. Data that is not available has the value `?`.
 
-A directory cursor gives the position for the next directory page. A `list` action cannot be in a tool call with file actions.
+A directory cursor gives the position for the next directory page. Directory actions `list` and `glob` cannot be in a tool call with file text actions or file edits.
+
+The `glob` action finds relative paths with a glob pattern. The glob pattern and path must agree in letter case. Doublestar v4.10.2 gives the glob matcher. The harness controls directory traversal, cancellation, and the result limit. It does not follow symbolic links or use `.gitignore`.
+
+The glob pattern can have `*`, `**`, `?`, character classes, and brace alternatives. The `pattern` parameter has 1 to 1024 characters. The optional `exclude` array has a maximum of 16 glob patterns.
+
+The tool does not examine a directory with a glob match in `exclude`. The default value of `kind` is `file` for regular files. Other values are `directory`, `link`, and `all`.
+
+The result has F/D/L/S labels and relative paths. The `fields` parameter can select more file data. The default limit is 100 glob matches and the maximum is 200. One 200-line/16-KiB limit applies to the paths together. A glob cursor continues the same query and has a maximum length of 32768 bytes. File edits use paths that the model selects, not automatic glob matches.
 
 The `delete` action removes files, symbolic links, and empty directories. It does not remove directory contents or the workspace root. The last symbolic link is not followed. Path checks use the same entry that the tool removes.
 

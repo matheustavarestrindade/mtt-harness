@@ -57,6 +57,8 @@ func (failure *fileToolError) Error() string {
 	switch failure.operation {
 	case "read", "write", "list", "delete":
 		operation = failure.operation
+	case "glob":
+		operation = "match paths under"
 	case "replace":
 		operation = "replace text in"
 	case "append", "prepend":
@@ -65,6 +67,8 @@ func (failure *fileToolError) Error() string {
 		operation = "produce the final read of"
 	case "return list":
 		operation = "produce the final listing of"
+	case "return glob":
+		operation = "produce the final path matches under"
 	case "return diff":
 		operation = "produce the final diff of"
 	case "commit":
@@ -89,7 +93,7 @@ func (failure *fileToolError) Error() string {
 func fileFailureReason(cause error, operation string) string {
 	switch {
 	case errors.Is(cause, os.ErrNotExist):
-		if operation == "list" || operation == "return list" {
+		if operation == "list" || operation == "return list" || operation == "glob" || operation == "return glob" {
 			return "directory does not exist"
 		}
 		return "file does not exist"

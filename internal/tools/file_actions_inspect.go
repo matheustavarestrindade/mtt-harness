@@ -38,6 +38,8 @@ func (fileTool FileActions) runFileInspections(operationContext context.Context,
 		var operationError error
 		if action.Operation == "list" {
 			text, operationError = actionResults.list(operationContext, path, action.Limit, action.Cursor, action.Fields)
+		} else if action.Operation == "glob" {
+			text, operationError = actionResults.glob(operationContext, path, action.fileGlobOptions, action.Limit, action.Cursor, action.Fields)
 		} else {
 			if _, operationError = file.Seek(0, io.SeekStart); operationError == nil {
 				text, operationError = actionResults.read(operationContext, file, action.fileTextSelection, fileTool.lineNumbers)
@@ -69,6 +71,12 @@ func (fileTool FileActions) runFileInspections(operationContext context.Context,
 		text, operationError := results.list(operationContext, path, input.Return.Limit, input.Return.Cursor, input.Return.Fields)
 		if operationError != nil {
 			return "", &fileActionFailure{operation: "return list", cause: operationError}
+		}
+		return text, nil
+	case "glob":
+		text, operationError := results.glob(operationContext, path, input.Return.fileGlobOptions, input.Return.Limit, input.Return.Cursor, input.Return.Fields)
+		if operationError != nil {
+			return "", &fileActionFailure{operation: "return glob", cause: operationError}
 		}
 		return text, nil
 	}

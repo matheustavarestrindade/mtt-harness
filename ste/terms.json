@@ -2,6 +2,99 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "glob matcher",
+      "category": "technical_noun",
+      "approved_forms": [
+        "glob matchers"
+      ],
+      "meaning": "the algorithm that compares a path with a glob pattern",
+      "source": "glob file discovery"
+    },
+    {
+      "term": "glob match",
+      "category": "technical_noun",
+      "approved_forms": [
+        "glob matches"
+      ],
+      "meaning": "a filesystem path selected by a glob pattern",
+      "source": "glob file discovery"
+    },
+    {
+      "term": "glob cursor",
+      "category": "technical_noun",
+      "approved_forms": [
+        "glob cursors"
+      ],
+      "meaning": "a root-and-query-specific continuation position for glob results",
+      "source": "glob file discovery"
+    },
+    {
+      "term": "MIT license",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the permissive MIT software license used by Doublestar",
+      "source": "glob library license"
+    },
+    {
+      "term": "escape character",
+      "category": "technical_noun",
+      "approved_forms": [
+        "escape characters"
+      ],
+      "meaning": "a character marking the next special pattern character as literal text",
+      "source": "glob pattern syntax"
+    },
+    {
+      "term": "glob pattern",
+      "category": "technical_noun",
+      "approved_forms": [
+        "glob patterns"
+      ],
+      "meaning": "a path-matching expression using wildcards and optional alternatives",
+      "source": "glob file discovery"
+    },
+    {
+      "term": "glob",
+      "category": "technical_noun",
+      "approved_forms": [
+        "globs"
+      ],
+      "meaning": "the file_actions operation for matching descendant paths",
+      "source": "file discovery"
+    },
+    {
+      "term": "Doublestar",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the pure-Go glob pattern library used for file path matching",
+      "source": "github.com/bmatcuk/doublestar"
+    },
+    {
+      "term": "character class",
+      "category": "technical_noun",
+      "approved_forms": [
+        "character classes"
+      ],
+      "meaning": "a bracket expression selecting allowed or disallowed characters in a pattern",
+      "source": "glob pattern syntax"
+    },
+    {
+      "term": "brace alternative",
+      "category": "technical_noun",
+      "approved_forms": [
+        "brace alternatives"
+      ],
+      "meaning": "comma-separated pattern alternatives enclosed in braces",
+      "source": "glob pattern syntax"
+    },
+    {
+      "term": "directory traversal",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "enumeration of directory entries and descendants during a file search",
+      "source": "glob file discovery"
+    },
+    {
       "term": "batch",
       "category": "technical_noun",
       "approved_forms": [
