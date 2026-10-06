@@ -24,6 +24,34 @@ An empty file does not supply system instructions. If the file is not available,
 
 After a template change, stop and start the harness.
 
+## Default Behavior
+
+The default template gives tool discovery and selection rules. The model must read the full tool description and input schema before a tool call. The tool definition gives the rules for the operation. The template does not give a different file action procedure.
+
+The model uses a definition that is available in the request. If the definition is not available, the model uses `search_tool`. The next model request gives the full definition. A tool name does not supply a tool definition.
+
+The default template includes the tool catalog, not full tool definitions. The initial request gives `search_tool` through the provider tool data. A file tool definition is available after tool discovery. Child sessions also have the `finish` tool.
+
+File edits can use information from the user, previous messages, or tool results. The model gets more file data only when necessary for a file edit. The tool definition gives output rules and steps for an error. The model must run the checks necessary for the task.
+
+## User Communication
+
+The default template uses ISO 24495-1 for messages to the user. English text also uses ASD-STE100. The model uses the chat language that the user selects.
+
+The template has 4 goals for messages:
+
+- `Relevant`: give the information necessary for the task.
+- `Findable`: put information in a clear sequence.
+- `Understandable`: use clear text.
+- `Usable`: give the information necessary for the next action.
+
+The rules apply to messages to the user. The model keeps messages to other agents short.
+
+See:
+
+- [ISO 24495-1:2023](https://www.iso.org/standard/78907.html)
+- [`IPLF`](https://www.iplfederation.org/iso-standard/)
+
 ## Variables
 
 Put a variable between braces, for example `{workspace}`. Use the same text as the variable name in the list.
@@ -44,7 +72,7 @@ For example, `{bash_info}` gives the definition of `bash`. `{file_actions_info}`
 
 A tool definition is JSON with `name`, `description`, `categories`, and `input_schema`. The schema includes parameter descriptions, defaults, and units. The definition of `agent` includes the model list for the instance.
 
-Tool variables do not change the session tool group. The initial request has the full definitions of `search_tool` and `file_actions`. The model uses `search_tool` to add other tools to the group. Tool permissions and input checks continue to apply.
+Tool variables do not change the session tool group. The initial request has the definition of `search_tool`. The model uses `search_tool` to add tools to the group. The model gets `file_actions` through tool discovery. Tool permissions and input checks continue to apply.
 
 The harness gets tool data from the registry for a model request. If a tool in a variable is not in the registry, the turn gives an error before the model call. Other sessions can continue. The rule also applies if an MCP server removes a tool.
 

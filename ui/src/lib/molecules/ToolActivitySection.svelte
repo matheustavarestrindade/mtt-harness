@@ -43,13 +43,16 @@
     >
   </button>
   {#if open}
-    <div id={identifier} class="min-w-0 space-y-3 pt-2 pl-3 pb-2">
+    <div
+      id={identifier}
+      class="tool-details mt-2 min-w-0 space-y-3 border border-border bg-card/70 p-3"
+    >
       {#if unmatched}<p class="mt-2 text-xs text-muted-foreground">
           The original tool call is not in this history.
         </p>
       {:else}
         <section aria-label="Tool input" class="min-w-0">
-          <h3 class="eyebrow">Input</h3>
+          <h3 class="eyebrow text-foreground/80">Input</h3>
           <CodeBlock
             text={JSON.stringify(activity.call.Input, null, 2) ?? 'null'}
             language="json"
@@ -57,8 +60,8 @@
           />
         </section>
       {/if}
-      <section aria-label="Tool output" class="min-w-0 pt-2">
-        <h3 class="eyebrow">Output</h3>
+      <section aria-label="Tool output" class="min-w-0 border-t border-border pt-3">
+        <h3 class="eyebrow text-foreground/80">Output</h3>
         {#if activity.result?.Content?.length}<MessageContent
             content={activity.result.Content}
             mode={language === 'markdown' ? 'markdown' : 'code'}

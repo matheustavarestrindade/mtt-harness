@@ -51,6 +51,8 @@ For `file_actions`, the section label shows the action sequence and path. The in
 
 The client prepares content views when the user opens a tool section. The section shows input, output, and the value of `ToolCallID`. The same section shows a new tool result. The UI shows a tool result in a different section if the tool call is not in the history.
 
-Tool sections, reasoning sections, and model text use the UI background. The sections have a line between them. A different color identifies a tool section. The tool section contains input and output. Content views in the sections do not have a card container. Copy buttons, source downloads, and CSV views stay available.
+Tool sections, reasoning sections, and model text use the UI background. The sections have a line between them. A different color identifies a tool section. When a tool section opens, one panel contains input and output. The panel has a background color and border. Input and output have a line between them.
+
+Content views in the panel do not have a card container. Copy buttons, source downloads, and CSV views stay available.
 
 Message history does not include tool status fields. The UI shows the label `Result` when a tool result is available. It does not change error text in the output.

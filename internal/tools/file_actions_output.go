@@ -35,7 +35,7 @@ func (results *fileActionResults) read(operationContext context.Context, source 
 	if preview.nextLine == 0 {
 		return preview.content, nil
 	}
-	continuation := fmt.Sprintf(`{"op":"read","start_line":%d`, preview.nextLine)
+	continuation := fmt.Sprintf(`{"start_line":%d`, preview.nextLine)
 	if preview.nextByte > 0 {
 		continuation += fmt.Sprintf(`,"start_byte":%d`, preview.nextByte)
 	}
@@ -43,14 +43,11 @@ func (results *fileActionResults) read(operationContext context.Context, source 
 		continuation += fmt.Sprintf(`,"end_line":%d`, *selection.EndLine)
 	}
 	continuation += "}"
-	return preview.content + "\n\n[Shared file_actions preview budget reached: 200 lines or 16 KiB including labels. Continue on the same path with file_actions actions:[" + continuation + "]. This notice is not file content.]", nil
+	return preview.content + "\n\n[Shared file_actions preview budget reached: 200 lines or 16 KiB including labels. Continuation for this path: " + continuation + ". This notice is not file content.]", nil
 }
 
-func (results *fileActionResults) add(label, text string) {
-	if text == "" {
-		text = "(empty output)"
-	}
-	results.parts = append(results.parts, label+"\n"+text)
+func (results *fileActionResults) add(text string) {
+	results.parts = append(results.parts, text)
 }
 
 func (results *fileActionResults) text() string { return strings.Join(results.parts, "\n\n") }

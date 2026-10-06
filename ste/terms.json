@@ -2,6 +2,256 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "glob matcher",
+      "category": "technical_noun",
+      "approved_forms": [
+        "glob matchers"
+      ],
+      "meaning": "the algorithm that compares a path with a glob pattern",
+      "source": "glob file discovery"
+    },
+    {
+      "term": "glob match",
+      "category": "technical_noun",
+      "approved_forms": [
+        "glob matches"
+      ],
+      "meaning": "a filesystem path selected by a glob pattern",
+      "source": "glob file discovery"
+    },
+    {
+      "term": "glob cursor",
+      "category": "technical_noun",
+      "approved_forms": [
+        "glob cursors"
+      ],
+      "meaning": "a root-and-query-specific continuation position for glob results",
+      "source": "glob file discovery"
+    },
+    {
+      "term": "MIT license",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the permissive MIT software license used by Doublestar",
+      "source": "glob library license"
+    },
+    {
+      "term": "escape character",
+      "category": "technical_noun",
+      "approved_forms": [
+        "escape characters"
+      ],
+      "meaning": "a character marking the next special pattern character as literal text",
+      "source": "glob pattern syntax"
+    },
+    {
+      "term": "glob pattern",
+      "category": "technical_noun",
+      "approved_forms": [
+        "glob patterns"
+      ],
+      "meaning": "a path-matching expression using wildcards and optional alternatives",
+      "source": "glob file discovery"
+    },
+    {
+      "term": "glob",
+      "category": "technical_noun",
+      "approved_forms": [
+        "globs"
+      ],
+      "meaning": "the file_actions operation for matching descendant paths",
+      "source": "file discovery"
+    },
+    {
+      "term": "Doublestar",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the pure-Go glob pattern library used for file path matching",
+      "source": "github.com/bmatcuk/doublestar"
+    },
+    {
+      "term": "character class",
+      "category": "technical_noun",
+      "approved_forms": [
+        "character classes"
+      ],
+      "meaning": "a bracket expression selecting allowed or disallowed characters in a pattern",
+      "source": "glob pattern syntax"
+    },
+    {
+      "term": "brace alternative",
+      "category": "technical_noun",
+      "approved_forms": [
+        "brace alternatives"
+      ],
+      "meaning": "comma-separated pattern alternatives enclosed in braces",
+      "source": "glob pattern syntax"
+    },
+    {
+      "term": "directory traversal",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "enumeration of directory entries and descendants during a file search",
+      "source": "glob file discovery"
+    },
+    {
+      "term": "batch",
+      "category": "technical_noun",
+      "approved_forms": [
+        "batches"
+      ],
+      "meaning": "a group of filesystem targets receiving one shared file-action request",
+      "source": "multi-file actions"
+    },
+    {
+      "term": "path gate",
+      "category": "technical_noun",
+      "approved_forms": [
+        "path gates"
+      ],
+      "meaning": "the synchronization gate owning operations on one resolved filesystem path",
+      "source": "file edit coordination"
+    },
+    {
+      "term": "target index",
+      "category": "technical_noun",
+      "approved_forms": [
+        "target indexes"
+      ],
+      "meaning": "a one-based position in the file_actions target path array",
+      "source": "multi-file feedback"
+    },
+    {
+      "term": "status count",
+      "category": "technical_noun",
+      "approved_forms": [
+        "status counts"
+      ],
+      "meaning": "the number of file-action targets with a given completion status",
+      "source": "multi-file summaries"
+    },
+    {
+      "term": "tool catalog",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tool catalogs"
+      ],
+      "meaning": "a compact list of registered tool names and categories",
+      "source": "tool discovery"
+    },
+    {
+      "term": "quoted name",
+      "category": "technical_noun",
+      "approved_forms": [
+        "quoted names"
+      ],
+      "meaning": "an escaped directory-entry name shown within quotation marks",
+      "source": "compact directory listing"
+    },
+    {
+      "term": "workspace root",
+      "category": "technical_noun",
+      "approved_forms": [
+        "workspace roots"
+      ],
+      "meaning": "the top directory configured for an instance workspace",
+      "source": "file deletion boundary"
+    },
+    {
+      "term": "UTC",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "Coordinated Universal Time used for filesystem timestamps",
+      "source": "directory metadata"
+    },
+    {
+      "term": "UID",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the numeric filesystem user identifier",
+      "source": "directory metadata"
+    },
+    {
+      "term": "GID",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the numeric filesystem group identifier",
+      "source": "directory metadata"
+    },
+    {
+      "term": "octal mode",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "filesystem permission bits expressed as an octal value",
+      "source": "directory metadata"
+    },
+    {
+      "term": "file modification time",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the observed filesystem timestamp for the last change to a file's content",
+      "source": "file action failure data"
+    },
+    {
+      "term": "panel",
+      "category": "technical_noun",
+      "approved_forms": [
+        "panels"
+      ],
+      "meaning": "a UI region containing related content or controls",
+      "source": "expanded tool output display"
+    },
+    {
+      "term": "background color",
+      "category": "technical_noun",
+      "approved_forms": [
+        "background colors"
+      ],
+      "meaning": "the color of a UI surface behind its content",
+      "source": "expanded tool output display"
+    },
+    {
+      "term": "border",
+      "category": "technical_noun",
+      "approved_forms": [
+        "borders"
+      ],
+      "meaning": "a visible line at the edge of a UI region",
+      "source": "expanded tool output display"
+    },
+    {
+      "term": "English text",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "text in English to which the startup prompt applies ASD-STE100 wording rules",
+      "source": "startup prompt communication guidance"
+    },
+    {
+      "term": "chat language",
+      "category": "technical_noun",
+      "approved_forms": [
+        "chat languages"
+      ],
+      "meaning": "the natural language selected by the user for conversation replies",
+      "source": "startup prompt communication guidance"
+    },
+    {
+      "term": "ISO 24495-1",
+      "category": "technical_noun",
+      "approved_forms": [
+        "ISO 24495-1:2023"
+      ],
+      "meaning": "the plain-language standard for reader-focused content, organization, wording, and usability",
+      "source": "startup prompt communication guidance"
+    },
+    {
+      "term": "ASD-STE100",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the Simplified Technical English specification used for English technical wording",
+      "source": "startup prompt communication guidance"
+    },
+    {
       "term": "session tree",
       "category": "technical_noun",
       "approved_forms": [

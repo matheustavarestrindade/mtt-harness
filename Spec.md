@@ -198,6 +198,10 @@ The template accepts the variables:
 
 Tool data comes from the registry for a model call. For example, `{bash_info}` gives the full tool definition of `bash`. The `agent` definition includes the instance model list. Tool variables do not change the session tool group. The model uses tool discovery to add tools to the group.
 
+The default template gives tool discovery and selection rules. The model must read the full tool description and input schema before a tool call. The tool definition gives the rules for the operation. The template does not give a different file action procedure.
+
+Messages to the user follow ISO 24495-1. The message must contain necessary information that the user can find and use. English text also follows ASD-STE100. The model uses the chat language that the user selects. Messages to other agents stay short.
+
 Use 2 braces before and after the variable name for literal text. For example, `{{workspace}}` gives `{workspace}`. Substitution occurs one time. JSON braces do not change. If a tool in a variable is not in the registry, the turn gives an error before the model call.
 
 See `docs/start-prompt.md` for variable rules and Docker configuration.
@@ -713,7 +717,7 @@ A verdict of `deny` must stop a tool before the harness reads a permission decis
 
 ### 10.2 Find Tools
 
-The initial model request has the full definitions of `search_tool` and `file_actions`. The model starts `search_tool` with a query to get other tools. The query has a category or text. The result gives only the fields `Name` and `Categories` of a tool.
+The initial model request has the full definition of `search_tool`. The model starts `search_tool` with a query to get other tools. The query can select `file_actions`. The query has a category or text. The result gives only the fields `Name` and `Categories` of a tool. Child agents also have the `finish` tool.
 
 The harness makes a search document from the tool name, description, categories, and input schema. A tool can also give usage examples through the optional `SearchDocument` method. For semantic search, a model changes the document to a vector. The query uses the same model. Lexical search uses TF-IDF vectors from the same documents.
 
@@ -765,7 +769,7 @@ Requirements:
 - R89: Text queries must put the largest cosine similarity first.
 - R90: Tools with the same cosine similarity value must be in name sequence.
 - R91: Tool discovery must give the same sequence for the same vectors and tool group.
-- R92: The harness must give the `search_tool` and `file_actions` tools to a model that can start tools.
+- R92: The harness must give `search_tool` to a model that can start tools. The model must get `file_actions` through tool discovery.
 - R93: The result of `search_tool` must give only `Name` and `Categories` for the found tools.
 - R94: The harness must add the found tools to the tool group of the session.
 - R95: The harness must give the tool group and the `search_tool` tool in the model request.
@@ -781,9 +785,13 @@ The model request must keep the parameter descriptions and defaults. A new model
 
 ### 10.4 File Tools
 
-The tool `file_actions` replaces the tools `read`, `write`, and `replace`. One tool call has one `path` and an `actions` array with 1 to 32 items. The field `op` can be `read`, `write`, `replace`, `append`, `prepend`, or `list`. A relative path starts at the instance workspace. The initial model request has the full schema.
+The tool `file_actions` replaces the tools `read`, `write`, and `replace`. One tool call has `path` or an array of 1 to 32 `paths`, and an `actions` array with 1 to 32 items. The field `op` can be `read`, `write`, `replace`, `append`, `prepend`, `delete`, `list`, or `glob`. A relative path starts at the instance workspace. The full schema is available after tool discovery.
 
-Actions run in input sequence on the same path. An action uses the content and line numbers from the previous action. File edits use temporary content. The actions and selected preview must be correct before the tool replaces the file. The tool uses one rename operation. An error prevents the file change.
+The same actions and output selection apply to the paths in input sequence. An action uses the content and line numbers from the previous action for the selected path. File edits use temporary content. The tool prepares content, output, and temporary files for the paths before the initial commit. An error before the initial commit prevents file edits.
+
+Paths with the same resolved value give an error. Paths for file edits must not contain other selected paths. The harness uses path gates in name sequence. The input sequence does not change the sequence of the path gates.
+
+A replacement uses one rename operation. A file has one commit. A commit error stops new file edits. Files from previous commits do not change after the error. The error gives the target indexes for previous commits. The initial target index is 1.
 
 The actions `read`, `write`, and `replace` have optional `start_line` and `end_line` parameters. Line numbers start at 1. The line range includes the start line and the end line. Without `start_line`, the range starts at line 1. Without `end_line`, the range continues to EOF.
 
@@ -811,11 +819,31 @@ The harness puts tool calls for the same resolved path in sequence. Different pa
 
 The `append` action adds `content` at the end of the file. The `prepend` action adds `content` at the start. They do not add line breaks automatically. The file must be available. A previous `write` action without a line range can make the file in the same tool call.
 
-The `list` action gives directory entries in name sequence. A name which starts with `.` is not removed. The tool does not follow symbolic links. The result gives the name, type, and number of bytes. The default `limit` is 100 directory entries, and the maximum is 200.
+The `list` action gives directory entries in name sequence. A name which starts with `.` is not removed. The tool does not follow symbolic links. The default result gives only a type prefix and name. `F` identifies a file, `D` a directory, `L` a symbolic link, and `S` a different entry type.
 
-A directory cursor gives the position for the next directory page. A `list` action cannot be in a tool call with file actions.
+The default `limit` is 100 directory entries, and the maximum is 200. The `fields` array can have `size`, `permissions`, `owner`, `group`, or `modified`. The result gives bytes for `size` and an octal mode for `permissions`. The fields `owner` and `group` give UID and GID. The field `modified` gives the file modification time in UTC.
 
-A file edit result gives the resolved path, file status, and number of lines and bytes. The status text is `Created`, `Updated`, or `Unchanged`. The result of `replace` also gives the number of text matches and the mode.
+The fields use input sequence. Data that is not available has the value `?`.
+
+A directory cursor gives the position for the next directory page. Directory actions `list` and `glob` cannot be in a tool call with file text actions or file edits.
+
+The `glob` action finds relative paths with a glob pattern. The glob pattern and path must agree in letter case. Doublestar v4.10.2 gives the glob matcher. The harness controls directory traversal, cancellation, and the result limit. It does not follow symbolic links or use `.gitignore`.
+
+The glob pattern can have `*`, `**`, `?`, character classes, and brace alternatives. The `pattern` parameter has 1 to 1024 characters. The optional `exclude` array has a maximum of 16 glob patterns.
+
+The tool does not examine a directory with a glob match in `exclude`. The default value of `kind` is `file` for regular files. Other values are `directory`, `link`, and `all`.
+
+The result has F/D/L/S labels and relative paths. The `fields` parameter can select more file data. The default limit is 100 glob matches and the maximum is 200. One 200-line/16-KiB limit applies to the paths together. A glob cursor continues the same query and has a maximum length of 32768 bytes. File edits use paths that the model selects, not automatic glob matches.
+
+The `delete` action removes files, symbolic links, and empty directories. It does not remove directory contents or the workspace root. The last symbolic link is not followed. Path checks use the same entry that the tool removes.
+
+A directory or symbolic link removal must use one `delete` action and `return.type` set to `summary`. File removal can be in a file action sequence. The tool examines the selected output before removal.
+
+A file must be available for output with `return.type` set to `read`. A unified diff for file removal has `/dev/null` as the new path.
+
+The result contains only the output selected by the model. For one path, it does not add the path, action information, or number of lines and bytes. With `return.type` set to `summary`, the result is `Created`, `Updated`, `Deleted`, `Unchanged`, or `OK`.
+
+For a batch, the file text and directory data have short path labels. A `summary` result gives status counts. A unified diff has the file path. One preview limit applies to the paths together.
 
 The model selects the result. A unified diff is not the default. In a unified diff, the prefix `-` shows lines which the tool removes. New lines have the prefix `+`. The preview keeps LF and CRLF and shows a last line without LF. The line numbers refer to the full file.
 
@@ -823,12 +851,12 @@ The limits apply only to the preview. The file edit writes the full replacement.
 
 A tool call with file edits must have a `return` object. The field `return.type` is necessary in the object. Use `return.type` to select the result:
 
-- `summary`: file status, action information, and the number of lines and bytes.
+- `summary`: one status value.
 - `diff`: a unified diff of previous and new content. The default value for `context_lines` is 3. The range is 0 to 100.
 - `read`: new file text, with optional `start_line`, `end_line`, and `start_byte`.
-- `list`: directory entries, with optional `limit` and `cursor`.
+- `list`: directory entries, with optional `limit`, `cursor`, and `fields`.
 
-A `read` or `list` action also gives output. The model must not select the same output again in `return`. The limit applies to action output and output from `return` together. Without a file edit, the `return` field is optional.
+With `return`, the tool gives only the output from `return`. The tool does not show output from a read action or list action. The output limit applies to `return` only. Without `return`, the tool gives selected file text or directory data. One limit applies to the full output. A file edit must have `return`.
 
 The line range in `return` uses the new file content. It does not select the previous lines to replace. The default start is line 1. The default end is EOF.
 
@@ -840,11 +868,11 @@ The tool removes the same outer text from the diff input but keeps lines of cont
 
 The tool makes the unified diff from the previous content and replacement content of the same file edit. It does not read the file again after the file edit. Thus, the result does not show a different file edit.
 
-Use `on_error.return` to select an error diagnostic for the same path. The type of error diagnostic must be `read` or `list`. It cannot change file content or run the actions again.
+The initial error stops the tool call. The tool does not start the next action or read the file again. Temporary content and previews are discarded. An error before the initial commit prevents file edits. An error from the commit gives the target indexes for previous commits. The tool does not accept `on_error`.
 
-After a file edit error, the preview uses previous file content. Temporary content and previews are discarded. The tool status stays `error`, with the action number and cause.
+The tool status stays `error`. The result gives the operation, action number, path, and cause. It can also give the file modification time from data available before the error. The result gives a preview of `old_text` if a text match is not available. The maximum preview for a long value is 160 bytes.
 
-An error diagnostic cannot replace the initial error. Cancellation and incorrect input do not start error diagnostic I/O. The tool call does not change the file. Use the error diagnostic to correct the next action. Do not use the same incorrect input again.
+Tool results give data, not steps for a different action. Error output does not cause a new file operation. The model selects the next action. The file text, command output, and MCP data do not change.
 
 The tool input can be:
 
@@ -852,7 +880,7 @@ The tool input can be:
 {"path":"src","actions":[{"op":"list","limit":100}]}
 {"path":"src/main.go","actions":[{"op":"read","start_line":10,"end_line":40}]}
 {"path":"notes.txt","actions":[{"op":"write","content":"hello\n"},{"op":"append","content":"world\n"}],"return":{"type":"read"}}
-{"path":"src/main.go","actions":[{"op":"replace","old_text":"oldName","new_text":"newName","mode":"all"}],"return":{"type":"diff","context_lines":3},"on_error":{"return":{"type":"read","start_line":10,"end_line":50}}}
+{"path":"src/main.go","actions":[{"op":"replace","old_text":"oldName","new_text":"newName","mode":"all"}],"return":{"type":"diff","context_lines":3}}
 ```
 
 ### 10.5 Read Output A/B Test
@@ -861,7 +889,7 @@ The process environment variable `MTT_READ_LINE_NUMBERS` selects the file text f
 
 The control output gives file text without line-number labels. The test output has the file line number before the text. For example, a range from line 10 starts with `10: `. The line prefix is output data, not file content. A model must not put the line prefix into a file edit. The tool description gives the active output format to the model.
 
-The A/B test does not change the line range in the tool input or the file content. The byte limit includes the line-number labels. The output can stop at a different byte because of the labels. The tool gives a truncation notice if the selected text is too large. The format applies to actions, `return`, and error diagnostics.
+The A/B test does not change the line range in the tool input or the file content. The byte limit includes the line-number labels. The output can stop at a different byte because of the labels. The tool gives a truncation notice if the selected text is too large. The format applies to actions and `return`.
 
 The model, task, and files must be the same for the control and the test. A new process start is necessary to change the output format.
 
@@ -1301,7 +1329,8 @@ mtt-harness/
       file_actions.go          # the file_actions tool and atomic action chain
       file_actions_input.go    # action and output validation
       file_actions_schema.go   # the model-facing input contract
-      file_actions_inspect.go  # read-only actions and error diagnostics
+      file_actions_inspect.go  # read-only file and directory actions
+      file_failure.go          # factual errors and observed file metadata
       file_actions_output.go   # the shared output budget
       file_directory.go       # bounded directory pages
       file_mutations.go       # line writes and literal text replacement

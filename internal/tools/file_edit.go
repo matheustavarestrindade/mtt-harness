@@ -104,36 +104,64 @@ func applyAtomicFileEdit(operationContext context.Context, path string, allowCre
 }
 
 func replaceFileContentsAtomically(operationContext context.Context, path string, information os.FileInfo, content []byte) error {
+	replacement, operationError := prepareFileReplacement(operationContext, path, information, content)
+	if operationError != nil {
+		return operationError
+	}
+	defer replacement.discard()
+	return replacement.commit(operationContext)
+}
+
+type preparedFileReplacement struct{ path, temporaryPath string }
+
+func (replacement *preparedFileReplacement) discard() { _ = os.Remove(replacement.temporaryPath) }
+
+func (replacement *preparedFileReplacement) commit(operationContext context.Context) error {
+	if operationError := operationContext.Err(); operationError != nil {
+		return operationError
+	}
+	return os.Rename(replacement.temporaryPath, replacement.path)
+}
+
+// Prepare every replacement before a multi-path call commits its first file.
+// Preparation failures leave destinations intact and remove their temporary data.
+func prepareFileReplacement(operationContext context.Context, path string, information os.FileInfo, content []byte) (*preparedFileReplacement, error) {
 	permissions := os.FileMode(0o644)
 	if information != nil {
 		// Rename permission alone must not bypass a read-only destination.
 		destination, operationError := os.OpenFile(path, os.O_WRONLY, 0)
 		if operationError != nil {
-			return operationError
+			return nil, operationError
 		}
 		if operationError := destination.Close(); operationError != nil {
-			return operationError
+			return nil, operationError
 		}
 		permissions = information.Mode().Perm()
 	}
 	temporaryPath := filepath.Join(filepath.Dir(path), ".mtt-edit-"+rand.Text())
 	temporaryFile, operationError := os.OpenFile(temporaryPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, permissions)
 	if operationError != nil {
-		return operationError
+		return nil, operationError
 	}
-	defer os.Remove(temporaryPath)
+	prepared := false
+	defer func() {
+		if !prepared {
+			_ = os.Remove(temporaryPath)
+		}
+	}()
 	if information != nil {
 		if operationError := temporaryFile.Chmod(permissions); operationError != nil {
-			return errors.Join(operationError, temporaryFile.Close())
+			return nil, errors.Join(operationError, temporaryFile.Close())
 		}
 	}
 	_, writeError := temporaryFile.Write(content)
 	closeError := temporaryFile.Close()
 	if operationError := errors.Join(writeError, closeError); operationError != nil {
-		return operationError
+		return nil, operationError
 	}
 	if operationError := operationContext.Err(); operationError != nil {
-		return operationError
+		return nil, operationError
 	}
-	return os.Rename(temporaryPath, path)
+	prepared = true
+	return &preparedFileReplacement{path: path, temporaryPath: temporaryPath}, nil
 }

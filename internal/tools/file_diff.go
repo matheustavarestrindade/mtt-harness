@@ -23,6 +23,10 @@ func renderFileEditDiff(path string, original, updated []byte, existed bool, con
 }
 
 func renderFileEditDiffWithin(path string, original, updated []byte, existed bool, contextLines int, limits filePreviewLimits) string {
+	return renderFileStateDiffWithin(path, original, updated, existed, true, contextLines, limits)
+}
+
+func renderFileStateDiffWithin(path string, original, updated []byte, existed, exists bool, contextLines int, limits filePreviewLimits) string {
 	if limits.lines <= 0 || limits.bytes <= 0 {
 		return "Diff preview omitted: the shared output budget is exhausted. The full edit succeeded."
 	}
@@ -31,15 +35,25 @@ func renderFileEditDiffWithin(path string, original, updated []byte, existed boo
 	}
 	before, after, skippedLines := selectFileDiffWindow(original, updated, contextLines)
 	if len(before)+len(after) > fileDiffComparisonBytes || countFileLines(before)+countFileLines(after) > fileDiffComparisonLines {
-		return fmt.Sprintf("Diff preview omitted: the changed region exceeds 256 KiB or 4000 combined lines. The full edit succeeded. Use file_actions with a read action from line %d to inspect the updated file; an empty file has no readable lines.", skippedLines+1)
+		return fmt.Sprintf("Diff preview omitted: the changed region exceeds 256 KiB or 4000 combined lines. The full edit succeeded. Changed region starts at line %d.", skippedLines+1)
 	}
 	beforeLines, afterLines := splitFileDiffLines(before), splitFileDiffLines(after)
 	preview := fileDiffPreview{limits: limits}
 	previousPath := strconv.Quote(path)
+	currentPath := strconv.Quote(path)
 	if !existed {
 		previousPath = "/dev/null"
 	}
-	preview.append(fmt.Sprintf("--- %s\n+++ %s\n", previousPath, strconv.Quote(path)))
+	if !exists {
+		currentPath = "/dev/null"
+	}
+	if existed != exists && len(original) == 0 && len(updated) == 0 {
+		if exists {
+			return "Empty file created."
+		}
+		return "Empty file deleted."
+	}
+	preview.append(fmt.Sprintf("--- %s\n+++ %s\n", previousPath, currentPath))
 	for _, group := range difflib.NewMatcher(beforeLines, afterLines).GetGroupedOpCodes(contextLines) {
 		first, last := group[0], group[len(group)-1]
 		preview.append(fmt.Sprintf("@@ -%s +%s @@\n", formatFileDiffRange(skippedLines+first.I1, last.I2-first.I1), formatFileDiffRange(skippedLines+first.J1, last.J2-first.J1)))
@@ -57,7 +71,7 @@ func renderFileEditDiffWithin(path string, original, updated []byte, existed boo
 		}
 	}
 	if preview.truncated {
-		return preview.content.String() + "\nDiff preview truncated at 200 lines or 16 KiB. The full edit succeeded. Use file_actions with a read action to inspect the remaining content."
+		return preview.content.String() + "\nDiff preview truncated at 200 lines or 16 KiB. The full edit succeeded."
 	}
 	return preview.content.String()
 }

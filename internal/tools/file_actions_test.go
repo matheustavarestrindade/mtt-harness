@@ -35,7 +35,7 @@ func TestFileActionsStageAnOrderedChainAndReturnChosenText(test *testing.T) {
 	testutil.RequireNoError(test, operationError)
 	actual, operationError := os.ReadFile(filepath.Join(workspace, "source.txt"))
 	testutil.RequireNoError(test, operationError)
-	if string(actual) != "top\nchanged\nnew\ntail" || !strings.HasSuffix(result.Text(), "2: changed\n3: new\n4: tail") || strings.Contains(result.Text(), "@@") {
+	if string(actual) != "top\nchanged\nnew\ntail" || result.Text() != "2: changed\n3: new\n4: tail" {
 		test.Fatalf("incorrect ordered edit or selected output: %q\n%s", actual, result.Text())
 	}
 }
@@ -54,12 +54,12 @@ func TestFileActionsNeverChooseADiffForTheModel(test *testing.T) {
 	arguments["return"] = map[string]any{"type": "summary"}
 	result, operationError = NewFileActions(false).Run(operationContext, fileCall(test, arguments))
 	testutil.RequireNoError(test, operationError)
-	if strings.Contains(result.Text(), "private file content") || strings.Contains(result.Text(), "@@") || !strings.Contains(result.Text(), "Created") {
+	if result.Text() != "Created" {
 		test.Fatalf("summary leaked unsolicited file content: %s", result.Text())
 	}
 }
 
-func TestFileActionsRollbackAndDiagnoseOriginalSnapshot(test *testing.T) {
+func TestFileActionsStopAtFailureAndDiscardStagedOutput(test *testing.T) {
 	workspace := test.TempDir()
 	path := filepath.Join(workspace, "source.txt")
 	original := "original\nsecond\n"
@@ -70,15 +70,16 @@ func TestFileActionsRollbackAndDiagnoseOriginalSnapshot(test *testing.T) {
 			map[string]any{"op": "write", "content": "UNCOMMITTED\nsecond\n"},
 			map[string]any{"op": "read"},
 			map[string]any{"op": "replace", "old_text": "missing", "new_text": "new"},
+			map[string]any{"op": "read", "start_line": 999},
+			map[string]any{"op": "write", "content": "MUST NOT RUN"},
 		},
-		"return":   map[string]any{"type": "summary"},
-		"on_error": map[string]any{"return": map[string]any{"type": "read", "start_line": 1, "end_line": 2}},
+		"return": map[string]any{"type": "read", "start_line": 999},
 	}))
-	if operationError == nil || result.Status != atom.StatusError || !strings.Contains(result.Error, "action 3 (replace)") || !strings.Contains(result.Error, "old_text was not found") {
+	if operationError == nil || result.Status != atom.StatusError || !strings.Contains(result.Error, "action 3") || !strings.Contains(result.Error, `text "missing" was not found`) {
 		test.Fatalf("failed edit lost status/cause: %+v %v", result, operationError)
 	}
-	if strings.Contains(result.Text(), "UNCOMMITTED") || !strings.Contains(result.Text(), "1: original\n2: second\n") {
-		test.Fatalf("error preview exposed rolled-back text: %s", result.Text())
+	if len(result.Content) != 0 || result.Text() != result.Error || strings.Contains(result.Text(), "UNCOMMITTED") || strings.Contains(result.Text(), "999") || strings.Contains(result.Text(), "MUST NOT RUN") {
+		test.Fatalf("failed call returned other action output: %s", result.Text())
 	}
 	actual, operationError := os.ReadFile(path)
 	testutil.RequireNoError(test, operationError)
@@ -106,15 +107,20 @@ func TestFileActionsInvalidReturnOrLateFailureCannotCreateAFile(test *testing.T)
 	}
 }
 
-func TestFileActionsKeepOriginalFailureIfRecoveryFails(test *testing.T) {
+func TestFileActionsRejectErrorRecoveryBeforeExecution(test *testing.T) {
 	workspace := test.TempDir()
 	testutil.RequireNoError(test, os.WriteFile(filepath.Join(workspace, "source.txt"), []byte("old"), 0o600))
 	result, operationError := NewFileActions(false).Run(harness.WithWorkspace(context.Background(), workspace), fileCall(test, map[string]any{
-		"path": "source.txt", "actions": []any{map[string]any{"op": "replace", "old_text": "missing", "new_text": "x"}},
+		"path": "source.txt", "actions": []any{map[string]any{"op": "append", "content": "changed"}},
 		"return": map[string]any{"type": "summary"}, "on_error": map[string]any{"return": map[string]any{"type": "read", "start_line": 20}},
 	}))
-	if operationError == nil || !strings.Contains(result.Error, "old_text was not found") || !strings.Contains(result.Text(), "Recovery read preview unavailable") || result.Status != atom.StatusError {
-		test.Fatalf("diagnostic hid the original failure: %+v", result)
+	if operationError == nil || !strings.Contains(result.Error, "on_error is not valid") || len(result.Content) != 0 || result.Status != atom.StatusError {
+		test.Fatalf("unsupported recovery accepted: %+v", result)
+	}
+	actual, operationError := os.ReadFile(filepath.Join(workspace, "source.txt"))
+	testutil.RequireNoError(test, operationError)
+	if string(actual) != "old" {
+		test.Fatal("unsupported input ran an action")
 	}
 }
 
@@ -124,10 +130,10 @@ func TestFileActionsShareOnePreviewBudget(test *testing.T) {
 	result, operationError := NewFileActions(false).Run(harness.WithWorkspace(context.Background(), workspace), fileCall(test, map[string]any{
 		"path": "source.txt", "actions": []any{
 			map[string]any{"op": "read", "end_line": 150}, map[string]any{"op": "read", "end_line": 150},
-		}, "return": map[string]any{"type": "read"},
+		},
 	}))
 	testutil.RequireNoError(test, operationError)
-	if strings.Count(result.Text(), "ROW_MARKER") != 200 || !strings.Contains(result.Text(), `"start_line":51`) || !strings.Contains(result.Text(), `"start_line":1`) {
+	if strings.Count(result.Text(), "ROW_MARKER") != 200 || !strings.Contains(result.Text(), `"start_line":51`) {
 		test.Fatalf("read actions bypassed the shared cap: %s", result.Text())
 	}
 }
@@ -161,10 +167,10 @@ func TestConcurrentFileActionAppendsDoNotLoseUpdates(test *testing.T) {
 	}
 }
 
-func TestFileActionsCancellationSkipsRecovery(test *testing.T) {
+func TestFileActionsCancellationReturnsOnlyTheFailure(test *testing.T) {
 	operationContext, cancelOperation := context.WithCancel(harness.WithWorkspace(context.Background(), test.TempDir()))
 	cancelOperation()
-	result, operationError := NewFileActions(false).Run(operationContext, fileCall(test, map[string]any{"path": "missing.txt", "actions": []any{map[string]any{"op": "read"}}, "on_error": map[string]any{"return": map[string]any{"type": "list"}}}))
+	result, operationError := NewFileActions(false).Run(operationContext, fileCall(test, map[string]any{"path": "missing.txt", "actions": []any{map[string]any{"op": "read"}}}))
 	if !errors.Is(operationError, context.Canceled) || len(result.Content) != 0 {
 		test.Fatalf("cancellation started recovery: %+v %v", result, operationError)
 	}

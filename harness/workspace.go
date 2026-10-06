@@ -23,6 +23,30 @@ func WorkspacePath(operationContext context.Context, path string) (string, error
 	return ResolvePath(path)
 }
 
+// WorkspaceEntryPath resolves the parent directory while preserving the final
+// entry. Removal must unlink a symlink itself, never the target used by reads.
+func WorkspaceEntryPath(operationContext context.Context, path string) (string, error) {
+	workspace, found := WorkspaceFrom(operationContext)
+	if !found {
+		return "", fmt.Errorf("operation has no instance workspace")
+	}
+	if path == "" {
+		return "", fmt.Errorf("path is required")
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(workspace, path)
+	}
+	absolute, operationError := filepath.Abs(path)
+	if operationError != nil {
+		return "", operationError
+	}
+	parent, operationError := ResolvePath(filepath.Dir(absolute))
+	if operationError != nil {
+		return "", operationError
+	}
+	return filepath.Join(parent, filepath.Base(absolute)), nil
+}
+
 // ResolvePath resolves existing symlink ancestors even when the final file
 // does not yet exist. Broken symlinks and permission errors fail the check.
 func ResolvePath(path string) (string, error) {

@@ -40,7 +40,17 @@ export function costLabel(statistics: Statistics | null): string {
     : statistics.Cost
       ? [statistics.Cost]
       : [];
-  if (!costs.length) return 'Unavailable';
+  if (!costs.length) {
+    const hasUsage = [
+      statistics.Calls,
+      statistics.Input,
+      statistics.CacheRead,
+      statistics.CacheWrite,
+      statistics.Output,
+      statistics.Reasoning,
+    ].some((value) => value !== 0);
+    return hasUsage ? 'Unavailable' : '0.0';
+  }
   return costs
     .map((cost) => {
       try {

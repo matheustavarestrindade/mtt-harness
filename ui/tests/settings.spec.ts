@@ -2,6 +2,33 @@ import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
 import { connectAndCreate } from './helpers';
 
+test('show zero cost for a new chat while preserving unknown and reported costs', async ({
+  page,
+}) => {
+  const fixture = await mockHarness(page);
+  Object.assign(fixture.sessionUsage, { Calls: 0, Input: 0, Output: 0 });
+  await connectAndCreate(page);
+  const usage = page.getByLabel('Session usage', { exact: true });
+  await expect(usage.getByText('0.0', { exact: true })).toBeVisible();
+  await expect(usage).not.toContainText('Unavailable');
+
+  await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Usage', exact: true }).click();
+  await expect(dialog.getByText('0.0', { exact: true })).toBeVisible();
+
+  Object.assign(fixture.sessionUsage, { Calls: 1, Input: 20, Output: 12 });
+  await dialog.getByRole('button', { name: 'Refresh usage', exact: true }).click();
+  await expect(dialog.getByText('Unavailable', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(usage.getByText('Unavailable', { exact: true })).toBeVisible();
+
+  fixture.sessionUsage.Cost = { Currency: 'USD', Value: 0 };
+  fixture.sessionUsage.Costs = [fixture.sessionUsage.Cost];
+  fixture.event(fixture.sessions[0], 'turn.end', {});
+  await expect(usage.getByText('$0.00', { exact: true })).toBeVisible();
+});
+
 test('settings stay in a modal, preserve the draft, and show real usage scopes', async ({
   page,
 }, testInfo) => {

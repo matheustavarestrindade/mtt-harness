@@ -39,17 +39,17 @@ func TestFileActionsListPagesUseSortedNamesAndDoNotFollowLinks(test *testing.T) 
 			if row == "" {
 				continue
 			}
-			columns := strings.Split(row, "\t")
-			if len(columns) != 3 {
+			kind, quotedName, found := strings.Cut(row, " ")
+			if !found || strings.Contains(row, "\t") {
 				test.Fatalf("invalid listing row: %q", row)
 			}
-			name, operationError := strconv.Unquote(columns[0])
+			name, operationError := strconv.Unquote(quotedName)
 			testutil.RequireNoError(test, operationError)
 			actual = append(actual, name)
-			if name == "outside-link" && columns[1] != "symlink" {
+			if name == "outside-link" && kind != "L" {
 				test.Fatal("listing followed a symlink target")
 			}
-			if name == "folder" && columns[1] != "directory" {
+			if name == "folder" && kind != "D" {
 				test.Fatal("directory type missing")
 			}
 		}
@@ -73,13 +73,13 @@ func TestFileActionsListPagesUseSortedNamesAndDoNotFollowLinks(test *testing.T) 
 	}
 }
 
-func TestFileActionsCanDiagnoseADirectoryTarget(test *testing.T) {
+func TestFileActionsDirectoryFailureDoesNotReturnAListing(test *testing.T) {
 	workspace := test.TempDir()
 	testutil.RequireNoError(test, os.WriteFile(filepath.Join(workspace, "existing.txt"), nil, 0o600))
 	result, operationError := NewFileActions(false).Run(harness.WithWorkspace(context.Background(), workspace), fileCall(test, map[string]any{
-		"path": ".", "actions": []any{map[string]any{"op": "write", "content": "wrong target"}}, "return": map[string]any{"type": "summary"}, "on_error": map[string]any{"return": map[string]any{"type": "list"}},
+		"path": ".", "actions": []any{map[string]any{"op": "write", "content": "wrong target"}}, "return": map[string]any{"type": "summary"},
 	}))
-	if operationError == nil || !strings.Contains(result.Error, "regular file") || !strings.Contains(result.Text(), "existing.txt") {
-		test.Fatalf("directory recovery missing: %+v", result)
+	if operationError == nil || !strings.Contains(result.Error, "regular file") || strings.Contains(result.Text(), "existing.txt") || len(result.Content) != 0 {
+		test.Fatalf("directory failure returned other data: %+v", result)
 	}
 }

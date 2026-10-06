@@ -17,7 +17,12 @@ function fileActionInput(call: ToolCall) {
 export function toolActivityLabel(call: ToolCall): string {
   const details = fileActionInput(call);
   if (!details?.operations.length) return call.Name;
-  const path = typeof details.input.path === 'string' ? ` · ${details.input.path}` : '';
+  const path =
+    typeof details.input.path === 'string'
+      ? ` · ${details.input.path}`
+      : Array.isArray(details.input.paths)
+        ? ` · ${details.input.paths.length} paths`
+        : '';
   return `${details.operations.join(' → ')}${path}`;
 }
 

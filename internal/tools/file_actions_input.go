@@ -9,61 +9,75 @@ import (
 )
 
 const fileActionsMaximum = 32
+const fileActionsMaximumPaths = 32
 const directoryPreviewDefaultEntries = 100
 
 type fileAction struct {
-	Operation string  `json:"op"`
-	Content   *string `json:"content,omitempty"`
-	OldText   *string `json:"old_text,omitempty"`
-	NewText   *string `json:"new_text,omitempty"`
-	Mode      *string `json:"mode,omitempty"`
-	Limit     *int    `json:"limit,omitempty"`
-	Cursor    string  `json:"cursor,omitempty"`
+	Operation string   `json:"op"`
+	Content   *string  `json:"content,omitempty"`
+	OldText   *string  `json:"old_text,omitempty"`
+	NewText   *string  `json:"new_text,omitempty"`
+	Mode      *string  `json:"mode,omitempty"`
+	Limit     *int     `json:"limit,omitempty"`
+	Cursor    string   `json:"cursor,omitempty"`
+	Fields    []string `json:"fields,omitempty"`
+	fileGlobOptions
 	fileTextSelection
 }
 
 type fileActionOutput struct {
-	Type         string `json:"type"`
-	ContextLines *int   `json:"context_lines,omitempty"`
-	Limit        *int   `json:"limit,omitempty"`
-	Cursor       string `json:"cursor,omitempty"`
+	Type         string   `json:"type"`
+	ContextLines *int     `json:"context_lines,omitempty"`
+	Limit        *int     `json:"limit,omitempty"`
+	Cursor       string   `json:"cursor,omitempty"`
+	Fields       []string `json:"fields,omitempty"`
+	fileGlobOptions
 	fileTextSelection
 }
 
 type fileActionsInput struct {
 	Path      string
+	Paths     []string
 	Actions   []fileAction
 	Return    fileActionOutput
-	OnError   fileActionOutput
 	mutates   bool
 	directory bool
+	deletes   bool
 }
-
-type fileActionFailure struct {
-	index     int
-	operation string
-	cause     error
-}
-
-func (failure *fileActionFailure) Error() string {
-	return fmt.Sprintf("action %d (%s): %v", failure.index, failure.operation, failure.cause)
-}
-
-func (failure *fileActionFailure) Unwrap() error { return failure.cause }
 
 func decodeFileActionsInput(data []byte) (fileActionsInput, error) {
 	var envelope struct {
-		Path    string            `json:"path"`
+		Path    *string           `json:"path"`
+		Paths   []string          `json:"paths"`
 		Actions []json.RawMessage `json:"actions"`
 		Return  json.RawMessage   `json:"return"`
-		OnError json.RawMessage   `json:"on_error"`
 	}
-	if operationError := decodeFileActionObject(data, &envelope, []string{"path", "actions", "return", "on_error"}); operationError != nil {
+	if operationError := decodeFileActionObject(data, &envelope, []string{"path", "paths", "actions", "return"}); operationError != nil {
 		return fileActionsInput{}, operationError
 	}
-	input := fileActionsInput{Path: envelope.Path}
-	if input.Path == "" || len(envelope.Actions) < 1 || len(envelope.Actions) > fileActionsMaximum {
-		return input, fmt.Errorf("path and 1-%d actions are required", fileActionsMaximum)
+	input := fileActionsInput{Paths: envelope.Paths}
+	if envelope.Path != nil {
+		input.Path = *envelope.Path
+		if envelope.Paths != nil {
+			return input, fmt.Errorf("path and paths cannot be combined")
+		}
+		input.Paths = []string{input.Path}
+	}
+	if len(input.Paths) < 1 || len(input.Paths) > fileActionsMaximumPaths {
+		return input, fmt.Errorf("one path or 1-%d paths are required", fileActionsMaximumPaths)
+	}
+	seen := make(map[string]bool, len(input.Paths))
+	for _, path := range input.Paths {
+		if path == "" {
+			return input, fmt.Errorf("paths must not be empty")
+		}
+		if seen[path] {
+			return input, fmt.Errorf("duplicate path %q", path)
+		}
+		seen[path] = true
+	}
+	if len(envelope.Actions) < 1 || len(envelope.Actions) > fileActionsMaximum {
+		return input, fmt.Errorf("1-%d actions are required", fileActionsMaximum)
 	}
 	for index, encoded := range envelope.Actions {
 		action, operationError := decodeFileAction(encoded)
@@ -72,43 +86,31 @@ func decodeFileActionsInput(data []byte) (fileActionsInput, error) {
 		}
 		input.Actions = append(input.Actions, action)
 		input.mutates = input.mutates || action.mutatesFile()
-		input.directory = input.directory || action.Operation == "list"
+		input.directory = input.directory || action.Operation == "list" || action.Operation == "glob"
+		input.deletes = input.deletes || action.Operation == "delete"
 	}
 	if input.directory {
 		for _, action := range input.Actions {
-			if action.Operation != "list" {
-				return input, fmt.Errorf("one call has one target: list actions cannot be mixed with file actions")
+			if action.Operation != "list" && action.Operation != "glob" {
+				return input, fmt.Errorf("directory discovery actions cannot be mixed with file actions")
 			}
 		}
 	}
 	if len(envelope.Return) > 0 {
-		output, operationError := decodeFileActionOutput(envelope.Return, false)
+		output, operationError := decodeFileActionOutput(envelope.Return)
 		if operationError != nil {
 			return input, fmt.Errorf("return: %w", operationError)
 		}
 		input.Return = output
 	}
 	if input.mutates && input.Return.Type == "" {
-		return input, fmt.Errorf("edits require an explicit return: choose summary, diff, or read; a diff is never automatic")
+		return input, fmt.Errorf("edits require an explicit return; return is missing")
 	}
 	if input.Return.Type == "diff" && !input.mutates {
 		return input, fmt.Errorf("return.type diff requires at least one mutation action")
 	}
-	if input.Return.Type == "list" && !input.directory || input.Return.Type == "read" && input.directory {
-		return input, fmt.Errorf("the return type must match the target: read for a file, list for a directory")
-	}
-	if len(envelope.OnError) > 0 {
-		var recovery struct {
-			Return json.RawMessage `json:"return"`
-		}
-		if operationError := decodeFileActionObject(envelope.OnError, &recovery, []string{"return"}); operationError != nil {
-			return input, fmt.Errorf("on_error: %w", operationError)
-		}
-		output, operationError := decodeFileActionOutput(recovery.Return, true)
-		if operationError != nil {
-			return input, fmt.Errorf("on_error.return: %w", operationError)
-		}
-		input.OnError = output
+	if (input.Return.Type == "list" || input.Return.Type == "glob") && !input.directory || input.Return.Type == "read" && input.directory {
+		return input, fmt.Errorf("return read requires file actions; return list/glob requires directory discovery actions")
 	}
 	return input, nil
 }
@@ -128,10 +130,13 @@ func decodeFileAction(data []byte) (fileAction, error) {
 		allowed = append(allowed, "old_text", "new_text", "mode", "start_line", "end_line")
 	case "append", "prepend":
 		allowed = append(allowed, "content")
+	case "delete":
 	case "list":
-		allowed = append(allowed, "limit", "cursor")
+		allowed = append(allowed, "limit", "cursor", "fields")
+	case "glob":
+		allowed = append(allowed, "pattern", "exclude", "kind", "limit", "cursor", "fields")
 	default:
-		return action, fmt.Errorf("op must be read, write, replace, append, prepend, or list")
+		return action, fmt.Errorf("op must be read, write, replace, append, prepend, delete, list, or glob")
 	}
 	if operationError := decodeFileActionObject(data, &action, allowed); operationError != nil {
 		return action, operationError
@@ -144,7 +149,7 @@ func decodeFileAction(data []byte) (fileAction, error) {
 	}
 	if action.Operation == "write" || action.Operation == "append" || action.Operation == "prepend" {
 		if action.Content == nil {
-			return action, fmt.Errorf("content is required, including an empty string for deletion or an empty file")
+			return action, fmt.Errorf("content is required")
 		}
 	}
 	if action.Operation == "replace" {
@@ -156,14 +161,19 @@ func decodeFileAction(data []byte) (fileAction, error) {
 		}
 	}
 	if action.Operation == "list" {
-		if operationError := validateDirectoryPreview(action.Limit, action.Cursor); operationError != nil {
+		if operationError := validateDirectoryPreview(action.Limit, action.Cursor, action.Fields); operationError != nil {
+			return action, operationError
+		}
+	}
+	if action.Operation == "glob" {
+		if operationError := action.validateGlobOptions(action.Limit, action.Cursor, action.Fields); operationError != nil {
 			return action, operationError
 		}
 	}
 	return action, nil
 }
 
-func decodeFileActionOutput(data []byte, recovery bool) (fileActionOutput, error) {
+func decodeFileActionOutput(data []byte) (fileActionOutput, error) {
 	var output fileActionOutput
 	if operationError := json.Unmarshal(data, &output); operationError != nil {
 		return output, operationError
@@ -176,15 +186,14 @@ func decodeFileActionOutput(data []byte, recovery bool) (fileActionOutput, error
 	case "read":
 		allowed = append(allowed, "start_line", "end_line", "start_byte")
 	case "list":
-		allowed = append(allowed, "limit", "cursor")
+		allowed = append(allowed, "limit", "cursor", "fields")
+	case "glob":
+		allowed = append(allowed, "pattern", "exclude", "kind", "limit", "cursor", "fields")
 	default:
-		return output, fmt.Errorf("type must be summary, diff, read, or list")
+		return output, fmt.Errorf("type must be summary, diff, read, list, or glob")
 	}
 	if operationError := decodeFileActionObject(data, &output, allowed); operationError != nil {
 		return output, operationError
-	}
-	if recovery && output.Type != "read" && output.Type != "list" {
-		return output, fmt.Errorf("error recovery can only read or list the same path; it cannot mutate or retry")
 	}
 	if output.ContextLines != nil && (*output.ContextLines < 0 || *output.ContextLines > 100) {
 		return output, fmt.Errorf("context_lines must be between 0 and 100")
@@ -196,7 +205,10 @@ func decodeFileActionOutput(data []byte, recovery bool) (fileActionOutput, error
 		return output, fmt.Errorf("start_byte must be zero or greater")
 	}
 	if output.Type == "list" {
-		return output, validateDirectoryPreview(output.Limit, output.Cursor)
+		return output, validateDirectoryPreview(output.Limit, output.Cursor, output.Fields)
+	}
+	if output.Type == "glob" {
+		return output, output.validateGlobOptions(output.Limit, output.Cursor, output.Fields)
 	}
 	return output, nil
 }
@@ -214,25 +226,35 @@ func decodeFileActionObject(data []byte, destination any, allowed []string) erro
 			return fmt.Errorf("%s is not valid for this operation", name)
 		}
 		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-			return fmt.Errorf("%s cannot be null; omit optional fields instead", name)
+			return fmt.Errorf("%s cannot be null", name)
 		}
 	}
 	return json.Unmarshal(data, destination)
 }
 
-func validateDirectoryPreview(limit *int, cursor string) error {
+func validateDirectoryPreview(limit *int, cursor string, fields []string) error {
 	if limit != nil && (*limit < 1 || *limit > filePreviewMaxLines) {
 		return fmt.Errorf("list limit must be between 1 and %d entries", filePreviewMaxLines)
 	}
 	if len(cursor) > 512 {
-		return fmt.Errorf("invalid directory cursor; use the cursor returned by list")
+		return fmt.Errorf("directory cursor exceeds the 512-byte limit")
 	}
 	if _, operationError := base64.RawURLEncoding.DecodeString(cursor); operationError != nil {
 		return fmt.Errorf("invalid directory cursor: %w", operationError)
+	}
+	seen := make(map[string]bool, len(fields))
+	for _, field := range fields {
+		if !slices.Contains([]string{"size", "permissions", "owner", "group", "modified"}, field) {
+			return fmt.Errorf("unknown listing field %q", field)
+		}
+		if seen[field] {
+			return fmt.Errorf("duplicate listing field %q", field)
+		}
+		seen[field] = true
 	}
 	return nil
 }
 
 func (action fileAction) mutatesFile() bool {
-	return action.Operation == "write" || action.Operation == "replace" || action.Operation == "append" || action.Operation == "prepend"
+	return action.Operation == "write" || action.Operation == "replace" || action.Operation == "append" || action.Operation == "prepend" || action.Operation == "delete"
 }
