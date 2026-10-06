@@ -153,6 +153,8 @@ The UI can make workspaces and sessions. The user can select an instance or sess
 
 The UI shows message history, tool input, tool results, events, token usage, and cost data. It reads status and history at an interval of 1.5 seconds. A WebSocket event can also cause a new request. The UI shows model text during the response. Message IDs connect event text to the history.
 
+The progress panel shows task state above the composer. It contains task statuses and the `DOING` task title and description. A task item with status `done` stays in the list while a task item has status `pending` or `in_progress`. The harness removes content from TODO and `DOING` when the last task item becomes `done` or `cancelled`. Empty task state removes the progress panel.
+
 The UI does not have a file editor, media upload, process terminal, or revert control. See `docs/design.md` for the UI boundary and plans.
 
 ## UI Compilation

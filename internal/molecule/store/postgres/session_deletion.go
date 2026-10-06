@@ -44,6 +44,7 @@ func (sessionStore *sessions) DeleteConversation(operationContext context.Contex
 		return nil, store.ErrConversationBusy
 	}
 	for _, statement := range []string{
+		`DELETE FROM session_task_state WHERE session_id=ANY($1::text[])`,
 		`DELETE FROM messages WHERE session_id=ANY($1::text[])`,
 		`DELETE FROM events WHERE session_id=ANY($1::text[])`,
 		`DELETE FROM processes WHERE session_id=ANY($1::text[])`,

@@ -34,6 +34,14 @@ The default template includes the tool catalog, not full tool definitions. The i
 
 File edits can use information from the user, previous messages, or tool results. The model gets more file data only when necessary for a file edit. The tool definition gives output rules and steps for an error. The model must run the checks necessary for the task.
 
+## Task State
+
+The default template gives the task tracking rules. Task tracking is optional. The model gets the `task_state` definition through tool discovery before a tool call.
+
+The loop adds a task state snapshot before context and request stages. After 3 model responses without a task update, it adds a task reminder. The task reminder tells the model to change task state before other work. Tool discovery comes first when the definition is not available. The task reminder does not stop other tools.
+
+The task state snapshot and task reminder are not written to the database. The context limit includes them. See `task-state.md` for task update and response counter rules.
+
 ## User Communication
 
 The default template uses ISO 24495-1 for messages to the user. English text also uses ASD-STE100. The model uses the chat language that the user selects.

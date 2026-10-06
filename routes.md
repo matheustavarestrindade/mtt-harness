@@ -90,6 +90,7 @@ When an instance stops, the database keeps the configuration and sessions. The a
 | GET | `/sessions/{id}/messages` | none | `200`, `Message[]` | `500` |
 | POST | `/sessions/{id}/messages` | `{"content":"text"}` or content array | `202`, `AcceptedMessage` | `404`, `400`, `409`, `429`, `500` |
 | GET | `/sessions/{id}/status` | none | `200`, `QueueStatus` | `404`, `500` |
+| GET | `/sessions/{id}/task-state` | none | `200`, `TaskState` | `404`, `500` |
 | POST | `/sessions/{id}/cancel` | none | `200`, `{"status":"cancelled"}` | `409`, `500` |
 | DELETE | `/sessions/{id}/queue/{message_id}` | none | `200`, `{"status":"removed"}` | `404`, `500` |
 | POST | `/sessions/{id}/revert` | `{"message_id":"ID"}` | `200`, `RevertResult` | `404`, `400`, `500` |
@@ -322,6 +323,7 @@ Event payload data:
 | `action.received` | `ToolCall` |
 | `tool.start` | `ToolCall` |
 | `tool.end` | `{"call":ToolCall,"status":"ok","result":ToolResult}` |
+| `task_state.updated` | `TaskState` |
 | `permission.request` | `PermissionRequest` |
 | `permission.decision` | `PermissionDecision` |
 | `run.error` | `{"message_id":"ID","error":"description"}` |
@@ -352,6 +354,29 @@ The process stream does not have a sequence cursor. It gives the output buffer, 
 The `data` field is a string in the process stream. The `ProcessEvent.Data` field uses Base64 in a session event.
 
 ## Data Types
+
+### Task State
+
+The task state route gives the same keys as `atom.TaskState`:
+
+```json
+{
+  "SessionID":"session-id",
+  "Todo":[
+    {"ID":"1","Title":"Examine the parser","Status":"done"},
+    {"ID":"2","Title":"Verify the correction","Status":"in_progress"}
+  ],
+  "Doing":{"Title":"Verifying the correction","Description":"Running the parser test suite."},
+  "Revision":2,
+  "UpdatedAt":"2026-10-06T12:00:00Z"
+}
+```
+
+Status values are `pending`, `in_progress`, `done`, and `cancelled`. Before the initial task update, a session gives `Todo: []`, `Doing: null`, and revision 0. The `UpdatedAt` value is `0001-01-01T00:00:00Z` before a task update. The revision does not decrease after a task update. The API does not give the response counter.
+
+The model uses `task_state` to change task state. The client reads the route and `task_state.updated` events. A previous revision must not replace a new revision. The client must not apply task state from a different session.
+
+See `docs/task-state.md` for task update rules.
 
 The code gives the JSON data types in TypeScript. It is not a harness dependency. A list can be `null` where shown. A duration uses nanoseconds.
 

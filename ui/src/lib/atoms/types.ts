@@ -19,6 +19,23 @@ export interface Session {
   CreatedAt: string;
   Completed: boolean;
 }
+export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'cancelled';
+export interface TaskItem {
+  ID: string;
+  Title: string;
+  Status: TaskStatus;
+}
+export interface DoingState {
+  Title: string;
+  Description: string;
+}
+export interface TaskState {
+  SessionID: string;
+  Todo: TaskItem[];
+  Doing: DoingState | null;
+  Revision: number;
+  UpdatedAt: string;
+}
 export interface Content {
   Type: 'text' | 'image' | 'audio' | 'file';
   Text: string;

@@ -133,10 +133,26 @@ func (sessionStore *sessions) Append(operationContext context.Context, message a
 }
 
 func (sessionStore *sessions) DeleteAfter(operationContext context.Context, sessionID atom.SessionID, messageID string) (int, error) {
-	tag, operationError := sessionStore.store.pool.Exec(operationContext, `
-		DELETE FROM messages WHERE session_id = $1 AND seq > (SELECT seq FROM messages WHERE id = $2 AND session_id = $1)`,
-		string(sessionID), messageID)
+	transaction, operationError := sessionStore.store.pool.Begin(operationContext)
 	if operationError != nil {
+		return 0, operationError
+	}
+	defer transaction.Rollback(context.WithoutCancel(operationContext))
+	if operationError := lockTaskSession(operationContext, transaction, sessionID); operationError != nil {
+		return 0, operationError
+	}
+	var sequence int64
+	if operationError := transaction.QueryRow(operationContext, `SELECT seq FROM messages WHERE id=$1 AND session_id=$2`, messageID, string(sessionID)).Scan(&sequence); operationError != nil {
+		return 0, operationError
+	}
+	tag, operationError := transaction.Exec(operationContext, `DELETE FROM messages WHERE session_id=$1 AND seq>$2`, string(sessionID), sequence)
+	if operationError != nil {
+		return 0, operationError
+	}
+	if _, operationError := transaction.Exec(operationContext, `UPDATE session_task_state SET todo='[]',doing=NULL,revision=revision+1,responses_since_update=0,updated_at=now() WHERE session_id=$1`, string(sessionID)); operationError != nil {
+		return 0, operationError
+	}
+	if operationError := transaction.Commit(operationContext); operationError != nil {
 		return 0, operationError
 	}
 	return int(tag.RowsAffected()), nil

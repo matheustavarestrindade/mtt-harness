@@ -5,14 +5,17 @@ import (
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/taskstate"
 )
 
 type preparedModelCall struct {
-	modelID  string
-	model    atom.ModelInfo
-	provider harness.Provider
-	request  atom.Request
-	session  atom.Session
+	modelID           string
+	model             atom.ModelInfo
+	provider          harness.Provider
+	request           atom.Request
+	session           atom.Session
+	taskStateRevision int64
+	taskStateActive   bool
 }
 
 // A nil call means policy stopped the turn. Resolve and validate after request
@@ -33,6 +36,14 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 		return nil, operationError
 	}
 	messages, operationError = agentLoop.prependStartPrompt(operationContext, session, messages)
+	if operationError != nil {
+		return nil, operationError
+	}
+	taskState, operationError := agentLoop.configuration.Store.TaskStates().Get(operationContext, session.ID)
+	if operationError != nil {
+		return nil, operationError
+	}
+	messages, operationError = appendTaskStateContext(messages, session.ID, taskState)
 	if operationError != nil {
 		return nil, operationError
 	}
@@ -85,5 +96,5 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 	if operationError != nil {
 		return nil, operationError
 	}
-	return &preparedModelCall{modelID: modelID, model: modelInfo, provider: modelProvider, request: request, session: session}, nil
+	return &preparedModelCall{modelID: modelID, model: modelInfo, provider: modelProvider, request: request, session: session, taskStateRevision: taskState.Revision, taskStateActive: taskstate.Active(taskState)}, nil
 }

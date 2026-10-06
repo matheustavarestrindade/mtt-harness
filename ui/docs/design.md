@@ -64,6 +64,12 @@ The sidebar stays open on large screens. A navigation drawer replaces the sideba
 
 The `Enter` key sends the message. The keys `Shift+Enter`, `Command+Enter`, and `Ctrl+Enter` add a new line. Text composition does not send a message.
 
+## Task State
+
+The `TaskProgress` molecule shows task state above the composer. The progress panel contains a task title, description, and task items with task status. A button opens or closes the content. The content has a height limit.
+
+The console reads `GET /sessions/{id}/task-state` and receives `task_state.updated` events. It accepts data only for the selected session and the same or newer revision. An empty TODO list with `DOING: null` removes the progress panel. An error on the task state route does not remove the session or message draft.
+
 ## API Data
 
 Response keys agree with the Go types. For example, an instance has `Workspace` and `DefaultModel`. Request keys use the handler format, such as `workspace` and `default_model`. A `null` collection becomes an empty array in the client.

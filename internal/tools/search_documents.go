@@ -1,5 +1,9 @@
 package tools
 
+func (TaskState) SearchDocument() string {
+	return `Track multi-step work and show user progress with persistent TODO and DOING. task_state can create task items, update an item by ID to in_progress or done, cancel obsolete work, and replace the current activity title and description. Update TODO and DOING together or independently without resending the whole list. Completed items remain while work is unfinished; final completion clears both fields. State belongs to the current session and survives restarts. Use it only when tracking is useful. Model-request reminders appear after three responses without a successful update. Retrieve the schema before calling the tool.`
+}
+
 // Usage documents supplement descriptions and input schemas in the internal
 // embedding index. They are separate from provider requests and tool results.
 func (bashTool *Bash) SearchDocument() string {

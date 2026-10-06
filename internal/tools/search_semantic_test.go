@@ -31,6 +31,7 @@ func TestSemanticDiscoveryWithRealEmbeddings(test *testing.T) {
 		{"inspect output from a running server", "process_output"},
 		{"replace existing text in a source file", "file_actions"},
 		{"find files recursively by a glob pattern", "file_actions"},
+		{"track todo items and the current work in progress", "task_state"},
 		{"delegate a smaller task to a child", "agent"},
 	} {
 		test.Run(example.query, func(test *testing.T) {

@@ -25,6 +25,7 @@ const (
 	EventProcessNotify      EventName = "process.notification"
 	EventAgentStart         EventName = "agent.start"
 	EventAgentEnd           EventName = "agent.end"
+	EventTaskStateUpdated   EventName = "task_state.updated"
 )
 
 type Event struct {

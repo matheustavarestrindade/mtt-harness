@@ -30,6 +30,14 @@ ALTER TABLE instances ADD COLUMN IF NOT EXISTS stopped boolean NOT NULL DEFAULT 
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS completed boolean NOT NULL DEFAULT false;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS reasoning_effort text NOT NULL DEFAULT '';
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS session_task_state (
+	session_id text PRIMARY KEY REFERENCES sessions(id),
+	todo jsonb NOT NULL DEFAULT '[]',
+	doing jsonb,
+	revision bigint NOT NULL DEFAULT 0,
+	responses_since_update int NOT NULL DEFAULT 0,
+	updated_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS messages (
 	id text PRIMARY KEY,
 	session_id text NOT NULL,
@@ -194,6 +202,7 @@ func (database *Store) Instances() store.InstanceStore {
 func (database *Store) Sessions() store.SessionStore {
 	return &sessions{database}
 }
+func (database *Store) TaskStates() store.TaskStateStore { return &taskStates{database} }
 func (database *Store) Events() store.EventStore {
 	return &events{database}
 }

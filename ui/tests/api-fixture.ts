@@ -7,6 +7,7 @@ import type {
   QueueStatus,
   Session,
   Statistics,
+  TaskState,
 } from '../src/lib/atoms/types';
 
 // Fixtures use the actual Go response casing, nullable lists and 202 queue
@@ -17,6 +18,7 @@ export async function mockHarness(page: Page) {
   const histories = new Map<string, Message[]>();
   const queued = new Map<string, Message[]>();
   const running = new Set<string>();
+  const taskStates = new Map<string, TaskState>();
   const settings = new Map<string, Record<string, string>>([
     ['', { agent_depth_limit: '2', process_limit: '8' }],
   ]);
@@ -244,6 +246,17 @@ export async function mockHarness(page: Page) {
             error: '',
           } satisfies QueueStatus);
         if (parts[2] === 'statistics') return reply(sessionUsage);
+        if (parts[2] === 'task-state')
+          return reply(
+            taskStates.get(session.ID) ??
+              ({
+                SessionID: session.ID,
+                Todo: [],
+                Doing: null,
+                Revision: 0,
+                UpdatedAt: session.CreatedAt,
+              } satisfies TaskState),
+          );
         if (parts[2] === 'messages' && method === 'POST') {
           const content = request.postDataJSON().content;
           const message: Message = {
@@ -309,5 +322,16 @@ export async function mockHarness(page: Page) {
       return reply({ error: `Fixture has no route for ${method} ${path}` }, 404);
     },
   );
-  return { instances, sessions, histories, settings, model, models, sessionUsage, running, event };
+  return {
+    instances,
+    sessions,
+    histories,
+    settings,
+    model,
+    models,
+    sessionUsage,
+    running,
+    event,
+    taskStates,
+  };
 }

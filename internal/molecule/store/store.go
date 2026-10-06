@@ -110,6 +110,7 @@ type Store interface {
 	Queue() QueueStore
 	Instances() InstanceStore
 	Sessions() SessionStore
+	TaskStates() TaskStateStore
 	Events() EventStore
 	Processes() ProcessStore
 	Permissions() PermissionStore

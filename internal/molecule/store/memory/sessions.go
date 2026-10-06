@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/taskstate"
 )
 
 type sessions struct{ store *Store }
@@ -115,6 +117,12 @@ func (sessionStore *sessions) List(operationContext context.Context, instanceID 
 func (sessionStore *sessions) DeleteAfter(operationContext context.Context, sessionID atom.SessionID, messageID string) (int, error) {
 	sessionStore.store.mutex.Lock()
 	defer sessionStore.store.mutex.Unlock()
+	if operationError := operationContext.Err(); operationError != nil {
+		return 0, operationError
+	}
+	if sessionStore.store.deletedSessions[sessionID] {
+		return 0, store.ErrSessionDeleted
+	}
 	list := sessionStore.store.messages[sessionID]
 	index := -1
 	for position := range list {
@@ -128,6 +136,9 @@ func (sessionStore *sessions) DeleteAfter(operationContext context.Context, sess
 	}
 	removed := len(list) - index - 1
 	sessionStore.store.messages[sessionID] = list[:index+1]
+	if state, found := sessionStore.store.taskStates[sessionID]; found {
+		sessionStore.store.taskStates[sessionID] = taskstate.Clear(state, time.Now())
+	}
 	return removed, nil
 }
 
