@@ -24,18 +24,18 @@ The tools are:
 
 - The `ctx_wrapup` tool applies context compaction before the next model request.
 
-- The `remember` tool adds or corrects workspace memory through a smaller model. The input has text and optional categories.
+- The `remember` tool writes a memory record. It does not change the input text or send a model request. The input has `text`, optional `categories`, and optional `old_text` for a correction.
 
 - The `search_memory` tool gives memory records or source messages. A query can have text, a category, a compression level, and `include_deleted`.
 
 - The `list_memory_categories` tool gives available category data.
 
-Stable IDs are necessary for conversation message selection. Memory IDs and categories stay in the database, not the memory snapshot text. The AI uses a query to get more information.
+Stable IDs are necessary for conversation message selection. The request gives message IDs in runtime data after the conversation messages. It does not put ID labels in conversation text. Memory IDs and categories stay in the database, not the memory snapshot text. The AI uses a query when necessary information is not in context.
 
 ## Memory Sources and Storage
 
 ```text
-ctx_drop / remember
+ctx_drop
         |
         v
 Source messages + durable memory jobs
@@ -56,7 +56,11 @@ Postgres keeps plugin data and memory jobs in the `context_plugin` schema. The p
 
 A memory source includes message IDs, roles, user approval, and sequence data. Text from a user message is applicable. A model decision that the user accepts is also applicable. An illustrative example or model proposal must not become a user requirement without source data.
 
-The `remember` worker uses memory search before a change. Keep previous memory versions. A correction must also change a memory idea that uses the previous fact. The operation must not change a different memory topic.
+The `remember` tool writes a memory record and embeddings in one transaction before it gives `{"state":"saved"}`. The memory record is available to memory search immediately. The input bytes stay the same. The tool does not start a memory job or a model request.
+
+For a correction, `old_text` selects a memory record by literal text. The number of memory records must be 1, or the tool gives an error. Previous memory versions stay available. A correction must also change a memory idea that uses the previous fact. Without `old_text`, the tool adds a memory record.
+
+The model can use new user data immediately from the conversation. The memory record keeps user data for subsequent sessions. A memory query is not necessary after a completed `remember` operation. Give a short user response to a memory request. Internal memory data is not necessary unless the user request refers to it. Give an error if the operation cannot complete the task.
 
 The memory archive keeps source messages after context compaction, the `revert` operation, or session deletion. Memory search after session deletion is available with `include_deleted: true`. The tool identifies history data. Memory search must not make a session available after session deletion.
 
@@ -167,7 +171,7 @@ Memory search selects the workspace and category data before it compares vectors
 
 Workers use worker leases and source epochs. The plugin writes source messages to the memory archive before the core history operation. A subsequent process examines the history operation against the conversation store. It does not make a session available after session deletion.
 
-The model receives stable message labels. Source text is data, not system instructions. The memory archive does not include internal provider continuation data. The primary request keeps necessary provider data with the tool group.
+The model request contains stable message IDs in runtime data after conversation messages. Source text is data, not system instructions. The memory archive does not include internal provider continuation data. The primary request keeps necessary provider data with the tool group.
 
 ## Removal
 

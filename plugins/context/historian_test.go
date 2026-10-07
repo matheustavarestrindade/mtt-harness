@@ -113,32 +113,10 @@ func TestRememberCorrectionKeepsOldVersionAndFreezesCurrentSnapshot(test *testin
 	old := seedMemory(test, fixture, "Drink preference", "The user likes Pepsi.", false)
 	messages := []atom.Message{testMessage("original", atom.RoleUser, "Hello")}
 	first := fixture.prepare(test, messages, 200000)
-	fixture.services.mutex.Lock()
-	fixture.services.respond = func(operationContext context.Context, input harness.WorkspaceAgentRequest) (harness.WorkspaceAgentResponse, error) {
-		var data extractionInput
-		for _, message := range input.Messages {
-			if message.Role == atom.RoleUser {
-				if operationError := json.Unmarshal([]byte(message.Content[0].Text), &data); operationError != nil {
-					return harness.WorkspaceAgentResponse{}, operationError
-				}
-			}
-		}
-		var sourceID int64
-		for _, source := range data.Sources {
-			if source.Role == atom.RoleUser && strings.Contains(source.Text, "I now dislike Pepsi.") {
-				sourceID = source.ID
-			}
-		}
-		proposal := memoryProposal{Title: "Drink preference", Categories: []string{"preferences"}, Text: summaries{Low: "The user now dislikes Pepsi.", Medium: "The user dislikes Pepsi.", High: "Dislikes Pepsi."}, Kind: "user_fact", Evidence: []memoryEvidence{{SourceID: sourceID, Quote: "I now dislike Pepsi."}}, Supersedes: []string{old.ID}}
-		encoded, _ := json.Marshal(map[string]any{"memories": []memoryProposal{proposal}})
-		return harness.WorkspaceAgentResponse{Model: input.Model, Text: string(encoded)}, operationContext.Err()
-	}
-	fixture.services.mutex.Unlock()
 	messages = append(messages, testMessage("answer", atom.RoleAssistant, "Understood."), testMessage("correction", atom.RoleUser, "I now dislike Pepsi."))
 	fixture.prepare(test, messages, 200000)
-	_, operationError := fixture.plugin.queueRemember(context.Background(), fixture.session, "remember-correction", rememberInput{Text: "The user now dislikes Pepsi.", Categories: []string{"preferences"}})
+	_, operationError := fixture.plugin.saveMemory(context.Background(), fixture.session, "remember-correction", rememberInput{Text: "The user now dislikes Pepsi.", OldText: &old.Text.Low, Categories: []string{"preferences"}})
 	testutil.RequireNoError(test, operationError)
-	waitForJob(test, fixture, "applied")
 	current, operationError := readValue[memoryRecord](context.Background(), fixture.plugin.database, fixture.session.InstanceID, "memory", old.ID)
 	testutil.RequireNoError(test, operationError)
 	if current.Version != 2 {

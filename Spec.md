@@ -697,6 +697,12 @@ Plugin interfaces give settings, conversation messages, model requests, embeddin
 
 The plugin has 5 tools: `ctx_drop`, `ctx_wrapup`, `remember`, `search_memory`, and `list_memory_categories`. Tool discovery is necessary. The registry examines the plugin state before tool discovery, tool definitions, and tool calls.
 
+The `remember` tool writes input text and embeddings before it gives a result. It does not change the text, send a model request, or start a memory job. The memory record is available to memory search immediately. An optional `old_text` field selects one memory record by literal text for a correction. Previous versions stay available. The number of memory records must be 1, or the tool gives an error.
+
+The model uses user data in the conversation immediately. Memory keeps the data for subsequent sessions. A memory query is not necessary after a completed `remember` operation. Give a short user response to a memory request. Internal memory data is not necessary unless the user request refers to it. Give an error if the operation cannot complete the task.
+
+The model request puts context selection IDs and tool groups in runtime data after conversation messages. The plugin does not put ID labels in conversation text. Internal context data must not be in a user response.
+
 The plugin writes source messages to the memory archive with stable selection IDs. The database schema keeps memory versions, source references, context views, worker leases, and text vectors. Previous memory versions do not change. Internal provider continuation data is not in the memory archive. The primary request keeps necessary provider data with the tool group.
 
 Memory extraction uses user text and model decisions that the user accepts. Workers receive source roles, message sequence, and user approval data. The plugin examines JSON, source text, and source references before it writes memory records. An illustrative example must not become a user requirement.

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +20,7 @@ type dropInput struct {
 }
 type rememberInput struct {
 	Text       string   `json:"text"`
+	OldText    *string  `json:"old_text,omitempty"`
 	Categories []string `json:"categories"`
 }
 
@@ -144,49 +144,6 @@ func enqueueReduction(database transaction, view sessionView, identifiers []int6
 	}
 	job.ContextIDs = uniqueSourceIDs(job.ContextIDs)
 	return job, database.Put("job", identifier, job)
-}
-
-func (plugin *Plugin) queueRemember(operationContext context.Context, session atom.Session, callID string, input rememberInput) (any, error) {
-	if strings.TrimSpace(input.Text) == "" || len(input.Text) > 8192 {
-		return nil, fmt.Errorf("remember text must contain 1..8192 UTF-8 bytes")
-	}
-	categories, operationError := normalizeCategories(input.Categories)
-	if operationError != nil {
-		return nil, operationError
-	}
-	operationError = plugin.database.Transact(operationContext, session.InstanceID, func(database transaction) error {
-		view, operationError := loadView(database, session.ID)
-		if operationError != nil {
-			return operationError
-		}
-		if view.Deleted || view.Mutation != nil {
-			return fmt.Errorf("session context is fenced")
-		}
-		identity := sha256.Sum256([]byte(string(session.ID) + "\x00remember\x00" + callID))
-		identifier := hex.EncodeToString(identity[:])
-		previous, operationError := readTransactionValue[memoryJob](database, "job", identifier)
-		if operationError != nil {
-			return operationError
-		}
-		if previous.ID != "" {
-			return nil
-		}
-		sourceID, operationError := database.NextSourceID()
-		if operationError != nil {
-			return operationError
-		}
-		entry := source{ID: sourceID, SessionID: session.ID, MessageID: "remember:" + callID, Role: atom.RoleAssistant, Text: input.Text, CreatedAt: time.Now().UTC()}
-		if operationError := database.Put("source", strconv.FormatInt(sourceID, 10), entry); operationError != nil {
-			return operationError
-		}
-		job := memoryJob{ID: identifier, SessionID: session.ID, Epoch: view.Epoch, Kind: "remember", Agent: "context.memory_writer", Status: "pending", Priority: 10, SourceIDs: []int64{sourceID}, ContextIDs: append([]int64(nil), view.Available[max(0, len(view.Available)-12):]...), Remember: true, Text: input.Text, Categories: categories, CreatedAt: time.Now().UTC()}
-		return database.Put("job", identifier, job)
-	})
-	if operationError != nil {
-		return nil, operationError
-	}
-	plugin.signalWork()
-	return map[string]any{"state": "queued"}, nil
 }
 
 func (plugin *Plugin) requestWrapup(operationContext context.Context, session atom.Session) (any, error) {

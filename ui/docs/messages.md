@@ -21,6 +21,8 @@ The client prepares event text at an interval of 100 milliseconds. A session cha
 
 ## Markdown and Code
 
+The UI removes an internal `context_message` label from the start of text in an `assistant` message. This also applies while the model sends the label in stream chunks. The message copy button uses the text shown to the user. User text and tool output do not change. Text in code blocks or between quotation marks stays the same. The UI does not change message history.
+
 Markdown has headings, lists, hyperlinks, tables, and code blocks. HTML in message text stays as text. The UI uses HTTP and HTTPS hyperlinks. It can also use hyperlinks with the format `mailto`. The UI removes event handlers and executable markup. Code does not run.
 
 The UI gets the syntax highlighting library when a code block opens. The code block supplies the code format. The UI does not find the format automatically. The UI shows text if syntax highlighting is not available for a format.

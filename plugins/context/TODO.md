@@ -24,7 +24,7 @@ The code and test suite are available. The UI control is subsequent work. Use `[
 ## 3. Tools and Memory Sources
 
 - [x] Add `ctx_drop`. Keep source messages until context compaction. Add `remember` and category input fields.
-- [x] Add `remember` to make or correct a memory record without context compaction.
+- [x] The `remember` tool must write input text and embeddings before it gives a result. Do not change the text. A model request or memory job is not necessary. Use `old_text` for a correction by literal text.
 - [x] Give workers message roles, source IDs, and user approval data. Do not change an illustrative example or model proposal into a user requirement.
 - [x] The plugin must examine worker output and write L/M/H text and memory sources in one transaction.
 - [x] Use memory search to find a previous memory record that does not agree with new source data. Keep previous versions and correct memory ideas that use the previous fact.
