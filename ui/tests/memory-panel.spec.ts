@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { MemoryMetrics } from '../src/lib/atoms/memory';
 import { agentTokenCount, totalAgentUsage } from '../src/lib/atoms/memory';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate } from './helpers';
+import { connectAndCreate, chooseSelectOption } from './helpers';
 
 async function openMemory(page: Page) {
   const toggle = page.getByRole('button', { name: 'Open memory panel', exact: true });
@@ -100,7 +100,7 @@ test('configure memory through the workspace API and show pending transitions', 
   await connectAndCreate(page);
   const panel = await openMemory(page);
   await panel.getByRole('button', { name: 'Enable memory', exact: true }).click();
-  await panel.getByLabel('Worker model', { exact: true }).selectOption(fixture.model.ID);
+  await chooseSelectOption(panel.getByLabel('Worker model', { exact: true }), fixture.model.ID);
   await panel.getByRole('button', { name: 'Save and enable memory', exact: true }).click();
   await expect(panel.getByRole('status')).toHaveText('On');
   expect(fixture.memoryUpdates).toEqual([

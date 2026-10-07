@@ -120,7 +120,10 @@ test('keep settings editable after a rejected update and preserve unchanged effo
   await panel.getByRole('button', { name: 'Refresh memory', exact: true }).click();
   await expect(panel.getByRole('status')).toHaveText('Off');
   await panel.getByRole('button', { name: 'Memory settings', exact: true }).click();
-  await expect(panel.getByLabel('Worker model', { exact: true })).toHaveValue(fixture.model.ID);
+  await expect(panel.getByLabel('Worker model', { exact: true })).toHaveAttribute(
+    'data-value',
+    fixture.model.ID,
+  );
   await panel.getByRole('button', { name: 'Save worker model', exact: true }).click();
   expect(fixture.memoryUpdates.at(-1)?.patch).toEqual({ worker_model: fixture.model.ID });
   expect(fixture.memoryStates.get(workspaceID)?.Configuration.worker_effort).toBe('low');

@@ -17,6 +17,7 @@
   import { memoryCounter, totalAgentUsage, agentTokenCount } from '../atoms/memory';
   import type { HarnessApi } from '../molecules/api/client';
   import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import SelectField from '../molecules/SelectField.svelte';
   import { MemoryPanelState } from './memory-panel.svelte';
 
   let {
@@ -190,18 +191,19 @@
             >
           </div>
           <div class="space-y-1.5">
-            <Label for="memory-worker-model" class="text-xs">Worker model</Label><select
+            <Label for="memory-worker-model" class="text-xs">Worker model</Label><SelectField
               id="memory-worker-model"
-              class="field-select w-full min-w-0 text-xs"
+              class="text-xs"
               bind:value={workerModel}
+              placeholder="Choose a model"
+              options={[
+                ...(workerModel && !models.some((model) => model.ID === workerModel)
+                  ? [{ value: workerModel, label: workerModel }]
+                  : []),
+                ...models.map((model) => ({ value: model.ID, label: modelLabel(model) })),
+              ]}
               disabled={configurationDisabled}
-              ><option value="" disabled>Choose a model</option
-              >{#if workerModel && !models.some((model) => model.ID === workerModel)}<option
-                  value={workerModel}>{workerModel}</option
-                >{/if}{#each models as model (model.ID)}<option value={model.ID}
-                  >{modelLabel(model)}</option
-                >{/each}</select
-            >
+            />
           </div>
           <p class="text-[10px] leading-5 text-muted-foreground">
             Used for context reduction and memory maintenance. A new model uses its default thinking

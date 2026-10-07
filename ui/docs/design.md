@@ -60,6 +60,10 @@ The dependency direction is `atoms <- molecules <- organisms`. An atom import mu
 
 The shadcn-svelte registry gives the buttons, fields, dialogs, sheet, badges, and notifications. The console components add navigation, connection forms, message history, usage, and the composer.
 
+The `SelectField` molecule uses the shadcn-svelte `Select` components. Model lists and settings use the molecule. Long model text uses line breaks. A long model list uses a scrollbar.
+
+The model ID and reasoning effort values do not change. The model default uses an empty reasoning effort. A model change stays at the previous selection until the API accepts the change.
+
 Use the header control to close the sidebar on large screens. The header control can also open the sidebar. A navigation drawer replaces the sidebar on small screens. The UI controls have labels and keyboard focus. The composer uses the viewport height and safe-area padding. Long output must not increase the document width.
 
 The composer starts with one text line. The composer height increases with the message draft, to a maximum of 192 pixels. More text uses a scrollbar. An empty message draft uses the minimum height again. A width change also adjusts the height for line breaks.

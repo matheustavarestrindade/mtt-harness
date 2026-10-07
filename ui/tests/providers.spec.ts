@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { chooseSelectOption } from './helpers';
 import { mockHarness } from './api-fixture';
 import type { DeviceLogin, Model, Provider } from '../src/lib/atoms/types';
 
@@ -149,10 +150,22 @@ test('offer every available model and submit model IDs rather than display names
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
   const workspaceModel = page.getByLabel('Default model');
-  await expect(workspaceModel.locator('option')).toHaveCount(3);
-  await expect(workspaceModel).toContainText('DeepSeek-V4.1-Flash (deepseek/deepseek-flash)');
-  await expect(workspaceModel).toContainText('DeepSeek-V4-Pro-0813 (deepseek/deepseek-v4-pro)');
-  await workspaceModel.selectOption('deepseek/deepseek-v4-pro');
+  await workspaceModel.click();
+  await expect(page.getByRole('option')).toHaveCount(3);
+  await expect(
+    page.getByRole('option', {
+      name: 'DeepSeek-V4.1-Flash (deepseek/deepseek-flash)',
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('option', {
+      name: 'DeepSeek-V4-Pro-0813 (deepseek/deepseek-v4-pro)',
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  await chooseSelectOption(workspaceModel, 'deepseek/deepseek-v4-pro');
   await page.getByLabel('Project directory').fill('/workspace/example-project');
   await page
     .getByRole('dialog')
@@ -161,9 +174,11 @@ test('offer every available model and submit model IDs rather than display names
   await expect(page.getByRole('button', { name: 'Create session', exact: true })).toBeVisible();
   expect(fixture.instances[0].DefaultModel).toBe('deepseek/deepseek-v4-pro');
   const sessionModel = page.getByRole('dialog').getByLabel('Model', { exact: true });
-  await expect(sessionModel.locator('option')).toHaveCount(2);
-  await expect(sessionModel).toHaveValue('deepseek/deepseek-v4-pro');
-  await sessionModel.selectOption('deepseek/deepseek-flash');
+  await sessionModel.click();
+  await expect(page.getByRole('option')).toHaveCount(2);
+  await page.keyboard.press('Escape');
+  await expect(sessionModel).toHaveAttribute('data-value', 'deepseek/deepseek-v4-pro');
+  await chooseSelectOption(sessionModel, 'deepseek/deepseek-flash');
   await page.getByRole('button', { name: 'Create session', exact: true }).click();
   await expect(page.getByLabel('Message', { exact: true })).toBeEnabled();
   expect(fixture.sessions[0].Model).toBe('deepseek/deepseek-flash');

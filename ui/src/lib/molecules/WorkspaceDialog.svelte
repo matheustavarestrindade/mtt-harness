@@ -6,6 +6,7 @@
   import { Button } from '$lib/atoms/ui/button';
   import type { InstanceInput, Model } from '$lib/atoms/types';
   import { modelLabel } from '$lib/atoms/format';
+  import SelectField from './SelectField.svelte';
   let {
     open = $bindable(false),
     models = [],
@@ -64,15 +65,13 @@
         </p>
       </div>
       <div class="space-y-2">
-        <Label for="workspace-model">Default model</Label>{#if models.length}<select
+        <Label for="workspace-model">Default model</Label>{#if models.length}<SelectField
             id="workspace-model"
-            class="field-select"
             bind:value={model}
+            options={models.map((item) => ({ value: item.ID, label: modelLabel(item) }))}
             required
             disabled={busy}
-            >{#each models as item (item.ID)}<option value={item.ID}>{modelLabel(item)}</option
-              >{/each}</select
-          >{:else}<Input
+          />{:else}<Input
             id="workspace-model"
             class="h-11 font-mono text-sm"
             bind:value={model}

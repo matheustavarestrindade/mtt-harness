@@ -7,6 +7,7 @@
   import { modelLabel } from '$lib/atoms/format';
   import ReasoningSelect from './ReasoningSelect.svelte';
   import ModelPricing from './ModelPricing.svelte';
+  import SelectField from './SelectField.svelte';
   let {
     open = $bindable(false),
     models = [],
@@ -53,15 +54,16 @@
       }}
     >
       <div class="space-y-2">
-        <Label for="session-model">Model</Label><select
+        <Label for="session-model">Model</Label><SelectField
           id="session-model"
-          class="field-select"
           bind:value={selectedModel}
+          options={models.map((model) => ({
+            value: model.ID,
+            label: `${modelLabel(model)}${model.Tools ? '' : ' · tool support not declared'}`,
+          }))}
+          disabled={busy}
           required
-          >{#each models as model (model.ID)}<option value={model.ID}
-              >{modelLabel(model)}{model.Tools ? '' : ' · tool support not declared'}</option
-            >{/each}</select
-        >{#if !models.length}<p class="text-sm text-muted-foreground">
+        />{#if !models.length}<p class="text-sm text-muted-foreground">
             No available models. Check the provider configuration and this instance's model list.
           </p>{/if}
       </div>

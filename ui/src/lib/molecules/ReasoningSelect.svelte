@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Model } from '../atoms/types';
   import { reasoningEffortLabel } from '../atoms/reasoning';
+  import SelectField from './SelectField.svelte';
   let {
     model,
     value = '',
@@ -16,6 +17,16 @@
   } = $props();
   const identifier = $props.id();
   const efforts = $derived(model?.ReasoningEfforts ?? []);
+  const options = $derived([
+    {
+      value: '',
+      label: `Default${model?.DefaultReasoningEffort ? ` (${reasoningEffortLabel(model.DefaultReasoningEffort)})` : ''}`,
+    },
+    ...efforts.map((effort) => ({ value: effort, label: reasoningEffortLabel(effort) })),
+    ...(value && !efforts.includes(value)
+      ? [{ value, label: `Unavailable: ${value}`, disabled: true }]
+      : []),
+  ]);
 </script>
 
 {#if model?.Reasoning || value}
@@ -24,31 +35,15 @@
       for={identifier}
       class={stacked ? 'text-sm font-medium' : 'shrink-0 text-muted-foreground'}>Thinking</label
     >
-    <select
+    <SelectField
       id={identifier}
-      aria-label="Thinking effort"
-      class={stacked
-        ? 'field-select h-11 min-w-0 w-full'
-        : 'h-11 min-w-0 max-w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring'}
+      ariaLabel="Thinking effort"
+      class={stacked ? '' : 'flex-1 text-xs'}
       {value}
+      {options}
       disabled={disabled || !model}
       title="Applies to the next model request. Default uses the model's setting."
-      onchange={(event) => {
-        const effort = event.currentTarget.value;
-        event.currentTarget.value = value;
-        onChange(effort);
-      }}
-    >
-      <option value=""
-        >Default{model?.DefaultReasoningEffort
-          ? ` (${reasoningEffortLabel(model.DefaultReasoningEffort)})`
-          : ''}</option
-      >
-      {#each efforts as effort (effort)}<option value={effort}
-          >{reasoningEffortLabel(effort)}</option
-        >{/each}
-      {#if value && !efforts.includes(value)}<option {value} disabled>Unavailable: {value}</option
-        >{/if}
-    </select>
+      onValueChange={onChange}
+    />
   </div>
 {/if}
