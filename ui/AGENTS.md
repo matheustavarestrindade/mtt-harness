@@ -1,5 +1,8 @@
 # UI contributor rules
 
+- Keep the composer compact at one line, with automatic height growth up to 192px and internal scrolling beyond that. Preserve caret insertion, IME handling, queued submissions, draft restoration, and resizing when the available width changes.
+- Navigation can collapse on desktop; its header control must remain reachable. The right Memory panel uses workspace plugin settings/statistics from the existing API and becomes a drawer below 1280px. Poll only while visible, cancel stale reads/writes on scope changes, show pending plugin transitions, and keep errors local to the panel. Counts must distinguish current memory heads from versions and retained history. Costs retain currencies, explicit zero, estimates, and unknown prices; output already includes reasoning. Layout preferences contain no credentials or message text.
+
 - This directory is a standalone HTTP/WebSocket client of the harness API. Do not modify Go code, API contracts, database schema, root runtime configuration, or root Compose services for UI convenience without explicit user permission.
 - Keep UI dependencies, build output, development proxy, fixtures, tests, and documentation in this directory. The Vite proxy adapts browser access; it adds no harness business logic.
 - Use Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`) and TypeScript. Keep transport code, client state, and visual components separate.

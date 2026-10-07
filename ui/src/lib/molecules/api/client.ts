@@ -14,6 +14,7 @@ import type {
   TaskState,
 } from '../../atoms/types';
 import type { RuntimeSettings, RuntimeSettingKey } from '../../atoms/settings';
+import type { MemoryMetrics, MemoryPluginState, MemoryConfiguration } from '../../atoms/memory';
 
 export class ApiError extends Error {
   constructor(
@@ -277,6 +278,31 @@ export class HarnessApi {
       `instances/${encodeURIComponent(instanceID)}/statistics`,
       'GET',
       undefined,
+      signal,
+    );
+  }
+  memoryState(instanceID: string, signal?: AbortSignal) {
+    return this.request<MemoryPluginState>(
+      `instances/${encodeURIComponent(instanceID)}/plugins/context/settings`,
+      'GET',
+      undefined,
+      signal,
+    );
+  }
+  async memoryMetrics(instanceID: string, signal?: AbortSignal): Promise<MemoryMetrics> {
+    const result = await this.request<MemoryMetrics>(
+      `instances/${encodeURIComponent(instanceID)}/plugins/context/statistics`,
+      'GET',
+      undefined,
+      signal,
+    );
+    return { ...result, Counters: result.Counters ?? {}, Agents: result.Agents ?? [] };
+  }
+  configureMemory(instanceID: string, patch: Partial<MemoryConfiguration>, signal?: AbortSignal) {
+    return this.request<MemoryPluginState>(
+      `instances/${encodeURIComponent(instanceID)}/plugins/context/settings`,
+      'PATCH',
+      patch,
       signal,
     );
   }

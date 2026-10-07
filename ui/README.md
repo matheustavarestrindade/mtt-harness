@@ -71,6 +71,10 @@ The navigation drawer contains the workspaces and sessions. The message composer
 
 ## A Conversation
 
+The message composer starts with one text line. More text increases the composer height automatically. The maximum height is 192 pixels. More text uses a scrollbar. An empty message draft uses the minimum height again.
+
+On a large screen, use `Collapse navigation` or `Expand navigation` in the header. The browser keeps the setting. On a small screen, use the navigation drawer.
+
 1. Connect to the API.
 2. Make a workspace with a server directory and a default model. For the test provider, use `test/test-model`.
 3. Make a session.
@@ -122,6 +126,14 @@ The usage section shows model calls, input tokens, output tokens, reasoning toke
 The API gives usage data for the available history. It does not give subscription limits. The UI shows `0.0` cost for a new conversation without model usage. The UI shows `Unavailable` when usage has occurred but price data is not available.
 
 Select a model name in the provider section to read token prices and reasoning efforts. The session form also shows token prices. A cost estimate has the label `Estimated cost`. A subscription model does not use API token prices.
+
+## Workspace Memory
+
+The `Memory` panel is on the right side of a large screen. Use the header control to open or close it. Small screens use a navigation drawer. Memory data applies to the workspace, across sessions.
+
+The panel shows memory records, source messages, memory jobs, agent tokens, costs, and context data. Open an agent row for more usage data. Use `Memory settings` to select a worker model or change the workspace plugin state. The UI uses the harness plugin API.
+
+See `docs/memory.md` for usage data and API limits.
 
 ## Reasoning
 
