@@ -2,6 +2,27 @@ import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
 import { connectAndCreate } from './helpers';
 
+test('notifications leave panel controls reachable after a screen resize', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await mockHarness(page);
+  await connectAndCreate(page);
+  const notification = page.locator('[data-sonner-toast][data-front="true"]').first();
+  await expect(notification).toBeVisible();
+  await expect
+    .poll(async () => (await notification.boundingBox())?.y ?? 0)
+    .toBeGreaterThanOrEqual(120);
+  await page.getByRole('button', { name: 'Memory settings', exact: true }).click({ timeout: 3000 });
+  await expect(page.getByLabel('Worker model', { exact: true })).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Close memory panel', exact: true })
+    .click({ timeout: 3000 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole('button', { name: 'Open memory panel', exact: true })
+    .click({ timeout: 3000 });
+  await expect(page.getByRole('dialog', { name: 'Workspace memory', exact: true })).toBeVisible();
+});
+
 test('keep the composer compact, grow with content and shrink after clearing', async ({
   page,
 }, testInfo) => {

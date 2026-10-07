@@ -614,4 +614,15 @@
   onDelete={() => void confirmSessionDeletion()}
 />
 <ActivityDialog bind:open={activityOpen} events={workbench.events} />
-<Toaster theme="dark" closeButton position="top-right" offset="80px" mobileOffset="16px" />
+<Toaster
+  theme="dark"
+  closeButton
+  position="top-right"
+  offset={{ top: '128px', right: '24px', left: '24px', bottom: '24px' }}
+  mobileOffset={{
+    top: 'calc(80px + env(safe-area-inset-top))',
+    right: '16px',
+    left: '16px',
+    bottom: '16px',
+  }}
+/>
