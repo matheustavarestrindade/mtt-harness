@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import {
     Menu,
     ChevronRight,
@@ -9,6 +10,9 @@
     Settings2,
     CircleAlert,
     LoaderCircle,
+    PanelLeftClose,
+    PanelLeftOpen,
+    BrainCircuit,
   } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
   import { Toaster } from '$lib/atoms/ui/sonner';
@@ -27,8 +31,10 @@
   import SessionSettingsDialog from '$lib/molecules/SessionSettingsDialog.svelte';
   import { findSessionModel, reasoningEffortLabel } from '$lib/atoms/reasoning';
   import { HarnessConsole } from '$lib/organisms/console.svelte';
+  import MemoryPanel from '$lib/organisms/MemoryPanel.svelte';
   import { ApiError } from '$lib/molecules/api/client';
   import { loadConnection, type ConnectionPreferences } from '$lib/molecules/connection-storage';
+  import { loadLayout, saveLayout } from '$lib/molecules/layout-storage';
   import { shortID, workspaceName } from '$lib/atoms/format';
   import type { Instance, InstanceInput, Session } from '$lib/atoms/types';
   import type { SettingsSection } from '$lib/atoms/settings';
@@ -56,6 +62,16 @@
   } | null>(null);
   let activityOpen = $state(false);
   let menuOpen = $state(false);
+  let navigationCollapsed = $state(false);
+  let memoryCollapsed = $state(false);
+  let memoryDrawerOpen = $state(false);
+  let layoutReady = $state(false);
+  const desktopNavigation = new MediaQuery('(min-width: 1024px)');
+  const desktopMemory = new MediaQuery('(min-width: 1280px)');
+  const memoryVisible = $derived(desktopMemory.current ? !memoryCollapsed : memoryDrawerOpen);
+  const connectedAPI = $derived(
+    workbench.connection === 'connected' ? workbench.connectedAPIClient() : null,
+  );
   let busy = $state('');
   let sending = $state(false);
   let drafts = $state<Record<string, string>>({});
@@ -83,6 +99,27 @@
     settingsSection = section ?? (workbench.connection === 'connected' ? 'general' : 'connection');
     settingsOpen = true;
   }
+  function toggleMemoryPanel() {
+    if (desktopMemory.current) memoryCollapsed = !memoryCollapsed;
+    else {
+      menuOpen = false;
+      memoryDrawerOpen = !memoryDrawerOpen;
+    }
+  }
+  function closeMemoryPanel() {
+    if (desktopMemory.current) memoryCollapsed = true;
+    memoryDrawerOpen = false;
+    void tick().then(() => document.getElementById('memory-panel-toggle')?.focus());
+  }
+  $effect(() => {
+    if (layoutReady) saveLayout({ navigationCollapsed, memoryCollapsed });
+  });
+  $effect(() => {
+    if (desktopNavigation.current) menuOpen = false;
+  });
+  $effect(() => {
+    if (desktopMemory.current) memoryDrawerOpen = false;
+  });
 
   $effect(() => {
     if (workspaceOpen) workspaceError = '';
@@ -281,6 +318,10 @@
     });
   }
   onMount(() => {
+    const layout = loadLayout();
+    navigationCollapsed = layout.navigationCollapsed;
+    memoryCollapsed = layout.memoryCollapsed;
+    layoutReady = true;
     preferences = loadConnection();
     if (preferences.token) void connect(preferences.base, preferences.token);
   });
@@ -306,22 +347,49 @@
   />
 {/snippet}
 
+{#snippet memoryPanel()}
+  <MemoryPanel
+    api={connectedAPI}
+    instance={workbench.instance}
+    models={workbench.models}
+    onClose={closeMemoryPanel}
+  />
+{/snippet}
+
 <div class="flex h-dvh w-full min-w-0 overflow-hidden">
-  <aside class="hidden w-[272px] shrink-0 border-r border-border lg:block">
-    {@render navigation()}
-  </aside>
+  {#if !navigationCollapsed}<aside
+      id="workspace-navigation"
+      class="hidden w-[272px] shrink-0 border-r border-border lg:block"
+    >
+      {@render navigation()}
+    </aside>{/if}
   <div class="flex min-w-0 flex-1 flex-col">
     <header
       class="flex min-h-16 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 sm:gap-3 sm:px-6"
       style="padding-top: env(safe-area-inset-top)"
     >
-      <Button
-        variant="ghost"
-        size="icon"
-        class="icon-button lg:hidden"
-        aria-label="Open navigation"
-        onclick={() => (menuOpen = true)}><Menu class="size-5" /></Button
-      >
+      {#if desktopNavigation.current}<Button
+          variant="ghost"
+          size="icon"
+          class="icon-button shrink-0 text-muted-foreground"
+          aria-label={navigationCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          title={navigationCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          aria-controls="workspace-navigation"
+          aria-expanded={!navigationCollapsed}
+          onclick={() => (navigationCollapsed = !navigationCollapsed)}
+          >{#if navigationCollapsed}<PanelLeftOpen class="size-4" />{:else}<PanelLeftClose
+              class="size-4"
+            />{/if}</Button
+        >{:else}<Button
+          variant="ghost"
+          size="icon"
+          class="icon-button lg:hidden"
+          aria-label="Open navigation"
+          onclick={() => {
+            memoryDrawerOpen = false;
+            menuOpen = true;
+          }}><Menu class="size-5" /></Button
+        >{/if}
       <div class="min-w-0 flex-1">
         <div class="flex min-w-0 items-center gap-2 text-sm">
           <FolderOpen class="hidden size-4 shrink-0 text-muted-foreground sm:block" /><span
@@ -341,6 +409,17 @@
           </p>{/if}
       </div>
       <div class="flex shrink-0 items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          class={`icon-button ${memoryVisible ? 'bg-accent text-foreground' : 'text-muted-foreground'}`}
+          aria-label={memoryVisible ? 'Hide memory panel' : 'Open memory panel'}
+          id="memory-panel-toggle"
+          title="Workspace memory"
+          aria-controls="workspace-memory-panel"
+          aria-expanded={memoryVisible}
+          onclick={toggleMemoryPanel}><BrainCircuit class="size-4" /></Button
+        >
         <Button
           variant="ghost"
           class="icon-button gap-2 px-2 text-xs sm:px-3"
@@ -374,72 +453,80 @@
         >
       </div>
     </header>
-    <main class="flex min-h-0 min-w-0 flex-1 flex-col" id="main-content">
-      {#if workbench.error}<div
-          role="alert"
-          class="flex shrink-0 items-start gap-2 border-b border-destructive/20 bg-destructive/5 px-4 py-3 text-xs leading-5 text-destructive sm:px-8"
-        >
-          <CircleAlert class="mt-0.5 size-4 shrink-0" /><span class="min-w-0 flex-1 break-words"
-            >{workbench.error}</span
-          ><Button
-            variant="ghost"
-            class="h-11 shrink-0 text-xs"
-            onclick={() => openSettings('connection')}>Connection</Button
+    <div class="flex min-h-0 min-w-0 flex-1">
+      <main class="flex min-h-0 min-w-0 flex-1 flex-col" id="main-content">
+        {#if workbench.error}<div
+            role="alert"
+            class="flex shrink-0 items-start gap-2 border-b border-destructive/20 bg-destructive/5 px-4 py-3 text-xs leading-5 text-destructive sm:px-8"
           >
-        </div>{/if}
-      {#if workbench.connection === 'connecting'}<div
-          class="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground"
-          role="status"
-        >
-          <LoaderCircle class="size-3.5 animate-spin" />Connecting to your harness…
-        </div>{/if}
-      <Conversation
-        console={workbench}
-        {busy}
-        onConnection={() => openSettings('connection')}
-        onWorkspace={() => (workspaceOpen = true)}
-        onSession={() => (sessionOpen = true)}
-        onResume={() => void runWorkbenchAction('resume', () => workbench.resumeInstance())}
-        onCancelQueued={(identifier) =>
-          void runWorkbenchAction(identifier, () => workbench.cancelQueuedMessage(identifier))}
-        onDecision={resolvePermissionRequest}
-        onPrompt={(text) => {
-          if (sessionID) drafts[sessionID] = text;
-        }}
-      />
-      <footer
-        class="shrink-0 bg-background px-3 pt-2 sm:px-8"
-        style="padding-bottom: max(.5rem, env(safe-area-inset-bottom))"
-      >
-        <div class="mx-auto max-w-4xl">
-          {#key sessionID}<TaskProgress
-              state={workbench.taskState}
-              error={workbench.taskStateError}
-            />{/key}
-          <Composer
-            bind:value={() => drafts[sessionID] ?? '', (value) => (drafts[sessionID] = value)}
-            {disabled}
-            {sending}
-            running={workbench.status.running}
-            cancelling={busy === 'cancel'}
-            onSend={() => void sendDraftMessage()}
-            onCancel={() => void runWorkbenchAction('cancel', () => workbench.cancelCurrentTurn())}
-            onSettings={workbench.session ? openSessionSettings : undefined}
-            settingsOpen={sessionSettingsOpen}
-          />
-          <div class="mt-1 flex items-center justify-between gap-2">
-            <UsageBar statistics={workbench.statistics} /><span
-              class="hidden shrink-0 text-[10px] text-muted-foreground/65 sm:block"
-              >{workbench.session
-                ? workbench.streamState === 'live'
-                  ? 'Events connected'
-                  : 'Syncing through the API'
-                : 'mtt-harness · API client'}</span
+            <CircleAlert class="mt-0.5 size-4 shrink-0" /><span class="min-w-0 flex-1 break-words"
+              >{workbench.error}</span
+            ><Button
+              variant="ghost"
+              class="h-11 shrink-0 text-xs"
+              onclick={() => openSettings('connection')}>Connection</Button
             >
+          </div>{/if}
+        {#if workbench.connection === 'connecting'}<div
+            class="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground"
+            role="status"
+          >
+            <LoaderCircle class="size-3.5 animate-spin" />Connecting to your harness…
+          </div>{/if}
+        <Conversation
+          console={workbench}
+          {busy}
+          onConnection={() => openSettings('connection')}
+          onWorkspace={() => (workspaceOpen = true)}
+          onSession={() => (sessionOpen = true)}
+          onResume={() => void runWorkbenchAction('resume', () => workbench.resumeInstance())}
+          onCancelQueued={(identifier) =>
+            void runWorkbenchAction(identifier, () => workbench.cancelQueuedMessage(identifier))}
+          onDecision={resolvePermissionRequest}
+          onPrompt={(text) => {
+            if (sessionID) drafts[sessionID] = text;
+          }}
+        />
+        <footer
+          class="shrink-0 bg-background px-3 pt-2 sm:px-8"
+          style="padding-bottom: max(.5rem, env(safe-area-inset-bottom))"
+        >
+          <div class="mx-auto max-w-4xl">
+            {#key sessionID}<TaskProgress
+                state={workbench.taskState}
+                error={workbench.taskStateError}
+              />{/key}
+            <Composer
+              bind:value={() => drafts[sessionID] ?? '', (value) => (drafts[sessionID] = value)}
+              {disabled}
+              {sending}
+              running={workbench.status.running}
+              cancelling={busy === 'cancel'}
+              onSend={() => void sendDraftMessage()}
+              onCancel={() =>
+                void runWorkbenchAction('cancel', () => workbench.cancelCurrentTurn())}
+              onSettings={workbench.session ? openSessionSettings : undefined}
+              settingsOpen={sessionSettingsOpen}
+            />
+            <div class="mt-1 flex items-center justify-between gap-2">
+              <UsageBar statistics={workbench.statistics} /><span
+                class="hidden shrink-0 text-[10px] text-muted-foreground/65 sm:block"
+                >{workbench.session
+                  ? workbench.streamState === 'live'
+                    ? 'Events connected'
+                    : 'Syncing through the API'
+                  : 'mtt-harness · API client'}</span
+              >
+            </div>
           </div>
-        </div>
-      </footer>
-    </main>
+        </footer>
+      </main>
+      {#if desktopMemory.current && !memoryCollapsed}<aside
+          class="w-[296px] shrink-0 border-l border-border 2xl:w-[312px]"
+        >
+          {@render memoryPanel()}
+        </aside>{/if}
+    </div>
   </div>
 </div>
 
@@ -452,6 +539,18 @@
     >{@render navigation()}</Sheet.Content
   ></Sheet.Root
 >
+{#if !desktopMemory.current}
+  <Sheet.Root bind:open={memoryDrawerOpen}>
+    <Sheet.Content side="right" class="w-[min(92vw,360px)] gap-0 p-0" showCloseButton={false}>
+      <Sheet.Header class="sr-only"
+        ><Sheet.Title>Workspace memory</Sheet.Title><Sheet.Description
+          >Memory records, agent usage, costs, and settings for the selected workspace.</Sheet.Description
+        ></Sheet.Header
+      >
+      {@render memoryPanel()}
+    </Sheet.Content>
+  </Sheet.Root>
+{/if}
 <SessionSettingsDialog
   bind:open={sessionSettingsOpen}
   models={workbench.models}
@@ -515,4 +614,15 @@
   onDelete={() => void confirmSessionDeletion()}
 />
 <ActivityDialog bind:open={activityOpen} events={workbench.events} />
-<Toaster theme="dark" closeButton position="top-right" offset="80px" mobileOffset="16px" />
+<Toaster
+  theme="dark"
+  closeButton
+  position="top-right"
+  offset={{ top: '128px', right: '24px', left: '24px', bottom: '24px' }}
+  mobileOffset={{
+    top: 'calc(80px + env(safe-area-inset-top))',
+    right: '16px',
+    left: '16px',
+    bottom: '16px',
+  }}
+/>

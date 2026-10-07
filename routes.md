@@ -266,6 +266,56 @@ The limit value must be 0 or more. The `api_token` value must not be empty. The 
 
 The `GET` routes give the database values for one scope. Instance values and harness values stay in different responses. A harness settings response can include `api_token`. The handler does not examine if the instance is in the database.
 
+## Plugin Control
+
+An API credential is necessary for plugin routes. An instance route examines the workspace in the database before the plugin operation.
+
+```text
+| Method | Path | Input | Success | Handler errors |
+|---|---|---|---|---|
+| GET | /plugins | none | 200, PluginState array | 500 |
+| GET | /plugins/{plugin}/settings | none | 200, PluginState | 400, 404, 500 |
+| PATCH | /plugins/{plugin}/settings | partial JSON object | 200, PluginState | 400, 404 |
+| GET | /instances/{id}/plugins | none | 200, PluginState array | 404, 500 |
+| GET | /instances/{id}/plugins/{plugin}/settings | none | 200, PluginState | 400, 404, 500 |
+| PATCH | /instances/{id}/plugins/{plugin}/settings | partial JSON object | 200, PluginState | 400, 404 |
+| GET | /instances/{id}/plugins/{plugin}/statistics | none | 200, PluginMetrics | 400, 404, 500 |
+| GET | /instances/{id}/agent-statistics | none | 200, AgentStatistics array | 404, 500 |
+```
+
+The default plugin state for `context` is `OFF`. An available worker model is necessary for `ON`. For example:
+
+```json
+{"enabled":true,"worker_model":"provider/model"}
+```
+
+The patch changes only supplied settings. A workspace value can override a harness value. A JSON `null` removes the workspace value. The `Schema.JSON` field gives parameter descriptions, defaults, and limits.
+
+```text
+PluginState {
+  Name: string, Version: string, WorkspaceID: string,
+  Available: boolean, Enabled: boolean, RequestedEnabled: boolean,
+  Pending: boolean, Configuration: object, Override: object,
+  Schema: { JSON: object }, Error?: string
+}
+
+PluginMetrics {
+  Name: string, WorkspaceID: string,
+  Counters: map<string, integer>, Agents: AgentStatistics[] | null
+}
+
+AgentStatistics {
+  Agent: string, ModelID: string, Statistics: Statistics,
+  FailedCalls: integer, DurationMilliseconds: integer
+}
+```
+
+`Configuration` is the resolved configuration. `Override` contains database fields for the selected scope. An empty `WorkspaceID` identifies harness settings. A client must use `Enabled` and `Pending` to show the plugin state. The value of `RequestedEnabled` does not identify when the harness completes the operation.
+
+Memory jobs stay in the database at `OFF`. The runtime stops new work after accepted tool groups and cancels active workers. The memory archive and the context view given to the model stay available. Workspace agent cost does not increase session cost.
+
+See `plugins/context/README.md` for configuration and memory behavior.
+
 ## Permission and Process Routes
 
 ```text

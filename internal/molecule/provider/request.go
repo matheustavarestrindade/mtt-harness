@@ -41,6 +41,13 @@ func (standardProvider *Standard) streamChatCompletions(operationContext context
 		switch key {
 		case "model", "messages", "tools", "stream", "stream_options":
 			return nil, fmt.Errorf("request parameter %q is reserved", key)
+		case "max_output_tokens":
+			// The harness uses one output-reservation unit; Chat Completions
+			// names its output cap max_tokens rather than the Responses field.
+			if _, explicit := request.Params["max_tokens"]; !explicit {
+				payload["max_tokens"] = value
+			}
+			continue
 		}
 		payload[key] = value
 	}

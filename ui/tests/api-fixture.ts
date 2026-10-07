@@ -1,4 +1,5 @@
 import type { Page, WebSocketRoute } from '@playwright/test';
+import type { MemoryMetrics, MemoryPluginState } from '../src/lib/atoms/memory';
 import type {
   HarnessEvent,
   Instance,
@@ -19,6 +20,9 @@ export async function mockHarness(page: Page) {
   const queued = new Map<string, Message[]>();
   const running = new Set<string>();
   const taskStates = new Map<string, TaskState>();
+  const memoryStates = new Map<string, MemoryPluginState>();
+  const memoryMetrics = new Map<string, MemoryMetrics>();
+  const memoryUpdates: { workspaceID: string; patch: Record<string, unknown> }[] = [];
   const settings = new Map<string, Record<string, string>>([
     ['', { agent_depth_limit: '2', process_limit: '8' }],
   ]);
@@ -121,6 +125,44 @@ export async function mockHarness(page: Page) {
         return reply(instance, 201);
       }
       const parts = path.split('/').filter(Boolean);
+      if (parts[0] === 'instances' && parts[2] === 'plugins' && parts[3] === 'context') {
+        const workspaceID = parts[1];
+        if (!memoryStates.has(workspaceID))
+          memoryStates.set(workspaceID, {
+            Name: 'context',
+            Version: '0.1.0',
+            WorkspaceID: workspaceID,
+            Available: true,
+            Enabled: false,
+            RequestedEnabled: false,
+            Pending: false,
+            Configuration: {
+              enabled: false,
+              worker_model: '',
+              worker_effort: '',
+              historian_model: '',
+            },
+            Override: {},
+          });
+        if (!memoryMetrics.has(workspaceID))
+          memoryMetrics.set(workspaceID, {
+            Name: 'context',
+            WorkspaceID: workspaceID,
+            Counters: {},
+            Agents: [],
+          });
+        if (parts[4] === 'statistics') return reply(memoryMetrics.get(workspaceID));
+        const state = memoryStates.get(workspaceID)!;
+        if (method === 'PATCH') {
+          const patch = request.postDataJSON();
+          memoryUpdates.push({ workspaceID, patch });
+          state.Configuration = { ...state.Configuration, ...patch };
+          state.Override = { ...state.Override, ...patch };
+          state.RequestedEnabled = state.Configuration.enabled;
+          if (!state.Pending) state.Enabled = state.RequestedEnabled;
+        }
+        return reply(state);
+      }
       if (path === '/statistics') return reply(harnessUsage);
       if (parts[0] === 'settings' || (parts[0] === 'instances' && parts[2] === 'settings')) {
         const scope = parts[0] === 'settings' ? '' : parts[1];
@@ -333,5 +375,8 @@ export async function mockHarness(page: Page) {
     running,
     event,
     taskStates,
+    memoryStates,
+    memoryMetrics,
+    memoryUpdates,
   };
 }

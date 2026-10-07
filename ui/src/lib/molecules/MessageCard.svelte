@@ -5,6 +5,7 @@
   import type { Message } from '$lib/atoms/types';
   import type { ToolActivity } from '$lib/atoms/transcript';
   import { messageText, formatTimestamp } from '$lib/atoms/format';
+  import { assistantDisplayMessage } from '$lib/atoms/assistant-display';
   import { copyToClipboard } from './clipboard';
   import MessageContent from './content/MessageContent.svelte';
   import ToolActivitySection from './ToolActivitySection.svelte';
@@ -20,9 +21,12 @@
     running?: boolean;
     streaming?: boolean;
   } = $props();
-  const text = $derived(messageText(message));
+  const displayMessage = $derived(assistantDisplayMessage(message, streaming));
+  const text = $derived(messageText(displayMessage));
   const hasContent = $derived(
-    (message.Content ?? []).some((content) => content.Type !== 'text' || Boolean(content.Text)),
+    (displayMessage.Content ?? []).some(
+      (content) => content.Type !== 'text' || Boolean(content.Text),
+    ),
   );
   async function copyText() {
     try {
@@ -78,7 +82,7 @@
       {#if hasContent}
         {#if message.Role === 'assistant'}
           <section class="assistant-section" aria-label="Assistant response">
-            <MessageContent content={message.Content} mode="markdown" />
+            <MessageContent content={displayMessage.Content} mode="markdown" />
           </section>
         {:else}
           <MessageContent

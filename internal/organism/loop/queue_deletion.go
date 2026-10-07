@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
@@ -75,10 +76,23 @@ func (messageQueue *Queue) deleteStoredConversation(command queueCommand) {
 				}
 			}
 		}
+		identifiers := make([]atom.SessionID, 0, len(selected))
+		for identifier := range selected {
+			identifiers = append(identifiers, identifier)
+		}
+		completeHistory, operationError := messageQueue.loop.beginPluginHistoryChange(operationContext, command.instanceID, harness.HistoryDelete, identifiers, "")
+		if operationError != nil {
+			return operationError
+		}
+		historyCommitted := false
+		defer func() {
+			operationError = errors.Join(operationError, completeHistory(context.WithoutCancel(operationContext), historyCommitted))
+		}()
 		completed.deleted, operationError = messageQueue.loop.configuration.Store.Sessions().DeleteConversation(operationContext, command.session.ID)
 		if operationError != nil {
 			return operationError
 		}
+		historyCommitted = true
 		for _, coordinator := range frozen {
 			if !selected[coordinator.session.ID] {
 				continue

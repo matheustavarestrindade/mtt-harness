@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate } from './helpers';
+import { connectAndCreate, chooseSelectOption } from './helpers';
 
 test('show zero cost for a new chat while preserving unknown and reported costs', async ({
   page,
@@ -41,13 +41,13 @@ test('settings stay in a modal, preserve the draft, and show real usage scopes',
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Usage', exact: true }).click();
-  await expect(dialog.getByLabel('Usage scope')).toHaveValue('session');
+  await expect(dialog.getByLabel('Usage scope')).toHaveAttribute('data-value', 'session');
   await expect(dialog.getByRole('region', { name: 'Usage overview' })).toContainText('Unavailable');
-  await dialog.getByLabel('Usage scope').selectOption('workspace');
+  await chooseSelectOption(dialog.getByLabel('Usage scope'), 'workspace');
   await expect(dialog.getByText('1,600', { exact: true })).toBeVisible();
   await expect(dialog.getByText('31.3%', { exact: true })).toBeVisible();
   await expect(dialog.getByText('$0.125', { exact: true })).toBeVisible();
-  await dialog.getByLabel('Usage scope').selectOption('harness');
+  await chooseSelectOption(dialog.getByLabel('Usage scope'), 'harness');
   await expect(dialog.getByText('$0.75 + €0.50', { exact: true })).toBeVisible();
   if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 700 });
   for (const button of await dialog
@@ -82,7 +82,7 @@ test('save harness and workspace limits and restore inheritance', async ({ page 
     .getByRole('button', { name: 'Save', exact: true })
     .click();
   await expect.poll(() => fixture.settings.get('')?.agent_depth_limit).toBe('3');
-  await dialog.getByLabel('Settings scope').selectOption('workspace');
+  await chooseSelectOption(dialog.getByLabel('Settings scope'), 'workspace');
   await expect(depth).toHaveValue('');
   await expect(dialog).toContainText('Harness setting: 3');
   await depth.fill('0');
@@ -137,7 +137,7 @@ test('failed usage and settings requests remain visible and recover on retry', a
   );
   await dialog.getByRole('button', { name: 'Usage', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Usage temporarily unavailable');
-  await dialog.getByLabel('Usage scope').selectOption('workspace');
+  await chooseSelectOption(dialog.getByLabel('Usage scope'), 'workspace');
   await expect(dialog.getByRole('alert')).toHaveCount(0);
   await expect(dialog.getByText('1,600', { exact: true })).toBeVisible();
 });

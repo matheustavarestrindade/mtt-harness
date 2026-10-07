@@ -24,6 +24,19 @@ type ToolSearchDocumentation interface {
 	SearchDocument() string
 }
 
+// ScopedTool optionally limits a registered capability to the current request.
+// Discovery and callable definitions use the same predicate as execution.
+type ScopedTool interface {
+	Available(context.Context) (bool, error)
+}
+
+func ToolAvailable(operationContext context.Context, tool Tool) (bool, error) {
+	if scoped, supported := tool.(ScopedTool); supported {
+		return scoped.Available(operationContext)
+	}
+	return true, nil
+}
+
 func (harnessRuntime *Harness) Tool(tool Tool) Unsubscribe {
 	harnessRuntime.mutex.Lock()
 	identifier := harnessRuntime.nextRegistrationID()

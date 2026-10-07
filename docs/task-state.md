@@ -72,11 +72,13 @@ The tool gives only `Updated` or `Cleared`. An error gives the operation and cau
 
 A task update puts the response counter at 0. The harness increases the response counter after the model completes a response with active task state. Stream chunks and tool calls do not increase it. The response counter uses the revision from the model request. It does not increase if task state has a different revision.
 
-At a response counter of 3, the next request gives a task reminder in the system message. The model must use `task_state` before other work. If the definition is not available, the model must use tool discovery first. The task reminder does not stop other tools.
+At a response counter of 3, the next request gives a task reminder after the conversation messages. The model must use `task_state` before other work. If the definition is not available, the model must use tool discovery first. The task reminder does not stop other tools.
 
 The model can change only the `DOING` object. A task update can also keep the same text. The task reminder stays in model requests until a task update puts the response counter at 0.
 
 The model receives one task state snapshot. The task state snapshot is JSON data, not system instructions. The loop adds it before context and request stages. The context limit includes the task state snapshot and task reminder. The task state snapshot and task reminder are not written to the database.
+
+The task state snapshot and task reminder use a request-local runtime message. A task update does not change the system prompt prefix. Context fitting does not use the runtime message as a new turn.
 
 ## Cancellation and Session Deletion
 

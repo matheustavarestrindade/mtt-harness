@@ -60,7 +60,15 @@ The dependency direction is `atoms <- molecules <- organisms`. An atom import mu
 
 The shadcn-svelte registry gives the buttons, fields, dialogs, sheet, badges, and notifications. The console components add navigation, connection forms, message history, usage, and the composer.
 
-The sidebar stays open on large screens. A navigation drawer replaces the sidebar on small screens. The UI controls have labels and keyboard focus. The composer uses the viewport height and safe-area padding. Long output must not increase the document width.
+The `SelectField` molecule uses the shadcn-svelte `Select` components. Model lists and settings use the molecule. Long model text uses line breaks. A long model list uses a scrollbar.
+
+The model ID and reasoning effort values do not change. The model default uses an empty reasoning effort. A model change stays at the previous selection until the API accepts the change.
+
+Use the header control to close the sidebar on large screens. The header control can also open the sidebar. A navigation drawer replaces the sidebar on small screens. The UI controls have labels and keyboard focus. The composer uses the viewport height and safe-area padding. Long output must not increase the document width.
+
+The composer starts with one text line. The composer height increases with the message draft, to a maximum of 192 pixels. More text uses a scrollbar. An empty message draft uses the minimum height again. A width change also adjusts the height for line breaks.
+
+The navigation control stays in the header when the sidebar closes. The browser keeps the setting in local storage. The setting does not contain credentials or conversation text.
 
 The `Enter` key sends the message. The keys `Shift+Enter`, `Command+Enter`, and `Ctrl+Enter` add a new line. Text composition does not send a message.
 
@@ -69,6 +77,16 @@ The `Enter` key sends the message. The keys `Shift+Enter`, `Command+Enter`, and 
 The `TaskProgress` molecule shows task state above the composer. The progress panel contains a task title, description, and task items with task status. A button opens or closes the content. The content has a height limit.
 
 The console reads `GET /sessions/{id}/task-state` and receives `task_state.updated` events. It accepts data only for the selected session and the same or newer revision. An empty TODO list with `DOING: null` removes the progress panel. An error on the task state route does not remove the session or message draft.
+
+## Memory Panel
+
+The `MemoryPanel` organism shows workspace memory data on the right side. A screen width below 1280 pixels uses a navigation drawer. The header control opens or closes the panel. The panel has a scrollbar.
+
+The `memory-panel.svelte.ts` file controls data requests and configuration requests. The API client uses harness plugin routes. A workspace change or connection change cancels previous requests. Previous requests also stop when the panel closes. A previous response must not change the new selected view.
+
+The `memory.ts` atom contains API types. The atom calculates usage data. The `MemoryAgentUsage` molecule shows agents and models.
+
+The UI does not change memory content or model context. See `memory.md` for usage data and configuration behavior.
 
 ## API Data
 

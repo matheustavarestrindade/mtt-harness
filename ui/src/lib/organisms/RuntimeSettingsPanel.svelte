@@ -13,6 +13,7 @@
     type RuntimeSettings,
   } from '../atoms/settings';
   import type { HarnessApi } from '../molecules/api/client';
+  import SelectField from '../molecules/SelectField.svelte';
 
   let { api, instance }: { api: HarnessApi; instance: Instance | null } = $props();
   let scope = $state('harness');
@@ -102,12 +103,17 @@
   </p>
   <div class="my-6 space-y-2">
     <Label for="settings-scope">Settings scope</Label>
-    <select id="settings-scope" class="field-select" bind:value={scope} disabled={!!busy}>
-      <option value="harness">Entire harness</option>
-      {#if instance}<option value="workspace"
-          >Workspace · {workspaceName(instance.Workspace)}</option
-        >{/if}
-    </select>
+    <SelectField
+      id="settings-scope"
+      bind:value={scope}
+      disabled={!!busy}
+      options={[
+        { value: 'harness', label: 'Entire harness' },
+        ...(instance
+          ? [{ value: 'workspace', label: `Workspace · ${workspaceName(instance.Workspace)}` }]
+          : []),
+      ]}
+    />
   </div>
   {#if loading}<p role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
       <LoaderCircle class="size-4 animate-spin" />Loading settings…

@@ -2,7 +2,11 @@ package loop
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
 func (coordinator *sessionCoordinator) startOperation(command sessionCommand) {
@@ -67,7 +71,7 @@ func (coordinator *sessionCoordinator) handleOperation(completed operationComple
 
 func (coordinator *sessionCoordinator) revertHistory(operationContext context.Context, command sessionCommand, active *runningTurn) operationCompletion {
 	completed := operationCompletion{command: command}
-	completed.response.operationError = func() error {
+	completed.response.operationError = func() (operationError error) {
 		messages, operationError := coordinator.loop.configuration.Store.Sessions().Messages(operationContext, coordinator.session.ID)
 		if operationError != nil {
 			return operationError
@@ -95,6 +99,14 @@ func (coordinator *sessionCoordinator) revertHistory(operationContext context.Co
 				return operationContext.Err()
 			}
 		}
+		completeHistory, operationError := coordinator.loop.beginPluginHistoryChange(operationContext, coordinator.session.InstanceID, harness.HistoryRevert, []atom.SessionID{coordinator.session.ID}, command.messageID)
+		if operationError != nil {
+			return operationError
+		}
+		historyCommitted := false
+		defer func() {
+			operationError = errors.Join(operationError, completeHistory(context.WithoutCancel(operationContext), historyCommitted))
+		}()
 		completed.storageChanged = true
 		if _, operationError := coordinator.loop.configuration.Store.Queue().ClearPending(operationContext, coordinator.session.ID); operationError != nil {
 			return operationError
@@ -105,6 +117,7 @@ func (coordinator *sessionCoordinator) revertHistory(operationContext context.Co
 			return operationError
 		}
 		completed.response.removed = removed
+		historyCommitted = true
 		coordinator.loop.mutex.Lock()
 		delete(coordinator.loop.groups, coordinator.session.ID)
 		delete(coordinator.loop.finished, coordinator.session.ID)

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate } from './helpers';
+import { connectAndCreate, chooseSelectOption, expectSelectOptions } from './helpers';
 
 test('configure the session through its cog and confirm smaller context switches in one dialog', async ({
   page,
@@ -30,15 +30,15 @@ test('configure the session through its cog and confirm smaller context switches
   await expect(cog).toHaveAttribute('aria-haspopup', 'dialog');
   await cog.click();
   await expect(page.getByRole('dialog', { name: 'Session settings', exact: true })).toBeVisible();
-  await thinking.selectOption('high');
-  await expect(thinking).toHaveValue('high');
-  await model.selectOption('test/larger');
-  await expect(model).toHaveValue('test/larger');
+  await chooseSelectOption(thinking, 'high');
+  await expect(thinking).toHaveAttribute('data-value', 'high');
+  await chooseSelectOption(model, 'test/larger');
+  await expect(model).toHaveAttribute('data-value', 'test/larger');
   await expect(page.getByRole('dialog')).toHaveCount(1);
-  await model.selectOption('test/equal');
-  await expect(model).toHaveValue('test/equal');
+  await chooseSelectOption(model, 'test/equal');
+  await expect(model).toHaveAttribute('data-value', 'test/equal');
   await expect(page.getByRole('dialog')).toHaveCount(1);
-  await model.selectOption('test/smaller');
+  await chooseSelectOption(model, 'test/smaller');
   const confirmation = page.getByRole('dialog');
   await expect(confirmation).toContainText('conversation context will be compacted to fit');
   await expect(confirmation).toContainText('256,000 → 32,000');
@@ -48,13 +48,13 @@ test('configure the session through its cog and confirm smaller context switches
   await expect(
     confirmation.getByRole('heading', { name: 'Session settings', exact: true }),
   ).toBeVisible();
-  await expect(model).toHaveValue('test/equal');
-  await model.selectOption('test/smaller');
+  await expect(model).toHaveAttribute('data-value', 'test/equal');
+  await chooseSelectOption(model, 'test/smaller');
   await confirmation.getByRole('button', { name: 'Switch and compact', exact: true }).click();
   await expect(confirmation).toHaveCount(1);
-  await expect(model).toHaveValue('test/smaller');
-  await expect(thinking).toHaveValue('');
-  await expect(thinking.locator('option')).toHaveText(['Default', 'Low']);
+  await expect(model).toHaveAttribute('data-value', 'test/smaller');
+  await expect(thinking).toHaveAttribute('data-value', '');
+  await expectSelectOptions(thinking, ['Default', 'Low']);
   if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 700 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('session-settings.png'), fullPage: true });
@@ -67,7 +67,10 @@ test('configure the session through its cog and confirm smaller context switches
   await page.screenshot({ path: testInfo.outputPath('compact-composer.png'), fullPage: true });
   await page.reload();
   await page.getByRole('button', { name: 'Session settings', exact: true }).click();
-  await expect(page.getByLabel('Session model', { exact: true })).toHaveValue('test/smaller');
+  await expect(page.getByLabel('Session model', { exact: true })).toHaveAttribute(
+    'data-value',
+    'test/smaller',
+  );
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
@@ -89,9 +92,12 @@ test('retain history and the selected model if a model change fails', async ({ p
     }),
   );
   await page.getByRole('button', { name: 'Session settings', exact: true }).click();
-  await page.getByLabel('Session model', { exact: true }).selectOption('test/other');
+  await chooseSelectOption(page.getByLabel('Session model', { exact: true }), 'test/other');
   await expect(page.getByText('Cannot change this model', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Session model', { exact: true })).toHaveValue('test/test-model');
+  await expect(page.getByLabel('Session model', { exact: true })).toHaveAttribute(
+    'data-value',
+    'test/test-model',
+  );
   await page.keyboard.press('Escape');
   await expect(page.getByRole('article', { name: 'assistant message' })).toContainText(
     'Done. Keep the conversation',

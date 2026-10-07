@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
@@ -56,8 +57,51 @@ type usage struct{ store *Store }
 func (usageStore *usage) Save(operationContext context.Context, record atom.UsageRecord) error {
 	usageStore.store.mutex.Lock()
 	defer usageStore.store.mutex.Unlock()
+	if operationError := operationContext.Err(); operationError != nil {
+		return operationError
+	}
+	if record.RequestID != "" {
+		for _, previous := range usageStore.store.usage {
+			if previous.InstanceID == record.InstanceID && previous.RequestID == record.RequestID {
+				return nil
+			}
+		}
+	}
 	usageStore.store.usage = append(usageStore.store.usage, record)
 	return nil
+}
+
+func (usageStore *usage) Agents(operationContext context.Context, instanceID string) ([]atom.AgentStatistics, error) {
+	usageStore.store.mutex.RLock()
+	defer usageStore.store.mutex.RUnlock()
+	if operationError := operationContext.Err(); operationError != nil {
+		return nil, operationError
+	}
+	groups := map[string][]atom.UsageRecord{}
+	for _, record := range usageStore.store.usage {
+		if record.InstanceID == instanceID && record.Agent != "" {
+			key := fmt.Sprintf("%s\x00%s", record.Agent, record.ModelID)
+			groups[key] = append(groups[key], record)
+		}
+	}
+	var result []atom.AgentStatistics
+	for _, records := range groups {
+		item := atom.AgentStatistics{Agent: records[0].Agent, ModelID: records[0].ModelID, Statistics: statistics(records)}
+		for _, record := range records {
+			item.DurationMilliseconds += record.Duration.Milliseconds()
+			if record.Status == "error" {
+				item.FailedCalls++
+			}
+		}
+		result = append(result, item)
+	}
+	sort.Slice(result, func(first, second int) bool {
+		if result[first].Agent == result[second].Agent {
+			return result[first].ModelID < result[second].ModelID
+		}
+		return result[first].Agent < result[second].Agent
+	})
+	return result, nil
 }
 
 func (usageStore *usage) Session(operationContext context.Context, sessionID atom.SessionID) (atom.Statistics, error) {

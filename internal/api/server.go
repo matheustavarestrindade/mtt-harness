@@ -9,6 +9,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/gateway"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/instances"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/loop"
+	"github.com/matheustavarestrindade/mtt-harness/internal/organism/plugins"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/processes"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/providerauth"
 )
@@ -24,6 +25,7 @@ type Server struct {
 	processes    *processes.Manager
 	gateway      *gateway.Gateway
 	providerAuth *providerauth.Service
+	plugins      *plugins.Host
 }
 
 type Config struct {
@@ -37,6 +39,7 @@ type Config struct {
 	Processes    *processes.Manager
 	Gateway      *gateway.Gateway
 	ProviderAuth *providerauth.Service
+	Plugins      *plugins.Host
 }
 
 func New(configuration Config) *Server {
@@ -54,6 +57,7 @@ func New(configuration Config) *Server {
 		processes:    configuration.Processes,
 		gateway:      configuration.Gateway,
 		providerAuth: configuration.ProviderAuth,
+		plugins:      configuration.Plugins,
 	}
 }
 
@@ -87,6 +91,14 @@ func (server *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /processes/{id}/output", server.processOutput)
 	mux.HandleFunc("POST /permissions/{id}", server.resolvePermission)
 	mux.HandleFunc("GET /statistics", server.statistics)
+	mux.HandleFunc("GET /plugins", server.listPlugins)
+	mux.HandleFunc("GET /plugins/{plugin}/settings", server.pluginSettings)
+	mux.HandleFunc("PATCH /plugins/{plugin}/settings", server.updatePluginSettings)
+	mux.HandleFunc("GET /instances/{id}/plugins", server.listPlugins)
+	mux.HandleFunc("GET /instances/{id}/plugins/{plugin}/settings", server.pluginSettings)
+	mux.HandleFunc("PATCH /instances/{id}/plugins/{plugin}/settings", server.updatePluginSettings)
+	mux.HandleFunc("GET /instances/{id}/plugins/{plugin}/statistics", server.pluginStatistics)
+	mux.HandleFunc("GET /instances/{id}/agent-statistics", server.workspaceAgentStatistics)
 	mux.HandleFunc("GET /providers", server.listProviders)
 	mux.HandleFunc("GET /providers/{id}/models", server.providerModels)
 	mux.HandleFunc("POST /providers/{id}/refresh", server.refreshProvider)

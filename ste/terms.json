@@ -2,6 +2,474 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "x",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the checked marker in a Markdown task checkbox [x]",
+      "source": "Markdown task lists"
+    },
+    {
+      "term": "request-local runtime message",
+      "category": "technical_noun",
+      "approved_forms": [
+        "request-local runtime messages"
+      ],
+      "meaning": "ephemeral runtime data added to one provider request without saved history",
+      "source": "context plugin"
+    },
+    {
+      "term": "context fitting",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "selection of request content within the selected model input budget",
+      "source": "context plugin"
+    },
+    {
+      "term": "request lease",
+      "category": "technical_noun",
+      "approved_forms": [
+        "request leases"
+      ],
+      "meaning": "request-scoped ownership of a stable plugin configuration until its tool group completes",
+      "source": "context plugin"
+    },
+    {
+      "term": "worker lease",
+      "category": "technical_noun",
+      "approved_forms": [
+        "worker leases"
+      ],
+      "meaning": "durable job ownership that expires after an interrupted worker",
+      "source": "context plugin"
+    },
+    {
+      "term": "source epoch",
+      "category": "technical_noun",
+      "approved_forms": [
+        "source epochs"
+      ],
+      "meaning": "a history generation used to reject stale worker publication",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory extraction",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "model-assisted production of supported memory from archived source messages",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory extraction page",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory extraction pages"
+      ],
+      "meaning": "bounded source fragments processed by one memory model request",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory job attempt",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory job attempts"
+      ],
+      "meaning": "one leased execution of a durable context-plugin job",
+      "source": "context plugin"
+    },
+    {
+      "term": "model identity",
+      "category": "technical_noun",
+      "approved_forms": [
+        "model identities"
+      ],
+      "meaning": "a fingerprint of embedding model assets that scopes stored vectors",
+      "source": "context plugin"
+    },
+    {
+      "term": "operation counter",
+      "category": "technical_noun",
+      "approved_forms": [
+        "operation counters"
+      ],
+      "meaning": "a durable count of measured plugin operations",
+      "source": "context plugin"
+    },
+    {
+      "term": "context checkpoint",
+      "category": "technical_noun",
+      "approved_forms": [
+        "context checkpoints"
+      ],
+      "meaning": "a safe request boundary that applies prepared context reductions",
+      "source": "context plugin"
+    },
+    {
+      "term": "history callback",
+      "category": "technical_noun",
+      "approved_forms": [
+        "history callbacks"
+      ],
+      "meaning": "a plugin callback before and after a fenced core history mutation",
+      "source": "context plugin"
+    },
+    {
+      "term": "local inference metrics",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "operation and duration measurements for in-process embedding inference",
+      "source": "context plugin"
+    },
+    {
+      "term": "source message",
+      "category": "technical_noun",
+      "approved_forms": [
+        "source messages"
+      ],
+      "meaning": "an original conversation message used as evidence or archive content for memory",
+      "source": "context plugin"
+    },
+    {
+      "term": "source reference",
+      "category": "technical_noun",
+      "approved_forms": [
+        "source references"
+      ],
+      "meaning": "a link from a memory record to the source message or memory version that supports it",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory topic",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory topics"
+      ],
+      "meaning": "a subject grouping for semantically related memory records",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory consolidation",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the historian operation that combines inactive related memory records into an idea",
+      "source": "context plugin"
+    },
+    {
+      "term": "model proposal",
+      "category": "technical_noun",
+      "approved_forms": [
+        "model proposals"
+      ],
+      "meaning": "a model suggestion that is not a user-approved decision",
+      "source": "memory source classification"
+    },
+    {
+      "term": "illustrative example",
+      "category": "technical_noun",
+      "approved_forms": [
+        "illustrative examples"
+      ],
+      "meaning": "hypothetical source text that demonstrates a format or behavior without asserting a user preference",
+      "source": "memory source classification"
+    },
+    {
+      "term": "output token allowance",
+      "category": "technical_noun",
+      "approved_forms": [
+        "output token allowances"
+      ],
+      "meaning": "the context capacity reserved for a model response",
+      "source": "context plugin"
+    },
+    {
+      "term": "input threshold",
+      "category": "technical_noun",
+      "approved_forms": [
+        "input thresholds"
+      ],
+      "meaning": "an input-budget percentage that triggers a context notice or forced compaction",
+      "source": "context plugin"
+    },
+    {
+      "term": "worker count",
+      "category": "technical_noun",
+      "approved_forms": [
+        "worker counts"
+      ],
+      "meaning": "the configured limit on concurrent memory workers",
+      "source": "context plugin"
+    },
+    {
+      "term": "retry limit",
+      "category": "technical_noun",
+      "approved_forms": [
+        "retry limits"
+      ],
+      "meaning": "the maximum permitted attempts for a background memory job",
+      "source": "context plugin"
+    },
+    {
+      "term": "retry data",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the recorded attempts and outcomes of retried memory work",
+      "source": "context plugin"
+    },
+    {
+      "term": "worker lease",
+      "category": "technical_noun",
+      "approved_forms": [
+        "worker leases"
+      ],
+      "meaning": "a time-bounded durable claim that assigns a memory job to one worker",
+      "source": "context plugin"
+    },
+    {
+      "term": "usage counter",
+      "category": "technical_noun",
+      "approved_forms": [
+        "usage counters"
+      ],
+      "meaning": "a count of memory queries, expansions, injections or background operations",
+      "source": "context plugin"
+    },
+    {
+      "term": "rule exception",
+      "category": "technical_noun",
+      "approved_forms": [
+        "rule exceptions"
+      ],
+      "meaning": "a source-supported qualification that limits a stored user requirement",
+      "source": "context plugin"
+    },
+    {
+      "term": "source retrieval",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "a memory query that returns original archived conversation content",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory source",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory sources"
+      ],
+      "meaning": "the conversation messages, roles and approval evidence that support a memory record",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory search",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory searches"
+      ],
+      "meaning": "query-based retrieval of workspace memories or archived conversation sources",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory job",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory jobs"
+      ],
+      "meaning": "one durable background job for memory preparation, correction or consolidation",
+      "source": "context plugin"
+    },
+    {
+      "term": "embedding service",
+      "category": "technical_noun",
+      "approved_forms": [
+        "embedding services"
+      ],
+      "meaning": "the host capability that encodes text chunks as search vectors",
+      "source": "context plugin"
+    },
+    {
+      "term": "input budget",
+      "category": "technical_noun",
+      "approved_forms": [
+        "input budgets"
+      ],
+      "meaning": "the model context capacity available for input after output reservation",
+      "source": "context plugin"
+    },
+    {
+      "term": "context notice",
+      "category": "technical_noun",
+      "approved_forms": [
+        "context notices"
+      ],
+      "meaning": "an appended runtime notice about model context utilization and a requested checkpoint",
+      "source": "context plugin"
+    },
+    {
+      "term": "context fitter",
+      "category": "technical_noun",
+      "approved_forms": [
+        "context fitters"
+      ],
+      "meaning": "the harness component that fits a complete request to the selected model context limit",
+      "source": "context plugin"
+    },
+    {
+      "term": "plugin setting",
+      "category": "technical_noun",
+      "approved_forms": [
+        "plugin settings"
+      ],
+      "meaning": "a database-backed configuration value owned by a plugin",
+      "source": "context plugin"
+    },
+    {
+      "term": "context compactor",
+      "category": "technical_noun",
+      "approved_forms": [
+        "context compactors"
+      ],
+      "meaning": "the workspace agent that prepares memories for conversation context reduction",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory writer",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory writers"
+      ],
+      "meaning": "the workspace agent that creates and corrects memory records for remember calls",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory search usage",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the retrieval and expansion counters used to measure memory use",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory record",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory records"
+      ],
+      "meaning": "a workspace-scoped stored fact or idea with versions, categories and source links",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory snapshot",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory snapshots"
+      ],
+      "meaning": "the fixed memory text included in a session's model requests between context refreshes",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory archive",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory archives"
+      ],
+      "meaning": "retained original conversation content available for memory retrieval and recovery",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory version",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory versions"
+      ],
+      "meaning": "one revision of a memory record and its compression levels",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory summary",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory summaries"
+      ],
+      "meaning": "a source-grounded compressed representation of conversation knowledge",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory idea",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory ideas"
+      ],
+      "meaning": "a historian abstraction linked to its more detailed source memory records",
+      "source": "context plugin"
+    },
+    {
+      "term": "memory worker",
+      "category": "technical_noun",
+      "approved_forms": [
+        "memory workers"
+      ],
+      "meaning": "a background worker that prepares or corrects workspace memory",
+      "source": "context plugin"
+    },
+    {
+      "term": "historian",
+      "category": "technical_noun",
+      "approved_forms": [
+        "historians"
+      ],
+      "meaning": "the workspace agent that consolidates related inactive memories into searchable ideas",
+      "source": "context plugin"
+    },
+    {
+      "term": "context refresh",
+      "category": "technical_noun",
+      "approved_forms": [
+        "context refreshes"
+      ],
+      "meaning": "an atomic context reduction boundary at which a session may replace its memory snapshot",
+      "source": "context plugin"
+    },
+    {
+      "term": "context view",
+      "category": "technical_noun",
+      "approved_forms": [
+        "context views"
+      ],
+      "meaning": "the selected conversation and memory content used to build a model request",
+      "source": "context plugin"
+    },
+    {
+      "term": "prompt prefix",
+      "category": "technical_noun",
+      "approved_forms": [
+        "prompt prefixes"
+      ],
+      "meaning": "the leading serialized request content whose stability permits provider prompt-cache reuse",
+      "source": "context plugin"
+    },
+    {
+      "term": "compression level",
+      "category": "technical_noun",
+      "approved_forms": [
+        "compression levels"
+      ],
+      "meaning": "the low, medium or high detail representation of a stored memory",
+      "source": "context plugin"
+    },
+    {
+      "term": "plugin state",
+      "category": "technical_noun",
+      "approved_forms": [
+        "plugin states"
+      ],
+      "meaning": "the requested and effective on/off state of a plugin for a workspace",
+      "source": "context plugin control"
+    },
+    {
+      "term": "pgvector",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "the PostgreSQL extension used for vector storage and similarity search",
+      "source": "context plugin"
+    },
+    {
       "term": "task update",
       "category": "technical_noun",
       "approved_forms": [

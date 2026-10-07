@@ -2,7 +2,10 @@ name: mtt-harness
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: mtt-postgres-vector:16-0.8.1
+    build:
+      context: .
+      dockerfile: docker/postgres.Dockerfile
     environment:
       POSTGRES_USER: ${MTT_DB_USER:-mtt}
       POSTGRES_PASSWORD: ${MTT_DB_PASSWORD:-mtt}
@@ -79,7 +82,10 @@ services:
 
   postgres-test:
     profiles: ["test"]
-    image: postgres:16-alpine
+    image: mtt-postgres-vector:16-0.8.1
+    build:
+      context: .
+      dockerfile: docker/postgres.Dockerfile
     environment:
       POSTGRES_USER: mtt
       POSTGRES_PASSWORD: mtt

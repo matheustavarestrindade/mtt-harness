@@ -27,6 +27,13 @@ func (toolRegistry *Registry) Find(operationContext context.Context, query strin
 	candidates := map[string]harness.Tool{}
 	var exact []harness.Tool
 	for _, tool := range toolRegistry.All() {
+		available, operationError := harness.ToolAvailable(operationContext, tool)
+		if operationError != nil {
+			return nil, operationError
+		}
+		if !available {
+			continue
+		}
 		documents = append(documents, toolsearch.Describe(tool))
 		if category != "" && !hasCategory(tool, category) {
 			continue

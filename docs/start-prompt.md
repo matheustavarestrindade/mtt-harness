@@ -119,6 +119,10 @@ The loop puts the system instructions before the session messages from the datab
 
 The system message from the template is not written to the database. System messages from the database stay after it. Context and request middleware can change the system instructions. The context limit includes the system message.
 
+Task state and task reminders are runtime data after conversation messages. They do not change the system prompt prefix. The context plugin keeps memory snapshot text, sequence, and position until context removal. Context notices are also runtime data after conversation messages.
+
+The tool list does not change when a plugin is set to `OFF`. Tool discovery and tool definitions use the applied plugin state. A tool definition is necessary before a tool call.
+
 For the `chat_completions` protocol, the adapter sends a system message. For the `responses` protocol, the adapter sends the text in `instructions`. Provider adapters do not add default system instructions when the text is empty.
 
 ## Docker

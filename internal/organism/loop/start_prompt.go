@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/startprompt"
 )
 
@@ -26,17 +27,26 @@ func (agentLoop *Loop) prependStartPrompt(operationContext context.Context, sess
 		}
 	}
 	if toolRegistry := agentLoop.configuration.Registry; toolRegistry != nil {
+		var references []atom.ToolReference
+		for _, tool := range toolRegistry.All() {
+			// The registered catalog is stable across runtime enable/disable.
+			// Discovery and callable definitions enforce request availability.
+			references = append(references, atom.ToolReference{Name: tool.Name(), Categories: tool.Categories()})
+		}
 		values.ToolList = func() []atom.ToolReference {
-			var references []atom.ToolReference
-			for _, tool := range toolRegistry.All() {
-				references = append(references, atom.ToolReference{Name: tool.Name(), Categories: tool.Categories()})
-			}
 			return references
 		}
 		values.ToolInfo = func(name string) (atom.ToolSpec, error) {
 			tool, found := toolRegistry.Get(name)
 			if !found {
 				return atom.ToolSpec{}, fmt.Errorf("tool %q is not registered", name)
+			}
+			available, operationError := harness.ToolAvailable(operationContext, tool)
+			if operationError != nil {
+				return atom.ToolSpec{}, operationError
+			}
+			if !available {
+				return atom.ToolSpec{}, fmt.Errorf("tool %q is not available for this workspace", name)
 			}
 			specification := describeTool(tool)
 			if name == "agent" {
@@ -53,6 +63,6 @@ func (agentLoop *Loop) prependStartPrompt(operationContext context.Context, sess
 		return messages, nil
 	}
 	contextMessages := make([]atom.Message, 1, len(messages)+1)
-	contextMessages[0] = atom.Message{SessionID: session.ID, Role: atom.RoleSystem, Content: []atom.Content{{Type: atom.Text, Text: prompt}}}
+	contextMessages[0] = atom.Message{SessionID: session.ID, Role: atom.RoleSystem, Ephemeral: true, Content: []atom.Content{{Type: atom.Text, Text: prompt}}}
 	return append(contextMessages, messages...), nil
 }

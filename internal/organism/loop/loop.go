@@ -35,6 +35,7 @@ type Config struct {
 	Instances   *instances.Manager
 	StartPrompt *startprompt.Template
 	MaxRounds   int
+	Plugins     harness.PluginRuntime
 }
 
 type Loop struct {
@@ -153,6 +154,9 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 			session.Completed = true
 			operationError = errors.Join(operationError, agentLoop.configuration.Store.Sessions().Save(completionContext, session))
 		}
+		if lifecycle, supported := agentLoop.configuration.Plugins.(harness.TurnLifecyclePlugin); supported {
+			operationError = errors.Join(operationError, lifecycle.EndTurn(completionContext, session, status))
+		}
 		operationError = errors.Join(operationError, agentLoop.emitSessionEvent(completionContext, session, atom.EventTurnEnd, map[string]any{"status": status}))
 	}()
 	if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventTurnStart, nil); operationError != nil {
@@ -169,36 +173,9 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 		if modelCall == nil {
 			return nil
 		}
-		roundContext, cancelRound := context.WithCancel(operationContext)
-		message, tasks, operationError := agentLoop.receiveModelResponse(roundContext, session, modelCall)
-		if operationError != nil {
-			cancelRound()
-			waitForTools(tasks)
-			return operation.WrapError(operationError, "receive model response")
-		}
-		if operationError := agentLoop.saveModelResponse(operationContext, session, modelCall.modelID, message); operationError != nil {
-			cancelRound()
-			waitForTools(tasks)
-			return operation.WrapError(operationError, "save model response")
-		}
-		calls := message.ToolCalls
-		if len(calls) == 0 {
-			cancelRound()
-			return agentLoop.recordTaskStateResponse(operationContext, session, modelCall)
-		}
-		results := waitForTools(tasks)
-		cancelRound()
-		if operationError := operationContext.Err(); operationError != nil {
+		finished, operationError := agentLoop.runModelRound(session, modelCall)
+		if operationError != nil || finished {
 			return operationError
-		}
-		if operationError := agentLoop.saveToolResults(operationContext, session, calls, results); operationError != nil {
-			return operation.WrapError(operationError, "save tool results")
-		}
-		if operationError := agentLoop.recordTaskStateResponse(operationContext, session, modelCall); operationError != nil {
-			return operation.WrapError(operationError, "record task state response")
-		}
-		if agentLoop.isFinished(session.ID) {
-			return nil
 		}
 	}
 	return fmt.Errorf("model round limit reached")

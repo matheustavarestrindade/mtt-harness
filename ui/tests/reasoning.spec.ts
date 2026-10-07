@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate } from './helpers';
+import { connectAndCreate, chooseSelectOption, expectSelectOptions } from './helpers';
 import type { Message } from '../src/lib/atoms/types';
 
 test('stream thinking collapsed and retain one expandable section after persistence', async ({
@@ -94,13 +94,16 @@ test('use model-specific effort choices and show model prices before creating a 
   await connectAndCreate(page);
   const effort = page.getByLabel('Thinking effort', { exact: true });
   await page.getByRole('button', { name: 'Session settings', exact: true }).click();
-  await expect(effort.locator('option')).toHaveText(['Default (Low)', 'Off', 'Low', 'High']);
-  await effort.selectOption('high');
+  await expectSelectOptions(effort, ['Default (Low)', 'Off', 'Low', 'High']);
+  await chooseSelectOption(effort, 'high');
   await expect.poll(() => fixture.sessions[0].ReasoningEffort).toBe('high');
-  await expect(effort).toHaveValue('high');
+  await expect(effort).toHaveAttribute('data-value', 'high');
   await page.reload();
   await page.getByRole('button', { name: 'Session settings', exact: true }).click();
-  await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveValue('high');
+  await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveAttribute(
+    'data-value',
+    'high',
+  );
   await page.keyboard.press('Escape');
   await page.locator('header').getByRole('button', { name: 'New session', exact: true }).click();
   const dialog = page.getByRole('dialog');
@@ -112,13 +115,16 @@ test('use model-specific effort choices and show model prices before creating a 
   await expect(dialog.getByRole('region', { name: 'Model pricing' })).toContainText(
     'Above 10,000 input tokens',
   );
-  await dialog.getByLabel('Thinking effort', { exact: true }).selectOption('none');
+  await chooseSelectOption(dialog.getByLabel('Thinking effort', { exact: true }), 'none');
   await dialog.getByRole('button', { name: 'Create session', exact: true }).click();
   await expect.poll(() => fixture.sessions[1]?.ReasoningEffort).toBe('none');
   await expect(dialog).toHaveCount(0);
   await page.getByRole('button', { name: 'Session settings', exact: true }).click();
-  await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveValue('none');
-  await page.getByLabel('Thinking effort', { exact: true }).selectOption('');
+  await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveAttribute(
+    'data-value',
+    'none',
+  );
+  await chooseSelectOption(page.getByLabel('Thinking effort', { exact: true }), '');
   await expect.poll(() => fixture.sessions[1]?.ReasoningEffort).toBe('');
 });
 
@@ -146,10 +152,13 @@ test('keep an effort selection after an older poll returns and recover from a sa
   });
   await expect.poll(() => captured).toBe(true);
   await page.getByRole('button', { name: 'Session settings', exact: true }).click();
-  await page.getByLabel('Thinking effort', { exact: true }).selectOption('high');
+  await chooseSelectOption(page.getByLabel('Thinking effort', { exact: true }), 'high');
   await expect.poll(() => fixture.sessions[0].ReasoningEffort).toBe('high');
   releasePoll!();
-  await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveValue('high');
+  await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveAttribute(
+    'data-value',
+    'high',
+  );
   await page.route('**/api/sessions/*/reasoning', (route) =>
     route.fulfill({
       status: 503,
@@ -157,9 +166,12 @@ test('keep an effort selection after an older poll returns and recover from a sa
       body: JSON.stringify({ error: 'Cannot save thinking effort' }),
     }),
   );
-  await page.getByLabel('Thinking effort', { exact: true }).selectOption('low');
+  await chooseSelectOption(page.getByLabel('Thinking effort', { exact: true }), 'low');
   await expect(page.getByText('Cannot save thinking effort', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveValue('high');
+  await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveAttribute(
+    'data-value',
+    'high',
+  );
 });
 
 test('show subscription access without API rates and label estimated usage', async ({ page }) => {

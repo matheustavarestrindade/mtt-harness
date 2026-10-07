@@ -5,6 +5,7 @@
   import type { Instance, Session, Statistics } from '../atoms/types';
   import { costLabel, workspaceName } from '../atoms/format';
   import type { HarnessApi } from '../molecules/api/client';
+  import SelectField from '../molecules/SelectField.svelte';
 
   let {
     api,
@@ -90,18 +91,18 @@
   </div>
   <div class="mb-6 space-y-2">
     <Label for="usage-scope">Usage scope</Label>
-    <select
+    <SelectField
       id="usage-scope"
-      class="field-select"
       value={selection}
-      onchange={(event) => (scope = event.currentTarget.value)}
-    >
-      <option value="harness">Entire harness</option>
-      {#if instance}<option value="workspace"
-          >Workspace · {workspaceName(instance.Workspace)}</option
-        >{/if}
-      {#if session}<option value="session">Current session</option>{/if}
-    </select>
+      options={[
+        { value: 'harness', label: 'Entire harness' },
+        ...(instance
+          ? [{ value: 'workspace', label: `Workspace · ${workspaceName(instance.Workspace)}` }]
+          : []),
+        ...(session ? [{ value: 'session', label: 'Current session' }] : []),
+      ]}
+      onValueChange={(value) => (scope = value)}
+    />
   </div>
   {#if loading}<p role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
       <LoaderCircle class="size-4 animate-spin" />Loading usage…

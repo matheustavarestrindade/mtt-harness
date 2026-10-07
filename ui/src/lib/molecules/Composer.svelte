@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowUp, Square, CornerDownLeft, LoaderCircle, Settings } from 'lucide-svelte';
+  import { ArrowUp, Square, LoaderCircle, Settings } from 'lucide-svelte';
   import { Button } from '$lib/atoms/ui/button';
   import { Textarea } from '$lib/atoms/ui/textarea';
   let {
@@ -23,6 +23,28 @@
     onSettings?: () => void;
     settingsOpen?: boolean;
   } = $props();
+  let textarea = $state<HTMLTextAreaElement | null>(null);
+  function resizeComposer() {
+    if (!textarea) return;
+    textarea.style.height = '0px';
+    textarea.style.height = `${Math.min(192, Math.max(44, textarea.scrollHeight))}px`;
+  }
+  $effect(() => {
+    value;
+    resizeComposer();
+  });
+  $effect(() => {
+    const element = textarea;
+    if (!element) return;
+    let previousWidth = element.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (element.clientWidth === previousWidth) return;
+      previousWidth = element.clientWidth;
+      resizeComposer();
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  });
   function handleComposerKeydown(event: KeyboardEvent) {
     // IME confirmation is text input, not a request to send the draft.
     if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
@@ -48,7 +70,7 @@
 </script>
 
 <form
-  class="rounded-2xl border border-input bg-card shadow-lg shadow-black/10 transition-colors focus-within:border-primary/50"
+  class="flex items-end gap-1 rounded-xl border border-input bg-card p-1.5 shadow-sm transition-colors focus-within:border-primary/50"
   onsubmit={(event) => {
     event.preventDefault();
     if (!disabled && !sending && value.trim()) onSend();
@@ -59,7 +81,11 @@
     id="message-input"
     enterkeyhint="send"
     bind:value
-    class="min-h-24 max-h-52 resize-none border-0 bg-transparent p-4 text-base shadow-none focus-visible:ring-0 dark:bg-transparent sm:text-sm"
+    bind:ref={textarea}
+    rows={1}
+    aria-describedby="composer-hint"
+    style="field-sizing: fixed"
+    class="min-h-11 max-h-48 min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-2.5 py-3 text-base leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent sm:text-sm"
     placeholder={disabled
       ? 'Choose a session to start a conversation…'
       : running
@@ -68,47 +94,44 @@
     {disabled}
     onkeydown={handleComposerKeydown}
   />
-  <div class="flex min-h-14 items-center justify-between gap-2 px-3 pb-3">
-    <span class="min-w-0 flex-1 pl-1 text-[10px] text-muted-foreground"
-      >{#if running}<span class="flex items-center gap-1.5"
-          ><span class="size-1.5 shrink-0 rounded-full bg-primary"></span><span class="truncate"
-            >New messages join the queue</span
-          ></span
-        >{:else}<span class="flex items-center gap-1.5"
-          ><CornerDownLeft class="size-3" /><span class="hidden sm:inline"
-            >Enter to send · Shift / ⌘ + Enter for a new line</span
-          ><span class="sm:hidden">Enter to send</span></span
-        >{/if}</span
-    >
-    <div class="flex shrink-0 items-center gap-2">
-      {#if onSettings}<Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          class="icon-button text-muted-foreground hover:text-foreground"
-          aria-label="Session settings"
-          title="Session settings"
-          aria-haspopup="dialog"
-          aria-expanded={settingsOpen}
-          onclick={onSettings}><Settings class="size-4" /></Button
-        >{/if}
-      {#if running}<Button
-          class="h-11 gap-2"
-          variant="outline"
-          type="button"
-          disabled={cancelling}
-          onclick={onCancel}
-          ><Square class="size-3 fill-current" />{cancelling ? 'Stopping…' : 'Stop'}</Button
-        >{/if}<Button
-        type="submit"
-        class="size-11 rounded-xl"
+  <span id="composer-hint" class="sr-only"
+    >Enter to send. Shift or Command + Enter for a new line. {running
+      ? 'New messages join the queue.'
+      : ''}</span
+  >
+  <div class="flex shrink-0 items-center gap-0.5">
+    {#if onSettings}<Button
+        type="button"
+        variant="ghost"
         size="icon"
-        aria-label={running ? 'Queue message' : 'Send message'}
-        disabled={disabled || sending || !value.trim()}
-        >{#if sending}<LoaderCircle class="size-4 animate-spin" />{:else}<ArrowUp
-            class="size-5"
+        class="icon-button text-muted-foreground hover:text-foreground"
+        aria-label="Session settings"
+        title="Session settings"
+        aria-haspopup="dialog"
+        aria-expanded={settingsOpen}
+        onclick={onSettings}><Settings class="size-4" /></Button
+      >{/if}
+    {#if running}<Button
+        class="size-11"
+        variant="outline"
+        size="icon"
+        type="button"
+        aria-label="Stop"
+        title="Stop generation"
+        disabled={cancelling}
+        onclick={onCancel}
+        >{#if cancelling}<LoaderCircle class="size-4 animate-spin" />{:else}<Square
+            class="size-3 fill-current"
           />{/if}</Button
-      >
-    </div>
+      >{/if}<Button
+      type="submit"
+      class="size-11 rounded-lg"
+      size="icon"
+      aria-label={running ? 'Queue message' : 'Send message'}
+      disabled={disabled || sending || !value.trim()}
+      >{#if sending}<LoaderCircle class="size-4 animate-spin" />{:else}<ArrowUp
+          class="size-5"
+        />{/if}</Button
+    >
   </div>
 </form>

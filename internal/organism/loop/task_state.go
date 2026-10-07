@@ -84,10 +84,8 @@ func appendTaskStateContext(messages []atom.Message, sessionID atom.SessionID, s
 	if state.ResponsesSinceUpdate >= taskstate.ReminderResponses {
 		text += "\nTask state refresh is due after three model responses without an update. Your first tool action must update task_state before other work. If its definition is not loaded, discover it with search_tool first and wait for the next request. Use the loaded definition; update only what is necessary and do not invent progress."
 	}
+	// Mutable progress belongs at the request tail. Rewriting the system prefix
+	// on each update invalidates caches for the entire conversation.
 	result := append([]atom.Message(nil), messages...)
-	if len(result) > 0 && result[0].Role == atom.RoleSystem {
-		result[0].Content = append(append([]atom.Content(nil), result[0].Content...), atom.Content{Type: atom.Text, Text: text})
-		return result, nil
-	}
-	return append([]atom.Message{{SessionID: sessionID, Role: atom.RoleSystem, Content: []atom.Content{{Type: atom.Text, Text: text}}}}, result...), nil
+	return append(result, atom.Message{SessionID: sessionID, Role: atom.RoleRuntime, Ephemeral: true, Content: []atom.Content{{Type: atom.Text, Text: text}}}), nil
 }

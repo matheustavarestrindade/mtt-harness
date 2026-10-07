@@ -93,14 +93,8 @@
     outline: 2px solid var(--ring);
     outline-offset: 3px;
   }
-  select {
-    color-scheme: dark;
-  }
 }
 @layer components {
-  .field-select {
-    @apply h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring;
-  }
   .eyebrow {
     @apply text-[10px] font-semibold tracking-[.17em] uppercase text-muted-foreground;
   }
