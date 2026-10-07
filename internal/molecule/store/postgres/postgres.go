@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"crypto/sha256"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -199,7 +200,8 @@ func Open(operationContext context.Context, databaseURL string) (*Store, error) 
 }
 
 // Concurrent application starts and test packages share the same catalog.
-// IF NOT EXISTS alone does not serialize PostgreSQL type creation.
+// IF NOT EXISTS alone does not serialize PostgreSQL type creation. Replaying
+// unchanged ALTER TABLE statements can also deadlock with live guarded writers.
 func initializeSchema(operationContext context.Context, pool *pgxpool.Pool) error {
 	transaction, operationError := pool.Begin(operationContext)
 	if operationError != nil {
@@ -209,7 +211,23 @@ func initializeSchema(operationContext context.Context, pool *pgxpool.Pool) erro
 	if _, operationError := transaction.Exec(operationContext, `SELECT pg_advisory_xact_lock(71393000)`); operationError != nil {
 		return operationError
 	}
+	if _, operationError := transaction.Exec(operationContext, `CREATE TABLE IF NOT EXISTS harness_schema_migrations (
+		fingerprint bytea PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now()
+	)`); operationError != nil {
+		return operationError
+	}
+	fingerprint := sha256.Sum256([]byte(schema))
+	var applied bool
+	if operationError := transaction.QueryRow(operationContext, `SELECT EXISTS(SELECT 1 FROM harness_schema_migrations WHERE fingerprint=$1)`, fingerprint[:]).Scan(&applied); operationError != nil {
+		return operationError
+	}
+	if applied {
+		return transaction.Commit(operationContext)
+	}
 	if _, operationError := transaction.Exec(operationContext, schema); operationError != nil {
+		return operationError
+	}
+	if _, operationError := transaction.Exec(operationContext, `INSERT INTO harness_schema_migrations(fingerprint) VALUES($1)`, fingerprint[:]); operationError != nil {
 		return operationError
 	}
 	return transaction.Commit(operationContext)
