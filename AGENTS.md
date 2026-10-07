@@ -5,7 +5,7 @@
 - Language: Go.
 - Plugins: Go packages in the module. External tools come from MCP servers (`mcp.json`, stdio or HTTP).
 - First user surface: a headless API (HTTP + WebSocket).
-- Database: Postgres. Vector recall is deferred to version 2.
+- Database: Postgres. The optional context plugin provides workspace memory and vector recall.
 - Application configuration: `mtt.json` is the bootstrap file (port, database URL, file paths, optional token). The database holds the settings and the provider secrets.
 - Benchmark configuration: Docker Compose reads the local, gitignored `.env` file and forwards `MTT_READ_LINE_NUMBERS` into the harness. `.env.example` documents the switch. The Go process reads the environment once at tool registration; it does not load `.env` itself.
 
@@ -70,7 +70,7 @@ Rules:
 - `providers.json.tool_search` selects `auto`, `semantic`, or `lexical` with separate cosine thresholds. `auto` uses MiniLM when available and permanently falls back to TF-IDF after a reported initialization/inference failure. Cancellation never starts fallback work. Strict `semantic` mode returns recoverable tool errors on inference failure.
 - MiniLM uses the optional Hugot v0.7.0 pure-Go adapter in `internal/molecule/embedding/minilm`, behind the `semantic` build tag. The only application import is in `cmd/mtt/tool_search_semantic.go`. The core build and registry depend on `toolsearch.Searcher`, not Hugot. Keep model-specific code and dependencies inside that adapter so it can be removed.
 - The standard Docker image bundles the pinned official `all-MiniLM-L6-v2` ONNX model and tokenizer under `/opt/mtt/models`. It uses no model server, native ONNX Runtime, or CGO. The Docker `core` target skips model assets and inference. Model downloads occur at image build time only.
-- MiniLM inputs have a 256-WordPiece limit. Split full documents with the real tokenizer, retain every chunk, and rank the best chunk per tool. The cache invalidates changed/removed documents. TF-IDF uses the same complete metadata, weighting capability descriptions above invocation examples. Conversation vector recall remains deferred.
+- MiniLM inputs have a 256-WordPiece limit. Split full documents with the real tokenizer, retain every chunk, and rank the best chunk per tool. The cache invalidates changed/removed documents. TF-IDF uses the same complete metadata, weighting capability descriptions above invocation examples. Workspace memory and archived conversation retrieval belong to the optional context plugin.
 - Exact tool names and category-only discovery bypass vector work. A failed strict search must return a recoverable tool error, rather than an empty successful result. Startup logs show the requested/selected backend and automatic fallback causes.
 
 ## File Editing and Read Benchmark
