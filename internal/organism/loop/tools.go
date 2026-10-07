@@ -62,6 +62,13 @@ func (agentLoop *Loop) runValidatedToolCall(operationContext context.Context, se
 	if !found {
 		return failedToolResult(call, fmt.Errorf("tool %q is not registered", call.Name))
 	}
+	available, availabilityError := harness.ToolAvailable(operationContext, tool)
+	if availabilityError != nil {
+		return failedToolResult(call, availabilityError)
+	}
+	if !available {
+		return failedToolResult(call, fmt.Errorf("tool %q is not available for this workspace", call.Name))
+	}
 	if operationError := schema.Validate(tool.InputSchema().JSON, call.Input); operationError != nil {
 		return failedToolResult(call, fmt.Errorf("loop: the input of %s is not correct: %w", call.Name, operationError))
 	}
@@ -118,6 +125,13 @@ func (agentLoop *Loop) sessionToolDefinitions(operationContext context.Context, 
 	var specifications []atom.ToolSpec
 	for _, selected := range group {
 		if tool, found := agentLoop.configuration.Registry.Get(selected.Name); found {
+			available, operationError := harness.ToolAvailable(operationContext, tool)
+			if operationError != nil {
+				return nil, operationError
+			}
+			if !available {
+				continue
+			}
 			specifications = append(specifications, describeTool(tool))
 		}
 	}

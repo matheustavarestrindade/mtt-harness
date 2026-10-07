@@ -237,6 +237,8 @@ At a response counter of 3, the next request gives a task reminder. The task rem
 
 The loop adds a task state snapshot before context and request stages. Task text is data, not system instructions. The context limit includes the data and task reminder. The task state snapshot and task reminder are not written to the database.
 
+The snapshot and task reminder use a request-local runtime message after the conversation messages. They do not change the system prompt prefix. Context fitting does not use them as new turns.
+
 Cancellation or a turn error removes content from `DOING` and keeps TODO. Revert removes task state with the history change. Session deletion removes task state and prevents new task updates. After a child agent completes a task, the loop removes task state for the child session. The API and `task_state.updated` event give the revision to the client.
 
 See `docs/task-state.md`.
@@ -539,6 +541,8 @@ The context limit is `ModelInfo.ContextMax`. The harness keeps the system messag
 
 User input or a runtime notification can start a turn. The database keeps the full message history.
 
+A request-local runtime message does not start a turn. A context policy plugin can select the request view before context fitting. With plugin context selection, the core does not remove turns automatically. The core examines the input budget before the model request.
+
 If the last turn is too large, the harness gives an error. The harness does not send the request. A provider can implement `TokenCounter` for the token count. The default token estimate uses text bytes and a media allowance. The estimate is not the usage. The provider response gives the usage.
 
 ```go
@@ -684,6 +688,36 @@ Requirements:
 - R68: The event bus must send an event to the handlers of the harness and the plugins.
 - R69: The model gateway must use the providers from the plugins.
 - R70: The harness must keep the other handlers when it removes a handler.
+
+### 9.1 Workspace Context Plugin
+
+The harness attaches the optional context plugin from `plugins/context/`. The default plugin state is `OFF`. Postgres keeps plugin settings in `plugin.context`. A workspace field can override the harness field. Provider configuration, credentials, and model prices do not change.
+
+Plugin interfaces give settings, conversation messages, model requests, embeddings, and workspace usage. A request lease keeps the same settings until the harness completes the tool group. A child agent uses the request lease of the parent session when the parent session waits for the child agent. History callbacks run in workers after active turns stop. The harness does not run plugin callbacks in session coordinators.
+
+The plugin has 5 tools: `ctx_drop`, `ctx_wrapup`, `remember`, `search_memory`, and `list_memory_categories`. Tool discovery is necessary. The registry examines the plugin state before tool discovery, tool definitions, and tool calls.
+
+The plugin writes source messages to the memory archive with stable selection IDs. The database schema keeps memory versions, source references, context views, worker leases, and text vectors. Previous memory versions do not change. Internal provider continuation data is not in the memory archive. The primary request keeps necessary provider data with the tool group.
+
+Memory extraction uses user text and model decisions that the user accepts. Workers receive source roles, message sequence, and user approval data. The plugin examines JSON, source text, and source references before it writes memory records. An illustrative example must not become a user requirement.
+
+The plugin starts a memory job when it accepts `ctx_drop`. The memory job does not change the live request. With `remember: true`, memory summaries and embeddings must be in the database before removal. With `remember: false`, the memory archive keeps source messages without a memory summary.
+
+A new session receives the initial workspace memory snapshot. Subsequent memory snapshots change only when context removal occurs. The memory snapshot text has a compression level and memory text, without memory IDs or categories.
+
+New information uses `L`. Subsequent context refreshes use `M`, then `H`. Only the historian makes `I` memory records. A context checkpoint without context removal does not change compression levels.
+
+The runtime gives context notices at 50% and 65% of the input budget, after conversation messages. At 80%, the plugin holds the next model request and prepares context compaction. The default input budget after context compaction is below 45%. If necessary content is too large, the plugin gives an error. System instructions, the last user request, active work, task state, and tool groups stay in the request.
+
+The historian makes memory ideas from related memory records that the model does not use. The memory search tool can get initial memory records. A memory correction keeps previous versions and corrects memory ideas that use the previous fact. Worker memory search usage and model memory search usage stay in different usage counters.
+
+Memory search selects workspace and category data before it compares vectors and literal text. The tool output has a 16 KiB text limit. A cursor continues UTF-8 text. Source data after session deletion is available with `include_deleted`. Previous versions are available with `include_history`. Memory search must not make a session available after session deletion.
+
+The harness must complete accepted tool groups before the plugin state can be `OFF`. Then it stops new memory work and cancels workers. It keeps database content and the context view given to the model. The runtime stops the plugin workers before it stops the providers and the database. The harness rejects previous worker output after the `revert` operation, session deletion, or cancellation.
+
+Workspace agents use the provider registry, credentials, model lists, and usage store. A memory job attempt has an agent name, run ID, and model request ID. Session IDs identify the memory source only. Worker cost increases workspace cost, not session cost. Provider cost, cost estimates, unknown prices, cache usage, and subscription billing rules stay applicable.
+
+The plugin API gives settings, plugin state, and usage counters. The UI control is subsequent work. See `plugins/context/README.md` for configuration and removal.
 
 ## 10. Tools
 
@@ -1677,3 +1711,5 @@ The milestones are:
 - Milestone 4: the plugin system and the MCP servers. Goal: a plugin changes the loop and an MCP server gives tools.
 - Milestone 5: agents. Goal: a child agent gives a result to the parent session.
 - Milestone 6: vector recall. Goal: the harness finds messages with an equivalent meaning.
+
+The optional context plugin gives workspace vector recall. The UI control is subsequent work.

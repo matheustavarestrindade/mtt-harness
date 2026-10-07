@@ -28,4 +28,7 @@ type Message struct {
 	Usage         *Usage
 	ProviderState *ProviderState `json:"-"`
 	CreatedAt     time.Time
+	// Ephemeral marks request-local data. It is not a persisted input turn and
+	// must not create a new trimming boundary or enter a conversation archive.
+	Ephemeral bool `json:"-"`
 }

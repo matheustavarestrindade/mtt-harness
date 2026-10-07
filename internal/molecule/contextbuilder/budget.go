@@ -15,24 +15,11 @@ func (builder *Builder) Fit(operationContext context.Context, request atom.Reque
 	if model.ContextMax <= 0 {
 		return request, nil
 	}
-	reserve := min(1024, model.ContextMax/4)
-	for _, key := range []string{"max_tokens", "max_completion_tokens", "max_output_tokens"} {
-		if value, found := request.Params[key]; found {
-			data, operationError := json.Marshal(value)
-			if operationError != nil {
-				return request, operationError
-			}
-			var limit int
-			if operationError := json.Unmarshal(data, &limit); operationError != nil || limit <= 0 {
-				return request, fmt.Errorf("%s must be a positive integer", key)
-			}
-			reserve = limit
-		}
+	measurement, operationError := MeasureRequest(operationContext, request, model, provider)
+	if operationError != nil {
+		return request, operationError
 	}
-	budget := model.ContextMax - reserve
-	if budget <= 0 {
-		return request, fmt.Errorf("output reservation exhausts model context")
-	}
+	budget := measurement.InputLimit
 	request.Messages = append([]atom.Message(nil), request.Messages...)
 	for {
 		count, operationError := countTokens(operationContext, request, provider)
@@ -44,7 +31,7 @@ func (builder *Builder) Fit(operationContext context.Context, request atom.Reque
 		}
 		firstTurnIndex, nextTurnIndex := -1, -1
 		for index, message := range request.Messages {
-			if message.Role != atom.RoleUser && message.Role != atom.RoleRuntime {
+			if message.Ephemeral || (message.Role != atom.RoleUser && message.Role != atom.RoleRuntime) {
 				continue
 			}
 			if firstTurnIndex < 0 {
@@ -59,12 +46,49 @@ func (builder *Builder) Fit(operationContext context.Context, request atom.Reque
 		}
 		kept := append([]atom.Message(nil), request.Messages[:firstTurnIndex]...)
 		for _, message := range request.Messages[firstTurnIndex:nextTurnIndex] {
-			if message.Role == atom.RoleSystem {
+			if message.Role == atom.RoleSystem || message.Ephemeral {
 				kept = append(kept, message)
 			}
 		}
 		request.Messages = append(kept, request.Messages[nextTurnIndex:]...)
 	}
+}
+
+// MeasureRequest is shared by core fitting and public plugin policies. It counts
+// all provider-bound content and identifies estimates instead of claiming exact
+// utilization when the provider has no tokenizer.
+func MeasureRequest(operationContext context.Context, request atom.Request, model atom.ModelInfo, provider harness.Provider) (harness.RequestBudget, error) {
+	measurement := harness.RequestBudget{ContextLimit: model.ContextMax}
+	_, exact := provider.(harness.TokenCounter)
+	measurement.Estimated = !exact
+	count, operationError := countTokens(operationContext, request, provider)
+	if operationError != nil {
+		return measurement, operationError
+	}
+	measurement.InputTokens = count
+	if model.ContextMax <= 0 {
+		return measurement, nil
+	}
+	reserve := min(1024, model.ContextMax/4)
+	for _, key := range []string{"max_tokens", "max_completion_tokens", "max_output_tokens"} {
+		if value, found := request.Params[key]; found {
+			data, operationError := json.Marshal(value)
+			if operationError != nil {
+				return measurement, operationError
+			}
+			var limit int
+			if operationError := json.Unmarshal(data, &limit); operationError != nil || limit <= 0 {
+				return measurement, fmt.Errorf("%s must be a positive integer", key)
+			}
+			reserve = limit
+		}
+	}
+	budget := model.ContextMax - reserve
+	if budget <= 0 {
+		return measurement, fmt.Errorf("output reservation exhausts model context")
+	}
+	measurement.OutputReserve, measurement.InputLimit = reserve, budget
+	return measurement, nil
 }
 
 func countTokens(operationContext context.Context, request atom.Request, provider harness.Provider) (int, error) {

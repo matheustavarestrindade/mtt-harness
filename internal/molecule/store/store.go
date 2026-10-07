@@ -74,6 +74,7 @@ type UsageStore interface {
 	Session(operationContext context.Context, sessionID atom.SessionID) (atom.Statistics, error)
 	Instance(operationContext context.Context, identifier string) (atom.Statistics, error)
 	All(operationContext context.Context) (atom.Statistics, error)
+	Agents(operationContext context.Context, instanceID string) ([]atom.AgentStatistics, error)
 }
 
 type ProviderStore interface {

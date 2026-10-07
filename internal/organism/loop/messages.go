@@ -25,7 +25,7 @@ func (agentLoop *Loop) saveModelResponse(operationContext context.Context, sessi
 	}
 	return agentLoop.configuration.Store.Usage().Save(operationContext, atom.UsageRecord{
 		InstanceID: session.InstanceID, SessionID: session.ID, ModelID: modelID,
-		Usage: *usage, CreatedAt: time.Now(),
+		Usage: *usage, CreatedAt: time.Now(), RequestID: message.ID,
 	})
 }
 

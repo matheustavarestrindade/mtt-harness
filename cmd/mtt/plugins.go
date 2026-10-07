@@ -1,14 +1,12 @@
 package main
 
 import (
-	"github.com/matheustavarestrindade/mtt-harness/harness"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/instances"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/plugins"
 	"github.com/matheustavarestrindade/mtt-harness/plugins/pathtools"
 )
 
-func attachPlugins(harnessRuntime *harness.Harness, instanceManager *instances.Manager) {
-	pluginHost := plugins.New(harnessRuntime)
+func attachPlugins(pluginHost *plugins.Host, instanceManager *instances.Manager) {
 	pathGuard := &pathtools.PathGuard{WorkspaceOf: func(instanceID string) string {
 		instance, found := instanceManager.Get(instanceID)
 		if !found {

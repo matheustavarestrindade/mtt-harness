@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -26,6 +27,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/instances"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/loop"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/memory"
+	"github.com/matheustavarestrindade/mtt-harness/internal/organism/plugins"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/processes"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/providerauth"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/registry"
@@ -43,6 +45,8 @@ func runApplication(configuration config.File) (operationError error) {
 	var messageQueue *loop.Queue
 	var processManager *processes.Manager
 	var toolSearch *toolsearch.Selector
+	var pluginHost *plugins.Host
+	var pluginEmbeddingCloser io.Closer
 	closeMCP := func() error {
 		return nil
 	}
@@ -56,6 +60,12 @@ func runApplication(configuration config.File) (operationError error) {
 		if processManager != nil {
 			operationError = errors.Join(operationError, processManager.Close(shutdownContext))
 		}
+		if pluginHost != nil {
+			operationError = errors.Join(operationError, pluginHost.Close(shutdownContext))
+		}
+		if pluginEmbeddingCloser != nil {
+			operationError = errors.Join(operationError, pluginEmbeddingCloser.Close())
+		}
 		operationError = errors.Join(operationError, closeMCP())
 		if toolSearch != nil {
 			operationError = errors.Join(operationError, toolSearch.Close())
@@ -63,6 +73,7 @@ func runApplication(configuration config.File) (operationError error) {
 		cancelApplication()
 	}()
 	harnessRuntime := harness.New()
+	pluginHost = plugins.New(harnessRuntime)
 	eventBus := eventbus.New(harnessRuntime)
 	eventBus.SetRecorder(database.Events().Record)
 	token := resolveToken(operationContext, database, configuration.APIToken)
@@ -81,6 +92,7 @@ func runApplication(configuration config.File) (operationError error) {
 		Gateway: modelGateway, Registry: toolRegistry, Store: database, Bus: eventBus,
 		Broker: permissionBroker, Engine: permissionEngine, Instances: instanceManager,
 		StartPrompt: startupPrompt,
+		Plugins:     pluginHost,
 	})
 	attachTools(toolRegistry, processManager, agentLoop)
 	messageQueue = loop.NewQueue(agentLoop)
@@ -91,13 +103,15 @@ func runApplication(configuration config.File) (operationError error) {
 		}
 		return operationError
 	})
-	attachPlugins(harnessRuntime, instanceManager)
+	attachPlugins(pluginHost, instanceManager)
 	if configuration.TestProvider {
 		testProvider := provider.NewTest("test", provider.Text("the test provider is active"))
 		requireStartupSuccess(modelGateway.Add(testProvider), "attach test provider")
 		log.Printf("mtt: the test provider is in use")
 	}
 	loadProviders(operationContext, configuration.ProvidersFile, modelGateway, database, providerAuthentication)
+	pluginEmbeddingCloser, operationError = attachContextPlugin(operationContext, pluginHost, database, instanceManager, modelGateway, configuration.DatabaseURL, configuration.ProvidersFile)
+	requireStartupSuccess(operationError, "attach context plugin")
 	mcpCleanup, mcpError := loadMCP(operationContext, configuration.MCPFile, toolRegistry)
 	requireStartupSuccess(mcpError, "connect MCP servers")
 	closeMCP = mcpCleanup
@@ -109,6 +123,7 @@ func runApplication(configuration config.File) (operationError error) {
 			Broker: permissionBroker, Loop: agentLoop, Queue: messageQueue,
 			Processes: processManager, Gateway: modelGateway,
 			ProviderAuth: providerAuthentication,
+			Plugins:      pluginHost,
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		BaseContext: func(net.Listener) context.Context {

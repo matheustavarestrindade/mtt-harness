@@ -5,7 +5,9 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/embedding/minilm"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/toolsearch"
 )
@@ -24,4 +26,13 @@ func newSemanticSearch(operationContext context.Context, configuration toolsearc
 		return nil, errors.Join(operationError, encoder.Close())
 	}
 	return toolsearch.New(encoder, toolsearch.Options{MinimumSimilarity: configuration.SemanticMinimumSimilarity}), nil
+}
+
+func newContextEmbeddings(modelDirectory string) (harness.TextEmbedder, string, io.Closer, error) {
+	identity, operationError := embeddingAssetIdentity(modelDirectory)
+	if operationError != nil {
+		return nil, "", nil, operationError
+	}
+	service := &lazyPluginEmbeddings{create: func() (ownedTextEmbedder, error) { return minilm.New(modelDirectory) }}
+	return service, identity, service, nil
 }

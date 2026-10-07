@@ -104,6 +104,13 @@ ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS cost_estimated boolean;
 UPDATE usage_records SET cost_estimated = cost_currency <> '' WHERE cost_estimated IS NULL;
 ALTER TABLE usage_records ALTER COLUMN cost_estimated SET DEFAULT false;
 ALTER TABLE usage_records ALTER COLUMN cost_estimated SET NOT NULL;
+ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS request_id text;
+ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS agent text NOT NULL DEFAULT '';
+ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS run_id text NOT NULL DEFAULT '';
+ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS source_session_id text NOT NULL DEFAULT '';
+ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS duration_ms bigint NOT NULL DEFAULT 0;
+ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT '';
+CREATE UNIQUE INDEX IF NOT EXISTS usage_request_once ON usage_records (instance_id, request_id) WHERE request_id IS NOT NULL;
 ALTER TABLE permissions ADD COLUMN IF NOT EXISTS session_id text NOT NULL DEFAULT '';
 ALTER TABLE permissions ADD COLUMN IF NOT EXISTS target text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS providers (
@@ -184,11 +191,28 @@ func Open(operationContext context.Context, databaseURL string) (*Store, error) 
 		pool.Close()
 		return nil, operationError
 	}
-	if _, operationError := pool.Exec(operationContext, schema); operationError != nil {
+	if operationError := initializeSchema(operationContext, pool); operationError != nil {
 		pool.Close()
 		return nil, operationError
 	}
 	return &Store{pool: pool}, nil
+}
+
+// Concurrent application starts and test packages share the same catalog.
+// IF NOT EXISTS alone does not serialize PostgreSQL type creation.
+func initializeSchema(operationContext context.Context, pool *pgxpool.Pool) error {
+	transaction, operationError := pool.Begin(operationContext)
+	if operationError != nil {
+		return operationError
+	}
+	defer transaction.Rollback(context.WithoutCancel(operationContext))
+	if _, operationError := transaction.Exec(operationContext, `SELECT pg_advisory_xact_lock(71393000)`); operationError != nil {
+		return operationError
+	}
+	if _, operationError := transaction.Exec(operationContext, schema); operationError != nil {
+		return operationError
+	}
+	return transaction.Commit(operationContext)
 }
 
 func (database *Store) Close() error {

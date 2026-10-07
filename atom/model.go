@@ -94,6 +94,23 @@ type UsageRecord struct {
 	ModelID    string
 	Usage      Usage
 	CreatedAt  time.Time
+	// RequestID deduplicates one provider attempt. Background agents have no
+	// SessionID; SourceSessionID is lineage only and never affects session cost.
+	RequestID       string        `json:",omitempty"`
+	Agent           string        `json:",omitempty"`
+	RunID           string        `json:",omitempty"`
+	SourceSessionID SessionID     `json:",omitempty"`
+	Duration        time.Duration `json:",omitempty"`
+	Status          string        `json:",omitempty"`
+}
+
+// AgentStatistics is a workspace-level breakdown, independent of chat trees.
+type AgentStatistics struct {
+	Agent                string
+	ModelID              string
+	Statistics           Statistics
+	FailedCalls          int
+	DurationMilliseconds int64
 }
 
 type Statistics struct {

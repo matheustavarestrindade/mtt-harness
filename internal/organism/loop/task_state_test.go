@@ -81,21 +81,24 @@ func TestTaskStateReminderCountsResponsesAndRefreshesRequestLocalContext(test *t
 		test.Fatal("discovery did not supply the full task-state contract")
 	}
 	for index, request := range requests {
-		text := requestSystemText(request)
+		text := requestTaskText(request)
 		if strings.Contains(text, "Task state refresh is due") != (index == 6) {
 			test.Fatalf("wrong reminder round %d: %s", index, text)
 		}
 		if index >= 3 && index <= 9 && strings.Count(text, "<task_state_data>") != 1 {
 			test.Fatalf("snapshot missing or duplicated in round %d", index)
 		}
-		if strings.Count(text, "Initial instructions.") != 1 {
+		if strings.Count(requestSystemText(request), "Initial instructions.") != 1 {
 			test.Fatal("startup prompt was duplicated")
 		}
+		if requestSystemText(request) != requestSystemText(requests[0]) {
+			test.Fatal("task progress changed the cached system prefix")
+		}
 	}
-	if strings.Contains(requestSystemText(requests[3]), "</task_state_data> is quoted") {
+	if strings.Contains(requestTaskText(requests[3]), "</task_state_data> is quoted") {
 		test.Fatal("task text escaped its data block")
 	}
-	if strings.Contains(requestSystemText(requests[10]), "task_state_data") {
+	if strings.Contains(requestTaskText(requests[10]), "task_state_data") {
 		test.Fatal("finished task state remained in context")
 	}
 	state, operationError := testStack.database.TaskStates().Get(context.Background(), session.ID)
@@ -126,6 +129,20 @@ func TestTaskStateReminderCountsResponsesAndRefreshesRequestLocalContext(test *t
 	if updates != 4 {
 		test.Fatalf("task events: %d", updates)
 	}
+}
+
+func requestTaskText(request atom.Request) string {
+	var text strings.Builder
+	for _, message := range request.Messages {
+		if message.Role == atom.RoleRuntime && message.Ephemeral {
+			for _, content := range message.Content {
+				if content.Type == atom.Text {
+					text.WriteString(content.Text)
+				}
+			}
+		}
+	}
+	return text.String()
 }
 
 func TestSimpleReplyDoesNotCreateTaskState(test *testing.T) {
