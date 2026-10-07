@@ -719,6 +719,16 @@ The historian makes memory ideas from related memory records that the model does
 
 Memory search selects workspace and category data before it compares vectors and literal text. The tool output has a 16 KiB text limit. A cursor continues UTF-8 text. Source data after session deletion is available with `include_deleted`. Previous versions are available with `include_history`. Memory search must not make a session available after session deletion.
 
+The configuration for memory embeddings is in `providers.json`. The `context_embeddings` object gives the backend, model files, native library path, text chunk limit, and number of CPU threads. The database keeps plugin behavior and worker models. Tool discovery has different configuration.
+
+The standard image uses EmbeddingGemma 2 for text with Q8 model files, ONNX Runtime, and Hugging Face Tokenizers. The optional native adapter runs in the harness process. Query and document prefixes are different. The native adapter keeps source text bytes.
+
+The model input limit is 8192 tokens. The output has 768 vector dimensions. The default text chunk limit is 1024 tokens, with the prefix and special tokens.
+
+After cancellation, the native adapter stops native inference. It then releases native resources. The harness waits for native inference before it stops. The image build gets model assets. It compares SHA-256 values.
+
+The model runs without network access. CGO and native libraries are not necessary for the core image. See `docs/context-embeddings.md`.
+
 The harness must complete accepted tool groups before the plugin state can be `OFF`. Then it stops new memory work and cancels workers. It keeps database content and the context view given to the model. The runtime stops the plugin workers before it stops the providers and the database. The harness rejects previous worker output after the `revert` operation, session deletion, or cancellation.
 
 Workspace agents use the provider registry, credentials, model lists, and usage store. A memory job attempt has an agent name, run ID, and model request ID. Session IDs identify the memory source only. Worker cost increases workspace cost, not session cost. Provider cost, cost estimates, unknown prices, cache usage, and subscription billing rules stay applicable.

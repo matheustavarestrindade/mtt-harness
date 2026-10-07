@@ -1,6 +1,6 @@
 # Context Plugin
 
-**Status: implemented.** The UI control is subsequent work. The harness attaches the plugin. The default plugin state is `OFF`.
+**Status: implemented.** The harness attaches the plugin. The default plugin state is `OFF`. The UI Memory panel shows workspace usage and configuration.
 
 See `TODO.md` for the work sequence.
 
@@ -127,7 +127,7 @@ The UI must show when a change waits for active work. It must not show `ON` or `
 
 The plugin must record model usage by workspace, agent name, run ID, provider, and model. Agent roles include the context compactor, memory writer, and historian. Keep token counts, cache data, cost, duration, operation status, and retry data. Workspace agent cost must not increase session cost. The session ID identifies the memory source only.
 
-Keep memory search usage, compression levels, and a usage counter for memory snapshots, memory correction, and memory consolidation. The plugin records local inference metrics. The local model does not have an API cost. The API gives usage data. The UI display is subsequent work.
+Keep memory search usage, compression levels, and a usage counter for memory snapshots, memory correction, and memory consolidation. The plugin records local inference metrics. The local model does not have an API cost. The API and UI give usage data.
 
 The next harness process must continue memory jobs. Do not write the same memory record again. The plugin must record the cost of a model request one time.
 
@@ -135,7 +135,9 @@ A previous worker result must not replace new context after the `revert` operati
 
 ## Configuration
 
-The plugin uses Postgres and the optional MiniLM adapter. The standard Docker image includes the adapter and model assets. Embeddings are not available in the `core` image. The model must have a context limit. An available worker model is necessary before memory work can start.
+The plugin uses Postgres and an optional native adapter. The standard Docker image includes EmbeddingGemma 2 for text and native libraries for the CPU. The configuration for memory embeddings is in `providers.json`.
+
+The `context_embeddings` object gives model assets and CPU settings. MiniLM stays available as an alternative backend. Embeddings are not available in the `core` image. An available worker model is necessary before memory work can start. See `../../docs/context-embeddings.md`.
 
 Use the plugin API to change settings. The database key is `plugin.context`. A workspace object can override a harness field. A JSON `null` removes the workspace field. The API gives the plugin state and configuration.
 
@@ -159,7 +161,9 @@ An empty `historian_model` uses `worker_model`. Empty reasoning effort uses the 
 
 The default input thresholds are 50%, 65%, and 80%. The input budget after context compaction is below 45%. The memory snapshot limit is 1000 estimated tokens. A workspace can run 2 memory jobs. The process has a limit of 32 active memory jobs. Model requests run one at a time in a workspace.
 
-The default retry limit is 2. A memory job attempt has a 120000 ms time limit. The database keeps completed text chunks and memory extraction pages. After cancellation, a worker does not start a subsequent text chunk. MiniLM completes the text chunk in progress before it stops.
+The default retry limit is 2. A memory job attempt has a 120000 ms time limit. The database keeps completed text chunks and memory extraction pages. After cancellation, a worker does not start a subsequent text chunk.
+
+The EmbeddingGemma adapter stops native inference before it releases native resources. The optional MiniLM backend completes the text chunk in progress before it stops.
 
 The default cost limit is 0. A value of 0 does not stop work because of cost. With a value above 0, workspace usage and a request estimate control subsequent requests. The currency must agree with the model prices. A cost estimate is not available for unknown prices. Subscription models do not receive API token prices.
 
@@ -184,9 +188,12 @@ Remove the files:
 ```text
 cmd/mtt/context_plugin.go
 cmd/mtt/plugin_embeddings.go
+cmd/mtt/context_embeddings.go
+cmd/mtt/context_embeddings_gemma.go
+cmd/mtt/context_embeddings_gemma_disabled.go
 ```
 
-Remove `newContextEmbeddings` from the files:
+Remove `newMiniLMContextEmbeddings` from the files:
 
 ```text
 cmd/mtt/tool_search_semantic.go

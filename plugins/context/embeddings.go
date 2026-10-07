@@ -5,11 +5,27 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
 func (plugin *Plugin) embedText(operationContext context.Context, workspaceID, agent, text string) ([]vectorChunk, error) {
+	return plugin.embedTextChunks(operationContext, workspaceID, agent, text, false)
+}
+
+func (plugin *Plugin) embedQueryText(operationContext context.Context, workspaceID, agent, text string) ([]vectorChunk, error) {
+	return plugin.embedTextChunks(operationContext, workspaceID, agent, text, true)
+}
+
+func (plugin *Plugin) embedTextChunks(operationContext context.Context, workspaceID, agent, text string, isQuery bool) ([]vectorChunk, error) {
 	if plugin.services.Embeddings == nil {
 		return nil, fmt.Errorf("semantic embeddings are unavailable")
+	}
+	encode := plugin.services.Embeddings.Embed
+	if isQuery {
+		if queryEncoder, available := plugin.services.Embeddings.(harness.QueryTextEmbedder); available {
+			encode = queryEncoder.EmbedQueries
+		}
 	}
 	started := time.Now()
 	chunks, operationError := plugin.services.Embeddings.Split(operationContext, text)
@@ -24,7 +40,7 @@ func (plugin *Plugin) embedText(operationContext context.Context, workspaceID, a
 		if operationError := operationContext.Err(); operationError != nil {
 			return nil, operationError
 		}
-		vectors, operationError := plugin.services.Embeddings.Embed(operationContext, []string{chunk})
+		vectors, operationError := encode(operationContext, []string{chunk})
 		if operationError != nil {
 			return nil, operationError
 		}

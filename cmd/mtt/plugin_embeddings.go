@@ -33,6 +33,9 @@ func (service *lazyPluginEmbeddings) load(operationContext context.Context) (own
 	}
 	service.mutex.Lock()
 	defer service.mutex.Unlock()
+	if operationError := operationContext.Err(); operationError != nil {
+		return nil, operationError
+	}
 	if service.closed {
 		return nil, fmt.Errorf("plugin embedding service is closed")
 	}
@@ -56,6 +59,17 @@ func (service *lazyPluginEmbeddings) Embed(operationContext context.Context, tex
 	encoder, operationError := service.load(operationContext)
 	if operationError != nil {
 		return nil, operationError
+	}
+	return encoder.Embed(operationContext, text)
+}
+
+func (service *lazyPluginEmbeddings) EmbedQueries(operationContext context.Context, text []string) ([][]float64, error) {
+	encoder, operationError := service.load(operationContext)
+	if operationError != nil {
+		return nil, operationError
+	}
+	if queryEncoder, available := encoder.(harness.QueryTextEmbedder); available {
+		return queryEncoder.EmbedQueries(operationContext, text)
 	}
 	return encoder.Embed(operationContext, text)
 }

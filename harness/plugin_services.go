@@ -58,10 +58,17 @@ type WorkspaceModels interface {
 }
 
 // TextEmbedder separates tokenizer-aware chunking from inference. Every byte
-// must survive Split, and Embed must reject inputs beyond its token limit.
+// must survive Split, and Embed encodes document chunks without truncation.
 type TextEmbedder interface {
 	Split(context.Context, string) ([]string, error)
 	Embed(context.Context, []string) ([][]float64, error)
+}
+
+// QueryTextEmbedder is an optional asymmetric retrieval capability. Split must
+// reserve enough tokens for both query and document preprocessing. Symmetric
+// encoders may implement only TextEmbedder; callers then use Embed for queries.
+type QueryTextEmbedder interface {
+	EmbedQueries(context.Context, []string) ([][]float64, error)
 }
 
 // PluginServices are explicit application dependencies. Plugin implementations

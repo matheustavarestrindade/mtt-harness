@@ -14,4 +14,6 @@ ste
 scripts/*
 !scripts/format/
 !scripts/format/**
+!scripts/download-context-model.py
+!scripts/download-embedding-runtime.py
 workspace/

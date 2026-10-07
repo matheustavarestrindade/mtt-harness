@@ -112,7 +112,7 @@ func (plugin *Plugin) searchMemory(operationContext context.Context, session ato
 	} else {
 		var vector []float64
 		if input.Query != "" {
-			chunks, embeddingError := plugin.embedText(operationContext, session.InstanceID, "context.main_search", input.Query)
+			chunks, embeddingError := plugin.embedQueryText(operationContext, session.InstanceID, "context.main_search", input.Query)
 			if embeddingError != nil {
 				return reply, embeddingError
 			}

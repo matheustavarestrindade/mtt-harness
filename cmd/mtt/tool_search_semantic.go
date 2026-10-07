@@ -28,7 +28,7 @@ func newSemanticSearch(operationContext context.Context, configuration toolsearc
 	return toolsearch.New(encoder, toolsearch.Options{MinimumSimilarity: configuration.SemanticMinimumSimilarity}), nil
 }
 
-func newContextEmbeddings(modelDirectory string) (harness.TextEmbedder, string, io.Closer, error) {
+func newMiniLMContextEmbeddings(modelDirectory string) (harness.TextEmbedder, string, io.Closer, error) {
 	identity, operationError := embeddingAssetIdentity(modelDirectory)
 	if operationError != nil {
 		return nil, "", nil, operationError

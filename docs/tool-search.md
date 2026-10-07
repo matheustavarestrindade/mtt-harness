@@ -73,7 +73,7 @@ docker compose up -d --force-recreate mtt
 
 ## Model Files
 
-The adapter uses [Hugot v0.7.0](https://github.com/knights-analytics/hugot/tree/v0.7.0). The model runs with Go. CGO and a native library are not necessary.
+The tool discovery adapter uses [Hugot v0.7.0](https://github.com/knights-analytics/hugot/tree/v0.7.0). The model runs with Go. CGO and a native library are not necessary for the adapter. Workspace memory uses different configuration and an optional native adapter. See `context-embeddings.md`.
 
 The image contains [MiniLM](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) from source revision `1110a243fdf4706b3f48f1d95db1a4f5529b4d41`. The image build gets the ONNX file, tokenizer, and configuration. It compares SHA-256 values. The model license is in the image.
 

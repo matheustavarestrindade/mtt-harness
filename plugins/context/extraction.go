@@ -144,7 +144,7 @@ func (plugin *Plugin) extractionPages(operationContext context.Context, workspac
 	}
 	candidates := map[string]memoryRecord{}
 	if strings.TrimSpace(query) != "" {
-		chunks, operationError := plugin.embedText(operationContext, workspaceID, job.Agent, query)
+		chunks, operationError := plugin.embedQueryText(operationContext, workspaceID, job.Agent, query)
 		if operationError != nil {
 			return nil, nil, operationError
 		}

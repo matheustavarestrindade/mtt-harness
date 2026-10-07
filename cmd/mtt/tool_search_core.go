@@ -15,6 +15,6 @@ func newSemanticSearch(operationContext context.Context, configuration toolsearc
 	return nil, fmt.Errorf("semantic search was not compiled; build with -tags semantic or choose lexical mode")
 }
 
-func newContextEmbeddings(modelDirectory string) (harness.TextEmbedder, string, io.Closer, error) {
+func newMiniLMContextEmbeddings(modelDirectory string) (harness.TextEmbedder, string, io.Closer, error) {
 	return nil, "", nil, fmt.Errorf("context embeddings require the semantic build")
 }

@@ -23,9 +23,21 @@ RUN go mod download
 COPY . .
 RUN go build -trimpath -ldflags="-s -w" -o /out/mtt ./cmd/mtt
 
-FROM core-builder AS builder
+FROM python:3.13-slim-bookworm AS context-assets
+ARG TARGETARCH
+COPY scripts/download-context-model.py scripts/download-embedding-runtime.py /build/
+RUN python /build/download-context-model.py /opt/mtt/models/embeddinggemma-2
+RUN python /build/download-embedding-runtime.py "${TARGETARCH}" /opt/mtt/lib
+
+FROM golang:1.26-bookworm AS builder
+ENV CGO_ENABLED=1 CGO_LDFLAGS=-L/opt/mtt/lib
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
 COPY --from=model-assets /opt/mtt/models /opt/mtt/models
-RUN go build -tags semantic -trimpath -ldflags="-s -w" -o /out/mtt ./cmd/mtt
+COPY --from=context-assets /opt/mtt /opt/mtt
+COPY . .
+RUN go build -tags semantic,gemma -trimpath -ldflags="-s -w" -o /out/mtt ./cmd/mtt
 
 FROM alpine:3.22 AS core
 RUN adduser -D -u 10001 mtt
@@ -37,6 +49,17 @@ EXPOSE 8080
 ENTRYPOINT ["mtt"]
 CMD ["--start-prompt-file", "/etc/mtt/start_prompt.md"]
 
-FROM core AS runtime
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget libstdc++6 libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 10001 mtt
 COPY --from=builder /out/mtt /usr/local/bin/mtt
 COPY --from=model-assets /opt/mtt/models /opt/mtt/models
+COPY --from=context-assets /opt/mtt/models /opt/mtt/models
+COPY --from=context-assets /opt/mtt/lib/libonnxruntime.so.1.30.0 /opt/mtt/lib/onnxruntime-LICENSE /opt/mtt/lib/onnxruntime-ThirdPartyNotices.txt /opt/mtt/lib/
+COPY --from=builder /src/providers.json /src/mcp.example.json /src/mtt.example.json /src/start_prompt.md /etc/mtt/
+WORKDIR /workspace
+USER mtt
+EXPOSE 8080
+ENTRYPOINT ["mtt"]
+CMD ["--start-prompt-file", "/etc/mtt/start_prompt.md"]

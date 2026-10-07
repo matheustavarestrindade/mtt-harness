@@ -105,10 +105,12 @@ services:
       context: .
       target: builder
     environment:
-      CGO_ENABLED: "0"
+      CGO_ENABLED: "1"
       MTT_TEST_DATABASE_URL: postgres://mtt:mtt@postgres-test:5432/mtt_test?sslmode=disable
       MTT_TEST_SEARCH_MODEL_DIRECTORY: /opt/mtt/models/all-MiniLM-L6-v2
-    command: ["go", "test", "-tags", "semantic", "./..."]
+      MTT_TEST_CONTEXT_MODEL_DIRECTORY: /opt/mtt/models/embeddinggemma-2
+      MTT_TEST_CONTEXT_RUNTIME_LIBRARY: /opt/mtt/lib/libonnxruntime.so.1.30.0
+    command: ["go", "test", "-tags", "semantic,gemma", "./..."]
     depends_on:
       postgres-test:
         condition: service_healthy
