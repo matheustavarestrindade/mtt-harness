@@ -6,5 +6,6 @@
   "test_provider": false,
   "mcp_file": "mcp.json",
   "start_prompt_file": "start_prompt.md",
-  "spaced_repetition_prompts": "plugins/spaced_repetition/prompts"
+  "spaced_repetition_prompts": "plugins/spaced_repetition/prompts",
+  "sidekick_prompt_file": "plugins/sidekick/prompt.md"
 }

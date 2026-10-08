@@ -102,6 +102,12 @@ The `WorkspacePluginPanelState` organism controls plugin requests. A response fr
 
 The UI does not add the cost of reminder tokens to worker cost. Mobile settings navigation uses 2 rows. The UI controls stay in the viewport.
 
+## Sidekick
+
+The `SidekickPanel` organism uses the plugin name `sidekick`. The settings dialog and task panel give access to the workspace configuration. The UI can select the worker model, reasoning effort, and retrieval sources. The UI also gives time and byte limits.
+
+The panel uses `WorkspacePluginPanelState` for data requests and configuration requests. Workspace usage includes worker model calls. The input for a Sidekick note is part of session usage. The harness calculates the text for a Sidekick note.
+
 ## API Data
 
 Response keys agree with the Go types. For example, an instance has `Workspace` and `DefaultModel`. Request keys use the handler format, such as `workspace` and `default_model`. A `null` collection becomes an empty array in the client.

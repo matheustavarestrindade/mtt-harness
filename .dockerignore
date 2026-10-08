@@ -11,6 +11,7 @@ dist
 *.md
 !start_prompt.md
 !plugins/spaced_repetition/prompts/*.md
+!plugins/sidekick/prompt.md
 ste
 scripts/*
 !scripts/format/

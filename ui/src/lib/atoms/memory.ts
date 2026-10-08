@@ -46,6 +46,7 @@ export function memoryAgentLabel(name: string): string {
         'context.historian': 'Historian',
         'context.memory_writer': 'Memory extraction',
         'spaced_repetition.instruction_recovery': 'Instruction recovery',
+        'sidekick.context': 'Sidekick context',
       } as Record<string, string>
     )[name] ?? name.replace(/^context\./, '').replaceAll('_', ' ')
   );

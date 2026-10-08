@@ -1,5 +1,7 @@
 # UI contributor rules
 
+- Sidekick workspace controls live in Settings → Sidekick, with a Tasks-panel shortcut. Reuse the generic plugin panel state and shadcn selectors. Show worker costs separately from hint-input counters, preserve unknown prices, and fence old workspace responses. File and memory retrieval belong to the harness plugin, not the UI. Counters distinguish already-present request context from previously delivered source versions.
+
 - The sidebar always shows the selected workspace's sessions. The compact top workspace button opens a shadcn DropdownMenu containing workspaces and a New workspace action; it must never navigate to another sidebar page. Choosing a workspace closes the menu and keeps the mobile navigation drawer open until session selection. Selecting the current workspace preserves the chat and draft. Session rows are single-line, 32px for fine pointers and 44px for touch; model details stay in the title tooltip. Keep the sidebar free of promotional copy.
 
 - The Instructions settings section configures `spaced_repetition` through existing plugin endpoints. Reuse `WorkspacePluginPanelState` for plugin polling and stale-response fences, and shadcn `SelectField` for dropdowns. Show workspace recovery usage separately from reminder-input counters; reminder input is already billed to the chat. The Memory panel shortcut must work on desktop and mobile. Settings navigation must keep all sections reachable on narrow screens.

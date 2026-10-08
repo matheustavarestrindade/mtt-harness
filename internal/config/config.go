@@ -12,6 +12,7 @@ type File struct {
 	MCPFile                 string `json:"mcp_file"`
 	StartPromptFile         string `json:"start_prompt_file"`
 	SpacedRepetitionPrompts string `json:"spaced_repetition_prompts"`
+	SidekickPromptFile      string `json:"sidekick_prompt_file"`
 	APIToken                string `json:"api_token"`
 	TestProvider            bool   `json:"test_provider"`
 }
@@ -23,6 +24,7 @@ func Default() File {
 		MCPFile:                 "mcp.json",
 		StartPromptFile:         "start_prompt.md",
 		SpacedRepetitionPrompts: "plugins/spaced_repetition/prompts",
+		SidekickPromptFile:      "plugins/sidekick/prompt.md",
 	}
 }
 

@@ -320,7 +320,11 @@ The interval object and reminder pattern array control reminder checkpoints. A w
 
 The usage counters include `reminders/low`, `reminders/medium`, `reminders/high`, `reminders/deferred`, `reminders/tokens`, and `reminders/estimated_tokens`. The API gives recovery records, memory queries, and duration in milliseconds. Worker usage uses the agent name `spaced_repetition.instruction_recovery`. Reminder tokens are part of session usage.
 
-See `plugins/context/README.md` and `plugins/spaced_repetition/README.md` for plugin configuration and behavior.
+The plugin name `sidekick` uses the same settings and statistics routes. The default plugin state is `OFF`. A worker model and a retrieval source are necessary for `ON`. Worker usage uses the agent name `sidekick.context`.
+
+The usage counters include `jobs/active`, `hints/delivered`, `hints/input_tokens`, `hints/estimated_tokens`, `sources/memories`, `sources/files`, and `sources/duplicates`. The text from a Sidekick note is not in the statistics response.
+
+See `plugins/context/README.md`, `plugins/spaced_repetition/README.md`, and `plugins/sidekick/README.md` for configuration and behavior.
 
 ## Permission and Process Routes
 

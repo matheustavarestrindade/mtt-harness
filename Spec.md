@@ -751,6 +751,20 @@ Workers use harness interfaces for model requests, prompt templates, and memory 
 
 The plugin rejects previous recovery reports after cancellation, the revert operation, or session deletion. Session deletion removes reminder data and keeps usage. The UI gives workspace configuration and statistics. See `plugins/spaced_repetition/README.md`.
 
+### 9.3 Sidekick Plugin
+
+The Sidekick plugin gives task context from workspace memory and project files. The default plugin state is `OFF`. Settings use the database key `plugin.sidekick`. Workspace settings can override harness settings. A worker model is necessary for `ON`.
+
+The plugin receives `task_state.updated` events. A worker examines the `DOING` fields. The event handler does not do model or file work. A model request is not necessary for a different TODO status.
+
+Memory retrieval uses the `medium` compression level without a snapshot change. File retrieval has workspace, byte, and output limits. Symbolic links and credential paths are not applicable retrieval sources. The worker result contains context text and source references. The worker can give an empty result.
+
+A Sidekick note is runtime data in a model request. The harness completes the tool group before the request. The input limit includes the Sidekick note. The same text stays at the same position until context removal. The plugin does not add user messages or start more turns.
+
+The plugin uses the `sidekick` Postgres schema. Task state, user messages, configuration, and source versions are examined before a Sidekick note is used. Revert and session removal stop the related workers.
+
+Workspace usage includes worker model calls. The input for a Sidekick note is part of session usage. See `plugins/sidekick/README.md`.
+
 ## 10. Tools
 
 The Go interface of a tool is:
