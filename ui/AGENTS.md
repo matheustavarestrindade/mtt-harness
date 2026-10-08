@@ -1,5 +1,7 @@
 # UI contributor rules
 
+- Sidebar navigation has two views: workspace list first, then only the selected workspace's sessions. Use the compact clickable workspace header to return to the workspace list. Keep the navigation level in Workbench so collapse and mobile drawer closure retain it. Choosing a workspace keeps the mobile drawer open until session selection. Returning to an already selected workspace must preserve the current chat and draft. Session rows are single-line, 32px for fine pointers and 44px for touch; model details stay in the title tooltip. Keep the sidebar free of promotional copy.
+
 - The Instructions settings section configures `spaced_repetition` through existing plugin endpoints. Reuse `WorkspacePluginPanelState` for plugin polling and stale-response fences, and shadcn `SelectField` for dropdowns. Show workspace recovery usage separately from reminder-input counters; reminder input is already billed to the chat. The Memory panel shortcut must work on desktop and mobile. Settings navigation must keep all sections reachable on narrow screens.
 
 - Use the shared `molecules/SelectField.svelte` for application dropdowns, backed by the generated shadcn-svelte Select primitives in `atoms/ui/select`. Do not reintroduce native `<select>` controls or browser-default menu styling. Keep 44px touch targets, bounded scrollable menus, wrapped long options, labels, and keyboard/focus behavior.

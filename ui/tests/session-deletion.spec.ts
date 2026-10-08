@@ -3,10 +3,18 @@ import { mockHarness } from './api-fixture';
 import { connectAndCreate } from './helpers';
 import { shortID } from '../src/lib/atoms/format';
 
-async function openDelete(page: Page, sessionID: string) {
+async function openSessions(page: Page) {
   const navigationButton = page.getByRole('button', { name: 'Open navigation', exact: true });
   if (await navigationButton.isVisible()) await navigationButton.click();
   const navigation = page.getByRole('navigation', { name: 'Workspaces and sessions' });
+  const selectedWorkspace = navigation.locator('[data-workspace-id][aria-current="page"]');
+  if (await selectedWorkspace.isVisible()) await selectedWorkspace.click();
+  await expect(navigation.getByRole('heading', { name: 'Sessions', exact: true })).toBeVisible();
+  return navigation;
+}
+
+async function openDelete(page: Page, sessionID: string) {
+  const navigation = await openSessions(page);
   const button = navigation.getByRole('button', {
     name: `Delete session ${shortID(sessionID)}`,
     exact: true,
@@ -47,8 +55,7 @@ test('delete an old conversation and children without disturbing the open draft'
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.reload();
   await expect(input).toBeEnabled();
-  const button = page.getByRole('button', { name: 'Open navigation', exact: true });
-  if (await button.isVisible()) await button.click();
+  await openSessions(page);
   await expect(
     page.getByRole('button', { name: `Delete session ${shortID(old.ID)}`, exact: true }),
   ).toHaveCount(0);

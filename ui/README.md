@@ -75,6 +75,8 @@ The message composer starts with one text line. More text increases the composer
 
 On a large screen, use `Collapse navigation` or `Expand navigation` in the header. The browser keeps the setting. On a small screen, use the navigation drawer.
 
+The sidebar starts with the workspace list. A workspace selection opens the session list and changes the header to the workspace name. The `Switch workspace` button opens the workspace list. A navigation drawer stays open until session selection.
+
 1. Connect to the API.
 2. Make a workspace with a server directory and a default model. For the test provider, use `test/test-model`.
 3. Make a session.

@@ -70,6 +70,10 @@ The composer starts with one text line. The composer height increases with the m
 
 The navigation control stays in the header when the sidebar closes. The browser keeps the setting in local storage. The setting does not contain credentials or conversation text.
 
+The sidebar starts with the workspace list. A workspace selection replaces the workspace list with the session list. The header shows the workspace name. The header also opens the workspace list.
+
+The `Workbench` organism keeps the navigation view when the sidebar closes. On a small screen, workspace selection keeps the navigation drawer open until session selection. A session has one text line in the list.
+
 The `Enter` key sends the message. The keys `Shift+Enter`, `Command+Enter`, and `Ctrl+Enter` add a new line. Text composition does not send a message.
 
 ## Task State

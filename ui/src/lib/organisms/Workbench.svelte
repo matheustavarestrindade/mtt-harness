@@ -62,6 +62,7 @@
   } | null>(null);
   let activityOpen = $state(false);
   let menuOpen = $state(false);
+  let navigationView = $state<'workspaces' | 'sessions'>('workspaces');
   let navigationCollapsed = $state(false);
   let memoryCollapsed = $state(false);
   let memoryDrawerOpen = $state(false);
@@ -121,6 +122,9 @@
   });
   $effect(() => {
     if (desktopMemory.current) memoryDrawerOpen = false;
+  });
+  $effect(() => {
+    if (!workbench.instance || workbench.connection !== 'connected') navigationView = 'workspaces';
   });
 
   $effect(() => {
@@ -188,6 +192,7 @@
       }
       workspaceOpen = false;
       menuOpen = false;
+      navigationView = 'sessions';
       toast.success('Workspace created');
       if (!workbench.session) sessionOpen = true;
     });
@@ -197,11 +202,13 @@
       await workbench.createSession(model, effort);
       sessionOpen = false;
       menuOpen = false;
+      navigationView = 'sessions';
       toast.success('Session ready');
     });
   }
   function selectInstance(instance: Instance) {
-    menuOpen = false;
+    navigationView = 'sessions';
+    if (workbench.instance?.ID === instance.ID && !workbench.error) return;
     void runWorkbenchAction('select', () => workbench.selectInstance(instance));
   }
   async function changeSessionModel(model: string, allowCompaction = false) {
@@ -330,9 +337,12 @@
   onDestroy(() => workbench.disconnect(false));
 </script>
 
-{#snippet navigation()}
+{#snippet navigation(drawer = false)}
   <Navigation
     console={workbench}
+    view={navigationView}
+    onWorkspaces={() => (navigationView = 'workspaces')}
+    onClose={drawer ? () => (menuOpen = false) : undefined}
     onSettings={() => openSettings()}
     onWorkspace={() => {
       menuOpen = false;
@@ -389,6 +399,7 @@
           class="icon-button lg:hidden"
           aria-label="Open navigation"
           onclick={() => {
+            toast.dismiss();
             memoryDrawerOpen = false;
             menuOpen = true;
           }}><Menu class="size-5" /></Button
@@ -534,12 +545,12 @@
 </div>
 
 <Sheet.Root bind:open={menuOpen}
-  ><Sheet.Content side="left" class="w-[min(88vw,310px)] gap-0 p-0" showCloseButton={true}
+  ><Sheet.Content side="left" class="w-[min(88vw,310px)] gap-0 p-0" showCloseButton={false}
     ><Sheet.Header class="sr-only"
       ><Sheet.Title>Workspaces and sessions</Sheet.Title><Sheet.Description
         >Choose a workspace or session, or change the API connection.</Sheet.Description
       ></Sheet.Header
-    >{@render navigation()}</Sheet.Content
+    >{@render navigation(true)}</Sheet.Content
   ></Sheet.Root
 >
 {#if !desktopMemory.current}
