@@ -19,11 +19,11 @@
 </script>
 
 {#if active || error}
-  <section aria-label="Task progress" class="mb-2 min-w-0 border border-border bg-card/40 text-xs">
+  <section aria-label="Task progress" class="min-w-0 text-xs">
     {#if active}
       <button
         type="button"
-        class="flex min-h-10 w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent/30 focus-visible:outline-2 focus-visible:outline-ring"
+        class="flex min-h-11 w-full items-center gap-2 px-4 py-3 text-left hover:bg-accent/30 focus-visible:outline-2 focus-visible:outline-ring"
         aria-label="Toggle task progress"
         aria-expanded={expanded}
         onclick={() => (expanded = !expanded)}
@@ -40,7 +40,7 @@
         />
       </button>
       {#if expanded}
-        <div class="max-h-44 overflow-y-auto border-t border-border px-3 py-2">
+        <div class="border-t border-border px-4 py-3">
           {#if taskState?.Doing}
             <p class="mb-2 whitespace-pre-wrap break-words leading-5 text-muted-foreground">
               {taskState.Doing.Description}
@@ -72,7 +72,7 @@
         </div>
       {/if}
     {/if}
-    {#if error}<p role="status" class="break-words px-3 py-2 text-muted-foreground">
+    {#if error}<p role="status" class="break-words px-4 py-3 text-muted-foreground">
         Task progress unavailable: {error}
       </p>{/if}
   </section>

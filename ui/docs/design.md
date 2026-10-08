@@ -78,7 +78,9 @@ The `Enter` key sends the message. The keys `Shift+Enter`, `Command+Enter`, and 
 
 ## Task State
 
-The `TaskProgress` molecule shows task state above the composer. The progress panel contains a task title, description, and task items with task status. A button opens or closes the content. The content has a height limit.
+The `Tasks` control in the header opens the `TaskPanel` organism on the right side. Small screens use a navigation drawer.
+
+The `TaskProgress` molecule shows session task state in the panel. The content has a task title, description, and task items with task status. A button opens or closes the content. The panel has a scrollbar.
 
 The console reads `GET /sessions/{id}/task-state` and receives `task_state.updated` events. It accepts data only for the selected session and the same or newer revision. An empty TODO list with `DOING: null` removes the progress panel. An error on the task state route does not remove the session or message draft.
 

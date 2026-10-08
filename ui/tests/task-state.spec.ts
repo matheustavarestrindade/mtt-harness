@@ -1,7 +1,12 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import type { TaskState } from '../src/lib/atoms/types';
 import { mockHarness } from './api-fixture';
 import { connectAndCreate } from './helpers';
+
+async function openTasks(page: Page) {
+  await page.getByRole('button', { name: 'Open tasks panel', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Session tasks', exact: true })).toBeVisible();
+}
 
 test('show task progress, keep accomplishments during work, and clear finished state', async ({
   page,
@@ -14,6 +19,8 @@ test('show task progress, keep accomplishments during work, and clear finished s
   const progress = page.getByRole('region', { name: 'Task progress' });
   await expect(progress).toHaveCount(0);
   await page.getByLabel('Message', { exact: true }).fill('Keep this draft');
+  await openTasks(page);
+  await expect(page.getByRole('region', { name: 'Workspace memory', exact: true })).toHaveCount(0);
   const state: TaskState = {
     SessionID: session.ID,
     Todo: [
@@ -32,6 +39,9 @@ test('show task progress, keep accomplishments during work, and clear finished s
   fixture.event(session, 'task_state.updated', state);
   await expect(progress).toContainText('0/2 done');
   await expect(progress).toContainText('Inspecting the task state');
+  await expect(
+    page.locator('main footer').getByRole('region', { name: 'Task progress' }),
+  ).toHaveCount(0);
   const updated: TaskState = {
     ...state,
     Todo: [
@@ -66,11 +76,13 @@ test('show task progress, keep accomplishments during work, and clear finished s
   await page.screenshot({ path: testInfo.outputPath('task-progress.png'), fullPage: true });
 
   await page.reload();
+  await openTasks(page);
   await expect(progress).toContainText('1/2 done');
   const cleared: TaskState = { ...updated, Todo: [], Doing: null, Revision: 3 };
   fixture.taskStates.set(session.ID, cleared);
   fixture.event(session, 'task_state.updated', cleared);
   await expect(progress).toHaveCount(0);
+  await expect(page.getByText('No active tasks.', { exact: true })).toBeVisible();
   fixture.event(session, 'task_state.updated', updated);
   await expect(progress).toHaveCount(0);
   expect(failures).toEqual([]);
@@ -90,6 +102,7 @@ test('ignore an older task-state read after a newer completion event', async ({ 
   };
   fixture.taskStates.set(session.ID, state);
   fixture.event(session, 'task_state.updated', state);
+  await openTasks(page);
   await expect(progress).toContainText('Old activity');
   let releaseRead!: () => void;
   let enteredRead!: () => void;
@@ -134,6 +147,7 @@ test('task-progress API failure preserves the selected conversation', async ({ p
   await connectAndCreate(page);
   const session = fixture.sessions[0];
   await page.getByLabel('Message', { exact: true }).fill('Keep the session');
+  await openTasks(page);
   await page.route(`**/sessions/${session.ID}/task-state`, (route) =>
     route.fulfill({
       status: 503,
@@ -147,4 +161,43 @@ test('task-progress API failure preserves the selected conversation', async ({ p
   );
   await expect(page.getByLabel('Message', { exact: true })).toHaveValue('Keep the session');
   await expect(page.getByLabel('Message', { exact: true })).toBeEnabled();
+});
+
+test('switch between Tasks and Memory and isolate tasks when the session changes', async ({
+  page,
+}, testInfo) => {
+  const fixture = await mockHarness(page);
+  await connectAndCreate(page);
+  const session = fixture.sessions[0];
+  const state: TaskState = {
+    SessionID: session.ID,
+    Todo: [{ ID: '1', Title: 'First session task', Status: 'in_progress' }],
+    Doing: null,
+    Revision: 1,
+    UpdatedAt: new Date().toISOString(),
+  };
+  fixture.taskStates.set(session.ID, state);
+  fixture.event(session, 'task_state.updated', state);
+  await openTasks(page);
+  await expect(page.getByRole('region', { name: 'Task progress' })).toContainText(
+    'First session task',
+  );
+  await page.getByRole('button', { name: 'Close tasks panel', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open tasks panel', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Open memory panel', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Workspace memory', exact: true })).toBeVisible();
+  if (testInfo.project.name === 'mobile')
+    await page.getByRole('button', { name: 'Close memory panel', exact: true }).click();
+  await openTasks(page);
+  await expect(page.getByRole('region', { name: 'Workspace memory', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Task progress' })).toContainText(
+    'First session task',
+  );
+  await page.getByRole('button', { name: 'Close tasks panel', exact: true }).click();
+  await page.locator('header').getByRole('button', { name: 'New session', exact: true }).click();
+  await page.getByRole('button', { name: 'Create session', exact: true }).click();
+  await openTasks(page);
+  fixture.event(session, 'task_state.updated', { ...state, Revision: 2 });
+  await expect(page.getByRole('region', { name: 'Task progress' })).toHaveCount(0);
+  await expect(page.getByText('No active tasks.', { exact: true })).toBeVisible();
 });

@@ -13,6 +13,7 @@
     PanelLeftClose,
     PanelLeftOpen,
     BrainCircuit,
+    ListTodo,
   } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
   import { Toaster } from '$lib/atoms/ui/sonner';
@@ -27,7 +28,7 @@
   import Conversation from '$lib/organisms/Conversation.svelte';
   import Composer from '$lib/molecules/Composer.svelte';
   import UsageBar from '$lib/molecules/UsageBar.svelte';
-  import TaskProgress from '$lib/molecules/TaskProgress.svelte';
+  import TaskPanel from '$lib/organisms/TaskPanel.svelte';
   import SessionSettingsDialog from '$lib/molecules/SessionSettingsDialog.svelte';
   import { findSessionModel, reasoningEffortLabel } from '$lib/atoms/reasoning';
   import { HarnessConsole } from '$lib/organisms/console.svelte';
@@ -63,12 +64,25 @@
   let activityOpen = $state(false);
   let menuOpen = $state(false);
   let navigationCollapsed = $state(false);
-  let memoryCollapsed = $state(false);
-  let memoryDrawerOpen = $state(false);
+  let sidePanelCollapsed = $state(false);
+  let sidePanelDrawerOpen = $state(false);
+  let activeSidePanel = $state<'memory' | 'tasks'>('memory');
   let layoutReady = $state(false);
   const desktopNavigation = new MediaQuery('(min-width: 1024px)');
-  const desktopMemory = new MediaQuery('(min-width: 1280px)');
-  const memoryVisible = $derived(desktopMemory.current ? !memoryCollapsed : memoryDrawerOpen);
+  const desktopSidePanel = new MediaQuery('(min-width: 1280px)');
+  const sidePanelVisible = $derived(
+    desktopSidePanel.current ? !sidePanelCollapsed : sidePanelDrawerOpen,
+  );
+  const memoryVisible = $derived(sidePanelVisible && activeSidePanel === 'memory');
+  const tasksVisible = $derived(sidePanelVisible && activeSidePanel === 'tasks');
+  const hasActiveTasks = $derived(
+    Boolean(workbench.taskState?.Doing) ||
+      Boolean(
+        workbench.taskState?.Todo.some(
+          (item) => item.Status === 'pending' || item.Status === 'in_progress',
+        ),
+      ),
+  );
   const connectedAPI = $derived(
     workbench.connection === 'connected' ? workbench.connectedAPIClient() : null,
   );
@@ -97,30 +111,34 @@
   function openSettings(section?: SettingsSection) {
     toast.dismiss();
     menuOpen = false;
-    memoryDrawerOpen = false;
+    sidePanelDrawerOpen = false;
     settingsSection = section ?? (workbench.connection === 'connected' ? 'general' : 'connection');
     settingsOpen = true;
   }
-  function toggleMemoryPanel() {
-    if (desktopMemory.current) memoryCollapsed = !memoryCollapsed;
+  function toggleSidePanel(panel: 'memory' | 'tasks') {
+    toast.dismiss();
+    const close = sidePanelVisible && activeSidePanel === panel;
+    activeSidePanel = panel;
+    if (desktopSidePanel.current) sidePanelCollapsed = close;
     else {
       menuOpen = false;
-      memoryDrawerOpen = !memoryDrawerOpen;
+      sidePanelDrawerOpen = !close;
     }
   }
-  function closeMemoryPanel() {
-    if (desktopMemory.current) memoryCollapsed = true;
-    memoryDrawerOpen = false;
-    void tick().then(() => document.getElementById('memory-panel-toggle')?.focus());
+  function closeSidePanel() {
+    if (desktopSidePanel.current) sidePanelCollapsed = true;
+    sidePanelDrawerOpen = false;
+    const control = activeSidePanel === 'tasks' ? 'tasks-panel-toggle' : 'memory-panel-toggle';
+    void tick().then(() => document.getElementById(control)?.focus());
   }
   $effect(() => {
-    if (layoutReady) saveLayout({ navigationCollapsed, memoryCollapsed });
+    if (layoutReady) saveLayout({ navigationCollapsed, memoryCollapsed: sidePanelCollapsed });
   });
   $effect(() => {
     if (desktopNavigation.current) menuOpen = false;
   });
   $effect(() => {
-    if (desktopMemory.current) memoryDrawerOpen = false;
+    if (desktopSidePanel.current) sidePanelDrawerOpen = false;
   });
 
   $effect(() => {
@@ -322,7 +340,7 @@
   onMount(() => {
     const layout = loadLayout();
     navigationCollapsed = layout.navigationCollapsed;
-    memoryCollapsed = layout.memoryCollapsed;
+    sidePanelCollapsed = layout.memoryCollapsed;
     layoutReady = true;
     preferences = loadConnection();
     if (preferences.token) void connect(preferences.base, preferences.token);
@@ -350,14 +368,21 @@
   />
 {/snippet}
 
-{#snippet memoryPanel()}
-  <MemoryPanel
-    api={connectedAPI}
-    instance={workbench.instance}
-    models={workbench.models}
-    onClose={closeMemoryPanel}
-    onInstructions={() => openSettings('instructions')}
-  />
+{#snippet sidePanel()}
+  {#if activeSidePanel === 'tasks'}
+    <TaskPanel
+      session={workbench.session}
+      state={workbench.taskState}
+      error={workbench.taskStateError}
+      onClose={closeSidePanel}
+    />
+  {:else}<MemoryPanel
+      api={connectedAPI}
+      instance={workbench.instance}
+      models={workbench.models}
+      onClose={closeSidePanel}
+      onInstructions={() => openSettings('instructions')}
+    />{/if}
 {/snippet}
 
 <div class="flex h-dvh w-full min-w-0 overflow-hidden">
@@ -391,7 +416,7 @@
           aria-label="Open navigation"
           onclick={() => {
             toast.dismiss();
-            memoryDrawerOpen = false;
+            sidePanelDrawerOpen = false;
             menuOpen = true;
           }}><Menu class="size-5" /></Button
         >{/if}
@@ -417,13 +442,30 @@
         <Button
           variant="ghost"
           size="icon"
+          class={`icon-button relative ${tasksVisible ? 'bg-accent text-foreground' : 'text-muted-foreground'}`}
+          aria-label={tasksVisible ? 'Hide tasks panel' : 'Open tasks panel'}
+          id="tasks-panel-toggle"
+          title="Session tasks"
+          aria-controls="session-tasks-panel"
+          aria-expanded={tasksVisible}
+          onclick={() => toggleSidePanel('tasks')}
+        >
+          <ListTodo class="size-4" />
+          {#if hasActiveTasks}<span
+              class="absolute top-2 right-2 size-1.5 rounded-full bg-primary"
+              aria-hidden="true"
+            ></span>{/if}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           class={`icon-button ${memoryVisible ? 'bg-accent text-foreground' : 'text-muted-foreground'}`}
           aria-label={memoryVisible ? 'Hide memory panel' : 'Open memory panel'}
           id="memory-panel-toggle"
           title="Workspace memory"
           aria-controls="workspace-memory-panel"
           aria-expanded={memoryVisible}
-          onclick={toggleMemoryPanel}><BrainCircuit class="size-4" /></Button
+          onclick={() => toggleSidePanel('memory')}><BrainCircuit class="size-4" /></Button
         >
         <Button
           variant="ghost"
@@ -497,10 +539,6 @@
           style="padding-bottom: max(.5rem, env(safe-area-inset-bottom))"
         >
           <div class="mx-auto max-w-4xl">
-            {#key sessionID}<TaskProgress
-                state={workbench.taskState}
-                error={workbench.taskStateError}
-              />{/key}
             <Composer
               bind:value={() => drafts[sessionID] ?? '', (value) => (drafts[sessionID] = value)}
               {disabled}
@@ -526,10 +564,10 @@
           </div>
         </footer>
       </main>
-      {#if desktopMemory.current && !memoryCollapsed}<aside
+      {#if desktopSidePanel.current && !sidePanelCollapsed}<aside
           class="w-[296px] shrink-0 border-l border-border 2xl:w-[312px]"
         >
-          {@render memoryPanel()}
+          {@render sidePanel()}
         </aside>{/if}
     </div>
   </div>
@@ -544,15 +582,19 @@
     >{@render navigation(true)}</Sheet.Content
   ></Sheet.Root
 >
-{#if !desktopMemory.current}
-  <Sheet.Root bind:open={memoryDrawerOpen}>
+{#if !desktopSidePanel.current}
+  <Sheet.Root bind:open={sidePanelDrawerOpen}>
     <Sheet.Content side="right" class="w-[min(92vw,360px)] gap-0 p-0" showCloseButton={false}>
       <Sheet.Header class="sr-only"
-        ><Sheet.Title>Workspace memory</Sheet.Title><Sheet.Description
-          >Memory records, agent usage, costs, and settings for the selected workspace.</Sheet.Description
+        ><Sheet.Title
+          >{activeSidePanel === 'tasks' ? 'Session tasks' : 'Workspace memory'}</Sheet.Title
+        ><Sheet.Description
+          >{activeSidePanel === 'tasks'
+            ? 'TODO items and current work for the selected session.'
+            : 'Memory records, agent usage, costs, and settings for the selected workspace.'}</Sheet.Description
         ></Sheet.Header
       >
-      {@render memoryPanel()}
+      {@render sidePanel()}
     </Sheet.Content>
   </Sheet.Root>
 {/if}
