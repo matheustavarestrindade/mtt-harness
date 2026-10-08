@@ -15,18 +15,22 @@ func (builder *Builder) Fit(operationContext context.Context, request atom.Reque
 	if model.ContextMax <= 0 {
 		return request, nil
 	}
-	measurement, operationError := MeasureRequest(operationContext, request, model, provider)
-	if operationError != nil {
-		return request, operationError
-	}
-	budget := measurement.InputLimit
+	return builder.FitMeasured(operationContext, request, func(measurementContext context.Context, candidate atom.Request) (harness.RequestBudget, error) {
+		return MeasureRequest(measurementContext, candidate, model, provider)
+	})
+}
+
+// FitMeasured counts projected request-local data without making it a pruning
+// boundary. Each candidate retains exactly the overlays whose anchors survive.
+func (builder *Builder) FitMeasured(operationContext context.Context, request atom.Request, measure func(context.Context, atom.Request) (harness.RequestBudget, error)) (atom.Request, error) {
 	request.Messages = append([]atom.Message(nil), request.Messages...)
 	for {
-		count, operationError := countTokens(operationContext, request, provider)
+		measurement, operationError := measure(operationContext, request)
 		if operationError != nil {
 			return request, operationError
 		}
-		if count <= budget {
+		budget := measurement.InputLimit
+		if budget <= 0 || measurement.InputTokens <= budget {
 			return request, nil
 		}
 		firstTurnIndex, nextTurnIndex := -1, -1

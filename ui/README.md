@@ -127,6 +127,12 @@ The API gives usage data for the available history. It does not give subscriptio
 
 Select a model name in the provider section to read token prices and reasoning efforts. The session form also shows token prices. A cost estimate has the label `Estimated cost`. A subscription model does not use API token prices.
 
+## Instruction Reminders
+
+Open `Settings`, then `Instructions`, or use `Instruction reminders` in the Memory panel. Select a workspace. The UI controls set the plugin state, interval, reminder pattern, and recovery worker model.
+
+The panel shows `low`, `medium`, `high`, and `deferred` reminders. It also shows added input tokens and worker usage. Automatic reminders do not make worker model calls. A worker model is necessary for the `remember_instructions` tool.
+
 ## Workspace Memory
 
 The `Memory` panel is on the right side of a large screen. Use the header control to open or close it. Small screens use a navigation drawer. Memory data applies to the workspace, across sessions.

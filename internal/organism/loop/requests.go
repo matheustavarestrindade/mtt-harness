@@ -20,6 +20,7 @@ type preparedModelCall struct {
 	taskStateActive   bool
 	operationContext  context.Context
 	release           func()
+	commitReminders   func(context.Context) error
 }
 
 // A nil call means policy stopped the turn. Resolve and validate after request
@@ -109,17 +110,30 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 		request.Tools = nil
 	}
 	managed := false
-	if agentLoop.configuration.Plugins != nil {
-		measure := func(measurementContext context.Context, candidate atom.Request) (harness.RequestBudget, error) {
-			return contextbuilder.MeasureRequest(measurementContext, candidate, modelInfo, modelProvider)
+	inputCeiling := 0
+	measure := func(measurementContext context.Context, candidate atom.Request) (harness.RequestBudget, error) {
+		return contextbuilder.MeasureRequest(measurementContext, candidate, modelInfo, modelProvider)
+	}
+	measureProjected := measure
+	reminderRuntime, hasReminders := agentLoop.configuration.Plugins.(harness.RequestReminderRuntime)
+	if hasReminders {
+		measureProjected = func(measurementContext context.Context, candidate atom.Request) (harness.RequestBudget, error) {
+			projected, projectionError := reminderRuntime.ProjectReminders(measurementContext, session, candidate)
+			if projectionError != nil {
+				return harness.RequestBudget{}, projectionError
+			}
+			return measure(measurementContext, projected)
 		}
-		selection, selectionError := agentLoop.configuration.Plugins.PrepareContext(operationContext, harness.ContextRequest{Session: session, Request: request, Model: modelInfo, Measure: measure})
+	}
+	if agentLoop.configuration.Plugins != nil {
+		selection, selectionError := agentLoop.configuration.Plugins.PrepareContext(operationContext, harness.ContextRequest{Session: session, Request: request, Model: modelInfo, ModelID: modelID, Measure: measureProjected})
 		if selectionError != nil {
 			return nil, selectionError
 		}
 		request, managed = selection.Request, selection.Managed
+		inputCeiling = selection.InputCeiling
 		if managed {
-			budget, budgetError := measure(operationContext, request)
+			budget, budgetError := measureProjected(operationContext, request)
 			if budgetError != nil {
 				return nil, budgetError
 			}
@@ -129,13 +143,36 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 		}
 	}
 	if !managed {
-		request, operationError = agentLoop.contextBuilder.Fit(operationContext, request, modelInfo, modelProvider)
+		request, operationError = agentLoop.contextBuilder.FitMeasured(operationContext, request, measureProjected)
 		if operationError != nil {
 			return nil, operationError
+		}
+	}
+	var commitReminders func(context.Context) error
+	if hasReminders {
+		budget, budgetError := measure(operationContext, request)
+		if budgetError != nil {
+			return nil, budgetError
+		}
+		plan, planError := reminderRuntime.PrepareReminders(operationContext, harness.ContextRequest{Session: session, Request: request, Model: modelInfo, ModelID: modelID, Budget: budget, Measure: measure, InputCeiling: inputCeiling})
+		if planError != nil {
+			return nil, planError
+		}
+		request, commitReminders = plan.Request, plan.Commit
+		finalBudget, budgetError := measure(operationContext, request)
+		if budgetError != nil {
+			return nil, budgetError
+		}
+		ceiling := finalBudget.InputLimit
+		if inputCeiling > 0 && (ceiling == 0 || inputCeiling < ceiling) {
+			ceiling = inputCeiling
+		}
+		if ceiling > 0 && finalBudget.InputTokens > ceiling {
+			return nil, fmt.Errorf("request reminders use %d tokens; input ceiling is %d", finalBudget.InputTokens, ceiling)
 		}
 	}
 	if operationError := validateModelMedia(modelInfo, request.Messages); operationError != nil {
 		return nil, operationError
 	}
-	return &preparedModelCall{modelID: modelID, model: modelInfo, provider: modelProvider, request: request, session: session, taskStateRevision: taskState.Revision, taskStateActive: taskstate.Active(taskState), operationContext: operationContext, release: release}, nil
+	return &preparedModelCall{modelID: modelID, model: modelInfo, provider: modelProvider, request: request, session: session, taskStateRevision: taskState.Revision, taskStateActive: taskstate.Active(taskState), operationContext: operationContext, release: release, commitReminders: commitReminders}, nil
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Cable, ChartNoAxesCombined, PlugZap, SlidersHorizontal } from 'lucide-svelte';
+  import { Cable, ChartNoAxesCombined, PlugZap, SlidersHorizontal, Repeat2 } from 'lucide-svelte';
   import * as Dialog from '../atoms/ui/dialog';
   import { Button } from '../atoms/ui/button';
   import type { SettingsSection } from '../atoms/settings';
@@ -9,6 +9,7 @@
   import ProvidersPanel from './ProvidersPanel.svelte';
   import UsagePanel from './UsagePanel.svelte';
   import RuntimeSettingsPanel from './RuntimeSettingsPanel.svelte';
+  import RepetitionPanel from './RepetitionPanel.svelte';
 
   let {
     open = $bindable(false),
@@ -39,6 +40,7 @@
   } = $props();
   const sections = [
     { id: 'general' as const, label: 'General', icon: SlidersHorizontal },
+    { id: 'instructions' as const, label: 'Instructions', icon: Repeat2 },
     { id: 'usage' as const, label: 'Usage', icon: ChartNoAxesCombined },
     { id: 'providers' as const, label: 'Providers', icon: PlugZap },
     { id: 'connection' as const, label: 'Connection', icon: Cable },
@@ -58,16 +60,16 @@
     <div class="flex min-h-0 min-w-0 flex-1 flex-col sm:flex-row">
       <nav
         aria-label="Settings sections"
-        class="flex shrink-0 overflow-x-auto border-b border-border bg-muted/20 p-2 sm:w-44 sm:flex-col sm:gap-1 sm:border-r sm:border-b-0 sm:p-3"
+        class="grid shrink-0 grid-cols-3 gap-1 border-b border-border bg-muted/20 p-2 sm:flex sm:w-44 sm:flex-col sm:border-r sm:border-b-0 sm:p-3"
       >
         {#each sections as item (item.id)}
           <Button
             variant={section === item.id ? 'secondary' : 'ghost'}
-            class="h-11 shrink-0 gap-2 px-3 text-xs sm:justify-start"
+            class="h-11 min-w-0 shrink-0 gap-2 px-2 text-xs sm:justify-start sm:px-3"
             aria-current={section === item.id ? 'page' : undefined}
             onclick={() => (section = item.id)}
           >
-            <item.icon class="size-4 shrink-0" /><span>{item.label}</span>
+            <item.icon class="hidden size-4 shrink-0 sm:block" /><span>{item.label}</span>
           </Button>
         {/each}
       </nav>
@@ -95,6 +97,7 @@
         {:else}
           {#key api}
             {#if section === 'general'}<RuntimeSettingsPanel {api} {instance} />
+            {:else if section === 'instructions'}<RepetitionPanel {api} {instance} />
             {:else if section === 'usage'}<UsagePanel {api} {instance} {session} />
             {:else if section === 'providers'}<ProvidersPanel
                 {api}

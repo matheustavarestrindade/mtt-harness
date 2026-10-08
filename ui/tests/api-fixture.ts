@@ -1,5 +1,6 @@
 import type { Page, WebSocketRoute } from '@playwright/test';
 import type { MemoryMetrics, MemoryPluginState } from '../src/lib/atoms/memory';
+import type { RepetitionConfiguration, WorkspacePluginState } from '../src/lib/atoms/plugins';
 import type {
   HarnessEvent,
   Instance,
@@ -23,6 +24,9 @@ export async function mockHarness(page: Page) {
   const memoryStates = new Map<string, MemoryPluginState>();
   const memoryMetrics = new Map<string, MemoryMetrics>();
   const memoryUpdates: { workspaceID: string; patch: Record<string, unknown> }[] = [];
+  const repetitionStates = new Map<string, WorkspacePluginState<RepetitionConfiguration>>();
+  const repetitionMetrics = new Map<string, MemoryMetrics>();
+  const repetitionUpdates: { workspaceID: string; patch: Partial<RepetitionConfiguration> }[] = [];
   const settings = new Map<string, Record<string, string>>([
     ['', { agent_depth_limit: '2', process_limit: '8' }],
   ]);
@@ -125,6 +129,57 @@ export async function mockHarness(page: Page) {
         return reply(instance, 201);
       }
       const parts = path.split('/').filter(Boolean);
+      if (parts[0] === 'instances' && parts[2] === 'plugins' && parts[3] === 'spaced_repetition') {
+        const workspaceID = parts[1];
+        if (!repetitionStates.has(workspaceID))
+          repetitionStates.set(workspaceID, {
+            Name: 'spaced_repetition',
+            Version: '0.1.0',
+            WorkspaceID: workspaceID,
+            Available: true,
+            Enabled: false,
+            RequestedEnabled: false,
+            Pending: false,
+            Override: {},
+            Configuration: {
+              enabled: false,
+              interval: {
+                mode: 'model_fraction',
+                tokens: 32768,
+                fraction: 0.125,
+                max_tokens: 32768,
+              },
+              pattern: ['low', 'low', 'low', 'medium'],
+              worker_model: '',
+              worker_effort: '',
+              worker_output_tokens: 1024,
+              job_timeout_ms: 120000,
+              max_queries: 4,
+              memory_result_limit: 5,
+              memory_bytes: 12000,
+              source_bytes: 8000,
+              worker_count: 2,
+            },
+          });
+        if (!repetitionMetrics.has(workspaceID))
+          repetitionMetrics.set(workspaceID, {
+            Name: 'spaced_repetition',
+            WorkspaceID: workspaceID,
+            Counters: {},
+            Agents: [],
+          });
+        if (parts[4] === 'statistics') return reply(repetitionMetrics.get(workspaceID));
+        const state = repetitionStates.get(workspaceID)!;
+        if (method === 'PATCH') {
+          const patch = request.postDataJSON();
+          repetitionUpdates.push({ workspaceID, patch });
+          state.Configuration = { ...state.Configuration, ...patch };
+          state.Override = { ...state.Override, ...patch };
+          state.RequestedEnabled = state.Configuration.enabled;
+          if (!state.Pending) state.Enabled = state.RequestedEnabled;
+        }
+        return reply(state);
+      }
       if (parts[0] === 'instances' && parts[2] === 'plugins' && parts[3] === 'context') {
         const workspaceID = parts[1];
         if (!memoryStates.has(workspaceID))
@@ -378,5 +433,8 @@ export async function mockHarness(page: Page) {
     memoryStates,
     memoryMetrics,
     memoryUpdates,
+    repetitionStates,
+    repetitionMetrics,
+    repetitionUpdates,
   };
 }

@@ -4,6 +4,8 @@ package startprompt
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"regexp"
@@ -19,8 +21,12 @@ type templatePart struct {
 
 // Template is immutable after parsing and can be rendered by concurrent sessions.
 type Template struct {
-	parts []templatePart
+	parts       []templatePart
+	fingerprint [32]byte
 }
+
+// Fingerprint identifies the original, already-loaded template bytes.
+func (template *Template) Fingerprint() string { return hex.EncodeToString(template.fingerprint[:]) }
 
 // Load reads the file once. Relative paths use the process working directory.
 // An empty file is valid and supplies no startup instructions.
@@ -39,7 +45,7 @@ func Load(path string) (*Template, error) {
 // Parse recognizes {variable} and escaped {{variable}}. Other braces, including
 // ordinary JSON objects, are literal. Tool names are resolved at request time.
 func Parse(text string) (*Template, error) {
-	template := &Template{}
+	template := &Template{fingerprint: sha256.Sum256([]byte(text))}
 	previousEnd := 0
 	for _, match := range placeholderPattern.FindAllStringSubmatchIndex(text, -1) {
 		template.parts = append(template.parts, templatePart{text: text[previousEnd:match[0]]})

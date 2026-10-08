@@ -17,7 +17,20 @@ func (agentLoop *Loop) prependStartPrompt(operationContext context.Context, sess
 	if agentLoop.configuration.StartPrompt == nil {
 		return messages, nil
 	}
-	values := startprompt.Values{Session: session, Model: session.Model}
+	prompt, operationError := agentLoop.renderPromptTemplate(operationContext, session, session.Model, agentLoop.configuration.StartPrompt)
+	if operationError != nil {
+		return nil, operationError
+	}
+	if strings.TrimSpace(prompt) == "" {
+		return messages, nil
+	}
+	contextMessages := make([]atom.Message, 1, len(messages)+1)
+	contextMessages[0] = atom.Message{SessionID: session.ID, Role: atom.RoleSystem, Ephemeral: true, Content: []atom.Content{{Type: atom.Text, Text: prompt}}}
+	return append(contextMessages, messages...), nil
+}
+
+func (agentLoop *Loop) renderPromptTemplate(operationContext context.Context, session atom.Session, model string, template *startprompt.Template) (string, error) {
+	values := startprompt.Values{Session: session, Model: model}
 	if agentLoop.configuration.Instances != nil {
 		if instance, found := agentLoop.configuration.Instances.Get(session.InstanceID); found {
 			values.Workspace = instance.Spec().Workspace
@@ -55,14 +68,5 @@ func (agentLoop *Loop) prependStartPrompt(operationContext context.Context, sess
 			return specification, nil
 		}
 	}
-	prompt, operationError := agentLoop.configuration.StartPrompt.Render(operationContext, values)
-	if operationError != nil {
-		return nil, operationError
-	}
-	if strings.TrimSpace(prompt) == "" {
-		return messages, nil
-	}
-	contextMessages := make([]atom.Message, 1, len(messages)+1)
-	contextMessages[0] = atom.Message{SessionID: session.ID, Role: atom.RoleSystem, Ephemeral: true, Content: []atom.Content{{Type: atom.Text, Text: prompt}}}
-	return append(contextMessages, messages...), nil
+	return template.Render(operationContext, values)
 }

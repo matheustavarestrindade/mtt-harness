@@ -14,7 +14,7 @@ func encodeResponsesAPIInput(messages []atom.Message, providerName string) ([]an
 	input := make([]any, 0, len(messages))
 	var instructions []string
 	for _, message := range messages {
-		if message.Role == atom.RoleSystem {
+		if message.Role == atom.RoleSystem && !message.InContext {
 			instructions = append(instructions, concatenateContentText(message.Content))
 			continue
 		}

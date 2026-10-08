@@ -95,7 +95,9 @@
   );
 
   function openSettings(section?: SettingsSection) {
+    toast.dismiss();
     menuOpen = false;
+    memoryDrawerOpen = false;
     settingsSection = section ?? (workbench.connection === 'connected' ? 'general' : 'connection');
     settingsOpen = true;
   }
@@ -353,6 +355,7 @@
     instance={workbench.instance}
     models={workbench.models}
     onClose={closeMemoryPanel}
+    onInstructions={() => openSettings('instructions')}
   />
 {/snippet}
 

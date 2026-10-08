@@ -1,5 +1,7 @@
 # UI contributor rules
 
+- The Instructions settings section configures `spaced_repetition` through existing plugin endpoints. Reuse `WorkspacePluginPanelState` for plugin polling and stale-response fences, and shadcn `SelectField` for dropdowns. Show workspace recovery usage separately from reminder-input counters; reminder input is already billed to the chat. The Memory panel shortcut must work on desktop and mobile. Settings navigation must keep all sections reachable on narrow screens.
+
 - Use the shared `molecules/SelectField.svelte` for application dropdowns, backed by the generated shadcn-svelte Select primitives in `atoms/ui/select`. Do not reintroduce native `<select>` controls or browser-default menu styling. Keep 44px touch targets, bounded scrollable menus, wrapped long options, labels, and keyboard/focus behavior.
 - SelectField keeps real values in client state and API requests; its internal option encoding also supports the empty-string model default. Controlled model/effort changes must wait for the owner to accept the change, including smaller-context confirmation and API failures. Disabled options need `aria-disabled`; a saving state must not lose keyboard focus or steal it back after user navigation.
 

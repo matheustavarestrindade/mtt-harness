@@ -25,8 +25,14 @@
     instance,
     models,
     onClose,
-  }: { api: HarnessApi | null; instance: Instance | null; models: Model[]; onClose: () => void } =
-    $props();
+    onInstructions,
+  }: {
+    api: HarnessApi | null;
+    instance: Instance | null;
+    models: Model[];
+    onClose: () => void;
+    onInstructions?: () => void;
+  } = $props();
   const panel = new MemoryPanelState();
   let settingsOpen = $state(false);
   let workerModel = $state('');
@@ -345,6 +351,11 @@
       {/if}
     {/if}
   </div>
+  {#if onInstructions}<Button
+      variant="ghost"
+      class="h-11 shrink-0 justify-start rounded-none border-t border-border px-4 text-xs"
+      onclick={onInstructions}>Instruction reminders</Button
+    >{/if}
   <footer
     class="flex min-h-12 shrink-0 items-center gap-2 border-t border-border px-4 pb-[env(safe-area-inset-bottom)] text-[10px] text-muted-foreground"
   >

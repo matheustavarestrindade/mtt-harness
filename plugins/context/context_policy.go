@@ -29,6 +29,9 @@ func (plugin *Plugin) PrepareContext(operationContext context.Context, input har
 		return harness.ContextSelection{}, operationError
 	}
 	selection := harness.ContextSelection{Request: input.Request, Managed: configuration.Enabled}
+	if configuration.Enabled && input.Budget.InputLimit > 0 {
+		selection.InputCeiling = (input.Budget.InputLimit*configuration.HardPercent - 1) / 100
+	}
 	if plugin.database == nil {
 		if configuration.Enabled {
 			return selection, plugin.unavailable

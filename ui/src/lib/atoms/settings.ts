@@ -1,4 +1,4 @@
-export type SettingsSection = 'general' | 'usage' | 'providers' | 'connection';
+export type SettingsSection = 'general' | 'usage' | 'providers' | 'connection' | 'instructions';
 export type RuntimeSettingKey = 'agent_depth_limit' | 'process_limit';
 export type RuntimeSettings = Partial<Record<RuntimeSettingKey, string>>;
 

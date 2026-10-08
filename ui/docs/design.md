@@ -88,6 +88,14 @@ The `memory.ts` atom contains API types. The atom calculates usage data. The `Me
 
 The UI does not change memory content or model context. See `memory.md` for usage data and configuration behavior.
 
+## Spaced Repetition
+
+The `Instructions` section in the settings dialog uses the plugin name `spaced_repetition`. A button in the Memory panel opens the section. The UI shows workspace settings for the interval, reminder pattern, worker model, and reasoning effort.
+
+The `WorkspacePluginPanelState` organism controls plugin requests. A response from a previous workspace must not change the selected view. Memory and spaced repetition use the same organism.
+
+The UI does not add the cost of reminder tokens to worker cost. Mobile settings navigation uses 2 rows. The UI controls stay in the viewport.
+
 ## API Data
 
 Response keys agree with the Go types. For example, an instance has `Workspace` and `DefaultModel`. Request keys use the handler format, such as `workspace` and `default_model`. A `null` collection becomes an empty array in the client.

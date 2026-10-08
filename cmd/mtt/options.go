@@ -15,6 +15,7 @@ func parseArguments(arguments []string) (config.File, error) {
 	providersFile := flags.String("providers-file", "", "the providers file")
 	mcpFile := flags.String("mcp-file", "", "the MCP server file")
 	startPromptFile := flags.String("start-prompt-file", "", "the startup prompt template file (default start_prompt.md)")
+	spacedPrompts := flags.String("spaced-repetition-prompts", "", "directory containing low.md, medium.md, and high.md reminder templates")
 	testProvider := flags.Bool("test-provider", false, "use the test provider")
 	if operationError := flags.Parse(arguments); operationError != nil {
 		return config.File{}, operation.WrapError(operationError, "parse arguments")
@@ -37,6 +38,9 @@ func parseArguments(arguments []string) (config.File, error) {
 	}
 	if *startPromptFile != "" {
 		configuration.StartPromptFile = *startPromptFile
+	}
+	if *spacedPrompts != "" {
+		configuration.SpacedRepetitionPrompts = *spacedPrompts
 	}
 	flags.Visit(func(option *flag.Flag) {
 		if option.Name == "test-provider" {

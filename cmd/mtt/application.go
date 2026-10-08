@@ -112,6 +112,7 @@ func runApplication(configuration config.File) (operationError error) {
 	loadProviders(operationContext, configuration.ProvidersFile, modelGateway, database, providerAuthentication)
 	pluginEmbeddingCloser, operationError = attachContextPlugin(operationContext, pluginHost, database, instanceManager, modelGateway, configuration.DatabaseURL, configuration.ProvidersFile)
 	requireStartupSuccess(operationError, "attach context plugin")
+	requireStartupSuccess(attachSpacedRepetition(operationContext, pluginHost, database, instanceManager, modelGateway, agentLoop, configuration.DatabaseURL, configuration.SpacedRepetitionPrompts, startupPrompt), "attach spaced repetition plugin")
 	mcpCleanup, mcpError := loadMCP(operationContext, configuration.MCPFile, toolRegistry)
 	requireStartupSuccess(mcpError, "connect MCP servers")
 	closeMCP = mcpCleanup

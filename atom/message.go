@@ -31,4 +31,7 @@ type Message struct {
 	// Ephemeral marks request-local data. It is not a persisted input turn and
 	// must not create a new trimming boundary or enter a conversation archive.
 	Ephemeral bool `json:"-"`
+	// InContext keeps a trusted request-local system reminder at its conversation
+	// position. Provider adapters must not fold it into startup instructions.
+	InContext bool `json:"-"`
 }

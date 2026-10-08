@@ -14,6 +14,11 @@ func (agentLoop *Loop) runModelRound(session atom.Session, modelCall *preparedMo
 	operationContext := modelCall.operationContext
 	roundContext, cancelRound := context.WithCancel(operationContext)
 	defer cancelRound()
+	if modelCall.commitReminders != nil {
+		if operationError := modelCall.commitReminders(roundContext); operationError != nil {
+			return false, operation.WrapError(operationError, "commit request reminders")
+		}
+	}
 	message, tasks, operationError := agentLoop.receiveModelResponse(roundContext, session, modelCall)
 	if operationError != nil {
 		cancelRound()
