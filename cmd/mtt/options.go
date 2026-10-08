@@ -16,6 +16,7 @@ func parseArguments(arguments []string) (config.File, error) {
 	mcpFile := flags.String("mcp-file", "", "the MCP server file")
 	startPromptFile := flags.String("start-prompt-file", "", "the startup prompt template file (default start_prompt.md)")
 	spacedPrompts := flags.String("spaced-repetition-prompts", "", "directory containing low.md, medium.md, and high.md reminder templates")
+	sidekickPrompt := flags.String("sidekick-prompt-file", "", "the Sidekick filtering prompt template file")
 	testProvider := flags.Bool("test-provider", false, "use the test provider")
 	if operationError := flags.Parse(arguments); operationError != nil {
 		return config.File{}, operation.WrapError(operationError, "parse arguments")
@@ -41,6 +42,9 @@ func parseArguments(arguments []string) (config.File, error) {
 	}
 	if *spacedPrompts != "" {
 		configuration.SpacedRepetitionPrompts = *spacedPrompts
+	}
+	if *sidekickPrompt != "" {
+		configuration.SidekickPromptFile = *sidekickPrompt
 	}
 	flags.Visit(func(option *flag.Flag) {
 		if option.Name == "test-provider" {

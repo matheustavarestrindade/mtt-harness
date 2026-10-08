@@ -108,6 +108,12 @@ type WorkspaceMemory interface {
 	SearchWorkspaceMemory(context.Context, MemoryQuery) ([]MemoryReference, error)
 }
 
+// WorkspaceMemoryVerifier checks whether previously retrieved current records
+// still have the same versions without another embedding search or snapshot edit.
+type WorkspaceMemoryVerifier interface {
+	VerifyWorkspaceMemory(context.Context, string, atom.SessionID, []MemoryReference) (bool, error)
+}
+
 // PluginServices are explicit application dependencies. Plugin implementations
 // never need an import of a harness internal package.
 type PluginServices struct {
@@ -119,6 +125,8 @@ type PluginServices struct {
 	Usage         WorkspaceUsage
 	Prompts       PromptRenderer
 	Memory        WorkspaceMemory
+	Tasks         TaskStateReader
+	Files         WorkspaceFiles
 }
 
 type WorkspaceUsage interface {

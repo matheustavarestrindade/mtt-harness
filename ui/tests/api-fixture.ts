@@ -27,6 +27,12 @@ export async function mockHarness(page: Page) {
   const repetitionStates = new Map<string, WorkspacePluginState<RepetitionConfiguration>>();
   const repetitionMetrics = new Map<string, MemoryMetrics>();
   const repetitionUpdates: { workspaceID: string; patch: Partial<RepetitionConfiguration> }[] = [];
+  const sidekickStates = new Map<
+    string,
+    WorkspacePluginState<import('../src/lib/atoms/plugins').SidekickConfiguration>
+  >();
+  const sidekickMetrics = new Map<string, MemoryMetrics>();
+  const sidekickUpdates: { workspaceID: string; patch: Record<string, unknown> }[] = [];
   const settings = new Map<string, Record<string, string>>([
     ['', { agent_depth_limit: '2', process_limit: '8' }],
   ]);
@@ -129,6 +135,56 @@ export async function mockHarness(page: Page) {
         return reply(instance, 201);
       }
       const parts = path.split('/').filter(Boolean);
+      if (parts[0] === 'instances' && parts[2] === 'plugins' && parts[3] === 'sidekick') {
+        const workspaceID = parts[1];
+        if (!sidekickStates.has(workspaceID))
+          sidekickStates.set(workspaceID, {
+            Name: 'sidekick',
+            Version: '0.1.0',
+            WorkspaceID: workspaceID,
+            Available: true,
+            Enabled: false,
+            RequestedEnabled: false,
+            Pending: false,
+            Override: {},
+            Configuration: {
+              enabled: false,
+              worker_model: '',
+              worker_effort: '',
+              memory_enabled: true,
+              files_enabled: true,
+              debounce_ms: 750,
+              cooldown_ms: 15000,
+              job_timeout_ms: 45000,
+              worker_count: 1,
+              worker_output_tokens: 768,
+              memory_limit: 5,
+              memory_bytes: 6000,
+              file_limit: 5,
+              file_bytes: 8000,
+              source_bytes: 4000,
+              hint_bytes: 1600,
+            },
+          });
+        if (!sidekickMetrics.has(workspaceID))
+          sidekickMetrics.set(workspaceID, {
+            Name: 'sidekick',
+            WorkspaceID: workspaceID,
+            Counters: {},
+            Agents: [],
+          });
+        if (parts[4] === 'statistics') return reply(sidekickMetrics.get(workspaceID));
+        const state = sidekickStates.get(workspaceID)!;
+        if (method === 'PATCH') {
+          const patch = request.postDataJSON();
+          sidekickUpdates.push({ workspaceID, patch });
+          state.Configuration = { ...state.Configuration, ...patch };
+          state.Override = { ...state.Override, ...patch };
+          state.RequestedEnabled = state.Configuration.enabled;
+          if (!state.Pending) state.Enabled = state.RequestedEnabled;
+        }
+        return reply(state);
+      }
       if (parts[0] === 'instances' && parts[2] === 'plugins' && parts[3] === 'spaced_repetition') {
         const workspaceID = parts[1];
         if (!repetitionStates.has(workspaceID))
@@ -436,5 +492,8 @@ export async function mockHarness(page: Page) {
     repetitionStates,
     repetitionMetrics,
     repetitionUpdates,
+    sidekickStates,
+    sidekickMetrics,
+    sidekickUpdates,
   };
 }

@@ -371,6 +371,7 @@
 {#snippet sidePanel()}
   {#if activeSidePanel === 'tasks'}
     <TaskPanel
+      onSidekick={() => openSettings('sidekick')}
       session={workbench.session}
       state={workbench.taskState}
       error={workbench.taskStateError}
