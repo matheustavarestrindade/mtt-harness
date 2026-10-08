@@ -53,8 +53,8 @@ test('discard a late memory response after switching workspaces', async ({ page 
       await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
     }
     await page.getByRole('button', { name: 'Switch workspace', exact: true }).click();
-    await page.getByRole('button', { name: 'Refresh workspaces', exact: true }).click();
-    await page.getByRole('button', { name: 'other-workspace', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Refresh workspaces', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'other-workspace', exact: true }).click();
     if (testInfo.project.name === 'mobile')
       await page.getByRole('button', { name: 'Close navigation', exact: true }).click();
     const switched = await openPanel(page);

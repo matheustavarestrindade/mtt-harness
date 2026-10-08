@@ -62,7 +62,6 @@
   } | null>(null);
   let activityOpen = $state(false);
   let menuOpen = $state(false);
-  let navigationView = $state<'workspaces' | 'sessions'>('workspaces');
   let navigationCollapsed = $state(false);
   let memoryCollapsed = $state(false);
   let memoryDrawerOpen = $state(false);
@@ -122,9 +121,6 @@
   });
   $effect(() => {
     if (desktopMemory.current) memoryDrawerOpen = false;
-  });
-  $effect(() => {
-    if (!workbench.instance || workbench.connection !== 'connected') navigationView = 'workspaces';
   });
 
   $effect(() => {
@@ -192,7 +188,6 @@
       }
       workspaceOpen = false;
       menuOpen = false;
-      navigationView = 'sessions';
       toast.success('Workspace created');
       if (!workbench.session) sessionOpen = true;
     });
@@ -202,12 +197,10 @@
       await workbench.createSession(model, effort);
       sessionOpen = false;
       menuOpen = false;
-      navigationView = 'sessions';
       toast.success('Session ready');
     });
   }
   function selectInstance(instance: Instance) {
-    navigationView = 'sessions';
     if (workbench.instance?.ID === instance.ID && !workbench.error) return;
     void runWorkbenchAction('select', () => workbench.selectInstance(instance));
   }
@@ -340,8 +333,6 @@
 {#snippet navigation(drawer = false)}
   <Navigation
     console={workbench}
-    view={navigationView}
-    onWorkspaces={() => (navigationView = 'workspaces')}
     onClose={drawer ? () => (menuOpen = false) : undefined}
     onSettings={() => openSettings()}
     onWorkspace={() => {

@@ -13,7 +13,7 @@ async function openNavigation(page: Page) {
   return navigation;
 }
 
-test('start with workspaces and drill into compact sessions through the header', async ({
+test('keep compact sessions visible while the header opens a workspace menu', async ({
   page,
 }, testInfo) => {
   const fixture = await mockHarness(page);
@@ -23,15 +23,11 @@ test('start with workspaces and drill into compact sessions through the header',
   await expect(page.getByLabel('Message', { exact: true })).toBeEnabled();
   await page.getByLabel('Message', { exact: true }).fill('Keep my draft');
   const navigation = await openNavigation(page);
-  await expect(navigation.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible();
-  await expect(navigation.getByRole('heading', { name: 'Sessions', exact: true })).toHaveCount(0);
-  await expect(navigation.getByRole('button', { name: /^Session / })).toHaveCount(0);
+  await expect(navigation.getByRole('heading', { name: 'Sessions', exact: true })).toBeVisible();
   await expect(navigation).not.toContainText('Your tools. Your workspace.');
   await expect(navigation).not.toContainText('This console keeps you in the loop.');
-  await navigation.getByRole('button', { name: 'example-project', exact: true }).click();
   const switcher = navigation.getByRole('button', { name: 'Switch workspace', exact: true });
   await expect(switcher).toContainText('example-project');
-  await expect(switcher).toBeFocused();
   await expect(navigation.getByRole('heading', { name: 'Workspaces', exact: true })).toHaveCount(0);
   await expect(navigation.getByRole('button', { name: 'New workspace', exact: true })).toHaveCount(
     0,
@@ -50,10 +46,21 @@ test('start with workspaces and drill into compact sessions through the header',
     await expect(page.getByRole('dialog', { name: 'Workspaces and sessions' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('workspace-sessions.png') });
   await switcher.press('Enter');
-  const workspaceButton = navigation.getByRole('button', { name: 'example-project', exact: true });
-  await expect(workspaceButton).toBeFocused();
-  await expect(navigation.getByRole('heading', { name: 'Sessions', exact: true })).toHaveCount(0);
-  await workspaceButton.press('Enter');
+  const menu = page.getByRole('menu', { name: 'Workspace menu', exact: true });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'example-project', exact: true })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'New workspace', exact: true })).toBeVisible();
+  await expect(navigation.getByRole('heading', { name: 'Sessions', exact: true })).toBeVisible();
+  await expect(sessionButton).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('workspace-menu.png') });
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(switcher).toBeFocused();
+  if (testInfo.project.name === 'mobile')
+    await expect(page.getByRole('dialog', { name: 'Workspaces and sessions' })).toBeVisible();
+  await switcher.click();
+  await menu.getByRole('menuitem', { name: 'example-project', exact: true }).click();
+  await expect(menu).toHaveCount(0);
   await sessionButton.click();
   if (testInfo.project.name === 'mobile') await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByLabel('Message', { exact: true })).toHaveValue('Keep my draft');
@@ -66,7 +73,7 @@ test('start with workspaces and drill into compact sessions through the header',
   await expect(reopened.getByRole('heading', { name: 'Sessions', exact: true })).toBeVisible();
 });
 
-test('a late workspace read cannot replace the selected sidebar section', async ({ page }) => {
+test('a late workspace read cannot replace the selected session list', async ({ page }) => {
   const fixture = await mockHarness(page);
   await connectAndCreate(page);
   const original = fixture.instances[0];
@@ -87,8 +94,8 @@ test('a late workspace read cannot replace the selected sidebar section', async 
   try {
     const navigation = await openNavigation(page);
     await navigation.getByRole('button', { name: 'Switch workspace', exact: true }).click();
-    await navigation.getByRole('button', { name: 'Refresh workspaces', exact: true }).click();
-    await navigation.getByRole('button', { name: 'another-project', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Refresh workspaces', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'another-project', exact: true }).click();
     await requested;
     await expect(
       navigation.getByRole('button', { name: 'Switch workspace', exact: true }),
@@ -101,7 +108,7 @@ test('a late workspace read cannot replace the selected sidebar section', async 
       }),
     ).toHaveCount(0);
     await navigation.getByRole('button', { name: 'Switch workspace', exact: true }).click();
-    await navigation.getByRole('button', { name: 'example-project', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'example-project', exact: true }).click();
     await expect(
       navigation.getByRole('button', {
         name: `Session ${shortID(originalSession.ID)}`,
@@ -145,8 +152,8 @@ test('show empty and stopped workspaces at 320px and recover a failed session re
   });
   const navigation = await openNavigation(page);
   await navigation.getByRole('button', { name: 'Switch workspace', exact: true }).click();
-  await navigation.getByRole('button', { name: 'Refresh workspaces', exact: true }).click();
-  await navigation.locator('[data-workspace-id="empty-workspace"]').click();
+  await page.getByRole('menuitem', { name: 'Refresh workspaces', exact: true }).click();
+  await page.getByRole('menu').locator('[data-workspace-id="empty-workspace"]').click();
   await expect(navigation.getByRole('alert')).toHaveText('Cannot load these sessions.');
   await expect(navigation.getByRole('button', { name: 'New session', exact: true })).toBeDisabled();
   reject = false;
@@ -161,5 +168,27 @@ test('show empty and stopped workspaces at 320px and recover a failed session re
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
   ).toBeTruthy();
   await navigation.getByRole('button', { name: 'Switch workspace', exact: true }).click();
-  await expect(navigation.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible();
+  await expect(page.getByRole('menu', { name: 'Workspace menu', exact: true })).toBeVisible();
+  await expect(navigation.getByRole('heading', { name: 'Sessions', exact: true })).toBeVisible();
+});
+
+test('create a workspace from the header dropdown', async ({ page }) => {
+  const fixture = await mockHarness(page);
+  await connectAndCreate(page);
+  const navigation = await openNavigation(page);
+  await navigation.getByRole('button', { name: 'Switch workspace', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'New workspace', exact: true }).click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toHaveCount(1);
+  await dialog.getByLabel('Project directory').fill('/workspace/menu-created');
+  await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click();
+  await page.getByRole('button', { name: 'Create session', exact: true }).click();
+  await expect(page.getByLabel('Message', { exact: true })).toBeEnabled();
+  const reopened = await openNavigation(page);
+  await expect(
+    reopened.getByRole('button', { name: 'Switch workspace', exact: true }),
+  ).toContainText('menu-created');
+  await expect(reopened.getByRole('heading', { name: 'Sessions', exact: true })).toBeVisible();
+  expect(fixture.instances.at(-1)?.Workspace).toBe('/workspace/menu-created');
 });

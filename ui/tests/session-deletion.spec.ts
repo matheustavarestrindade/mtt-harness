@@ -7,8 +7,6 @@ async function openSessions(page: Page) {
   const navigationButton = page.getByRole('button', { name: 'Open navigation', exact: true });
   if (await navigationButton.isVisible()) await navigationButton.click();
   const navigation = page.getByRole('navigation', { name: 'Workspaces and sessions' });
-  const selectedWorkspace = navigation.locator('[data-workspace-id][aria-current="page"]');
-  if (await selectedWorkspace.isVisible()) await selectedWorkspace.click();
   await expect(navigation.getByRole('heading', { name: 'Sessions', exact: true })).toBeVisible();
   return navigation;
 }
