@@ -43,11 +43,12 @@ FROM alpine:3.22 AS core
 RUN adduser -D -u 10001 mtt
 COPY --from=core-builder /out/mtt /usr/local/bin/mtt
 COPY --from=core-builder /src/providers.json /src/mcp.example.json /src/mtt.example.json /src/start_prompt.md /etc/mtt/
+COPY --from=core-builder /src/plugins/spaced_repetition/prompts /etc/mtt/spaced-repetition
 WORKDIR /workspace
 USER mtt
 EXPOSE 8080
 ENTRYPOINT ["mtt"]
-CMD ["--start-prompt-file", "/etc/mtt/start_prompt.md"]
+CMD ["--start-prompt-file", "/etc/mtt/start_prompt.md", "--spaced-repetition-prompts", "/etc/mtt/spaced-repetition"]
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget libstdc++6 libgomp1 \
@@ -58,8 +59,9 @@ COPY --from=model-assets /opt/mtt/models /opt/mtt/models
 COPY --from=context-assets /opt/mtt/models /opt/mtt/models
 COPY --from=context-assets /opt/mtt/lib/libonnxruntime.so.1.30.0 /opt/mtt/lib/onnxruntime-LICENSE /opt/mtt/lib/onnxruntime-ThirdPartyNotices.txt /opt/mtt/lib/
 COPY --from=builder /src/providers.json /src/mcp.example.json /src/mtt.example.json /src/start_prompt.md /etc/mtt/
+COPY --from=builder /src/plugins/spaced_repetition/prompts /etc/mtt/spaced-repetition
 WORKDIR /workspace
 USER mtt
 EXPOSE 8080
 ENTRYPOINT ["mtt"]
-CMD ["--start-prompt-file", "/etc/mtt/start_prompt.md"]
+CMD ["--start-prompt-file", "/etc/mtt/start_prompt.md", "--spaced-repetition-prompts", "/etc/mtt/spaced-repetition"]

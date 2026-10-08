@@ -79,6 +79,9 @@ func (pluginHost *Host) PrepareContext(operationContext context.Context, input h
 		}
 		selection.Request = next.Request
 		selection.Managed = selection.Managed || next.Managed
+		if next.InputCeiling > 0 && (selection.InputCeiling == 0 || next.InputCeiling < selection.InputCeiling) {
+			selection.InputCeiling = next.InputCeiling
+		}
 	}
 	return selection, nil
 }

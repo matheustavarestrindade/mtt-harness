@@ -733,7 +733,23 @@ The harness must complete accepted tool groups before the plugin state can be `O
 
 Workspace agents use the provider registry, credentials, model lists, and usage store. A memory job attempt has an agent name, run ID, and model request ID. Session IDs identify the memory source only. Worker cost increases workspace cost, not session cost. Provider cost, cost estimates, unknown prices, cache usage, and subscription billing rules stay applicable.
 
-The plugin API gives settings, plugin state, and usage counters. The UI control is subsequent work. See `plugins/context/README.md` for configuration and removal.
+The plugin API gives settings, plugin state, and usage counters. The UI Memory panel shows workspace configuration and usage. See `plugins/context/README.md` for configuration and removal.
+
+### 9.2 Spaced Repetition Plugin
+
+The optional plugin `spaced_repetition` gives reminders after context growth. It uses 3 Markdown templates: `low`, `medium`, and `high`. The template directory is in the bootstrap file field `spaced_repetition_prompts`. The template renderer reads the files when the program starts.
+
+The database key `plugin.spaced_repetition` keeps harness settings and workspace settings. The default plugin state is `OFF`. The default interval is 12.5% of model context capacity, with a maximum of 32768 tokens. The interval can also use a constant token value. The default reminder pattern is `low`, `low`, `low`, `medium`.
+
+Context growth does not include reminder text. Context removal or a model change starts a new interval without a change to the reminder pattern position. The plugin gives a maximum of one reminder for a model request. A reminder checkpoint changes the reminder schedule only when the harness sends the model request.
+
+Reminder text uses `<spaced repetition>`. The request view keeps reminders at the reminder anchors. Context selection and input limits include the text. The Responses API keeps reminders in the input sequence. System instructions at the start of the request do not change.
+
+The tool `remember_instructions` starts a recovery worker for instruction drift. The worker uses memory search at compression level `M`. It prepares a `high` reminder from instruction sources. The tool gives a result after the recovery report is in the database. The recovery report applies at a request boundary after the tool group.
+
+Workers use harness interfaces for model requests, prompt templates, and memory search. Worker usage is workspace usage. Source session IDs identify instruction sources only. Reminder tokens are part of session usage. The plugin does not calculate the cost again.
+
+The plugin rejects previous recovery reports after cancellation, the revert operation, or session deletion. Session deletion removes reminder data and keeps usage. The UI gives workspace configuration and statistics. See `plugins/spaced_repetition/README.md`.
 
 ## 10. Tools
 

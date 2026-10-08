@@ -23,15 +23,21 @@ type ContextRequest struct {
 	Session atom.Session
 	Request atom.Request
 	Model   atom.ModelInfo
+	// ModelID is the resolved provider-qualified selection after middleware.
+	ModelID string
 	Budget  RequestBudget
 	Measure func(context.Context, atom.Request) (RequestBudget, error)
+	// InputCeiling is an optional stricter context-policy limit, including all
+	// projected reminders. Zero uses the model input limit.
+	InputCeiling int
 }
 
 // ContextSelection contains a request-local view. Managed disables automatic
 // history trimming, but never disables the final core input-budget check.
 type ContextSelection struct {
-	Request atom.Request
-	Managed bool
+	Request      atom.Request
+	Managed      bool
+	InputCeiling int
 }
 
 // RequestLifecyclePlugin freezes request-local plugin configuration before

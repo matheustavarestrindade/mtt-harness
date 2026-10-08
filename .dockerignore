@@ -10,6 +10,7 @@ bin
 dist
 *.md
 !start_prompt.md
+!plugins/spaced_repetition/prompts/*.md
 ste
 scripts/*
 !scripts/format/

@@ -71,6 +71,43 @@ type QueryTextEmbedder interface {
 	EmbedQueries(context.Context, []string) ([][]float64, error)
 }
 
+// PromptRenderer renders startup-compatible, preloaded templates. Rendering
+// never discovers tools, activates schemas, or reads a prompt file at runtime.
+type PromptRenderer interface {
+	RenderPrompt(context.Context, atom.Session, string, string) (string, error)
+}
+
+var ErrWorkspaceMemoryUnavailable = errors.New("workspace memory is unavailable")
+
+// MemoryQuery is scoped retrieval for a workspace worker. Attribution affects
+// counters only; SourceSessionID does not become an owning billing session.
+type MemoryQuery struct {
+	WorkspaceID     string
+	SourceSessionID atom.SessionID
+	Agent           string
+	RunID           string
+	Query           string
+	Categories      []string
+	Compression     string
+	Limit           int
+	MaxBytes        int
+}
+
+// MemoryReference is current, non-deleted workspace data. Reference identifiers
+// are worker provenance, not text to add to user-facing replies.
+type MemoryReference struct {
+	ID         string
+	Version    int
+	Categories []string
+	Text       string
+}
+
+// WorkspaceMemory performs read-only retrieval without changing a session's
+// frozen memory snapshot or promotion levels. It never exposes archived secrets.
+type WorkspaceMemory interface {
+	SearchWorkspaceMemory(context.Context, MemoryQuery) ([]MemoryReference, error)
+}
+
 // PluginServices are explicit application dependencies. Plugin implementations
 // never need an import of a harness internal package.
 type PluginServices struct {
@@ -80,6 +117,8 @@ type PluginServices struct {
 	Models        WorkspaceModels
 	Embeddings    TextEmbedder
 	Usage         WorkspaceUsage
+	Prompts       PromptRenderer
+	Memory        WorkspaceMemory
 }
 
 type WorkspaceUsage interface {

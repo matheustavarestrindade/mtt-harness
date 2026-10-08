@@ -314,7 +314,13 @@ AgentStatistics {
 
 Memory jobs stay in the database at `OFF`. The runtime stops new work after accepted tool groups and cancels active workers. The memory archive and the context view given to the model stay available. Workspace agent cost does not increase session cost.
 
-See `plugins/context/README.md` for configuration and memory behavior.
+The plugin name `spaced_repetition` uses the same settings and statistics routes. The default plugin state is `OFF`. Automatic reminders can run with an empty worker model. A worker model is necessary for the `remember_instructions` tool.
+
+The interval object and reminder pattern array control reminder checkpoints. A workspace value in the interval object can override a harness value. JSON `null` removes a workspace value.
+
+The usage counters include `reminders/low`, `reminders/medium`, `reminders/high`, `reminders/deferred`, `reminders/tokens`, and `reminders/estimated_tokens`. The API gives recovery records, memory queries, and duration in milliseconds. Worker usage uses the agent name `spaced_repetition.instruction_recovery`. Reminder tokens are part of session usage.
+
+See `plugins/context/README.md` and `plugins/spaced_repetition/README.md` for plugin configuration and behavior.
 
 ## Permission and Process Routes
 

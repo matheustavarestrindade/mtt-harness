@@ -14,7 +14,8 @@ import type {
   TaskState,
 } from '../../atoms/types';
 import type { RuntimeSettings, RuntimeSettingKey } from '../../atoms/settings';
-import type { MemoryMetrics, MemoryPluginState, MemoryConfiguration } from '../../atoms/memory';
+import type { MemoryMetrics, MemoryConfiguration } from '../../atoms/memory';
+import type { WorkspacePluginState } from '../../atoms/plugins';
 
 export class ApiError extends Error {
   constructor(
@@ -282,16 +283,26 @@ export class HarnessApi {
     );
   }
   memoryState(instanceID: string, signal?: AbortSignal) {
-    return this.request<MemoryPluginState>(
-      `instances/${encodeURIComponent(instanceID)}/plugins/context/settings`,
+    return this.workspacePluginState<MemoryConfiguration>(instanceID, 'context', signal);
+  }
+  workspacePluginState<Configuration>(instanceID: string, plugin: string, signal?: AbortSignal) {
+    return this.request<WorkspacePluginState<Configuration>>(
+      `instances/${encodeURIComponent(instanceID)}/plugins/${encodeURIComponent(plugin)}/settings`,
       'GET',
       undefined,
       signal,
     );
   }
   async memoryMetrics(instanceID: string, signal?: AbortSignal): Promise<MemoryMetrics> {
+    return this.workspacePluginMetrics(instanceID, 'context', signal);
+  }
+  async workspacePluginMetrics(
+    instanceID: string,
+    plugin: string,
+    signal?: AbortSignal,
+  ): Promise<MemoryMetrics> {
     const result = await this.request<MemoryMetrics>(
-      `instances/${encodeURIComponent(instanceID)}/plugins/context/statistics`,
+      `instances/${encodeURIComponent(instanceID)}/plugins/${encodeURIComponent(plugin)}/statistics`,
       'GET',
       undefined,
       signal,
@@ -299,8 +310,16 @@ export class HarnessApi {
     return { ...result, Counters: result.Counters ?? {}, Agents: result.Agents ?? [] };
   }
   configureMemory(instanceID: string, patch: Partial<MemoryConfiguration>, signal?: AbortSignal) {
-    return this.request<MemoryPluginState>(
-      `instances/${encodeURIComponent(instanceID)}/plugins/context/settings`,
+    return this.configureWorkspacePlugin<MemoryConfiguration>(instanceID, 'context', patch, signal);
+  }
+  configureWorkspacePlugin<Configuration>(
+    instanceID: string,
+    plugin: string,
+    patch: Partial<Configuration>,
+    signal?: AbortSignal,
+  ) {
+    return this.request<WorkspacePluginState<Configuration>>(
+      `instances/${encodeURIComponent(instanceID)}/plugins/${encodeURIComponent(plugin)}/settings`,
       'PATCH',
       patch,
       signal,

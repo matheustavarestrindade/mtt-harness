@@ -42,6 +42,12 @@ The loop adds a task state snapshot before context and request stages. After 3 m
 
 The task state snapshot and task reminder are not written to the database. The context limit includes them. See `task-state.md` for task update and response counter rules.
 
+## Spaced Repetition
+
+The optional spaced repetition plugin uses 3 smaller prompt templates. The files use the same template renderer as the startup prompt. A reminder does not activate tools. The bootstrap file field `spaced_repetition_prompts` and command-line argument of the same name select the directory.
+
+The plugin adds reminders after context growth. It keeps the initial startup prompt and previous reminder text stable. Instruction recovery uses workspace memory search at compression level `M`. See `../plugins/spaced_repetition/README.md`.
+
 ## User Communication
 
 The default template uses ISO 24495-1 for messages to the user. English text also uses ASD-STE100. The model uses the chat language that the user selects.

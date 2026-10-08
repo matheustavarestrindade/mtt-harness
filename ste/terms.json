@@ -2,6 +2,138 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "prompt template",
+      "category": "technical_noun",
+      "approved_forms": [
+        "prompt templates"
+      ],
+      "meaning": "instruction text with request-time variable substitution",
+      "source": "startup prompt service"
+    },
+    {
+      "term": "memory index",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "stored search representation of workspace memory",
+      "source": "context plugin"
+    },
+    {
+      "term": "reminder",
+      "category": "technical_noun",
+      "approved_forms": [
+        "reminders"
+      ],
+      "meaning": "request-local instruction message supplied by a harness plugin",
+      "source": "request reminder contract"
+    },
+    {
+      "term": "context growth",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "increase in the measured provider input across requests",
+      "source": "spaced repetition scheduling"
+    },
+    {
+      "term": "reminder schedule",
+      "category": "technical_noun",
+      "approved_forms": [
+        "reminder schedules"
+      ],
+      "meaning": "per-session reminder thresholds and pattern position",
+      "source": "spaced repetition state"
+    },
+    {
+      "term": "reminder checkpoint",
+      "category": "technical_noun",
+      "approved_forms": [
+        "reminder checkpoints"
+      ],
+      "meaning": "context threshold for an automatic instruction reminder",
+      "source": "spaced repetition state"
+    },
+    {
+      "term": "recovery report",
+      "category": "technical_noun",
+      "approved_forms": [
+        "recovery reports"
+      ],
+      "meaning": "source-grounded instruction guidance prepared by the recovery worker",
+      "source": "spaced repetition plugin"
+    },
+    {
+      "term": "recovery worker",
+      "category": "technical_noun",
+      "approved_forms": [
+        "recovery workers"
+      ],
+      "meaning": "workspace model worker that prepares an instruction recovery report",
+      "source": "spaced repetition plugin"
+    },
+    {
+      "term": "recovery record",
+      "category": "technical_noun",
+      "approved_forms": [
+        "recovery records"
+      ],
+      "meaning": "persisted instruction-recovery attempt and status",
+      "source": "spaced repetition storage"
+    },
+    {
+      "term": "template renderer",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "shared service that expands loaded prompt template variables",
+      "source": "startup prompt service"
+    },
+    {
+      "term": "instruction source",
+      "category": "technical_noun",
+      "approved_forms": [
+        "instruction sources"
+      ],
+      "meaning": "reference evidence for an instruction-recovery finding",
+      "source": "spaced repetition worker"
+    },
+    {
+      "term": "spaced repetition",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "instruction reminder scheduling after model context growth",
+      "source": "spaced repetition plugin"
+    },
+    {
+      "term": "instruction recovery",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "bounded worker process that restores relevant guidance from instructions and workspace memory",
+      "source": "spaced repetition plugin"
+    },
+    {
+      "term": "instruction drift",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "repeated failure to apply relevant instructions during a conversation",
+      "source": "spaced repetition plugin"
+    },
+    {
+      "term": "reminder anchor",
+      "category": "technical_noun",
+      "approved_forms": [
+        "reminder anchors"
+      ],
+      "meaning": "stable conversation position associated with a request-local reminder",
+      "source": "spaced repetition plugin"
+    },
+    {
+      "term": "reminder pattern",
+      "category": "technical_noun",
+      "approved_forms": [
+        "reminder patterns"
+      ],
+      "meaning": "configured sequence of automatic reminder tiers",
+      "source": "spaced repetition plugin"
+    },
+    {
       "term": "network access",
       "category": "technical_noun",
       "approved_forms": [],
