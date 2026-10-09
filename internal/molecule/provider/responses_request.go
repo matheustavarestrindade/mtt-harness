@@ -40,6 +40,11 @@ func (standardProvider *Standard) streamResponses(operationContext context.Conte
 		payload["tools"] = tools
 	}
 	for name, value := range request.Params {
+		// Coding-plan Responses does not accept this wire parameter. Keep
+		// the harness's output reservation in its request budget only.
+		if name == "max_output_tokens" && standardProvider.providerSpec.Authentication == "chatgpt" {
+			continue
+		}
 		switch name {
 		case "model", "input", "instructions", "tools", "stream", "store", "include", "previous_response_id", "conversation":
 			return nil, fmt.Errorf("request parameter %q is reserved", name)
@@ -47,6 +52,9 @@ func (standardProvider *Standard) streamResponses(operationContext context.Conte
 		payload[name] = value
 	}
 	if operationError := standardProvider.applyReasoningParameters(payload, request); operationError != nil {
+		return nil, operationError
+	}
+	if operationError := standardProvider.applyModelPreset(payload, request); operationError != nil {
 		return nil, operationError
 	}
 	body, operationError := json.Marshal(payload)

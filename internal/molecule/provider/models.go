@@ -57,6 +57,8 @@ func (standardProvider *Standard) Refresh(operationContext context.Context) ([]a
 		if !cached {
 			model = newCatalogModel(catalogModel.ID)
 		}
+		// A native ID must not inherit an earlier preset's transport selection.
+		model.APIModel, model.ServiceTier = "", ""
 		model = applyModelMetadata(model, defaults)
 		model = applyModelMetadata(model, metadata[model.ID].ModelMetadata)
 		model = applyModelMetadata(model, catalogModel.ModelMetadata)
@@ -72,6 +74,19 @@ func (standardProvider *Standard) Refresh(operationContext context.Context) ([]a
 			return nil, operationError
 		}
 		models = append(models, model)
+		presets, operationError := standardProvider.catalogServiceTierPresets(model, catalogModel.ServiceTiers)
+		if operationError != nil {
+			return nil, operationError
+		}
+		for index := range presets {
+			if price, configured := prices[presets[index].ID]; configured {
+				presets[index].Prices = &price
+			}
+		}
+		models = append(models, presets...)
+	}
+	if operationError := validateCatalogSelectionIDs(models); operationError != nil {
+		return nil, operationError
 	}
 	if operationError := operationContext.Err(); operationError != nil {
 		return nil, operationError

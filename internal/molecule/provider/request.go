@@ -54,6 +54,9 @@ func (standardProvider *Standard) streamChatCompletions(operationContext context
 	if operationError := standardProvider.applyReasoningParameters(payload, request); operationError != nil {
 		return nil, operationError
 	}
+	if operationError := standardProvider.applyModelPreset(payload, request); operationError != nil {
+		return nil, operationError
+	}
 	body, operationError := json.Marshal(payload)
 	if operationError != nil {
 		return nil, operationError

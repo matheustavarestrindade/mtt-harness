@@ -6,7 +6,7 @@ The standard configuration uses the Models.dev JSON API.
 
 The model catalog is part of OpenCode. Pi uses the model catalog.
 
-The provider endpoint gives available model IDs. Models.dev supplies model data and token prices. The model catalog must not add IDs to the provider response.
+The provider endpoint gives available model IDs. Models.dev supplies model data and token prices. The model catalog must not add provider model IDs to the provider response.
 
 Add the fields below to a provider entry in `providers.json`:
 
@@ -28,6 +28,18 @@ The value `refresh_hours` sets the interval for model data. The route `POST /pro
 - The metadata source.
 - Provider defaults in `providers.json`.
 - The model cache.
+
+## Codex Model Selection
+
+The Codex model endpoint uses the `client_version` query value. The value is part of `model_list_url` in `providers.json`. The endpoint can remove models because of the client version. The configuration uses Codex `0.162.1`.
+
+The harness reads the `visibility` field. It includes models with `list` and models without the field. It does not include models with `hide` or `none`.
+
+The `service_tiers` list gives model presets. The model preset ID is `MODEL_ID@TIER_ID`. The model name includes the service tier name. The fields `APIModel` and `ServiceTier` give the provider request values for `model` and `service_tier`. Session data, model permissions, and usage keep the model preset ID.
+
+A model preset uses the provider model data. Prices can be different. You can set prices in the JSON file for the model preset ID. When the provider removes a model or service tier, the harness removes the related model preset. The database keeps the request values in the model cache.
+
+With `chatgpt` authentication, the adapter does not send `max_output_tokens`. The harness keeps the output token limit.
 
 ## Reasoning Effort
 
@@ -96,7 +108,8 @@ MTT_TEST_LIVE_MODEL_METADATA=1 go test -count=1 ./internal/molecule/provider -ru
 - [Models.dev API](https://models.dev/#api)
 - [Pi model data](https://github.com/badlogic/pi-mono/blob/main/packages/ai/scripts/generate-models.ts)
 - [OpenAI reasoning](https://developers.openai.com/api/docs/guides/reasoning)
-- [Codex model data](https://github.com/openai/codex/blob/rust-v0.101.0/codex-rs/protocol/src/openai_models.rs)
+- [Codex model data](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/protocol/src/openai_models.rs)
+- [OpenCode Codex adapter](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/plugin/openai/codex.ts)
 - [DeepSeek reasoning](https://api-docs.deepseek.com/guides/thinking_mode)
 - [DeepSeek Responses API](https://api-docs.deepseek.com/guides/responses_api)
 - [DeepSeek prices](https://api-docs.deepseek.com/quick_start/pricing)

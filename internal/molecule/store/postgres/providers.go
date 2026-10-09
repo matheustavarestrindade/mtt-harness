@@ -84,10 +84,10 @@ func (providerStore *providers) SaveModels(operationContext context.Context, pro
 			prices = data
 		}
 		if _, operationError := transaction.Exec(operationContext, `
-			INSERT INTO models (provider, id, level, input, output, tools, context_max, prices, name, tool_support_unknown, reasoning, reasoning_efforts, default_reasoning_effort, reasoning_summary, billing)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+			INSERT INTO models (provider, id, level, input, output, tools, context_max, prices, name, tool_support_unknown, reasoning, reasoning_efforts, default_reasoning_effort, reasoning_summary, billing, api_model, service_tier)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
 			provider, model.ID, model.Level, input, output, model.Tools, model.ContextMax, prices, model.Name, model.ToolSupportUnknown,
-			model.Reasoning, reasoningEfforts, model.DefaultReasoningEffort, model.ReasoningSummary, model.Billing); operationError != nil {
+			model.Reasoning, reasoningEfforts, model.DefaultReasoningEffort, model.ReasoningSummary, model.Billing, model.APIModel, model.ServiceTier); operationError != nil {
 			return operationError
 		}
 	}
@@ -96,7 +96,7 @@ func (providerStore *providers) SaveModels(operationContext context.Context, pro
 
 func (providerStore *providers) Models(operationContext context.Context, provider string) ([]atom.ModelInfo, error) {
 	rows, operationError := providerStore.store.pool.Query(operationContext, `
-		SELECT id, level, input, output, tools, context_max, prices, name, tool_support_unknown, reasoning, reasoning_efforts, default_reasoning_effort, reasoning_summary, billing
+		SELECT id, level, input, output, tools, context_max, prices, name, tool_support_unknown, reasoning, reasoning_efforts, default_reasoning_effort, reasoning_summary, billing, api_model, service_tier
 		FROM models WHERE provider = $1 ORDER BY id`, provider)
 	if operationError != nil {
 		return nil, operationError
@@ -107,7 +107,7 @@ func (providerStore *providers) Models(operationContext context.Context, provide
 		var model atom.ModelInfo
 		var input, output, prices, reasoningEfforts []byte
 		if operationError := rows.Scan(&model.ID, &model.Level, &input, &output, &model.Tools, &model.ContextMax, &prices, &model.Name, &model.ToolSupportUnknown,
-			&model.Reasoning, &reasoningEfforts, &model.DefaultReasoningEffort, &model.ReasoningSummary, &model.Billing); operationError != nil {
+			&model.Reasoning, &reasoningEfforts, &model.DefaultReasoningEffort, &model.ReasoningSummary, &model.Billing, &model.APIModel, &model.ServiceTier); operationError != nil {
 			return nil, operationError
 		}
 		_ = json.Unmarshal(input, &model.Input)
