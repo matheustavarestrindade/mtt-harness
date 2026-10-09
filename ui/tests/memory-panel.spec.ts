@@ -2,12 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 import type { MemoryMetrics } from '../src/lib/atoms/memory';
 import { agentTokenCount, totalAgentUsage } from '../src/lib/atoms/memory';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate, chooseSelectOption } from './helpers';
+import { connectAndCreate, chooseSelectOption, openWorkbenchAction } from './helpers';
 
 async function openMemory(page: Page) {
-  const toggle = page.getByRole('button', { name: 'Open memory panel', exact: true });
-  if (await toggle.isVisible()) await toggle.click();
   const panel = page.getByRole('region', { name: 'Workspace memory', exact: true });
+  if (!(await panel.isVisible())) await openWorkbenchAction(page, 'Memory');
   await expect(panel).toBeVisible();
   return panel;
 }

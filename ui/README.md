@@ -75,6 +75,8 @@ The message composer starts with one text line. More text increases the composer
 
 On a large screen, use `Collapse navigation` or `Expand navigation` in the header. The browser keeps the setting. On a small screen, use the navigation drawer.
 
+On a small screen, the header shows the workspace name and model. The navigation drawer contains `Tasks`, `Memory`, `Session activity`, and `Settings`. The `New session` action is above the session list. A panel selection closes the navigation drawer and opens the selected panel.
+
 The sidebar shows the session list for the selected workspace. The `Switch workspace` button opens a `DropdownMenu` with workspaces and a `New workspace` action. The sidebar keeps the session list. A navigation drawer stays open until session selection.
 
 1. Connect to the API.
@@ -200,7 +202,7 @@ The UI can make workspaces and sessions. The user can select an instance or sess
 
 The UI shows message history, tool input, tool results, events, token usage, and cost data. It reads status and history at an interval of 1.5 seconds. A WebSocket event can also cause a new request. The UI shows model text during the response. Message IDs connect event text to the history.
 
-The `Tasks` control in the header opens task state on the right side. Small screens use a navigation drawer. The panel contains task statuses and the `DOING` task title and description.
+The `Tasks` control opens task state on the right side. On large screens, the control is in the header. On small screens, the control is in the navigation drawer. The panel contains task statuses and the `DOING` task title and description.
 
 A task item with status `done` stays in the list while a task item has status `pending` or `in_progress`. The harness removes content from TODO and `DOING` when the last task item becomes `done` or `cancelled`. Empty task state shows `No active tasks` in the panel.
 

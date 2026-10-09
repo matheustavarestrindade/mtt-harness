@@ -65,6 +65,7 @@
   } | null>(null);
   let activityOpen = $state(false);
   let menuOpen = $state(false);
+  let navigationActionOpen = $state(false);
   let navigationCollapsed = $state(false);
   let sidePanelCollapsed = $state(false);
   let sidePanelDrawerOpen = $state(false);
@@ -152,9 +153,32 @@
   function closeSidePanel() {
     if (desktopSidePanel.current) sidePanelCollapsed = true;
     sidePanelDrawerOpen = false;
-    const control = activeSidePanel === 'tasks' ? 'tasks-panel-toggle' : 'memory-panel-toggle';
+    const control = desktopNavigation.current
+      ? activeSidePanel === 'tasks'
+        ? 'tasks-panel-toggle'
+        : 'memory-panel-toggle'
+      : 'mobile-navigation-toggle';
     void tick().then(() => document.getElementById(control)?.focus());
   }
+  function openNavigationAction(action: () => void) {
+    menuOpen = false;
+    navigationActionOpen = !desktopNavigation.current;
+    action();
+  }
+  $effect(() => {
+    if (
+      navigationActionOpen &&
+      !settingsOpen &&
+      !activityOpen &&
+      !sessionOpen &&
+      !workspaceOpen &&
+      !deleteSessionOpen &&
+      !sidePanelDrawerOpen
+    ) {
+      navigationActionOpen = false;
+      void tick().then(() => document.getElementById('mobile-navigation-toggle')?.focus());
+    }
+  });
   $effect(() => {
     if (layoutReady) saveLayout({ navigationCollapsed, memoryCollapsed: sidePanelCollapsed });
   });
@@ -386,15 +410,13 @@
   <Navigation
     console={workbench}
     onClose={drawer ? () => (menuOpen = false) : undefined}
-    onSettings={() => openSettings()}
-    onWorkspace={() => {
-      menuOpen = false;
-      workspaceOpen = true;
-    }}
-    onSession={() => {
-      menuOpen = false;
-      sessionOpen = true;
-    }}
+    onSettings={() => openNavigationAction(() => openSettings())}
+    onWorkspace={() => openNavigationAction(() => (workspaceOpen = true))}
+    onSession={() => openNavigationAction(() => (sessionOpen = true))}
+    onTasks={drawer ? () => openNavigationAction(() => toggleSidePanel('tasks')) : undefined}
+    onMemory={drawer ? () => openNavigationAction(() => toggleSidePanel('memory')) : undefined}
+    onActivity={drawer ? () => openNavigationAction(() => (activityOpen = true)) : undefined}
+    {hasActiveTasks}
     onSelectInstance={selectInstance}
     onSelectSession={selectSession}
     onDeleteSession={requestSessionDeletion}
@@ -429,6 +451,7 @@
     </aside>{/if}
   <div class="flex min-w-0 flex-1 flex-col">
     <header
+      id="conversation-header"
       class="flex min-h-16 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 sm:gap-3 sm:px-6"
       style="padding-top: env(safe-area-inset-top)"
     >
@@ -449,6 +472,7 @@
           size="icon"
           class="icon-button lg:hidden"
           aria-label="Open navigation"
+          id="mobile-navigation-toggle"
           onclick={() => {
             toast.dismiss();
             sidePanelDrawerOpen = false;
@@ -457,14 +481,15 @@
         >{/if}
       <div class="min-w-0 flex-1">
         <div class="flex min-w-0 items-center gap-2 text-sm">
-          <FolderOpen class="hidden size-4 shrink-0 text-muted-foreground sm:block" /><span
+          <FolderOpen class="hidden size-4 shrink-0 text-muted-foreground lg:block" /><span
             class="truncate font-medium"
             title={workbench.instance?.Workspace}
             >{workbench.instance ? workspaceName(workbench.instance.Workspace) : 'Workspace'}</span
-          ><ChevronRight class="size-3 shrink-0 text-muted-foreground/50" /><span
-            class="truncate text-xs text-muted-foreground"
-            >{workbench.session ? `Session ${shortID(workbench.session.ID)}` : 'Overview'}</span
-          >
+          >{#if desktopNavigation.current}<ChevronRight
+              class="size-3 shrink-0 text-muted-foreground/50"
+            /><span class="truncate text-xs text-muted-foreground"
+              >{workbench.session ? `Session ${shortID(workbench.session.ID)}` : 'Overview'}</span
+            >{/if}
         </div>
         {#if workbench.session}<p
             class="mt-0.5 truncate font-mono text-[10px] text-muted-foreground"
@@ -473,67 +498,67 @@
             {sessionModelLabel}
           </p>{/if}
       </div>
-      <div class="flex shrink-0 items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          class={`icon-button relative ${tasksVisible ? 'bg-accent text-foreground' : 'text-muted-foreground'}`}
-          aria-label={tasksVisible ? 'Hide tasks panel' : 'Open tasks panel'}
-          id="tasks-panel-toggle"
-          title="Session tasks"
-          aria-controls="session-tasks-panel"
-          aria-expanded={tasksVisible}
-          onclick={() => toggleSidePanel('tasks')}
-        >
-          <ListTodo class="size-4" />
-          {#if hasActiveTasks}<span
-              class="absolute top-2 right-2 size-1.5 rounded-full bg-primary"
-              aria-hidden="true"
-            ></span>{/if}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          class={`icon-button ${memoryVisible ? 'bg-accent text-foreground' : 'text-muted-foreground'}`}
-          aria-label={memoryVisible ? 'Hide memory panel' : 'Open memory panel'}
-          id="memory-panel-toggle"
-          title="Workspace memory"
-          aria-controls="workspace-memory-panel"
-          aria-expanded={memoryVisible}
-          onclick={() => toggleSidePanel('memory')}><BrainCircuit class="size-4" /></Button
-        >
-        <Button
-          variant="ghost"
-          class="icon-button gap-2 px-2 text-xs sm:px-3"
-          onclick={() => openSettings()}
-          title={connectionLabel}
-          aria-label="Open settings"
-          ><span
-            class="hidden size-1.5 rounded-full sm:block {workbench.connection === 'connected'
-              ? 'bg-primary'
-              : 'bg-muted-foreground'}"
-          ></span><span class="hidden sm:inline">{connectionLabel}</span><Settings2
-            class="size-4"
-          /></Button
-        >
-        <Button
-          variant="ghost"
-          size="icon"
-          class="icon-button text-muted-foreground"
-          disabled={!workbench.session}
-          title="Session activity"
-          aria-label="Session activity"
-          onclick={() => (activityOpen = true)}><Radio class="size-4" /></Button
-        ><Button
-          variant="outline"
-          class="icon-button px-3 text-xs"
-          disabled={!workbench.instance || workbench.instance.Stopped}
-          title="New session"
-          onclick={() => (sessionOpen = true)}
-          ><MessageSquarePlus class="size-4" /><span class="hidden sm:inline">New session</span
-          ><span class="sr-only sm:hidden">New session</span></Button
-        >
-      </div>
+      {#if desktopNavigation.current}<div class="flex shrink-0 items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            class={`icon-button relative ${tasksVisible ? 'bg-accent text-foreground' : 'text-muted-foreground'}`}
+            aria-label={tasksVisible ? 'Hide tasks panel' : 'Open tasks panel'}
+            id="tasks-panel-toggle"
+            title="Session tasks"
+            aria-controls="session-tasks-panel"
+            aria-expanded={tasksVisible}
+            onclick={() => toggleSidePanel('tasks')}
+          >
+            <ListTodo class="size-4" />
+            {#if hasActiveTasks}<span
+                class="absolute top-2 right-2 size-1.5 rounded-full bg-primary"
+                aria-hidden="true"
+              ></span>{/if}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            class={`icon-button ${memoryVisible ? 'bg-accent text-foreground' : 'text-muted-foreground'}`}
+            aria-label={memoryVisible ? 'Hide memory panel' : 'Open memory panel'}
+            id="memory-panel-toggle"
+            title="Workspace memory"
+            aria-controls="workspace-memory-panel"
+            aria-expanded={memoryVisible}
+            onclick={() => toggleSidePanel('memory')}><BrainCircuit class="size-4" /></Button
+          >
+          <Button
+            variant="ghost"
+            class="icon-button gap-2 px-2 text-xs sm:px-3"
+            onclick={() => openSettings()}
+            title={connectionLabel}
+            aria-label="Open settings"
+            ><span
+              class="hidden size-1.5 rounded-full sm:block {workbench.connection === 'connected'
+                ? 'bg-primary'
+                : 'bg-muted-foreground'}"
+            ></span><span class="hidden sm:inline">{connectionLabel}</span><Settings2
+              class="size-4"
+            /></Button
+          >
+          <Button
+            variant="ghost"
+            size="icon"
+            class="icon-button text-muted-foreground"
+            disabled={!workbench.session}
+            title="Session activity"
+            aria-label="Session activity"
+            onclick={() => (activityOpen = true)}><Radio class="size-4" /></Button
+          ><Button
+            variant="outline"
+            class="icon-button px-3 text-xs"
+            disabled={!workbench.instance || workbench.instance.Stopped}
+            title="New session"
+            onclick={() => (sessionOpen = true)}
+            ><MessageSquarePlus class="size-4" /><span class="hidden sm:inline">New session</span
+            ><span class="sr-only sm:hidden">New session</span></Button
+          >
+        </div>{/if}
     </header>
     <div class="flex min-h-0 min-w-0 flex-1">
       <main class="flex min-h-0 min-w-0 flex-1 flex-col" id="main-content">
@@ -618,7 +643,13 @@
 </div>
 
 <Sheet.Root bind:open={menuOpen}
-  ><Sheet.Content side="left" class="w-[min(88vw,310px)] gap-0 p-0" showCloseButton={false}
+  ><Sheet.Content
+    side="left"
+    class="w-[min(88vw,310px)] gap-0 p-0"
+    showCloseButton={false}
+    onCloseAutoFocus={(event) => {
+      if (navigationActionOpen) event.preventDefault();
+    }}
     ><Sheet.Header class="sr-only"
       ><Sheet.Title>Workspaces and sessions</Sheet.Title><Sheet.Description
         >Choose a workspace or session, or change the API connection.</Sheet.Description

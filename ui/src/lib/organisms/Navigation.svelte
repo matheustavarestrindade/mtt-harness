@@ -8,6 +8,9 @@
     LoaderCircle,
     GitBranch,
     Trash2,
+    ListTodo,
+    BrainCircuit,
+    Radio,
   } from 'lucide-svelte';
   import { Button } from '$lib/atoms/ui/button';
   import WorkspaceSwitcher from '../molecules/WorkspaceSwitcher.svelte';
@@ -24,6 +27,10 @@
     onSelectSession,
     onDeleteSession,
     onRefresh,
+    onTasks,
+    onMemory,
+    onActivity,
+    hasActiveTasks = false,
   }: {
     console: HarnessConsole;
     onClose?: () => void;
@@ -34,6 +41,10 @@
     onSelectSession: (session: Session) => void;
     onDeleteSession: (session: Session) => void;
     onRefresh: () => void;
+    onTasks?: () => void;
+    onMemory?: () => void;
+    onActivity?: () => void;
+    hasActiveTasks?: boolean;
   } = $props();
 </script>
 
@@ -127,25 +138,67 @@
       {/each}
     </div>
   </div>
-  <button
-    class="flex min-h-16 items-center gap-3 border-t border-border px-5 text-left hover:bg-muted"
-    onclick={onSettings}
-  >
-    <span class="relative grid size-8 place-items-center rounded-full bg-secondary"
-      ><Settings2 class="size-4 text-muted-foreground" /><span
-        class="absolute right-0 bottom-0 size-2 rounded-full ring-2 ring-card {workbench.connection ===
-        'connected'
-          ? 'bg-primary'
-          : 'bg-muted-foreground'}"
-      ></span></span
+  {#if onTasks || onMemory || onActivity}
+    <div
+      class="shrink-0 border-t border-border p-2"
+      style="padding-bottom: max(.5rem, env(safe-area-inset-bottom))"
+      aria-label="Workspace tools"
     >
-    <span class="flex-1"
-      ><span class="block text-xs font-medium">Settings</span><span
-        class="mt-0.5 block text-[10px] text-muted-foreground"
-        >{workbench.connection === 'connected'
-          ? 'Harness connected'
-          : 'API connection required'}</span
-      ></span
-    ><Circle class="size-3 text-muted-foreground/50" />
-  </button>
+      <Button
+        variant="ghost"
+        class="h-11 w-full justify-start gap-3 px-3 text-sm"
+        onclick={onTasks}
+        disabled={!workbench.session}
+      >
+        <ListTodo class="size-4" />Tasks
+        {#if hasActiveTasks}<span
+            class="ml-auto size-1.5 rounded-full bg-primary"
+            aria-hidden="true"
+          ></span>{/if}
+      </Button>
+      <Button
+        variant="ghost"
+        class="h-11 w-full justify-start gap-3 px-3 text-sm"
+        onclick={onMemory}
+        disabled={!workbench.instance}
+      >
+        <BrainCircuit class="size-4" />Memory
+      </Button>
+      <Button
+        variant="ghost"
+        class="h-11 w-full justify-start gap-3 px-3 text-sm"
+        onclick={onActivity}
+        disabled={!workbench.session}
+      >
+        <Radio class="size-4" />Session activity
+      </Button>
+      <Button
+        variant="ghost"
+        class="h-11 w-full justify-start gap-3 px-3 text-sm"
+        onclick={onSettings}
+      >
+        <Settings2 class="size-4" />Settings
+      </Button>
+    </div>
+  {:else}<button
+      class="flex min-h-16 items-center gap-3 border-t border-border px-5 text-left hover:bg-muted"
+      onclick={onSettings}
+    >
+      <span class="relative grid size-8 place-items-center rounded-full bg-secondary"
+        ><Settings2 class="size-4 text-muted-foreground" /><span
+          class="absolute right-0 bottom-0 size-2 rounded-full ring-2 ring-card {workbench.connection ===
+          'connected'
+            ? 'bg-primary'
+            : 'bg-muted-foreground'}"
+        ></span></span
+      >
+      <span class="flex-1"
+        ><span class="block text-xs font-medium">Settings</span><span
+          class="mt-0.5 block text-[10px] text-muted-foreground"
+          >{workbench.connection === 'connected'
+            ? 'Harness connected'
+            : 'API connection required'}</span
+        ></span
+      ><Circle class="size-3 text-muted-foreground/50" />
+    </button>{/if}
 </nav>

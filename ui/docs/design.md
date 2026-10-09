@@ -82,7 +82,7 @@ The selected model gives the input media types. The UI examines input media type
 
 ## Task State
 
-The `Tasks` control in the header opens the `TaskPanel` organism on the right side. Small screens use a navigation drawer.
+The `Tasks` control opens the `TaskPanel` organism on the right side. On large screens, the control is in the header. On small screens, the control is in the navigation drawer.
 
 The `TaskProgress` molecule shows session task state in the panel. The content has a task title, description, and task items with task status. A button opens or closes the content. The panel has a scrollbar.
 

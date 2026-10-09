@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
-import { chooseSelectOption, connectAndCreate } from './helpers';
+import { chooseSelectOption, connectAndCreate, openWorkbenchAction } from './helpers';
 
 test('configure workspace repetition with themed selectors and keep the draft', async ({
   page,
@@ -8,7 +8,7 @@ test('configure workspace repetition with themed selectors and keep the draft', 
   const fixture = await mockHarness(page);
   await connectAndCreate(page);
   await page.getByLabel('Message', { exact: true }).fill('Keep this draft');
-  await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: 'Instructions', exact: true }).click();
   const panel = dialog.getByRole('region', { name: 'Spaced repetition', exact: true });
@@ -74,7 +74,7 @@ test('show recorded repetition metrics and recovery costs at narrow widths', asy
       },
     ],
   });
-  await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: 'Instructions', exact: true }).click();
   const panel = dialog.getByRole('region', { name: 'Spaced repetition', exact: true });
@@ -98,8 +98,8 @@ test('show recorded repetition metrics and recovery costs at narrow widths', asy
 test('open instruction controls directly from the memory panel', async ({ page }) => {
   await mockHarness(page);
   await connectAndCreate(page);
-  if (await page.getByRole('button', { name: 'Open memory panel', exact: true }).isVisible())
-    await page.getByRole('button', { name: 'Open memory panel', exact: true }).click();
+  if (!(await page.getByRole('region', { name: 'Workspace memory', exact: true }).isVisible()))
+    await openWorkbenchAction(page, 'Memory');
   await page.getByRole('button', { name: 'Instruction reminders', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await expect(
