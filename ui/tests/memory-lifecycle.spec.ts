@@ -1,11 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate } from './helpers';
+import { connectAndCreate, openWorkbenchAction } from './helpers';
 
 async function openPanel(page: Page) {
-  const button = page.getByRole('button', { name: 'Open memory panel', exact: true });
-  if (await button.isVisible()) await button.click();
   const panel = page.getByRole('region', { name: 'Workspace memory', exact: true });
+  if (!(await panel.isVisible())) await openWorkbenchAction(page, 'Memory');
   await expect(panel).toBeVisible();
   return panel;
 }

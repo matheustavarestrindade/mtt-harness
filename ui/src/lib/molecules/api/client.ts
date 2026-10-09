@@ -1,12 +1,13 @@
 import type {
   AcceptedMessage,
+  Content,
+  DeviceLogin,
   HarnessEvent,
   Instance,
   InstanceInput,
   Message,
   Model,
   Provider,
-  DeviceLogin,
   QueueStatus,
   Session,
   SessionDeletion,
@@ -347,11 +348,13 @@ export class HarnessApi {
     const prefix = instanceID ? `instances/${encodeURIComponent(instanceID)}/` : '';
     return this.request(`${prefix}settings/${key}`, 'DELETE', undefined, signal);
   }
-  sendMessage(sessionID: string, content: string) {
+  sendMessage(sessionID: string, content: string | Content[]) {
     return this.request<AcceptedMessage>(
       `sessions/${encodeURIComponent(sessionID)}/messages`,
       'POST',
       { content },
+      undefined,
+      Array.isArray(content) ? 120_000 : 20_000,
     );
   }
   cancelCurrentTurn(sessionID: string) {

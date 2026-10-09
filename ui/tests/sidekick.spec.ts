@@ -1,9 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockHarness } from './api-fixture';
-import { chooseSelectOption, connectAndCreate } from './helpers';
+import { chooseSelectOption, connectAndCreate, openWorkbenchAction } from './helpers';
 
 async function openSidekick(page: Page) {
-  await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await openWorkbenchAction(page, 'Settings');
   await page
     .getByRole('navigation', { name: 'Settings sections' })
     .getByRole('button', { name: 'Sidekick', exact: true })
@@ -80,7 +80,7 @@ test('validate retrieval sources and display observed activity', async ({ page }
 test('open Sidekick from the Tasks panel', async ({ page }) => {
   await mockHarness(page);
   await connectAndCreate(page);
-  await page.getByRole('button', { name: 'Open tasks panel', exact: true }).click();
+  await openWorkbenchAction(page, 'Tasks');
   await page.getByRole('button', { name: 'Sidekick settings', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Sidekick settings', exact: true })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(1);

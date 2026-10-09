@@ -186,7 +186,7 @@ func validateModelMetadata(metadata ModelMetadata) error {
 	}
 	for _, mediaType := range append(append([]atom.MediaType{}, metadata.Input...), metadata.Output...) {
 		switch mediaType {
-		case atom.Text, atom.Image, atom.Audio, atom.File:
+		case atom.Text, atom.Image, atom.Audio, atom.Video, atom.File:
 		default:
 			return fmt.Errorf("unsupported model media type %q", mediaType)
 		}

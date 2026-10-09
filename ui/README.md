@@ -75,6 +75,8 @@ The message composer starts with one text line. More text increases the composer
 
 On a large screen, use `Collapse navigation` or `Expand navigation` in the header. The browser keeps the setting. On a small screen, use the navigation drawer.
 
+On a small screen, the header shows the workspace name and model. The navigation drawer contains `Tasks`, `Memory`, `Session activity`, and `Settings`. The `New session` action is above the session list. A panel selection closes the navigation drawer and opens the selected panel.
+
 The sidebar shows the session list for the selected workspace. The `Switch workspace` button opens a `DropdownMenu` with workspaces and a `New workspace` action. The sidebar keeps the session list. A navigation drawer stays open until session selection.
 
 1. Connect to the API.
@@ -88,6 +90,27 @@ With the default Docker configuration, the host directory `./workspace` is at `/
 The directory must be available before a workspace starts. The workspace request does not make a directory. For `/workspace/teste`, first make the host directory `./workspace/teste`. A path such as `/teste` refers to a different directory in the container.
 
 The harness includes the test provider by default in Docker. Open `Settings`, then `Providers`, to connect OpenAI or DeepSeek. The API contracts are in `../routes.md`.
+
+## File Attachments
+
+The `Upload attachments` button opens a `DropdownMenu`. The list shows `Images`, `Documents`, `Video`, and `Audio`. You cannot select a media type with the label `Not supported`. A selection opens a file list for the related file formats.
+
+The selected model gives the input media types. The UI uses input capabilities from the API. Output media types do not change the input media types. The `Documents` UI control accepts text files when the model accepts text input.
+
+Models with text input accept UTF-8 text files as text content. The model and provider must accept the file format.
+
+```text
+Image: .png .jpg .jpeg .webp .gif
+Audio: .wav .mp3
+Video: .mp4 .mpeg .mpg .mov .webm
+File:  .pdf and document formats
+```
+
+Audio input uses the Chat Completions protocol. Video input uses a compatible provider. Provider limits apply to document formats.
+
+A message can contain 8 file attachments and 10 MiB of file data. A text file can contain 512 KiB. The full JSON request limit is 16 MiB with base64 data. A rejected file does not remove the message draft. The UI examines input media types before it sends the message.
+
+The composer accepts a file selection, a file drop, or clipboard files. A message can contain only file attachments. History and queue receipts show file attachments. Images have a preview. Audio and video have browser UI controls. The `Download` UI control gives the file data.
 
 ## Provider Connections
 
@@ -179,7 +202,7 @@ The UI can make workspaces and sessions. The user can select an instance or sess
 
 The UI shows message history, tool input, tool results, events, token usage, and cost data. It reads status and history at an interval of 1.5 seconds. A WebSocket event can also cause a new request. The UI shows model text during the response. Message IDs connect event text to the history.
 
-The `Tasks` control in the header opens task state on the right side. Small screens use a navigation drawer. The panel contains task statuses and the `DOING` task title and description.
+The `Tasks` control opens task state on the right side. On large screens, the control is in the header. On small screens, the control is in the navigation drawer. The panel contains task statuses and the `DOING` task title and description.
 
 A task item with status `done` stays in the list while a task item has status `pending` or `in_progress`. The harness removes content from TODO and `DOING` when the last task item becomes `done` or `cancelled`. Empty task state shows `No active tasks` in the panel.
 

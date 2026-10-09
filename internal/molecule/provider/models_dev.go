@@ -130,7 +130,7 @@ func catalogMediaTypes(values []string) []atom.MediaType {
 			mediaType = atom.File
 		}
 		switch mediaType {
-		case atom.Text, atom.Image, atom.Audio, atom.File:
+		case atom.Text, atom.Image, atom.Audio, atom.Video, atom.File:
 			if !slices.Contains(result, mediaType) {
 				result = append(result, mediaType)
 			}

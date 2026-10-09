@@ -16,6 +16,7 @@
   import { messageText, shortID } from '$lib/atoms/format';
   import { buildConversationEntries } from '$lib/atoms/transcript';
   import MessageCard from '../molecules/MessageCard.svelte';
+  import MessageContent from '../molecules/content/MessageContent.svelte';
   import PermissionCard from '../molecules/PermissionCard.svelte';
   let {
     console: workbench,
@@ -159,7 +160,7 @@
               <div class="mb-1 flex items-center gap-2 text-[10px] text-muted-foreground">
                 <LoaderCircle class="size-3.5 animate-spin" />Message accepted
               </div>
-              <p class="message-copy text-foreground/75">{messageText(receipt)}</p>
+              <MessageContent content={receipt.Content} />
             </div>{/each}
         </div>
       {/if}

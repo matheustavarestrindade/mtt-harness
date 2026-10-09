@@ -76,9 +76,13 @@ Workspace selection changes the session list. On a small screen, the navigation 
 
 The `Enter` key sends the message. The keys `Shift+Enter`, `Command+Enter`, and `Ctrl+Enter` add a new line. Text composition does not send a message.
 
+The `AttachmentDrafts` organism keeps file attachments for a session. The `Composer` molecule receives files from the browser. The `AttachmentTray` molecule shows attachment drafts and error messages. The `MediaContent` molecule shows content in history and queue receipts.
+
+The selected model gives the input media types. The UI examines input media types before it sends a message. If the API rejects the message, the UI keeps the message draft. After the API accepts a message, the UI removes the file attachments from the message draft. The UI removes object URLs when files are removed.
+
 ## Task State
 
-The `Tasks` control in the header opens the `TaskPanel` organism on the right side. Small screens use a navigation drawer.
+The `Tasks` control opens the `TaskPanel` organism on the right side. On large screens, the control is in the header. On small screens, the control is in the navigation drawer.
 
 The `TaskProgress` molecule shows session task state in the panel. The content has a task title, description, and task items with task status. A button opens or closes the content. The panel has a scrollbar.
 

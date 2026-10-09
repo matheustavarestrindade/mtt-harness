@@ -417,17 +417,19 @@ export async function mockHarness(page: Page) {
             SessionID: session.ID,
             Seq: 0,
             Role: 'user',
-            Content: [
-              {
-                Type: 'text',
-                Text: content,
-                Data: null,
-                MIME: '',
-                URL: '',
-                Filename: '',
-                AudioID: '',
-              },
-            ],
+            Content: Array.isArray(content)
+              ? content
+              : [
+                  {
+                    Type: 'text',
+                    Text: content,
+                    Data: null,
+                    MIME: '',
+                    URL: '',
+                    Filename: '',
+                    AudioID: '',
+                  },
+                ],
             ToolCalls: null,
             ToolCallID: '',
             Usage: null,
@@ -441,7 +443,14 @@ export async function mockHarness(page: Page) {
             );
           }
           histories.get(session.ID)?.push(message);
-          if (content.includes('wait')) {
+          const messageText =
+            typeof content === 'string'
+              ? content
+              : content
+                  .filter((part: { Type: string; Text: string }) => part.Type === 'text')
+                  .map((part: { Text: string }) => part.Text)
+                  .join('\n');
+          if (messageText.includes('wait')) {
             running.add(session.ID);
             event(session, 'turn.start', null);
           } else {
@@ -449,7 +458,17 @@ export async function mockHarness(page: Page) {
               ...message,
               ID: `assistant-${identifier}`,
               Role: 'assistant',
-              Content: [{ ...message.Content![0], Text: `Done. ${content}` }],
+              Content: [
+                {
+                  Type: 'text',
+                  Text: `Done. ${messageText}`,
+                  Data: null,
+                  MIME: '',
+                  URL: '',
+                  Filename: '',
+                  AudioID: '',
+                },
+              ],
             });
             event(session, 'turn.end', { status: 'completed' });
           }

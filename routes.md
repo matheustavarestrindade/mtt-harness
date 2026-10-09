@@ -176,7 +176,15 @@ Content request example:
 {"content":[{"Type":"text","Text":"Describe this image"},{"Type":"image","MIME":"image/png","Data":"BASE64_DATA"}]}
 ```
 
-Content types are `text`, `image`, `audio`, and `file`. A media item must have data, a URL, or an audio ID. The loop examines model compatibility before the model call. Thus, an accepted message can give a turn error.
+Content types are `text`, `image`, `audio`, `video`, and `file`. A media item must have data or a URL. The loop examines model compatibility before the model call. Thus, an accepted message can give a turn error.
+
+The JSON request limit is 16 MiB. `Data` contains base64 data. Video data must have a `video/` MIME type. A video URL can contain HTTP, HTTPS, or a video data URI. The model must accept video input.
+
+```json
+{"content":[{"Type":"text","Text":"Describe the clip"},{"Type":"video","Data":"BASE64_DATA","MIME":"video/mp4","Filename":"clip.mp4"}]}
+```
+
+A compatible Chat Completions provider receives `video_url`. A compatible Responses provider receives `input_video`. The formats are provider extensions. The harness examines input media types, not output media types. See the [compatible video API](https://openrouter.ai/docs/guides/overview/multimodal/videos).
 
 ## Providers and Keys
 

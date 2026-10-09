@@ -2,6 +2,101 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "file attachment",
+      "category": "technical_noun",
+      "approved_forms": [
+        "file attachments"
+      ],
+      "meaning": "a browser file supplied as a message content item",
+      "source": "composer attachments"
+    },
+    {
+      "term": "queue receipt",
+      "category": "technical_noun",
+      "approved_forms": [
+        "queue receipts"
+      ],
+      "meaning": "the message returned by an accepted queue submission",
+      "source": "message API"
+    },
+    {
+      "term": "file drop",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "a file selection received by dragging files into the composer",
+      "source": "browser file input"
+    },
+    {
+      "term": "data URI",
+      "category": "technical_noun",
+      "approved_forms": [
+        "data URIs"
+      ],
+      "meaning": "inline media URL containing a MIME type and encoded bytes",
+      "source": "RFC 2397"
+    },
+    {
+      "term": "MIME type",
+      "category": "technical_noun",
+      "approved_forms": [
+        "MIME types"
+      ],
+      "meaning": "media format identifier for a content item",
+      "source": "media content contract"
+    },
+    {
+      "term": "provider extension",
+      "category": "technical_noun",
+      "approved_forms": [
+        "provider extensions"
+      ],
+      "meaning": "an API addition available from a compatible provider, not necessarily from the original protocol endpoint",
+      "source": "compatible video APIs"
+    },
+    {
+      "term": "input capability",
+      "category": "technical_noun",
+      "approved_forms": [
+        "input capabilities"
+      ],
+      "meaning": "a media input type declared by the model catalog",
+      "source": "model metadata"
+    },
+    {
+      "term": "video",
+      "category": "technical_noun",
+      "approved_forms": [
+        "videos"
+      ],
+      "meaning": "time-based visual media supplied to a compatible model or shown by the UI",
+      "source": "media content contract"
+    },
+    {
+      "term": "video input",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "video media in a provider model request",
+      "source": "compatible video API contracts"
+    },
+    {
+      "term": "attachment draft",
+      "category": "technical_noun",
+      "approved_forms": [
+        "attachment drafts"
+      ],
+      "meaning": "browser-local files prepared for one session message",
+      "source": "UI composer"
+    },
+    {
+      "term": "object URL",
+      "category": "technical_noun",
+      "approved_forms": [
+        "object URLs"
+      ],
+      "meaning": "browser-owned blob URL with an explicit lifetime",
+      "source": "browser File API"
+    },
+    {
       "term": "Sidekick note",
       "category": "technical_noun",
       "approved_forms": [

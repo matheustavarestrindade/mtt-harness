@@ -37,7 +37,7 @@ export interface TaskState {
   UpdatedAt: string;
 }
 export interface Content {
-  Type: 'text' | 'image' | 'audio' | 'file';
+  Type: 'text' | 'image' | 'audio' | 'video' | 'file';
   Text: string;
   Data: string | null;
   MIME: string;
