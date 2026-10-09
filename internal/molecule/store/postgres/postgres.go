@@ -152,6 +152,8 @@ ALTER TABLE models ADD COLUMN IF NOT EXISTS reasoning_efforts jsonb NOT NULL DEF
 ALTER TABLE models ADD COLUMN IF NOT EXISTS default_reasoning_effort text NOT NULL DEFAULT '';
 ALTER TABLE models ADD COLUMN IF NOT EXISTS reasoning_summary text NOT NULL DEFAULT '';
 ALTER TABLE models ADD COLUMN IF NOT EXISTS billing text NOT NULL DEFAULT '';
+ALTER TABLE models ADD COLUMN IF NOT EXISTS api_model text NOT NULL DEFAULT '';
+ALTER TABLE models ADD COLUMN IF NOT EXISTS service_tier text NOT NULL DEFAULT '';
 -- Legacy false values could mean missing capability metadata. Preserve explicit
 -- false values written after this one-time nullable-column migration.
 ALTER TABLE models ADD COLUMN IF NOT EXISTS tool_support_unknown boolean;

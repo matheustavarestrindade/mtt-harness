@@ -40,7 +40,11 @@ type Cost struct {
 
 type ModelInfo struct {
 	ID string
-	// Name is an optional display label. Requests and allowlists use ID.
+	// APIModel and ServiceTier identify a catalog-advertised service-tier preset.
+	// Sessions, allowlists, and usage retain ID; adapters send APIModel on the wire.
+	APIModel    string `json:",omitempty"`
+	ServiceTier string `json:",omitempty"`
+	// Name is an optional display label. Session selections and allowlists use ID.
 	Name   string `json:",omitempty"`
 	Level  int
 	Input  []MediaType

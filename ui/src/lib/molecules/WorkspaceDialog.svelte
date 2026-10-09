@@ -53,16 +53,9 @@
           class="h-11 font-mono text-sm"
           bind:value={workspace}
           required
-          placeholder="/workspace"
-          aria-describedby="workspace-path-help"
+          placeholder="/path/to/project"
           disabled={busy}
         />
-        <p id="workspace-path-help" class="text-xs leading-5 text-muted-foreground">
-          This is a folder path on the harness server. The folder must already exist. Docker mounts
-          the host's <code>workspace</code> folder at <code>/workspace</code>. Use
-          <code>/workspace/teste</code>
-          only after creating that folder. Opening a workspace does not create directories.
-        </p>
       </div>
       <div class="space-y-2">
         <Label for="workspace-model">Default model</Label>{#if models.length}<SelectField
