@@ -17,6 +17,75 @@ async function setup(page: Page, input: string[] = ['text'], protocol = 'chat_co
   return fixture;
 }
 
+test('show all attachment types and disable unsupported options', async ({ page }, testInfo) => {
+  const fixture = await mockHarness(page);
+  fixture.model.Output = ['text', 'image', 'audio', 'video'];
+  await connectAndCreate(page);
+  await page.getByLabel('Message', { exact: true }).fill('Keep this draft');
+  const trigger = page.getByRole('button', { name: 'Upload attachments', exact: true });
+  await trigger.click();
+  const menu = page.getByRole('menu', { name: 'Attachment types', exact: true });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem')).toHaveCount(4);
+  for (const label of ['Images', 'Video', 'Audio']) {
+    const item = menu.getByRole('menuitem', { name: label, exact: true });
+    await expect(item).toBeVisible();
+    await expect(item).toHaveAttribute('aria-disabled', 'true');
+  }
+  const documents = menu.getByRole('menuitem', { name: 'Documents', exact: true });
+  await expect(documents).toBeEnabled();
+  await expect(documents).toContainText('Text files only');
+  await expect(menu).toBeInViewport();
+  await page.screenshot({ path: testInfo.outputPath('attachment-menu.png'), fullPage: true });
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.press('ArrowDown');
+  await expect(documents).toBeFocused();
+  const chooserPromise = page.waitForEvent('filechooser');
+  await documents.press('Enter');
+  const chooser = await chooserPromise;
+  expect(chooser.isMultiple()).toBe(true);
+  const filter = await chooser.element().getAttribute('accept');
+  expect(filter).toContain('.txt');
+  expect(filter).not.toMatch(/image\/|video\/|audio\/|\.pdf/);
+  await chooser.setFiles({
+    name: 'notes.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Notes'),
+  });
+  await expect(page.getByRole('list', { name: 'Attachments', exact: true })).toContainText(
+    'notes.txt',
+  );
+  await expect(page.getByLabel('Message', { exact: true })).toHaveValue('Keep this draft');
+  expect(fixture.histories.get(fixture.sessions[0]!.ID)).toHaveLength(0);
+});
+
+test('open category-specific file pickers from the attachment menu', async ({ page }) => {
+  await setup(page, ['text', 'image', 'audio', 'video', 'file']);
+  const trigger = page.getByRole('button', { name: 'Upload attachments', exact: true });
+  const choices = [
+    { label: 'Images', included: 'image/png', excluded: /video\/|audio\/|\.pdf|\.txt/ },
+    { label: 'Documents', included: '.pdf', excluded: /image\/|video\/|audio\// },
+    { label: 'Video', included: 'video/mp4', excluded: /image\/|audio\/|\.pdf|\.txt/ },
+    { label: 'Audio', included: 'audio/mpeg', excluded: /image\/|video\/|\.pdf|\.txt/ },
+  ];
+  for (const choice of choices) {
+    await trigger.click();
+    const item = page.getByRole('menuitem', { name: choice.label, exact: true });
+    await expect(item).toBeEnabled();
+    expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const chooserPromise = page.waitForEvent('filechooser');
+    await item.click();
+    const chooser = await chooserPromise;
+    const filter = await chooser.element().getAttribute('accept');
+    expect(filter).toContain(choice.included);
+    expect(filter).not.toMatch(choice.excluded);
+    await chooser.setFiles([]);
+    await expect(page.getByRole('menu', { name: 'Attachment types', exact: true })).toHaveCount(0);
+  }
+});
+
 test('send a UTF-8 text attachment with a text-only model', async ({ page }) => {
   const fixture = await setup(page);
   const input = page.getByLabel('Attach files', { exact: true });
@@ -170,6 +239,12 @@ test('revalidate drafts after model changes and reject Responses audio', async (
   await connectAndCreate(page);
   const input = page.getByLabel('Attach files', { exact: true });
   await expect(input).not.toHaveAttribute('accept', /audio\//);
+  await page.getByRole('button', { name: 'Upload attachments', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: 'Audio', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await page.keyboard.press('Escape');
   await input.setInputFiles({ name: 'image.png', mimeType: 'image/png', buffer: png });
   await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Session settings', exact: true }).click();
@@ -183,6 +258,12 @@ test('revalidate drafts after model changes and reject Responses audio', async (
   );
   await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Remove image.png', exact: true }).click();
+  await page.getByRole('button', { name: 'Upload attachments', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: 'Images', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await expect(page.getByRole('menuitem', { name: 'Documents', exact: true })).toBeEnabled();
 });
 
 test('retain queued attachments and preserve a new draft during submission', async ({ page }) => {

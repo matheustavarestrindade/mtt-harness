@@ -1,15 +1,11 @@
 <script lang="ts">
-  import { ArrowUp, Square, LoaderCircle, Settings, Paperclip } from 'lucide-svelte';
+  import { ArrowUp, Square, LoaderCircle, Settings } from 'lucide-svelte';
   import { Button } from '$lib/atoms/ui/button';
   import { Textarea } from '$lib/atoms/ui/textarea';
   import type { Model } from '../atoms/types';
-  import {
-    attachmentAccept,
-    attachmentCapabilities,
-    attachmentIssue,
-    type DraftAttachment,
-  } from '../atoms/attachments';
+  import { attachmentIssue, type DraftAttachment } from '../atoms/attachments';
   import AttachmentTray from './AttachmentTray.svelte';
+  import AttachmentMenu from './AttachmentMenu.svelte';
   let {
     value = $bindable(''),
     disabled = false,
@@ -44,16 +40,7 @@
     onRemoveAttachment?: (id: string) => void;
   } = $props();
   let textarea = $state<HTMLTextAreaElement | null>(null);
-  let fileInput = $state<HTMLInputElement | null>(null);
   let dragging = $state(false);
-  const accept = $derived(attachmentAccept(model, protocol));
-  const capabilities = $derived(attachmentCapabilities(model, protocol));
-  const uploadDescription = $derived(
-    `Attach ${Object.entries(capabilities)
-      .filter(([, allowed]) => allowed)
-      .map(([kind]) => (kind === 'text' ? 'text files' : kind + 's'))
-      .join(', ')}. Up to 8 files, 10 MB total. Text files up to 512 KB.`,
-  );
   const blocked = $derived(attachments.some((item) => attachmentIssue(item, model, protocol)));
   const canSend = $derived(
     !disabled && !sending && !blocked && Boolean(value.trim() || attachments.length),
@@ -149,30 +136,7 @@
     </p>{/if}
   <div class="flex w-full min-w-0 items-end gap-1">
     {#if onFiles}
-      <input
-        bind:this={fileInput}
-        type="file"
-        multiple
-        {accept}
-        class="sr-only"
-        tabindex="-1"
-        aria-label="Attach files"
-        disabled={disabled || sending || !accept}
-        onchange={(event) => {
-          chooseFiles(Array.from(event.currentTarget.files ?? []));
-          event.currentTarget.value = '';
-        }}
-      />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        class="icon-button shrink-0 text-muted-foreground hover:text-foreground"
-        aria-label="Upload attachments"
-        title={uploadDescription}
-        disabled={disabled || sending || !accept}
-        onclick={() => fileInput?.click()}><Paperclip class="size-4" /></Button
-      >
+      <AttachmentMenu {model} {protocol} disabled={disabled || sending} onFiles={chooseFiles} />
     {/if}
     <label for="message-input" class="sr-only">Message</label>
     <Textarea

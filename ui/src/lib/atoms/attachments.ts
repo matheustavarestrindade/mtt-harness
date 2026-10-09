@@ -5,6 +5,7 @@ export const textAttachmentByteLimit = 512 * 1024;
 export const attachmentCountLimit = 8;
 export const messageBodyByteLimit = 16 * 1024 * 1024;
 export type AttachmentKind = Content['Type'];
+export type AttachmentCategory = 'image' | 'document' | 'video' | 'audio';
 export interface DraftAttachment {
   id: string;
   name: string;
@@ -98,18 +99,26 @@ export function attachmentCapabilities(model: Model | undefined, protocol?: stri
   };
 }
 
-export function attachmentAccept(model: Model | undefined, protocol?: string): string {
+export function attachmentAccept(
+  model: Model | undefined,
+  protocol?: string,
+  category?: AttachmentCategory,
+): string {
   const allowed = attachmentCapabilities(model, protocol);
   return [
-    ...(allowed.text ? textExtensions.map((extension) => '.' + extension) : []),
-    ...(allowed.image ? Object.values(imageFormats) : []),
-    ...(allowed.audio
+    ...(allowed.text && (!category || category === 'document')
+      ? textExtensions.map((extension) => '.' + extension)
+      : []),
+    ...(allowed.image && (!category || category === 'image') ? Object.values(imageFormats) : []),
+    ...(allowed.audio && (!category || category === 'audio')
       ? ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', '.mp3', '.wav']
       : []),
-    ...(allowed.video
+    ...(allowed.video && (!category || category === 'video')
       ? [...Object.values(videoFormats), '.mp4', '.mpeg', '.mpg', '.mov', '.webm']
       : []),
-    ...(allowed.file ? Object.keys(documentFormats).map((extension) => '.' + extension) : []),
+    ...(allowed.file && (!category || category === 'document')
+      ? Object.keys(documentFormats).map((extension) => '.' + extension)
+      : []),
   ].join(',');
 }
 

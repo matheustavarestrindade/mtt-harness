@@ -91,7 +91,9 @@ The harness includes the test provider by default in Docker. Open `Settings`, th
 
 ## File Attachments
 
-The composer has an `Upload attachments` button. The selected model gives the input media types. The UI uses input capabilities from the API. Output media types do not change the input media types.
+The `Upload attachments` button opens a `DropdownMenu`. The list shows `Images`, `Documents`, `Video`, and `Audio`. You cannot select a media type with the label `Not supported`. A selection opens a file list for the related file formats.
+
+The selected model gives the input media types. The UI uses input capabilities from the API. Output media types do not change the input media types. The `Documents` UI control accepts text files when the model accepts text input.
 
 Models with text input accept UTF-8 text files as text content. The model and provider must accept the file format.
 
