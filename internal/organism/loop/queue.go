@@ -117,7 +117,7 @@ func validateMessageContent(content []atom.Content) error {
 	for _, item := range content {
 		switch item.Type {
 		case atom.Text:
-		case atom.Image, atom.Audio, atom.File:
+		case atom.Image, atom.Audio, atom.Video, atom.File:
 			if len(item.Data) == 0 && item.URL == "" {
 				return fmt.Errorf("%w: media requires data or a URL", ErrInvalidContent)
 			}

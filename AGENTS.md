@@ -33,6 +33,8 @@ Rules:
 
 ## Web UI Boundary
 
+- Content supports `text`, `image`, `audio`, `video`, and `file`. Model input metadata controls media admission; output support does not imply input support. Compatible Chat Completions video uses `video_url.url`, and compatible Responses video uses `input_video.video_url`. Preserve inline data bytes and MIME types; reject invalid video URLs/MIME values. These are compatible-provider extensions, not a claim that every Responses endpoint supports video. The existing Responses adapter rejects audio input. The public JSON body limit remains 16 MiB; uploads do not add a separate asset service.
+
 - `ui/` is a standalone API client, not part of the harness runtime. Its package, dependencies, configuration, build, tests, proxy, and documentation belong inside `ui/`.
 - Do not change the harness, API behavior/contracts, Go code, database, runtime configuration, or root Docker services to satisfy a UI requirement unless the user explicitly authorizes that backend change. Adapt the client to the existing API and document gaps instead.
 - Root `routes.md` documents the implemented public API. Check handlers and atom JSON shapes before changing client types or route documentation; the actual wire format is authoritative.

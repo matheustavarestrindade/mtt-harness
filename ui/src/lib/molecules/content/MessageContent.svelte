@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { FileText } from 'lucide-svelte';
   import type { Content } from '../../atoms/types';
-  import { contentFileText, fileLanguage, safeContentURL } from '../../atoms/content';
+  import { contentFileText, fileLanguage } from '../../atoms/content';
+  import { textAttachmentPrefix } from '../../atoms/attachments';
   import RichText from './RichText.svelte';
   import CodeBlock from './CodeBlock.svelte';
+  import MediaContent from './MediaContent.svelte';
   let {
     content,
     mode = 'markdown',
@@ -19,7 +20,8 @@
     const result: Content[] = [];
     for (const item of content ?? []) {
       const previous = result[result.length - 1];
-      if (item.Type === 'text' && previous?.Type === 'text') previous.Text += '\n' + item.Text;
+      if (item.Type === 'text' && previous?.Type === 'text' && !item.Filename && !previous.Filename)
+        previous.Text += '\n' + item.Text;
       else result.push({ ...item });
     }
     return result;
@@ -27,7 +29,15 @@
 </script>
 
 {#each parts as item, index (index)}
-  {#if item.Type === 'text' && item.Text}
+  {#if item.Type === 'text' && item.Filename}
+    {@const prefix = textAttachmentPrefix(item.Filename)}
+    <CodeBlock
+      text={item.Text.startsWith(prefix) ? item.Text.slice(prefix.length) : item.Text}
+      language={fileLanguage(item.Filename)}
+      filename={item.Filename}
+      {embedded}
+    />
+  {:else if item.Type === 'text' && item.Text}
     {#if mode === 'markdown'}<RichText text={item.Text} {embedded} />
     {:else if mode === 'code'}<CodeBlock text={item.Text} {language} {embedded} />
     {:else}<p class="message-copy">{item.Text}</p>{/if}
@@ -43,20 +53,6 @@
       {embedded}
     />
   {:else if item.Type !== 'text'}
-    {@const url = safeContentURL(item.URL, window.location.href)}
-    <div
-      class="my-3 flex min-w-0 items-center gap-2 text-xs text-muted-foreground {embedded
-        ? 'border-b border-border py-3'
-        : 'rounded-lg border border-border p-3'}"
-    >
-      <FileText class="size-4 shrink-0" /><span class="min-w-0 flex-1 break-words"
-        >{item.Filename || item.Type} {item.MIME ? `· ${item.MIME}` : ''}</span
-      >{#if url}<a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-flex min-h-11 shrink-0 items-center px-2 underline">Open</a
-        >{/if}
-    </div>
+    <MediaContent {item} />
   {/if}
 {/each}

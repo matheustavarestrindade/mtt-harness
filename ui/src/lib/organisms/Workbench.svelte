@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onMount, onDestroy, tick } from 'svelte';
+  import { onMount, onDestroy, tick, untrack } from 'svelte';
+  import { AttachmentDrafts } from './attachments.svelte';
+  import { composeMessageContent } from '../atoms/attachments';
   import { MediaQuery } from 'svelte/reactivity';
   import {
     Menu,
@@ -89,8 +91,30 @@
   let busy = $state('');
   let sending = $state(false);
   let drafts = $state<Record<string, string>>({});
+  const attachmentDrafts = new AttachmentDrafts();
+  let providerProtocols = $state<Record<string, string>>({});
   const sessionID = $derived(workbench.session?.ID ?? '');
   const sessionModel = $derived(findSessionModel(workbench.models, workbench.session?.Model ?? ''));
+  const attachmentProtocol = $derived(
+    providerProtocols[(sessionModel?.ID || workbench.session?.Model || '').split('/')[0]],
+  );
+  $effect(() => {
+    const api = connectedAPI;
+    untrack(() => attachmentDrafts.clearAll());
+    providerProtocols = {};
+    if (!api) return;
+    const controller = new AbortController();
+    void api
+      .providers(controller.signal)
+      .then((providers) => {
+        if (!controller.signal.aborted)
+          providerProtocols = Object.fromEntries(
+            providers.map((provider) => [provider.Name, provider.Protocol || 'openai']),
+          );
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  });
   const sessionModelLabel = $derived(
     `${workbench.session?.Model ?? ''} (${reasoningEffortLabel(workbench.session?.ReasoningEffort || sessionModel?.DefaultReasoningEffort || '')})`,
   );
@@ -298,7 +322,10 @@
     deletingSession = true;
     try {
       const removed = await workbench.deleteSession(selected);
-      for (const identifier of removed) delete drafts[identifier];
+      for (const identifier of removed) {
+        delete drafts[identifier];
+        attachmentDrafts.clearSession(identifier);
+      }
       deleteSessionOpen = false;
       if (removed.length) toast.success('Session deleted');
     } catch (failure) {
@@ -314,11 +341,15 @@
   async function sendDraftMessage() {
     const identifier = sessionID;
     const content = drafts[identifier] ?? '';
-    if (disabled || sending || !content.trim()) return;
+    const attachments = attachmentDrafts.drafts[identifier] ?? [];
+    if (disabled || sending || (!content.trim() && !attachments.length)) return;
     sending = true;
     try {
-      await workbench.sendMessage(content);
+      const message = composeMessageContent(content, attachments, sessionModel, attachmentProtocol);
+      await workbench.sendMessage(message);
       if (drafts[identifier] === content) drafts[identifier] = '';
+      for (const attachment of attachments) attachmentDrafts.remove(identifier, attachment.id);
+      delete attachmentDrafts.errors[identifier];
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Message was not accepted.');
     } finally {
@@ -345,7 +376,10 @@
     preferences = loadConnection();
     if (preferences.token) void connect(preferences.base, preferences.token);
   });
-  onDestroy(() => workbench.disconnect(false));
+  onDestroy(() => {
+    attachmentDrafts.clearAll();
+    workbench.disconnect(false);
+  });
 </script>
 
 {#snippet navigation(drawer = false)}
@@ -541,6 +575,15 @@
         >
           <div class="mx-auto max-w-4xl">
             <Composer
+              attachments={attachmentDrafts.drafts[sessionID] ?? []}
+              attachmentError={attachmentDrafts.errors[sessionID] ?? ''}
+              model={sessionModel}
+              protocol={attachmentProtocol}
+              onFiles={(files) => {
+                if (!disabled && !sending)
+                  attachmentDrafts.addFiles(sessionID, files, sessionModel, attachmentProtocol);
+              }}
+              onRemoveAttachment={(id) => attachmentDrafts.remove(sessionID, id)}
               bind:value={() => drafts[sessionID] ?? '', (value) => (drafts[sessionID] = value)}
               {disabled}
               {sending}

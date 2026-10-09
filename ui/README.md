@@ -89,6 +89,25 @@ The directory must be available before a workspace starts. The workspace request
 
 The harness includes the test provider by default in Docker. Open `Settings`, then `Providers`, to connect OpenAI or DeepSeek. The API contracts are in `../routes.md`.
 
+## File Attachments
+
+The composer has an `Upload attachments` button. The selected model gives the input media types. The UI uses input capabilities from the API. Output media types do not change the input media types.
+
+Models with text input accept UTF-8 text files as text content. The model and provider must accept the file format.
+
+```text
+Image: .png .jpg .jpeg .webp .gif
+Audio: .wav .mp3
+Video: .mp4 .mpeg .mpg .mov .webm
+File:  .pdf and document formats
+```
+
+Audio input uses the Chat Completions protocol. Video input uses a compatible provider. Provider limits apply to document formats.
+
+A message can contain 8 file attachments and 10 MiB of file data. A text file can contain 512 KiB. The full JSON request limit is 16 MiB with base64 data. A rejected file does not remove the message draft. The UI examines input media types before it sends the message.
+
+The composer accepts a file selection, a file drop, or clipboard files. A message can contain only file attachments. History and queue receipts show file attachments. Images have a preview. Audio and video have browser UI controls. The `Download` UI control gives the file data.
+
 ## Provider Connections
 
 Open the settings dialog from the header, sidebar, or phone navigation drawer. Use the button with the label `Providers`. OpenAI and DeepSeek have API key forms. Supply the key in the field. Select the button with the label `Save API key`. The UI puts the key in the harness database and gets the model list.

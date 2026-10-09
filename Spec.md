@@ -349,7 +349,9 @@ The provider gives the model list for the instance. A model gives:
 
 The field `Name` is optional. It gives a display label for the model. The field `ID` gives the value for model requests and instance model lists. A model version can change without a change to the model ID.
 
-A message has content items. A content item has one media type and the data of the item. Thus, the harness can send text, an image, audio, or a file to a model.
+A message has content items. A content item has one media type and the data of the item. Thus, the harness can send text, an image, audio, video, or a file to a model.
+
+The model gives the input media types. A compatible Chat Completions provider uses `video_url` for video. A compatible Responses provider uses `input_video` for video. The formats apply only to compatible providers. History keeps the initial data.
 
 A provider can use a standard API shape. The harness gives a standard adapter for a provider with the standard API shape. Thus, the harness can connect a new provider of the standard shape without new code.
 
