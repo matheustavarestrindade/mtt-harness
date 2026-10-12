@@ -120,6 +120,7 @@ test('ignore an older task-state read after a newer completion event', async ({ 
     await blocked;
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify(state) });
   });
+  fixture.event(session, 'turn.end', {});
   await entered;
   const cleared: TaskState = { ...state, Todo: [], Doing: null, Revision: 2 };
   fixture.taskStates.set(session.ID, cleared);

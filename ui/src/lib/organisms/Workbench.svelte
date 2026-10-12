@@ -245,7 +245,7 @@
           error.status === 400 &&
           /^(?:stat|lstat) .*: no such file or directory$/s.test(error.message);
         workspaceError = missingDirectory
-          ? `The directory "${input.workspace}" does not exist on the harness server. Use an existing directory such as /workspace, or create your project folder and make it accessible inside Docker first.`
+          ? `The directory "${input.workspace}" does not exist on the harness server.`
           : error instanceof Error
             ? error.message
             : 'Could not open the workspace.';

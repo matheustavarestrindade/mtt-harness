@@ -14,6 +14,7 @@ import type {
   TaskState,
 } from '../atoms/types';
 import { saveConnection, forgetConnection } from '../molecules/connection-storage';
+import { reconcileMessageHistory } from '../atoms/message-history';
 
 const idleStatus = (): QueueStatus => ({ running: false, queued: 0, messages: [], error: '' });
 export class HarnessConsole {
@@ -224,12 +225,15 @@ export class HarnessConsole {
       session.ID,
       (event) => this.receiveEvent(event),
       (state) => {
-        if (!signal.aborted) this.streamState = state;
+        if (signal.aborted) return;
+        const previous = this.streamState;
+        this.streamState = state;
+        if (state === 'live' && previous !== 'live') this.scheduleSessionRefresh();
       },
     );
     const pollSessionStatus = async () => {
       if (signal.aborted) return;
-      await this.refreshSession();
+      await this.pollSessionMetadata();
       if (!signal.aborted) this.sessionPollTimer = setTimeout(pollSessionStatus, 1500);
     };
     this.sessionPollTimer = setTimeout(pollSessionStatus, 1500);
@@ -262,7 +266,7 @@ export class HarnessConsole {
         ),
       ]);
       if (signal.aborted || this.session?.ID !== session.ID) return;
-      this.messages = messages;
+      this.messages = reconcileMessageHistory(this.messages, messages);
       this.session = {
         ...updatedSession,
         Model:
@@ -325,6 +329,49 @@ export class HarnessConsole {
       this.refreshTimer = undefined;
       void this.refreshSession();
     }, 150);
+  }
+
+  private async pollSessionMetadata() {
+    const api = this.api;
+    const session = this.session;
+    const signal = this.sessionReads.signal;
+    if (!api || !session || signal.aborted) return;
+    // Events drive history synchronization. A disconnected stream falls back to
+    // full reads; a healthy idle stream needs only small lifecycle metadata.
+    if (this.streamState !== 'live') {
+      await this.refreshSession();
+      return;
+    }
+    const selectionRevision = this.selectionRevision;
+    try {
+      const [status, updatedSession] = await Promise.all([
+        api.status(session.ID, signal),
+        api.session(session.ID, signal),
+      ]);
+      if (signal.aborted || this.session?.ID !== session.ID) return;
+      const queued = status.messages ?? [];
+      const previousQueued = this.status.messages ?? [];
+      const changed =
+        status.running !== this.status.running ||
+        status.queued !== this.status.queued ||
+        status.error !== this.status.error ||
+        queued.length !== previousQueued.length ||
+        queued.some((identifier, index) => identifier !== previousQueued[index]) ||
+        updatedSession.Completed !== this.session.Completed;
+      this.session = {
+        ...updatedSession,
+        Model:
+          selectionRevision === this.selectionRevision ? updatedSession.Model : this.session.Model,
+        ReasoningEffort:
+          selectionRevision === this.selectionRevision
+            ? updatedSession.ReasoningEffort
+            : this.session.ReasoningEffort,
+      };
+      if (changed) await this.refreshSession();
+    } catch {
+      // The authoritative refresh handles deletion, cancellation and API errors.
+      if (!signal.aborted) await this.refreshSession();
+    }
   }
 
   private receiveEvent(event: HarnessEvent) {

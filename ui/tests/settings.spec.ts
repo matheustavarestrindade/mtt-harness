@@ -23,6 +23,7 @@ test('show zero cost for a new chat while preserving unknown and reported costs'
   await expect(dialog.getByText('0.0', { exact: true })).toBeVisible();
 
   Object.assign(fixture.sessionUsage, { Calls: 1, Input: 20, Output: 12 });
+  fixture.event(fixture.sessions[0], 'turn.end', {});
   await dialog.getByRole('button', { name: 'Refresh usage', exact: true }).click();
   await expect(dialog.getByText('Unavailable', { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');

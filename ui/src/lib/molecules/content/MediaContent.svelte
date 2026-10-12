@@ -13,6 +13,11 @@
   );
   const audio = $derived(item.Type === 'audio');
   const video = $derived(item.Type === 'video');
+  // Recovery reads can replace the enclosing message. Only changed media bytes,
+  // MIME or URL should replace a playing resource.
+  const mediaData = $derived(item.Data || '');
+  const mediaMIME = $derived(item.MIME || (image ? 'image/png' : 'application/octet-stream'));
+  const mediaURL = $derived(item.URL || '');
   $effect(() => {
     const element = container;
     if (!element) return;
@@ -34,13 +39,12 @@
     let objectURL = '';
     let resolved = '';
     try {
-      if (item.Data && item.Data.length <= 16 * 1024 * 1024) {
-        const bytes = Uint8Array.from(atob(item.Data), (character) => character.charCodeAt(0));
-        const mime = item.MIME || (image ? 'image/png' : 'application/octet-stream');
-        objectURL = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      if (mediaData && mediaData.length <= 16 * 1024 * 1024) {
+        const bytes = Uint8Array.from(atob(mediaData), (character) => character.charCodeAt(0));
+        objectURL = URL.createObjectURL(new Blob([bytes], { type: mediaMIME }));
         resolved = objectURL;
-      } else if (item.URL) {
-        resolved = safeContentURL(item.URL, window.location.href, true);
+      } else if (mediaURL) {
+        resolved = safeContentURL(mediaURL, window.location.href, true);
       }
       if (!resolved) failed = true;
     } catch {
