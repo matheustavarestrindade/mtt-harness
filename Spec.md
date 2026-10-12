@@ -386,6 +386,8 @@ The harness calculates the cost from the usage and the prices. The cost data is 
 
 A cost from the provider response replaces a cost estimate. A cost estimate has `Estimated: true`. A total with a cost estimate also has `Estimated: true`. A subscription provider does not get a token cost estimate.
 
+A response with `finish_reason: aborted` or `finish_reason: insufficient_system_resource` is an error. The harness keeps available response text and usage after a provider error. The usage record has `Status: error`. The task state response counter does not increase.
+
 A price tier applies when the full input tokens are above the price tier limit. The price tier applies to the full request. Output tokens include reasoning tokens. The field `Prices.Reasoning` can give a different price for reasoning tokens. The reasoning price replaces the output price for reasoning tokens.
 
 A price of 0 and price data that is not available are different. If the response has cache tokens without price data, the cost is not available. Usage statistics include only costs with price data.
@@ -546,6 +548,8 @@ Requirements:
 ### 6.3 Context Limit
 
 The context limit is `ModelInfo.ContextMax`. The harness keeps the system messages and the last turn. When the context is too large, the harness removes the initial turn from the request. A turn includes the tool calls and the tool results.
+
+Context fitting uses binary search for full turns. The harness keeps system messages and the last turn. A token estimate includes request reminders. The harness examines content types after context fitting. Only content in the selected request can stop a model change.
 
 User input or a runtime notification can start a turn. The database keeps the full message history.
 
@@ -726,6 +730,10 @@ The runtime gives context notices at 50% and 65% of the input budget, after conv
 The historian makes memory ideas from related memory records that the model does not use. The memory search tool can get initial memory records. A memory correction keeps previous versions and corrects memory ideas that use the previous fact. Worker memory search usage and model memory search usage stay in different usage counters.
 
 Memory search selects workspace and category data before it compares vectors and literal text. The tool output has a 16 KiB text limit. A cursor continues UTF-8 text. Source data after session deletion is available with `include_deleted`. Previous versions are available with `include_history`. Memory search must not make a session available after session deletion.
+
+Memory search has a maximum number of search candidates. A vector index has one model ID and a vector dimension value. Memory search keeps workspace data isolated and keeps category selection. The version and session deletion rules do not change.
+
+Exact search gives more documents when the vector index does not give the necessary number. The memory job dispatcher selects memory jobs through database queries. Completed memory jobs stay in storage.
 
 The configuration for memory embeddings is in `providers.json`. The `context_embeddings` object gives the backend, model files, native library path, text chunk limit, and number of CPU threads. The database keeps plugin behavior and worker models. Tool discovery has different configuration.
 
@@ -1230,6 +1238,8 @@ The message input can have text or content items:
 
 The event path accepts `?since=N`. The database gives the sequence number. The API sends the events after the sequence number, then the new events. A slow client must not stop the loop.
 
+An event cursor identifies one session. The database keeps the event sequence for a session through commit. Event storage for different sessions can run at the same time. Cancellation stops an event storage request that has not started. Event handlers run after event storage.
+
 When the user reverts a session, the API stops the current run. The API must wait until the current run stops. Then the API removes the messages after the given message. The API must not accept a new message while it removes messages. The usage record keeps the cost.
 
 Requirements:
@@ -1593,6 +1603,7 @@ type EventStore interface {
     Append(operationContext context.Context, event atom.Event) error
     Record(operationContext context.Context, event atom.Event) (atom.Event, error)
     Since(operationContext context.Context, instanceID string, sequenceNumber uint64) ([]atom.Event, error)
+    SinceSession(operationContext context.Context, sessionID atom.SessionID, sequenceNumber uint64) ([]atom.Event, error)
 }
 
 type TaskStateStore interface {

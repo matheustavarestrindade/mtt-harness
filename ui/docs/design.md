@@ -126,6 +126,10 @@ The message draft and view of a different session do not change. The dialog show
 
 A new session view reads events from sequence 0. Permission requests and decisions come from the event stream. A new connection after an error uses the last event sequence. Message history from the API is the source for completed responses.
 
+The client reads session data and queue status with an interval of 1500 ms. An active WebSocket gives events for message history. The client reads history after a turn event, status change, or new connection. If the WebSocket has an error, the client reads full history with the same interval.
+
+The client keeps message data when message content does not change. Source bytes, MIME type, and URL control Blob URLs. A file attachment keeps the source URL when the content does not change. A content change releases the previous Blob URL.
+
 The client uses `message_id` to connect model event text to message history. Reasoning text has a section that is closed by default. The session reasoning effort control uses the values from model data. A previous request must not replace a new selection.
 
 The UI shows model text with Markdown markup. The DOMPurify library removes dangerous markup before display. HTML in message text stays as text. The code block gives the format for syntax highlighting. A media item has a type and filename in the UI. The UI does not run code from model output.
