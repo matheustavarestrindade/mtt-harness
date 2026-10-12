@@ -18,7 +18,7 @@
   } = $props();
 </script>
 
-<section aria-label={`${title} models`} aria-busy={loading} class="mt-4 space-y-2">
+<section aria-label={`${title} models`} aria-busy={loading} class="mt-2 space-y-2">
   <div class="flex items-center gap-2 text-xs text-muted-foreground">
     <h3 class="font-medium">Models</h3>
     {#if !loading && !error}<span>{models.length}</span>{/if}

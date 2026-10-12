@@ -144,6 +144,10 @@ test('offer every available model and submit model IDs rather than display names
       }),
   );
   await openProviders(page, testInfo.project.name === 'mobile');
+  await page
+    .getByRole('region', { name: 'DeepSeek API setup', exact: true })
+    .getByRole('button', { name: /^Models/ })
+    .click();
   await expect(page.getByRole('region', { name: 'DeepSeek models', exact: true })).toContainText(
     'DeepSeek-V4.1-Flash',
   );
@@ -201,36 +205,129 @@ async function openProviders(page: Page, mobile: boolean) {
   await expect(page.getByRole('heading', { name: 'Providers', exact: true })).toBeVisible();
 }
 
+test('keep provider cards compact and open models only on request', async ({ page }, testInfo) => {
+  await providerFixture(page);
+  let openAIModelReads = 0;
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/providers/openai/models') openAIModelReads += 1;
+  });
+  await openProviders(page, testInfo.project.name === 'mobile');
+  const panel = page.getByRole('region', { name: 'Provider setup', exact: true });
+  const openai = panel.getByRole('region', { name: 'OpenAI API setup', exact: true });
+  const deepseek = panel.getByRole('region', { name: 'DeepSeek API setup', exact: true });
+  const models = openai.getByRole('button', { name: /^Models/ });
+  await expect(models).toBeEnabled();
+  await expect(panel.locator('input[type=password]')).toHaveCount(0);
+  await expect(panel.getByRole('region', { name: /model names$/ })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Sign in with ChatGPT' })).toHaveCount(0);
+  expect(openAIModelReads).toBe(0);
+  const first = (await openai.boundingBox())!;
+  const second = (await deepseek.boundingBox())!;
+  expect(first.height).toBeLessThan(180);
+  if (testInfo.project.name === 'desktop') {
+    expect(Math.abs(first.y - second.y)).toBeLessThan(2);
+    expect(second.x).toBeGreaterThan(first.x + first.width);
+  } else {
+    expect(second.y).toBeGreaterThan(first.y + first.height);
+    expect(
+      await models.evaluate((element) => element.getBoundingClientRect().height),
+    ).toBeGreaterThanOrEqual(44);
+  }
+  await page.screenshot({ path: testInfo.outputPath('providers-compact.png'), fullPage: true });
+  await models.focus();
+  await page.keyboard.press('Enter');
+  await expect(models).toHaveAttribute('aria-expanded', 'true');
+  await expect(
+    openai.getByRole('region', { name: 'OpenAI model names', exact: true }),
+  ).toBeVisible();
+  expect(openAIModelReads).toBe(1);
+  await models.click();
+  await expect(openai.getByRole('region', { name: 'OpenAI models', exact: true })).toHaveCount(0);
+  await models.click();
+  await expect(
+    openai.getByRole('region', { name: 'OpenAI model names', exact: true }),
+  ).toBeVisible();
+  expect(openAIModelReads).toBe(1);
+  await openai.getByRole('button', { name: 'Configure', exact: true }).click();
+  await expect(models).toHaveAttribute('aria-expanded', 'false');
+  await expect(openai.getByRole('region', { name: 'OpenAI models', exact: true })).toHaveCount(0);
+  await expect(openai.getByLabel('OpenAI API key')).toBeVisible();
+  await openai.getByRole('button', { name: 'Configure', exact: true }).click();
+  await expect(openai.getByLabel('OpenAI API key')).toHaveCount(0);
+  await page.setViewportSize({ width: 320, height: 720 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const cardBounds = (await openai.boundingBox())!;
+  expect(cardBounds.x + cardBounds.width).toBeLessThanOrEqual(320);
+});
+
+test('keep a pending coding-plan sign-in available when its card is collapsed', async ({
+  page,
+}, testInfo) => {
+  await providerFixture(page);
+  await openProviders(page, testInfo.project.name === 'mobile');
+  const plan = page.getByRole('region', { name: 'OpenAI coding plan setup', exact: true });
+  await plan.getByRole('button', { name: 'Configure', exact: true }).click();
+  await plan.getByRole('button', { name: 'Sign in with ChatGPT', exact: true }).click();
+  await expect(plan.getByLabel('One-time sign-in code')).toHaveValue('TEST-CODE');
+  const pending = plan.getByRole('button', { name: 'Sign-in pending', exact: true });
+  await pending.click();
+  await expect(plan.getByLabel('One-time sign-in code')).toHaveCount(0);
+  await pending.click();
+  await expect(plan.getByLabel('One-time sign-in code')).toHaveValue('TEST-CODE');
+  await plan.getByRole('button', { name: 'Cancel sign-in', exact: true }).click();
+  await expect(plan.getByLabel('One-time sign-in code')).toHaveCount(0);
+  await expect(
+    plan.getByRole('button', { name: 'Sign in with ChatGPT', exact: true }),
+  ).toBeEnabled();
+});
+
 test('configure API providers, refresh catalogs, and remove a key', async ({ page }, testInfo) => {
   const fixture = await providerFixture(page);
   await openProviders(page, testInfo.project.name === 'mobile');
   const openai = page.getByRole('region', { name: 'OpenAI API setup', exact: true });
+  await expect(openai.getByLabel('OpenAI API key')).toHaveCount(0);
+  await expect(openai.getByRole('region', { name: 'OpenAI model names', exact: true })).toHaveCount(
+    0,
+  );
+  await openai.getByRole('button', { name: /^Models/ }).click();
   await expect(
     openai.getByRole('region', { name: 'OpenAI model names', exact: true }).locator('summary code'),
   ).toHaveText(['openai/gpt-6-luna', 'openai/gpt-6-sol']);
+  await page
+    .getByRole('region', { name: 'OpenAI coding plan setup', exact: true })
+    .getByRole('button', { name: /^Models/ })
+    .click();
   await expect(
     page
       .getByRole('region', { name: 'OpenAI coding plan model names', exact: true })
       .locator('summary code'),
   ).toHaveText(['openai-codex/gpt-5.5', 'openai-codex/gpt-6-sol']);
+  await page
+    .getByRole('region', { name: 'Test provider setup', exact: true })
+    .getByRole('button', { name: /^Models/ })
+    .click();
   await expect(
     page.getByRole('region', { name: 'Test provider model names', exact: true }),
   ).toContainText('test/test-model');
+  await openai.getByRole('button', { name: 'Configure', exact: true }).click();
   await openai.getByLabel('OpenAI API key').fill('openai-example-key');
   await openai.getByRole('button', { name: 'Save API key' }).click();
   await expect(openai.getByText('Configured', { exact: true })).toBeVisible();
   await expect(openai.getByLabel('OpenAI API key')).toHaveValue('');
   expect(fixture.keys.get('openai')).toBe('openai-example-key');
   const deepseek = page.getByRole('region', { name: 'DeepSeek API setup', exact: true });
+  await deepseek.getByRole('button', { name: /^Models/ }).click();
   await expect(deepseek.locator('summary code')).toHaveText([
     'deepseek/deepseek-flash',
     'deepseek/deepseek-v4-pro',
   ]);
+  await deepseek.getByRole('button', { name: 'Configure', exact: true }).click();
   await deepseek.getByLabel('DeepSeek API key').fill('deepseek-example-key');
   await deepseek.getByRole('button', { name: 'Save API key' }).click();
   await expect(deepseek.getByText('Configured', { exact: true })).toBeVisible();
   const newModel = `coding-model-${'long-name-'.repeat(15)}`;
   fixture.modelIDs.deepseek = ['deepseek-flash', newModel];
+  await deepseek.getByRole('button', { name: /^Models/ }).click();
   await deepseek.getByRole('button', { name: 'Refresh models', exact: true }).click();
   await expect(deepseek.locator('summary code')).toHaveText([
     'deepseek/deepseek-flash',
@@ -258,10 +355,18 @@ test('show catalog failures independently and distinguish an empty model list', 
   const fixture = await providerFixture(page);
   fixture.modelErrors.add('deepseek');
   await openProviders(page, testInfo.project.name === 'mobile');
+  await page
+    .getByRole('region', { name: 'DeepSeek API setup', exact: true })
+    .getByRole('button', { name: /^Models/ })
+    .click();
   const deepseek = page.getByRole('region', { name: 'DeepSeek models', exact: true });
   await expect(deepseek.getByRole('alert')).toContainText(
     'Could not load model names: model catalog unavailable',
   );
+  await page
+    .getByRole('region', { name: 'OpenAI API setup', exact: true })
+    .getByRole('button', { name: /^Models/ })
+    .click();
   await expect(page.getByRole('region', { name: 'OpenAI model names', exact: true })).toContainText(
     'openai/gpt-6-sol',
   );
@@ -277,6 +382,10 @@ test('complete a coding-plan sign-in and show key validation errors', async ({
 }, testInfo) => {
   const fixture = await providerFixture(page);
   await openProviders(page, testInfo.project.name === 'mobile');
+  await page
+    .getByRole('region', { name: 'OpenAI coding plan setup', exact: true })
+    .getByRole('button', { name: 'Configure', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Sign in with ChatGPT' }).click();
   await expect(page.getByLabel('One-time sign-in code')).toHaveValue('TEST-CODE');
   await expect(page.getByRole('link', { name: 'Open OpenAI sign-in' })).toHaveAttribute(
@@ -290,6 +399,7 @@ test('complete a coding-plan sign-in and show key validation errors', async ({
   await plan.getByRole('button', { name: 'Disconnect coding plan' }).click();
   await expect(plan.getByText('Not connected', { exact: true })).toBeVisible();
   const openai = page.getByRole('region', { name: 'OpenAI API setup', exact: true });
+  await openai.getByRole('button', { name: 'Configure', exact: true }).click();
   await openai.getByLabel('OpenAI API key').fill('invalid-key');
   await openai.getByRole('button', { name: 'Save API key' }).click();
   await expect(openai.getByRole('alert')).toContainText('Key saved, but model refresh failed');
