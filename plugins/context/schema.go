@@ -2,6 +2,7 @@ package contextplugin
 
 const databaseSchema = `
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE SCHEMA IF NOT EXISTS context_plugin;
 CREATE SEQUENCE IF NOT EXISTS context_plugin.source_ids;
 CREATE TABLE IF NOT EXISTS context_plugin.documents (
@@ -13,6 +14,10 @@ CREATE TABLE IF NOT EXISTS context_plugin.documents (
     PRIMARY KEY (workspace_id,kind,key)
 );
 CREATE INDEX IF NOT EXISTS context_jobs_status ON context_plugin.documents ((data->>'status'),updated_at) WHERE kind='job';
+CREATE INDEX IF NOT EXISTS context_jobs_active_workspace ON context_plugin.documents
+    (workspace_id, (COALESCE((data->>'priority')::int,0)), key)
+    WHERE kind='job' AND data->>'status' IN ('pending','running');
+CREATE INDEX IF NOT EXISTS context_workspace_directory ON context_plugin.documents(workspace_id) WHERE kind='workspace';
 CREATE TABLE IF NOT EXISTS context_plugin.vectors (
     workspace_id text NOT NULL,
     kind text NOT NULL,
@@ -31,6 +36,7 @@ CREATE TABLE IF NOT EXISTS context_plugin.vectors (
 CREATE INDEX IF NOT EXISTS context_vectors_scope ON context_plugin.vectors (workspace_id,kind,deleted,historical,model);
 CREATE INDEX IF NOT EXISTS context_vectors_text ON context_plugin.vectors USING gin(search_text);
 CREATE INDEX IF NOT EXISTS context_vectors_categories ON context_plugin.vectors USING gin(categories);
+CREATE INDEX IF NOT EXISTS context_vectors_literal ON context_plugin.vectors USING gin(lower(content) gin_trgm_ops);
 CREATE TABLE IF NOT EXISTS context_plugin.metrics (
     workspace_id text NOT NULL,
     agent text NOT NULL,

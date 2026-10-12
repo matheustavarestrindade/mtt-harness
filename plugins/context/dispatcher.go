@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 )
 
 const maximumActiveWorkers = 32
+const maximumWorkspaceDispatchPage = 64
+const maximumJobClaimPage = 64
 
 func (plugin *Plugin) runDispatcher() {
 	defer close(plugin.dispatchDone)
@@ -32,14 +33,26 @@ func (plugin *Plugin) runDispatcher() {
 }
 
 func (plugin *Plugin) dispatchJobs(operationContext context.Context) error {
-	workspaces, operationError := plugin.database.PendingWorkspaces(operationContext, 4096)
+	plugin.mutex.Lock()
+	after := plugin.dispatchCursor
+	plugin.mutex.Unlock()
+	workspaces, operationError := plugin.database.PendingWorkspaces(operationContext, after, maximumWorkspaceDispatchPage)
 	if operationError != nil {
 		return operationError
+	}
+	if len(workspaces) == 0 && after != "" {
+		workspaces, operationError = plugin.database.PendingWorkspaces(operationContext, "", maximumWorkspaceDispatchPage)
+		if operationError != nil {
+			return operationError
+		}
 	}
 	for _, workspaceID := range workspaces {
 		if operationError := operationContext.Err(); operationError != nil {
 			return operationError
 		}
+		plugin.mutex.Lock()
+		plugin.dispatchCursor = workspaceID
+		plugin.mutex.Unlock()
 		if operationError := plugin.recoverHistoryChanges(operationContext, workspaceID); operationError != nil {
 			return operationError
 		}
@@ -121,24 +134,12 @@ func (plugin *Plugin) dispatchJobs(operationContext context.Context) error {
 func (plugin *Plugin) claimJob(operationContext context.Context, workspaceID string, configuration configuration) (memoryJob, bool, error) {
 	var selected memoryJob
 	operationError := plugin.database.Transact(operationContext, workspaceID, func(database transaction) error {
-		jobs, operationError := readTransactionValues[memoryJob](database, "job")
+		now := time.Now().UTC()
+		jobs, operationError := database.RunnableJobs(now, maximumJobClaimPage)
 		if operationError != nil {
 			return operationError
 		}
-		sort.Slice(jobs, func(first, second int) bool {
-			if jobs[first].Priority != jobs[second].Priority {
-				return jobs[first].Priority < jobs[second].Priority
-			}
-			return jobs[first].CreatedAt.Before(jobs[second].CreatedAt)
-		})
-		now := time.Now().UTC()
 		for _, job := range jobs {
-			if job.Status != "pending" && !(job.Status == "running" && job.LeaseUntil.Before(now)) {
-				continue
-			}
-			if job.NextAttempt.After(now) {
-				continue
-			}
 			if job.SessionID != "" {
 				view, operationError := loadView(database, job.SessionID)
 				if operationError != nil {

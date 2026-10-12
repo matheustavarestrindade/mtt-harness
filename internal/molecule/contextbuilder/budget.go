@@ -24,38 +24,84 @@ func (builder *Builder) Fit(operationContext context.Context, request atom.Reque
 // boundary. Each candidate retains exactly the overlays whose anchors survive.
 func (builder *Builder) FitMeasured(operationContext context.Context, request atom.Request, measure func(context.Context, atom.Request) (harness.RequestBudget, error)) (atom.Request, error) {
 	request.Messages = append([]atom.Message(nil), request.Messages...)
-	for {
-		measurement, operationError := measure(operationContext, request)
+	if operationError := operationContext.Err(); operationError != nil {
+		return request, operationError
+	}
+	measurement, operationError := measure(operationContext, request)
+	if operationError != nil {
+		return request, operationError
+	}
+	if measurement.InputLimit <= 0 || measurement.InputTokens <= measurement.InputLimit {
+		return request, nil
+	}
+	var turns []int
+	var protected []atom.Message
+	var protectedCounts []int
+	for index, message := range request.Messages {
+		if !message.Ephemeral && (message.Role == atom.RoleUser || message.Role == atom.RoleRuntime) {
+			turns = append(turns, index)
+			protectedCounts = append(protectedCounts, len(protected))
+		}
+		if len(turns) == 0 || message.Role == atom.RoleSystem || message.Ephemeral {
+			protected = append(protected, message)
+		}
+	}
+	if len(turns) < 2 {
+		return request, fmt.Errorf("newest turn and tool schemas exceed the context budget of %d tokens", measurement.InputLimit)
+	}
+	// Probe whole-turn suffixes rather than repeatedly copying and recounting one
+	// shrinking turn at a time. Each measurement still projects anchored reminders.
+	// Keep an actually measured fitting candidate even for a non-monotone custom
+	// counter; fitting never depends on a token estimate extrapolated from a probe.
+	candidateAt := func(turn int) atom.Request {
+		candidate := request
+		candidate.Messages = make([]atom.Message, 0, protectedCounts[turn]+len(request.Messages)-turns[turn])
+		candidate.Messages = append(candidate.Messages, protected[:protectedCounts[turn]]...)
+		candidate.Messages = append(candidate.Messages, request.Messages[turns[turn]:]...)
+		return candidate
+	}
+	lower, upper := 1, len(turns)-1
+	best := candidateAt(upper)
+	measurement, operationError = measure(operationContext, best)
+	if operationError != nil {
+		return request, operationError
+	}
+	if measurement.InputLimit > 0 && measurement.InputTokens > measurement.InputLimit {
+		// TokenCounter and projection callbacks can be non-monotone. An
+		// over-budget newest suffix does not prove every longer suffix fails.
+		for turnIndex := 1; turnIndex < len(turns)-1; turnIndex++ {
+			if operationError := operationContext.Err(); operationError != nil {
+				return request, operationError
+			}
+			candidate := candidateAt(turnIndex)
+			candidateBudget, measurementError := measure(operationContext, candidate)
+			if measurementError != nil {
+				return request, measurementError
+			}
+			if candidateBudget.InputLimit <= 0 || candidateBudget.InputTokens <= candidateBudget.InputLimit {
+				return candidate, nil
+			}
+		}
+		return request, fmt.Errorf("newest turn and tool schemas exceed the context budget of %d tokens", measurement.InputLimit)
+	}
+	for lower < upper {
+		if operationError := operationContext.Err(); operationError != nil {
+			return request, operationError
+		}
+		middle := lower + (upper-lower)/2
+		candidate := candidateAt(middle)
+		measurement, operationError = measure(operationContext, candidate)
 		if operationError != nil {
 			return request, operationError
 		}
-		budget := measurement.InputLimit
-		if budget <= 0 || measurement.InputTokens <= budget {
-			return request, nil
+		if measurement.InputLimit <= 0 || measurement.InputTokens <= measurement.InputLimit {
+			best = candidate
+			upper = middle
+			continue
 		}
-		firstTurnIndex, nextTurnIndex := -1, -1
-		for index, message := range request.Messages {
-			if message.Ephemeral || (message.Role != atom.RoleUser && message.Role != atom.RoleRuntime) {
-				continue
-			}
-			if firstTurnIndex < 0 {
-				firstTurnIndex = index
-				continue
-			}
-			nextTurnIndex = index
-			break
-		}
-		if nextTurnIndex < 0 {
-			return request, fmt.Errorf("newest turn and tool schemas exceed the context budget of %d tokens", budget)
-		}
-		kept := append([]atom.Message(nil), request.Messages[:firstTurnIndex]...)
-		for _, message := range request.Messages[firstTurnIndex:nextTurnIndex] {
-			if message.Role == atom.RoleSystem || message.Ephemeral {
-				kept = append(kept, message)
-			}
-		}
-		request.Messages = append(kept, request.Messages[nextTurnIndex:]...)
+		lower = middle + 1
 	}
+	return best, nil
 }
 
 // MeasureRequest is shared by core fitting and public plugin policies. It counts
