@@ -142,6 +142,12 @@ Provider keys and OAuth tokens stay in the harness database. The UI does not kee
 
 ## Settings and Usage
 
+The message input area shows `Last context`, `Out`, `Cache`, and `Total`. Token values come from the provider for the last response in the selected session. `Last context` adds input and output tokens. Input includes `CacheRead` and `CacheWrite`. Output includes reasoning tokens. Child agents do not add tokens to the last response.
+
+The model context limit comes from the model for the last response. A model change does not replace the limit for a previous response. The percentage is not available without a model context limit. `Cache` is the percentage of input tokens from `CacheRead`. The UI shows `—` when usage data is not available.
+
+The UI changes the values after a provider response. The UI does not count subsequent messages or tool results until the provider gives new usage data. `Total` gives available cost data for the conversation and child agents. The `≈` symbol identifies a cost estimate. Context compaction does not change token or cost statistics.
+
 The settings dialog has 4 sections: `General`, `Usage`, `Providers`, and `Connection`. The UI keeps the conversation and message draft when the dialog closes. Use the button with the label `Close`, or use the `Escape` key.
 
 The general section sets the agent depth limit and process limit. Select the harness or workspace scope. Supply an integer of 0 or more. Select the button with the label `Save`.

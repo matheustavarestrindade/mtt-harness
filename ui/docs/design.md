@@ -146,6 +146,12 @@ See `messages.md` for the libraries, content limits, and source buttons.
 
 ## Settings
 
+The `UsageBar` molecule uses `Message.Usage` from the last model response in the selected session. It does not use token values from `Statistics`. `Last context` is the sum of `Input`, `CacheRead`, `CacheWrite`, and `Output`. Output includes reasoning tokens. `Out` and `Cache` use the same request.
+
+The client connects a message ID to the model in the `model.call` event. The model supplies the context limit. The model for a previous response can be different from the selected model. The UI shows `—` when usage data is not available.
+
+The client removes previous model IDs on session selection. The conversation cost includes child agents. The label `Total` identifies the scope. The settings dialog gives usage statistics. Context compaction does not remove previous usage from the statistics.
+
 Settings use one dialog above the conversation. Large screens have a sidebar for section selection. Small screens have a horizontal section list. The content section has a scrollbar. The user can close the dialog with the `Escape` key. The dialog keeps keyboard focus while it is open.
 
 The dialog has connection, provider, usage, and general settings sections. The usage section sends requests to the API to get statistics. The general section sends configuration requests to the API. An empty value removes the selected setting.
