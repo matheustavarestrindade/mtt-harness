@@ -77,7 +77,7 @@
     >
       {#if message.Role === 'assistant' && message.Reasoning}<ThinkingSection
           text={message.Reasoning}
-          {streaming}
+          streaming={streaming && running && !hasContent}
         />{/if}
       {#if hasContent}
         {#if message.Role === 'assistant'}

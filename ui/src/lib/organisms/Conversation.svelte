@@ -179,16 +179,6 @@
         >
           This child agent has completed its task. Its conversation is read-only.
         </p>{/if}
-      {#if workbench.status.running}<div
-          role="status"
-          class="mt-6 flex items-center gap-3 py-2 text-xs text-muted-foreground"
-        >
-          <span class="flex gap-1"
-            ><span class="size-1 rounded-full bg-primary"></span><span
-              class="size-1 rounded-full bg-primary/60"
-            ></span><span class="size-1 rounded-full bg-primary/30"></span></span
-          >Harness is working{workbench.permissions.length ? ' · waiting for permission' : '…'}
-        </div>{/if}
       {#if workbench.status.error}<p
           role="alert"
           class="mt-5 break-words rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm leading-6 text-destructive"

@@ -200,6 +200,10 @@ Tool data comes from the registry for a model call. For example, `{bash_info}` g
 
 The default template gives tool discovery and selection rules. The model must read the full tool description and input schema before a tool call. The tool definition gives the rules for the operation. The template does not give a different file action procedure.
 
+File work uses the session workspace by default. The model reads `AGENTS.md` files in the workspace and related directories below it. The model does not examine `/`, `/home`, or parent directories to find workspace content.
+
+A file in an external directory can be necessary for a task. The user request or task data must identify the necessary external file. The model uses the file path or the smallest necessary directory.
+
 Messages to the user follow ISO 24495-1. The message must contain necessary information that the user can find and use. English text also follows ASD-STE100. The model uses the chat language that the user selects. Messages to other agents stay short.
 
 Use 2 braces before and after the variable name for literal text. For example, `{{workspace}}` gives `{workspace}`. Substitution occurs one time. JSON braces do not change. If a tool in a variable is not in the registry, the turn gives an error before the model call.
