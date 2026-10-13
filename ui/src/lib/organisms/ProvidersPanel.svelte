@@ -8,11 +8,12 @@
   import type { DeviceLogin, Model, Provider } from '$lib/atoms/types';
   import type { HarnessApi } from '$lib/molecules/api/client';
   import ProviderKeyCard from '$lib/molecules/ProviderKeyCard.svelte';
-  import ProviderModelList from '$lib/molecules/ProviderModelList.svelte';
+  import ProviderCard from '$lib/molecules/ProviderCard.svelte';
 
   let { api, onChanged }: { api: HarnessApi; onChanged: () => Promise<void> } = $props();
   let providers = $state<Provider[]>([]);
-  let catalogs = $state<Record<string, { models: Model[]; error: string }>>({});
+  let catalogs = $state<Record<string, { models: Model[]; error: string; loading?: boolean }>>({});
+  let expanded = $state<Record<string, 'setup' | 'models' | null>>({});
   let loading = $state(true);
   let error = $state('');
   let busy = $state('');
@@ -20,6 +21,7 @@
   let login = $state<DeviceLogin | null>(null);
   const lifetime = new AbortController();
   let catalogRequest: AbortController | undefined;
+  const modelRequests = new Map<string, AbortController>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const codingPlan = $derived(providers.find((provider) => provider.Authentication === 'chatgpt'));
   const keyProviders = $derived(
@@ -40,6 +42,11 @@
 
   async function loadProvidersAndModels() {
     catalogRequest?.abort();
+    for (const [providerID, request] of modelRequests) {
+      request.abort();
+      if (catalogs[providerID]?.loading) delete catalogs[providerID];
+    }
+    modelRequests.clear();
     catalogRequest = new AbortController();
     const signal = AbortSignal.any([lifetime.signal, catalogRequest.signal]);
     loading = true;
@@ -47,19 +54,23 @@
     try {
       const result = await api.providers(signal);
       const modelLists = await Promise.all(
-        result.map(async (provider) => {
-          try {
-            return {
-              provider: provider.Name,
-              models: await api.providerModels(provider.Name, signal),
-              error: '',
-            };
-          } catch (failure) {
-            return { provider: provider.Name, models: [], error: providerErrorMessage(failure) };
-          }
-        }),
+        result
+          .filter((provider) => expanded[provider.Name] === 'models')
+          .map(async (provider) => {
+            try {
+              return {
+                provider: provider.Name,
+                models: await api.providerModels(provider.Name, signal),
+                error: '',
+              };
+            } catch (failure) {
+              return { provider: provider.Name, models: [], error: providerErrorMessage(failure) };
+            }
+          }),
       );
       if (signal.aborted) return;
+      // Bound disclosures need an explicit value before their cards mount.
+      for (const provider of result) expanded[provider.Name] ??= null;
       providers = result;
       catalogs = Object.fromEntries(
         modelLists.map(({ provider, models, error }) => [provider, { models, error }]),
@@ -68,6 +79,23 @@
       if (!signal.aborted) error = providerErrorMessage(failure);
     } finally {
       if (!signal.aborted) loading = false;
+    }
+  }
+  async function loadProviderModels(providerID: string) {
+    if (catalogs[providerID] && !catalogs[providerID].error) return;
+    modelRequests.get(providerID)?.abort();
+    const request = new AbortController();
+    modelRequests.set(providerID, request);
+    const signal = AbortSignal.any([lifetime.signal, request.signal]);
+    catalogs[providerID] = { models: [], error: '', loading: true };
+    try {
+      const models = await api.providerModels(providerID, signal);
+      if (!signal.aborted) catalogs[providerID] = { models, error: '', loading: false };
+    } catch (failure) {
+      if (!signal.aborted)
+        catalogs[providerID] = { models: [], error: providerErrorMessage(failure), loading: false };
+    } finally {
+      if (modelRequests.get(providerID) === request) modelRequests.delete(providerID);
     }
   }
   async function refreshProviderViews() {
@@ -172,15 +200,9 @@
 </script>
 
 <section aria-label="Provider setup" class="min-w-0">
-  <div class="mx-auto max-w-5xl">
-    <div class="mb-7 flex items-start justify-between gap-4">
-      <div>
-        <h2 class="text-xl font-medium tracking-tight">Providers</h2>
-        <p class="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-          Connect OpenAI or DeepSeek. Keys and account credentials stay in the harness database, not
-          in this browser.
-        </p>
-      </div>
+  <div class="mx-auto max-w-3xl">
+    <div class="mb-4 flex items-center justify-between gap-3">
+      <h2 class="text-base font-medium">Providers</h2>
       <Button
         variant="ghost"
         size="icon"
@@ -194,17 +216,21 @@
         <LoaderCircle class="size-4 animate-spin" />Loading providers…
       </p>{/if}
     {#if error}<p role="alert" class="mb-4 break-words text-sm text-destructive">{error}</p>{/if}
-    <div class="grid min-w-0 items-start gap-4">
+    <div
+      class="grid min-w-0 items-start gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr))]"
+    >
       {#each keyProviders as provider (provider.Name)}
         <ProviderKeyCard
           {provider}
           title={providerDisplayName(provider)}
           keyURL={providerKeyManagementURL(provider)}
-          busy={!!busy}
+          busy={!!busy || loading}
           error={errors[provider.Name] ?? ''}
           models={catalogs[provider.Name]?.models ?? []}
-          modelsLoading={loading}
+          modelsLoading={loading || !!catalogs[provider.Name]?.loading}
           modelsError={catalogs[provider.Name]?.error ?? ''}
+          bind:expanded={expanded[provider.Name]}
+          onModels={() => void loadProviderModels(provider.Name)}
           onSave={(key) => saveProviderAPIKey(provider, key)}
           onDisconnect={() =>
             void runProviderAction(provider.Name, () =>
@@ -217,114 +243,104 @@
         />
       {/each}
       {#if codingPlan}
-        <section
-          aria-label="OpenAI coding plan setup"
-          class="min-w-0 rounded-xl border border-border bg-card p-5 sm:p-6"
+        <ProviderCard
+          provider={codingPlan}
+          title="OpenAI coding plan"
+          label="OpenAI coding plan setup"
+          caption="ChatGPT"
+          bind:expanded={expanded[codingPlan.Name]}
+          busy={!!busy || loading}
+          error={errors[codingPlan.Name] ?? ''}
+          setupLabel={login?.Status === 'pending' ? 'Sign-in pending' : 'Configure'}
+          models={catalogs[codingPlan.Name]?.models ?? []}
+          modelsLoading={loading || !!catalogs[codingPlan.Name]?.loading}
+          modelsError={catalogs[codingPlan.Name]?.error ?? ''}
+          onModels={() => codingPlan && void loadProviderModels(codingPlan.Name)}
+          onRefresh={() =>
+            codingPlan &&
+            void runProviderAction(codingPlan.Name, () =>
+              api.refreshProvider(codingPlan!.Name, lifetime.signal),
+            )}
         >
-          <div class="mb-5 flex items-start justify-between gap-3">
-            <div>
-              <LogIn class="mb-4 size-5 text-muted-foreground" />
-              <h2 class="text-base font-medium">OpenAI coding plan</h2>
-              <p class="mt-1 text-xs text-muted-foreground">
-                Sign in with ChatGPT · subscription access
-              </p>
-            </div>
-            <span
-              class="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground"
-              >{codingPlan.Connected ? 'Configured' : 'Not connected'}</span
-            >
-          </div>
-          <p class="mb-4 text-sm leading-6 text-muted-foreground">
-            Use your ChatGPT account for Codex access. This is separate from a usage-billed OpenAI
-            API key.
-          </p>
-          {#if login?.Status === 'pending'}
-            <div class="space-y-3 rounded-lg border border-border bg-background/40 p-4">
-              <Label for="device-user-code">One-time sign-in code</Label><Input
-                id="device-user-code"
-                value={login.UserCode}
-                readonly
-                class="h-12 text-center font-mono text-lg tracking-widest"
-                onclick={(event) => event.currentTarget.select()}
-              />
-              <a
-                href={login.VerificationURL}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
-                >Open OpenAI sign-in<ExternalLink class="size-4" /></a
-              >
-              <p class="text-xs leading-5 text-muted-foreground">
-                Sign in and enter this code. Enable device-code login in your ChatGPT security
-                settings if requested. The code expires in 15 minutes.
-              </p>
-              <p role="status" class="flex items-center gap-2 text-xs text-muted-foreground">
-                <LoaderCircle class="size-3.5 animate-spin" />Waiting for OpenAI approval…
-              </p>
+          {#snippet setup()}
+            {#if login?.Status === 'pending'}
+              <div class="space-y-3 rounded-lg border border-border bg-background/40 p-4">
+                <Label for="device-user-code">One-time sign-in code</Label><Input
+                  id="device-user-code"
+                  value={login.UserCode}
+                  readonly
+                  class="h-12 text-center font-mono text-lg tracking-widest"
+                  onclick={(event) => event.currentTarget.select()}
+                />
+                <a
+                  href={login.VerificationURL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+                  >Open OpenAI sign-in<ExternalLink class="size-4" /></a
+                >
+                <p class="text-xs leading-5 text-muted-foreground">
+                  Sign in and enter this code. Enable device-code login in your ChatGPT security
+                  settings if requested. The code expires in 15 minutes.
+                </p>
+                <p role="status" class="flex items-center gap-2 text-xs text-muted-foreground">
+                  <LoaderCircle class="size-3.5 animate-spin" />Waiting for OpenAI approval…
+                </p>
+                <Button
+                  variant="outline"
+                  class="h-11 w-full"
+                  disabled={!!busy}
+                  onclick={() => void cancelDeviceLogin()}>Cancel sign-in</Button
+                >
+              </div>
+            {:else}
+              {#if login?.Error}<p role="alert" class="mb-3 break-words text-sm text-destructive">
+                  {login.Error}
+                </p>{/if}
               <Button
-                variant="outline"
                 class="h-11 w-full"
                 disabled={!!busy}
-                onclick={() => void cancelDeviceLogin()}>Cancel sign-in</Button
+                onclick={() => void startCodingPlanLogin()}
+                >{#if busy === codingPlan.Name}<LoaderCircle
+                    class="size-4 animate-spin"
+                  />{:else}<LogIn class="size-4" />{/if}{codingPlan.Connected
+                  ? 'Sign in again'
+                  : 'Sign in with ChatGPT'}</Button
               >
-            </div>
-          {:else}
-            {#if login?.Error}<p role="alert" class="mb-3 break-words text-sm text-destructive">
-                {login.Error}
-              </p>{/if}
-            <Button
-              class="h-11 w-full"
-              disabled={!!busy}
-              onclick={() => void startCodingPlanLogin()}
-              >{#if busy === codingPlan.Name}<LoaderCircle
-                  class="size-4 animate-spin"
-                />{:else}<LogIn class="size-4" />{/if}{codingPlan.Connected
-                ? 'Sign in again'
-                : 'Sign in with ChatGPT'}</Button
-            >
-          {/if}
-          {#if errors[codingPlan.Name]}<p
-              role="alert"
-              class="mt-3 break-words text-sm leading-6 text-destructive"
-            >
-              {errors[codingPlan.Name]}
-            </p>{/if}
-          {#if codingPlan.Connected}<Button
-              variant="ghost"
-              class="mt-3 h-11 text-xs"
-              disabled={!!busy}
-              onclick={() =>
-                void runProviderAction(codingPlan.Name, async () => {
-                  clearTimeout(timer);
-                  login = null;
-                  await api.disconnectCodingPlan(codingPlan.Name, lifetime.signal);
-                })}><Unplug class="size-3.5" />Disconnect coding plan</Button
-            >{/if}
-          <p class="mt-4 text-xs text-muted-foreground">
-            Models use the <code>{codingPlan.Name}/</code> prefix. Plan limits still apply.
-          </p>
-          <ProviderModelList
-            providerID={codingPlan.Name}
-            title="OpenAI coding plan"
-            models={catalogs[codingPlan.Name]?.models ?? []}
-            {loading}
-            error={catalogs[codingPlan.Name]?.error ?? ''}
-          />
-        </section>
+            {/if}
+            {#if codingPlan.Connected}<Button
+                variant="ghost"
+                class="mt-3 h-11 text-xs"
+                disabled={!!busy}
+                onclick={() =>
+                  void runProviderAction(codingPlan.Name, async () => {
+                    clearTimeout(timer);
+                    login = null;
+                    await api.disconnectCodingPlan(codingPlan.Name, lifetime.signal);
+                  })}><Unplug class="size-3.5" />Disconnect coding plan</Button
+              >{/if}
+          {/snippet}
+        </ProviderCard>
       {/if}
+      {#each providers.filter((provider) => provider.Authentication !== 'api_key' && provider.Authentication !== 'chatgpt') as provider (provider.Name)}
+        <ProviderCard
+          {provider}
+          title={provider.Name === 'test' ? 'Test provider' : providerDisplayName(provider)}
+          label={`${provider.Name === 'test' ? 'Test provider' : providerDisplayName(provider)} setup`}
+          caption="No credentials"
+          bind:expanded={expanded[provider.Name]}
+          busy={!!busy || loading}
+          error={errors[provider.Name] ?? ''}
+          models={catalogs[provider.Name]?.models ?? []}
+          modelsLoading={loading || !!catalogs[provider.Name]?.loading}
+          modelsError={catalogs[provider.Name]?.error ?? ''}
+          onModels={() => void loadProviderModels(provider.Name)}
+          onRefresh={() =>
+            void runProviderAction(provider.Name, () =>
+              api.refreshProvider(provider.Name, lifetime.signal),
+            )}
+        />
+      {/each}
     </div>
-    {#if providers.some((provider) => provider.Name === 'test')}<p
-        class="mt-6 text-xs leading-5 text-muted-foreground"
-      >
-        The test provider is also available for connection checks. It does not use a real AI model.
-      </p>
-      <ProviderModelList
-        providerID="test"
-        title="Test provider"
-        models={catalogs.test?.models ?? []}
-        {loading}
-        error={catalogs.test?.error ?? ''}
-      />
-    {/if}
   </div>
 </section>

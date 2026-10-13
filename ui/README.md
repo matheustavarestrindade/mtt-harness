@@ -114,11 +114,13 @@ The composer accepts a file selection, a file drop, or clipboard files. A messag
 
 ## Provider Connections
 
-Open the settings dialog from the header, sidebar, or phone navigation drawer. Use the button with the label `Providers`. OpenAI and DeepSeek have API key forms. Supply the key in the field. Select the button with the label `Save API key`. The UI puts the key in the harness database and gets the model list.
+Open the settings dialog from the header, sidebar, or phone navigation drawer. Use the button with the label `Providers`. A provider has a name and connection status. Use the `Configure` button to open the connection form.
+
+OpenAI and DeepSeek have API key forms. Supply the key in the field. Select the button with the label `Save API key`. The UI puts the key in the harness database and gets the model list.
 
 A refresh error does not remove the key from the database.
 
-For a ChatGPT subscription, use the button with the label `Sign in with ChatGPT`. Open the OpenAI URL and supply the user code. Device-code login in the ChatGPT account settings must be active. The user must supply the code in 15 minutes. Keep the provider section open to see the result.
+For a ChatGPT subscription, use the `Configure` button for `OpenAI coding plan`. Use the button with the label `Sign in with ChatGPT`. Open the OpenAI URL and supply the user code. Device-code login in the ChatGPT account settings must be active. The user must supply the code in 15 minutes. Keep the provider section open to see the result.
 
 Model IDs use a provider prefix:
 
@@ -128,7 +130,7 @@ DeepSeek API key:      deepseek/MODEL
 ChatGPT subscription: openai-codex/MODEL
 ```
 
-The provider section shows model IDs from the API. The list changes when the user refreshes model data. The provider section shows a model list error.
+Use the `Models` button to get and show model IDs from the API. Use the button again to close the list. The list has the `Refresh models` button. A model list error shows in the list. A list that is closed does not use space in the provider section.
 
 The workspace form shows the models from providers with a connection. The session form shows the model list from the instance API. The forms show the optional model label with the ID. Requests use the ID.
 

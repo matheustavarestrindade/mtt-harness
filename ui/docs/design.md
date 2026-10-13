@@ -150,6 +150,10 @@ Section requests stop when the dialog closes. They also stop when the user selec
 
 The provider section uses the default OpenAI and DeepSeek configuration. API key forms are molecules. The provider organism controls key requests, model lists, and device login status.
 
+The `ProviderCard` molecule shows the provider name, connection status, and buttons. The provider section has one column on small screens. A large screen has 2 columns. The `Configure` button opens the connection form. The `Models` button opens a model list. The sections are closed by default.
+
+The UI gets a model list when the user opens the list. Model list requests stop when the provider section closes. The UI keeps an active device login when the user closes a connection form.
+
 Model data can include token prices and reasoning efforts. The UI shows model data from the API. The UI does not get a model catalog from a different program. A cost estimate has a label. Subscription access does not get an API token price estimate.
 
 The provider `openai-codex` uses OpenAI device authentication. OAuth tokens stay on the server. The UI gets a user code and an OpenAI URL. When the provider section closes, the browser stops status requests. Server authentication can continue for 15 minutes or until the user cancels it.
