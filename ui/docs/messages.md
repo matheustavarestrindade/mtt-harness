@@ -19,6 +19,12 @@ The client receives text from `model.chunk` events during the response. The fiel
 
 The client prepares event text at an interval of 100 milliseconds. A session change removes previous event text. The API does not send continuation data in messages or events.
 
+During reasoning, the `Thinking` label includes a short text preview. The preview uses text from the provider. It selects the last heading or available text. The full reasoning text stays available in the section.
+
+A text preview uses a maximum of 120 characters. The UI reads a maximum of 8192 characters for a preview.
+
+The UI uses `ActivityIndicator` for work in progress. The icon moves during a response. There is only an icon above the message input. A permission request removes the icon. The `prefers-reduced-motion` setting stops the movement.
+
 ## Markdown and Code
 
 The UI removes an internal `context_message` label from the start of text in an `assistant` message. This also applies while the model sends the label in stream chunks. The message copy button uses the text shown to the user. User text and tool output do not change. Text in code blocks or between quotation marks stays the same. The UI does not change message history.
