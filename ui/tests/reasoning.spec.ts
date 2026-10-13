@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate, chooseSelectOption, expectSelectOptions } from './helpers';
+import {
+  connectAndCreate,
+  chooseSelectOption,
+  expectSelectOptions,
+  openWorkbenchAction,
+} from './helpers';
 import type { Message } from '../src/lib/atoms/types';
 
 test('stream thinking collapsed and retain one expandable section after persistence', async ({
@@ -105,7 +110,7 @@ test('use model-specific effort choices and show model prices before creating a 
     'high',
   );
   await page.keyboard.press('Escape');
-  await page.locator('header').getByRole('button', { name: 'New session', exact: true }).click();
+  await openWorkbenchAction(page, 'New session');
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('region', { name: 'Model pricing' })).toContainText(
     'Rates per 1 million tokens',
@@ -181,11 +186,11 @@ test('show subscription access without API rates and label estimated usage', asy
   fixture.sessionUsage.Cost = { Currency: 'USD', Value: 0.001, Estimated: true };
   fixture.sessionUsage.Costs = [fixture.sessionUsage.Cost];
   await connectAndCreate(page);
-  await page.locator('header').getByRole('button', { name: 'New session', exact: true }).click();
+  await openWorkbenchAction(page, 'New session');
   await expect(page.getByRole('dialog')).toContainText('Subscription access');
   await expect(page.getByRole('dialog')).not.toContainText('$90');
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await openWorkbenchAction(page, 'Settings');
   await page
     .getByRole('navigation', { name: 'Settings sections' })
     .getByRole('button', { name: 'Usage', exact: true })

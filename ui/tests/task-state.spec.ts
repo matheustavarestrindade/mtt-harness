@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { TaskState } from '../src/lib/atoms/types';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate } from './helpers';
+import { connectAndCreate, openWorkbenchAction, workbenchReturnControl } from './helpers';
 
 async function openTasks(page: Page) {
-  await page.getByRole('button', { name: 'Open tasks panel', exact: true }).click();
+  await openWorkbenchAction(page, 'Tasks');
   await expect(page.getByRole('region', { name: 'Session tasks', exact: true })).toBeVisible();
 }
 
@@ -183,8 +183,8 @@ test('switch between Tasks and Memory and isolate tasks when the session changes
     'First session task',
   );
   await page.getByRole('button', { name: 'Close tasks panel', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open tasks panel', exact: true })).toBeFocused();
-  await page.getByRole('button', { name: 'Open memory panel', exact: true }).click();
+  await expect(workbenchReturnControl(page, 'Open tasks panel')).toBeFocused();
+  await openWorkbenchAction(page, 'Memory');
   await expect(page.getByRole('region', { name: 'Workspace memory', exact: true })).toBeVisible();
   if (testInfo.project.name === 'mobile')
     await page.getByRole('button', { name: 'Close memory panel', exact: true }).click();
@@ -194,7 +194,7 @@ test('switch between Tasks and Memory and isolate tasks when the session changes
     'First session task',
   );
   await page.getByRole('button', { name: 'Close tasks panel', exact: true }).click();
-  await page.locator('header').getByRole('button', { name: 'New session', exact: true }).click();
+  await openWorkbenchAction(page, 'New session');
   await page.getByRole('button', { name: 'Create session', exact: true }).click();
   await openTasks(page);
   fixture.event(session, 'task_state.updated', { ...state, Revision: 2 });

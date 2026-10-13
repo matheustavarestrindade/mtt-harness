@@ -6,6 +6,7 @@ const (
 	Text  MediaType = "text"
 	Image MediaType = "image"
 	Audio MediaType = "audio"
+	Video MediaType = "video"
 	File  MediaType = "file"
 )
 

@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate, chooseSelectOption } from './helpers';
+import {
+  connectAndCreate,
+  chooseSelectOption,
+  openWorkbenchAction,
+  workbenchReturnControl,
+} from './helpers';
 
 test('show zero cost for a new chat while preserving unknown and reported costs', async ({
   page,
@@ -12,7 +17,7 @@ test('show zero cost for a new chat while preserving unknown and reported costs'
   await expect(usage.getByText('0.0', { exact: true })).toBeVisible();
   await expect(usage).not.toContainText('Unavailable');
 
-  await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: 'Usage', exact: true }).click();
   await expect(dialog.getByText('0.0', { exact: true })).toBeVisible();
@@ -37,7 +42,7 @@ test('settings stay in a modal, preserve the draft, and show real usage scopes',
   await mockHarness(page);
   await connectAndCreate(page);
   await page.getByLabel('Message', { exact: true }).fill('Keep this draft');
-  await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Usage', exact: true }).click();
@@ -65,14 +70,14 @@ test('settings stay in a modal, preserve the draft, and show real usage scopes',
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await expect(page.getByLabel('Message', { exact: true })).toHaveValue('Keep this draft');
-  await expect(page.getByRole('button', { name: 'Open settings', exact: true })).toBeFocused();
+  await expect(workbenchReturnControl(page, 'Open settings')).toBeFocused();
   expect(failures).toEqual([]);
 });
 
 test('save harness and workspace limits and restore inheritance', async ({ page }) => {
   const fixture = await mockHarness(page);
   await connectAndCreate(page);
-  await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
   const depth = dialog.getByLabel('Agent depth limit', { exact: true });
   await expect(depth).toHaveValue('2');
@@ -122,7 +127,7 @@ test('failed usage and settings requests remain visible and recover on retry', a
           })
         : route.fallback(),
   );
-  await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('alert')).toContainText('Settings temporarily unavailable');
   failed = false;

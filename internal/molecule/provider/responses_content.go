@@ -98,6 +98,13 @@ func encodeResponsesAPIContent(contents []atom.Content) (any, error) {
 				mime = "application/octet-stream"
 			}
 			parts = append(parts, map[string]any{"type": "input_file", "filename": filename, "file_data": "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(content.Data)})
+		case atom.Video:
+			hasMedia = true
+			videoURL, operationError := encodeVideoURL(content)
+			if operationError != nil {
+				return nil, operationError
+			}
+			parts = append(parts, map[string]any{"type": "input_video", "video_url": videoURL})
 		default:
 			return nil, fmt.Errorf("Responses API does not support content type %q in this adapter", content.Type)
 		}

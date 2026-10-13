@@ -1,6 +1,7 @@
 import { ApiError, HarnessApi } from '../molecules/api/client';
 import { subscribeEvents, type StreamState } from '../molecules/api/events';
 import type {
+  Content,
   HarnessEvent,
   Instance,
   InstanceInput,
@@ -492,14 +493,22 @@ export class HarnessConsole {
     }
   }
 
-  async sendMessage(content: string) {
+  async sendMessage(content: string | Content[]) {
     const api = this.requireAPIClient();
     const session = this.session;
     if (!session) throw new Error('Create a session first.');
     const receipt = await api.sendMessage(session.ID, content);
     if (this.api === api && this.session?.ID === session.ID) {
       this.receipts = [...this.receipts, receipt.message];
-      await this.refreshSession();
+      // Acceptance is authoritative even if the subsequent status read fails.
+      // Keeping a sent attachment as a retryable draft would duplicate the turn.
+      try {
+        await this.refreshSession();
+      } catch (error) {
+        if (this.api === api && this.session?.ID === session.ID)
+          this.error =
+            error instanceof Error ? error.message : 'Cannot refresh the accepted message.';
+      }
     }
     return receipt;
   }

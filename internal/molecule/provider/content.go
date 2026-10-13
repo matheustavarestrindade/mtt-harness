@@ -129,6 +129,12 @@ func encodeChatMessageContent(contents []atom.Content) (any, error) {
 				return nil, fmt.Errorf("audio input requires WAV or MP3 data")
 			}
 			parts = append(parts, map[string]any{"type": "input_audio", "input_audio": map[string]any{"data": base64.StdEncoding.EncodeToString(content.Data), "format": format}})
+		case atom.Video:
+			videoURL, operationError := encodeVideoURL(content)
+			if operationError != nil {
+				return nil, operationError
+			}
+			parts = append(parts, map[string]any{"type": "video_url", "video_url": map[string]any{"url": videoURL}})
 		case atom.File:
 			if len(content.Data) == 0 {
 				return nil, fmt.Errorf("file input requires inline data")
