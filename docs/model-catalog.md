@@ -35,6 +35,12 @@ The Codex model endpoint uses the `client_version` query value. The value is par
 
 The harness reads the `visibility` field. It includes models with `list` and models without the field. It does not include models with `hide` or `none`.
 
+The Codex field `context_window` gives the client default. A `max_context_window` value above 0 gives the available maximum. The harness uses the maximum for `ModelInfo.ContextMax`. The harness uses `context_window` when the maximum is not available.
+
+A model configuration in `providers.json` can replace the value. Model presets use the same context limit.
+
+The harness must refresh the model cache to replace the context limit. The next request uses the selected model data. The provider model response replaces a value from Models.dev. The harness does not use an API context limit to replace a different provider limit.
+
 The `service_tiers` list gives model presets. The model preset ID is `MODEL_ID@TIER_ID`. The model name includes the service tier name. The fields `APIModel` and `ServiceTier` give the provider request values for `model` and `service_tier`. Session data, model permissions, and usage keep the model preset ID.
 
 A model preset uses the provider model data. Prices can be different. You can set prices in the JSON file for the model preset ID. When the provider removes a model or service tier, the harness removes the related model preset. The database keeps the request values in the model cache.

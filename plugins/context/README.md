@@ -77,12 +77,18 @@ Include system text, tool schemas, image data, audio data, task state, and memor
 The input thresholds are:
 
 - At 50%, add a context notice. It tells the AI to examine context and use `ctx_drop`.
-- At 65%, add a context notice to use `ctx_drop` and `ctx_wrapup` immediately.
+- At 65%, add a context notice. It gives a request to use `ctx_drop` and `ctx_wrapup`.
 - At 80%, hold the next model request and apply context compaction without model approval.
+
+The 50% and 65% context notices give a request to the model. The model can continue without context tool calls. Memory jobs do not stop a request below the 80% limit. The queue accepts user messages while the plugin prepares context.
 
 Keep system instructions, the last user request, active tool work, and `TODO` / `DOING` data. A tool call and the tool result must stay together. Write memory records before source messages are removed from the context view. The plugin must change the context view in one transaction after the active tool group.
 
-After context compaction at 80%, the input budget must be below 50%. The plugin gives an error when it cannot keep necessary content in the input budget. A memory job with an error must not cause content removal. The context fitter must use plugin policy when the plugin state is `ON`.
+The default `target_percent` is 45. Context notices give a goal to the model. It is not a request limit. After automatic context compaction, the request can continue below the 80% limit.
+
+The plugin can apply context compaction while a different memory job has an error. Source messages for the memory job stay in the context.
+
+The plugin gives an error when it cannot keep necessary content below the 80% limit. The context fitter must use plugin policy when the plugin state is `ON`.
 
 ## Memory Snapshots and Cache
 
