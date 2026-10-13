@@ -160,7 +160,7 @@
       "protocol": "responses",
       "authentication": "chatgpt",
       "api_url": "https://chatgpt.com/backend-api/codex",
-      "model_list_url": "https://chatgpt.com/backend-api/codex/models?client_version=0.101.0",
+      "model_list_url": "https://chatgpt.com/backend-api/codex/models?client_version=0.162.1",
       "model_list_format": "codex",
       "metadata_url": "https://models.dev/api.json",
       "metadata_format": "models_dev",

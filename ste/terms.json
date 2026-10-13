@@ -2,6 +2,24 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "service tier",
+      "category": "technical_noun",
+      "approved_forms": [
+        "service tiers"
+      ],
+      "meaning": "a provider-advertised request priority and usage class for a model",
+      "source": "Codex model catalog"
+    },
+    {
+      "term": "model preset",
+      "category": "technical_noun",
+      "approved_forms": [
+        "model presets"
+      ],
+      "meaning": "a selectable model ID that maps to a provider model and service tier",
+      "source": "model catalog"
+    },
+    {
       "term": "file attachment",
       "category": "technical_noun",
       "approved_forms": [

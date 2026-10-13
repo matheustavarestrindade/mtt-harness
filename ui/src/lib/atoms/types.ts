@@ -87,6 +87,8 @@ export interface SessionDeletion {
 }
 export interface Model {
   ID: string;
+  APIModel?: string;
+  ServiceTier?: string;
   Name?: string;
   Level: number;
   Input: string[] | null;

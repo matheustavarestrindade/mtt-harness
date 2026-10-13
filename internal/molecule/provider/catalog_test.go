@@ -104,13 +104,13 @@ func TestMalformedCatalogKeepsLastUsableModels(test *testing.T) {
 
 func TestCodexCatalogFetchesRemoteAvailabilityAndMetadata(test *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/models" || request.URL.Query().Get("client_version") != "0.101.0" || request.Header.Get("Authorization") != "Bearer test-access-token" || request.Header.Get("ChatGPT-Account-Id") != "test-account" {
+		if request.URL.Path != "/models" || request.URL.Query().Get("client_version") != "2.4.6" || request.Header.Get("Authorization") != "Bearer test-access-token" || request.Header.Get("ChatGPT-Account-Id") != "test-account" {
 			test.Error("catalog request lost configured URL or account authentication")
 		}
 		fmt.Fprint(responseWriter, `{"models":[{"slug":"remote-coding-model","display_name":"Remote coding model","context_window":32768,"input_modalities":["text","image"],"supports_parallel_tool_calls":false}]}`)
 	}))
 	defer server.Close()
-	standardProvider := New(atom.ProviderSpec{Name: "example-coding-plan", ModelListURL: server.URL + "/models?client_version=0.101.0", ModelListFormat: "codex"})
+	standardProvider := New(atom.ProviderSpec{Name: "example-coding-plan", ModelListURL: server.URL + "/models?client_version=2.4.6", ModelListFormat: "codex"})
 	standardProvider.SetHeaderResolver(func(context.Context) (http.Header, error) {
 		return http.Header{"Authorization": {"Bearer test-access-token"}, "Chatgpt-Account-Id": {"test-account"}}, nil
 	})

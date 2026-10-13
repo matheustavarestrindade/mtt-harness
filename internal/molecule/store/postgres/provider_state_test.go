@@ -29,12 +29,15 @@ func TestProviderAuthenticationAndReasoningPersistence(test *testing.T) {
 	if storedSpec.Protocol != "responses" || storedSpec.Authentication != "chatgpt" || storedSpec.ModelListFormat != "codex" {
 		test.Fatalf("provider metadata = %#v", storedSpec)
 	}
-	model := atom.ModelInfo{ID: "unclassified-model", Name: "Example model", ToolSupportUnknown: true, ContextMax: 8192}
+	model := atom.ModelInfo{ID: "unclassified-model@expedited", APIModel: "unclassified-model", ServiceTier: "expedited", Name: "Example model", ToolSupportUnknown: true, ContextMax: 8192}
 	testutil.RequireNoError(test, database.Providers().SaveModels(operationContext, identifier, []atom.ModelInfo{model}))
 	storedModels, operationError := database.Providers().Models(operationContext, identifier)
 	testutil.RequireNoError(test, operationError)
 	if len(storedModels) != 1 || storedModels[0].ID != model.ID || storedModels[0].Name != model.Name || !storedModels[0].ToolSupportUnknown || storedModels[0].Tools {
 		test.Fatalf("model names or capabilities were lost in storage: %+v", storedModels)
+	}
+	if storedModels[0].APIModel != model.APIModel || storedModels[0].ServiceTier != model.ServiceTier {
+		test.Fatal("cached model preset lost its provider model or service tier")
 	}
 	session := atom.Session{ID: atom.SessionID(identifier), InstanceID: identifier, CreatedAt: time.Now()}
 	testutil.RequireNoError(test, database.Sessions().Save(operationContext, session))

@@ -11,7 +11,13 @@ import (
 type catalogModel struct {
 	ID string
 	ModelMetadata
-	Prices *atom.Prices
+	Prices       *atom.Prices
+	ServiceTiers []catalogServiceTier
+}
+
+type catalogServiceTier struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type openAIModelEntry struct {
@@ -25,19 +31,22 @@ type openAIModelEntry struct {
 	} `json:"pricing"`
 }
 
-// The Codex wire fields are documented by openai/codex, rust-v0.101.0:
+// The Codex wire fields are documented by openai/codex, rust-v0.162.1:
 // codex-rs/protocol/src/openai_models.rs and codex-api/src/endpoint/models.rs.
 // supports_parallel_tool_calls concerns parallelism, not basic tool support.
 type codexModelEntry struct {
-	Slug                     string           `json:"slug"`
-	DisplayName              *string          `json:"display_name"`
-	ContextWindow            *int             `json:"context_window"`
-	InputModalities          []atom.MediaType `json:"input_modalities"`
-	DefaultReasoningEffort   *string          `json:"default_reasoning_level"`
+	Slug                     string               `json:"slug"`
+	Visibility               *string              `json:"visibility"`
+	ServiceTiers             []catalogServiceTier `json:"service_tiers"`
+	DisplayName              *string              `json:"display_name"`
+	ContextWindow            *int                 `json:"context_window"`
+	InputModalities          []atom.MediaType     `json:"input_modalities"`
+	DefaultReasoningEffort   *string              `json:"default_reasoning_level"`
 	SupportedReasoningLevels *[]struct {
 		Effort string `json:"effort"`
 	} `json:"supported_reasoning_levels"`
-	SupportsReasoningSummaries *bool `json:"supports_reasoning_summaries"`
+	SupportsReasoningSummaries        *bool `json:"supports_reasoning_summaries"`
+	SupportsReasoningSummaryParameter *bool `json:"supports_reasoning_summary_parameter"`
 }
 
 func decodeModelCatalog(responseBody io.Reader, format string) ([]catalogModel, error) {
@@ -85,6 +94,9 @@ func decodeModelCatalog(responseBody io.Reader, format string) ([]catalogModel, 
 			return nil, fmt.Errorf("model catalog must contain a models array")
 		}
 		for _, entry := range *response.Models {
+			if entry.Visibility != nil && *entry.Visibility != "list" {
+				continue
+			}
 			metadata := ModelMetadata{Name: entry.DisplayName, ContextMax: entry.ContextWindow, Input: entry.InputModalities, DefaultReasoningEffort: entry.DefaultReasoningEffort}
 			if entry.SupportedReasoningLevels != nil {
 				metadata.ReasoningEfforts = []string{}
@@ -106,7 +118,11 @@ func decodeModelCatalog(responseBody io.Reader, format string) ([]catalogModel, 
 				}
 				metadata.ReasoningSummary = &summary
 			}
-			catalog = append(catalog, catalogModel{ID: entry.Slug, ModelMetadata: metadata})
+			if entry.SupportsReasoningSummaryParameter != nil && !*entry.SupportsReasoningSummaryParameter {
+				summary := ""
+				metadata.ReasoningSummary = &summary
+			}
+			catalog = append(catalog, catalogModel{ID: entry.Slug, ModelMetadata: metadata, ServiceTiers: entry.ServiceTiers})
 		}
 	default:
 		return nil, fmt.Errorf("unsupported model catalog format %q", format)

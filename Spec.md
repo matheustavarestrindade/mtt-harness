@@ -504,11 +504,17 @@ A model list response can give only IDs. The harness uses model data in the sequ
 
 When a model list endpoint is available, the harness uses only the IDs in a correct response. An empty list removes available models. A request error or an incorrect response keeps the last correct list. Model data in the JSON file must not add IDs to the response list.
 
+A service tier from the provider can give a model preset. The model preset ID is `MODEL_ID@TIER_ID`. The fields `APIModel` and `ServiceTier` give the provider request values. Session data, model permissions, and usage keep the model preset ID. The model cache keeps the request values. Model preset prices can be different from provider model prices.
+
 The field `ToolSupportUnknown` is `true` when the response does not give data about tools. Then the harness sends the tool definitions. The provider can reject the request. A value of `false` for `tools` removes tool definitions. The database keeps `ToolSupportUnknown` with `Tools`.
 
 For the `codex` format, the adapter reads the model list URL with account authentication. The response has a `models` array with `slug`, `display_name`, `context_window`, and `input_modalities` fields. The configuration supplies the URL and client version. A source code change is not necessary to change the URL or version.
 
 The Codex response also supplies `supported_reasoning_levels`, `default_reasoning_level`, and `supports_reasoning_summaries`. The adapter uses the data for reasoning effort selection. Token prices from Models.dev do not apply to subscription access.
+
+The Codex client version can change the available model list. The adapter reads `visibility` and `service_tiers`. It includes models with `list` and models without `visibility`. It does not include models with `hide` or `none`. A model preset is removed when the provider removes the related model or service tier.
+
+With `chatgpt` authentication, the adapter does not send `max_output_tokens`. The harness keeps the output token limit.
 
 A provider can use the `Refresher` interface:
 

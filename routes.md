@@ -218,6 +218,10 @@ A correct model list response replaces available models. An empty list removes a
 
 The field `ToolSupportUnknown` is `true` when the response does not give data about tools. Then the harness sends tool definitions. A value of `false` for `tools` in model data removes tool definitions.
 
+Codex model lists do not include models with `visibility: hide` or `visibility: none`. A service tier can add a model preset with the ID `MODEL_ID@TIER_ID`. The optional fields `APIModel` and `ServiceTier` give the provider request values.
+
+A `Fast` model preset uses the provider model ID and `service_tier: priority`. Use the full model preset ID in session and workspace requests.
+
 The provider list contains providers in the registry and the test provider when available. A previous database provider without a registry entry is not in the response. Provider data includes the fields:
 
 ```typescript
@@ -491,6 +495,7 @@ type Provider = {
 type Model = {
   ID: string; Name?: string; Level: number; Input: string[] | null; Output: string[] | null;
   Tools: boolean; ToolSupportUnknown?: boolean; ContextMax: number;
+  APIModel?: string; ServiceTier?: string;
   Reasoning?: boolean; ReasoningEfforts?: string[]; DefaultReasoningEffort?: string;
   ReasoningSummary?: string; Billing?: 'tokens' | 'subscription';
   Prices: null | (PriceRates & { Currency: string; Source?: string; Tiers?: PriceTier[] });
