@@ -2,6 +2,63 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "Sidekick note",
+      "category": "technical_noun",
+      "approved_forms": [
+        "Sidekick notes"
+      ],
+      "meaning": "quoted task-scoped context prepared by the Sidekick worker",
+      "source": "Sidekick plugin"
+    },
+    {
+      "term": "retrieval source",
+      "category": "technical_noun",
+      "approved_forms": [
+        "retrieval sources"
+      ],
+      "meaning": "workspace memory or project file supplying context evidence",
+      "source": "Sidekick plugin"
+    },
+    {
+      "term": "memory retrieval",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "searching current workspace memory through the public read-only service",
+      "source": "harness memory service"
+    },
+    {
+      "term": "file retrieval",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "bounded read-only project file search",
+      "source": "workspace file service"
+    },
+    {
+      "term": "worker record",
+      "category": "technical_noun",
+      "approved_forms": [
+        "worker records"
+      ],
+      "meaning": "persisted background worker run metadata",
+      "source": "plugin storage"
+    },
+    {
+      "term": "Sidekick",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "workspace plugin that supplies task-scoped context notes",
+      "source": "plugins/sidekick"
+    },
+    {
+      "term": "filtering worker",
+      "category": "technical_noun",
+      "approved_forms": [
+        "filtering workers"
+      ],
+      "meaning": "workspace model worker that selects supported relevant context notes",
+      "source": "Sidekick plugin"
+    },
+    {
       "term": "prompt template",
       "category": "technical_noun",
       "approved_forms": [

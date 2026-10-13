@@ -135,6 +135,12 @@ Open `Settings`, then `Instructions`, or use `Instruction reminders` in the Memo
 
 The panel shows `low`, `medium`, `high`, and `deferred` reminders. It also shows added input tokens and worker usage. Automatic reminders do not make worker model calls. A worker model is necessary for the `remember_instructions` tool.
 
+## Sidekick
+
+The `Sidekick` section is in the settings dialog. The task panel also has a `Sidekick settings` button. A worker model is necessary before the plugin state can be `ON`.
+
+The panel shows Sidekick notes and worker usage. Workspace memory and project files are different retrieval sources. The harness gives Sidekick notes to the agent in a model request.
+
 ## Workspace Memory
 
 The `Memory` panel is on the right side of a large screen. Use the header control to open or close it. Small screens use a navigation drawer. Memory data applies to the workspace, across sessions.

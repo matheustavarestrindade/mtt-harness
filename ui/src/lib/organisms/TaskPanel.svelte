@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ListTodo, X } from 'lucide-svelte';
+  import { Bot, ListTodo, X } from 'lucide-svelte';
   import { Button } from '../atoms/ui/button';
   import { shortID } from '../atoms/format';
   import type { Session, TaskState } from '../atoms/types';
@@ -10,11 +10,13 @@
     state,
     error = '',
     onClose,
+    onSidekick,
   }: {
     session: Session | null;
     state: TaskState | null;
     error?: string;
     onClose: () => void;
+    onSidekick: () => void;
   } = $props();
   const active = $derived(Boolean(state?.Doing) || Boolean(state?.Todo.length));
 </script>
@@ -50,4 +52,9 @@
         Select a session to see its tasks.
       </p>{/if}
   </div>
+  <footer class="shrink-0 border-t border-border px-3 py-2">
+    <Button variant="ghost" class="h-11 w-full justify-start gap-2 text-xs" onclick={onSidekick}
+      ><Bot class="size-4" />Sidekick settings</Button
+    >
+  </footer>
 </section>

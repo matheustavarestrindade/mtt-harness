@@ -1,5 +1,12 @@
 <script lang="ts">
-  import { Cable, ChartNoAxesCombined, PlugZap, SlidersHorizontal, Repeat2 } from 'lucide-svelte';
+  import {
+    Cable,
+    ChartNoAxesCombined,
+    PlugZap,
+    SlidersHorizontal,
+    Repeat2,
+    Bot,
+  } from 'lucide-svelte';
   import * as Dialog from '../atoms/ui/dialog';
   import { Button } from '../atoms/ui/button';
   import type { SettingsSection } from '../atoms/settings';
@@ -10,6 +17,7 @@
   import UsagePanel from './UsagePanel.svelte';
   import RuntimeSettingsPanel from './RuntimeSettingsPanel.svelte';
   import RepetitionPanel from './RepetitionPanel.svelte';
+  import SidekickPanel from './SidekickPanel.svelte';
 
   let {
     open = $bindable(false),
@@ -41,6 +49,7 @@
   const sections = [
     { id: 'general' as const, label: 'General', icon: SlidersHorizontal },
     { id: 'instructions' as const, label: 'Instructions', icon: Repeat2 },
+    { id: 'sidekick' as const, label: 'Sidekick', icon: Bot },
     { id: 'usage' as const, label: 'Usage', icon: ChartNoAxesCombined },
     { id: 'providers' as const, label: 'Providers', icon: PlugZap },
     { id: 'connection' as const, label: 'Connection', icon: Cable },
@@ -98,6 +107,7 @@
           {#key api}
             {#if section === 'general'}<RuntimeSettingsPanel {api} {instance} />
             {:else if section === 'instructions'}<RepetitionPanel {api} {instance} />
+            {:else if section === 'sidekick'}<SidekickPanel {api} {instance} />
             {:else if section === 'usage'}<UsagePanel {api} {instance} {session} />
             {:else if section === 'providers'}<ProvidersPanel
                 {api}

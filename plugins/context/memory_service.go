@@ -6,8 +6,41 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
+
+// VerifyWorkspaceMemory checks current versions without embedding work or a
+// change to the session's cached memory snapshot.
+func (plugin *Plugin) VerifyWorkspaceMemory(operationContext context.Context, workspaceID string, sessionID atom.SessionID, references []harness.MemoryReference) (bool, error) {
+	if len(references) > 20 || workspaceID == "" || sessionID == "" {
+		return false, fmt.Errorf("memory verification scope or count is invalid")
+	}
+	session, operationError := plugin.services.Conversations.Get(operationContext, sessionID)
+	if operationError != nil {
+		return false, operationError
+	}
+	if session.InstanceID != workspaceID {
+		return false, harness.ErrConversationUnavailable
+	}
+	configuration, operationError := plugin.requestConfiguration(operationContext, workspaceID)
+	if operationError != nil {
+		return false, operationError
+	}
+	if !configuration.Enabled || plugin.database == nil {
+		return false, harness.ErrWorkspaceMemoryUnavailable
+	}
+	for _, reference := range references {
+		record, operationError := readValue[memoryRecord](operationContext, plugin.database, workspaceID, "memory", reference.ID)
+		if operationError != nil {
+			return false, operationError
+		}
+		if record.ID == "" || record.Version != reference.Version || (record.Status != "active" && record.Status != "consolidated") {
+			return false, nil
+		}
+	}
+	return true, nil
+}
 
 // SearchWorkspaceMemory gives other plugins current, scoped memory references.
 // It records attributed retrieval work without touching any conversation view.

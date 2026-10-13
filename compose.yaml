@@ -36,6 +36,8 @@ services:
       - /etc/mtt/start_prompt.md
       - --spaced-repetition-prompts
       - /etc/mtt/spaced-repetition
+      - --sidekick-prompt-file
+      - /etc/mtt/sidekick.md
       - --database-url
       - postgres://${MTT_DB_USER:-mtt}:${MTT_DB_PASSWORD:-mtt}@postgres:5432/${MTT_DB_NAME:-mtt}?sslmode=disable
       - --port
@@ -76,6 +78,12 @@ services:
       - type: bind
         source: ./plugins/spaced_repetition/prompts
         target: /etc/mtt/spaced-repetition
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./plugins/sidekick/prompt.md
+        target: /etc/mtt/sidekick.md
         read_only: true
         bind:
           create_host_path: false
