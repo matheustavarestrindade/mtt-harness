@@ -23,7 +23,9 @@ During reasoning, the `Thinking` label includes a short text preview. The previe
 
 A text preview uses a maximum of 120 characters. The UI reads a maximum of 8192 characters for a preview.
 
-The UI uses `ActivityIndicator` for work in progress. The icon moves during a response. There is only an icon above the message input. A permission request removes the icon. The `prefers-reduced-motion` setting stops the movement.
+The UI uses `ActivityIndicator` for work in progress. The icon moves during a response. The sidebar shows the icon before the selected session label. If navigation is closed, the header shows the icon.
+
+The conversation does not have a row for the icon. A permission request removes the icon. The `prefers-reduced-motion` setting stops the movement.
 
 ## Markdown and Code
 

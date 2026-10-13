@@ -36,6 +36,36 @@ test('animate the loader without work text and stop it on cancellation', async (
   await expect(loader).toBeVisible();
   await expect(activity).toHaveText('');
   await expect(page.getByText('Harness is working', { exact: false })).toHaveCount(0);
+  await expect(
+    page
+      .getByRole('region', { name: 'Conversation', exact: true })
+      .getByRole('status', { name: 'Processing', exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator('[data-slot="conversation-activity"]')).toHaveCount(0);
+  const navigation = page.getByRole('navigation', { name: 'Workspaces and sessions', exact: true });
+  const header = page.locator('#conversation-header');
+  if (testInfo.project.name === 'mobile') {
+    await expect(header.getByRole('status', { name: 'Processing', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+    await expect(
+      navigation
+        .locator('[aria-current="page"]')
+        .getByRole('status', { name: 'Processing', exact: true }),
+    ).toBeVisible();
+    await expect(header.getByRole('status', { name: 'Processing', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Close navigation', exact: true }).click();
+  } else {
+    await expect(
+      navigation
+        .locator('[aria-current="page"]')
+        .getByRole('status', { name: 'Processing', exact: true }),
+    ).toBeVisible();
+    await expect(header.getByRole('status', { name: 'Processing', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Collapse navigation', exact: true }).click();
+    await expect(header.getByRole('status', { name: 'Processing', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Expand navigation', exact: true }).click();
+  }
+  await expect(activity).toHaveCount(1);
   expect(
     await loader.evaluate(
       (element) =>
@@ -63,7 +93,7 @@ test('animate the loader without work text and stop it on cancellation', async (
   if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 640 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await expect(page.getByText('Session ready', { exact: true })).toHaveCount(0);
-  await page.screenshot({ path: testInfo.outputPath('live-thinking-bits.png'), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('sidebar-processing.png'), fullPage: true });
   await page.getByRole('button', { name: 'Stop', exact: true }).click();
   await expect(activity).toHaveCount(0);
   await expect(page.locator('[data-slot="activity-indicator"]')).toHaveCount(0);

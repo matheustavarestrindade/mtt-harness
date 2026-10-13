@@ -13,6 +13,7 @@
     Radio,
   } from 'lucide-svelte';
   import { Button } from '$lib/atoms/ui/button';
+  import ActivityIndicator from '../atoms/ActivityIndicator.svelte';
   import WorkspaceSwitcher from '../molecules/WorkspaceSwitcher.svelte';
   import type { HarnessConsole } from '$lib/organisms/console.svelte';
   import type { Instance, Session } from '$lib/atoms/types';
@@ -46,6 +47,9 @@
     onActivity?: () => void;
     hasActiveTasks?: boolean;
   } = $props();
+  const processingSessionID = $derived(
+    workbench.status.running && !workbench.permissions.length ? workbench.session?.ID : undefined,
+  );
 </script>
 
 <nav aria-label="Workspaces and sessions" class="flex h-full min-h-0 min-w-0 flex-col bg-card">
@@ -115,10 +119,17 @@
           <button
             class="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-xs pointer-coarse:h-11"
             aria-current={workbench.session?.ID === session.ID ? 'page' : undefined}
+            aria-label={`${session.Parent ? 'Agent' : 'Session'} ${shortID(session.ID)}`}
             title={`${session.ID}\n${session.Model}`}
             onclick={() => onSelectSession(session)}
           >
-            {#if session.Parent}<GitBranch class="size-3.5 shrink-0" />{:else}<MessageSquare
+            {#if session.ID === processingSessionID}<span
+                role="status"
+                aria-label="Processing"
+                data-slot="session-activity"
+                class="inline-flex shrink-0"><ActivityIndicator class="size-3.5" /></span
+              >
+            {:else if session.Parent}<GitBranch class="size-3.5 shrink-0" />{:else}<MessageSquare
                 class="size-3.5 shrink-0"
                 strokeWidth={1.7}
               />{/if}

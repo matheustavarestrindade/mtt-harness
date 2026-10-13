@@ -15,7 +15,6 @@
   import type { HarnessConsole } from '$lib/organisms/console.svelte';
   import { messageText, shortID } from '$lib/atoms/format';
   import { buildConversationEntries } from '$lib/atoms/transcript';
-  import ActivityIndicator from '../atoms/ActivityIndicator.svelte';
   import MessageCard from '../molecules/MessageCard.svelte';
   import MessageContent from '../molecules/content/MessageContent.svelte';
   import PermissionCard from '../molecules/PermissionCard.svelte';
@@ -180,14 +179,6 @@
         >
           This child agent has completed its task. Its conversation is read-only.
         </p>{/if}
-      {#if workbench.status.running && !workbench.permissions.length}<div
-          role="status"
-          aria-label="Processing"
-          data-slot="conversation-activity"
-          class="mt-3 flex items-center px-2 py-2 text-muted-foreground"
-        >
-          <ActivityIndicator />
-        </div>{/if}
       {#if workbench.status.error}<p
           role="alert"
           class="mt-5 break-words rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm leading-6 text-destructive"
