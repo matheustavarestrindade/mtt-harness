@@ -514,7 +514,11 @@ A service tier from the provider can give a model preset. The model preset ID is
 
 The field `ToolSupportUnknown` is `true` when the response does not give data about tools. Then the harness sends the tool definitions. The provider can reject the request. A value of `false` for `tools` removes tool definitions. The database keeps `ToolSupportUnknown` with `Tools`.
 
-For the `codex` format, the adapter reads the model list URL with account authentication. The response has a `models` array with `slug`, `display_name`, `context_window`, and `input_modalities` fields. The configuration supplies the URL and client version. A source code change is not necessary to change the URL or version.
+For the `codex` format, the adapter reads the model list URL with account authentication. The response has a `models` array with `slug`, `display_name`, `context_window`, `max_context_window`, and `input_modalities` fields. The configuration supplies the URL and client version. A source code change is not necessary to change the URL or version.
+
+The `context_window` value is the Codex client default. A `max_context_window` value above 0 gives the available maximum. `ModelInfo.ContextMax` uses the maximum when available, or the client default.
+
+A model configuration in `providers.json` can replace the value. A model preset uses the same context limit.
 
 The Codex response also supplies `supported_reasoning_levels`, `default_reasoning_level`, and `supports_reasoning_summaries`. The adapter uses the data for reasoning effort selection. Token prices from Models.dev do not apply to subscription access.
 
@@ -729,7 +733,13 @@ A new session receives the initial workspace memory snapshot. Subsequent memory 
 
 New information uses `L`. Subsequent context refreshes use `M`, then `H`. Only the historian makes `I` memory records. A context checkpoint without context removal does not change compression levels.
 
-The runtime gives context notices at 50% and 65% of the input budget, after conversation messages. At 80%, the plugin holds the next model request and prepares context compaction. The default input budget after context compaction is below 45%. If necessary content is too large, the plugin gives an error. System instructions, the last user request, active work, task state, and tool groups stay in the request.
+The runtime gives context notices at 50% and 65% of the input budget, after conversation messages. A context notice gives a request to the model. The model can continue without context tool calls. A context notice does not stop model requests.
+
+The queue accepts user messages while the plugin prepares context. The default `target_percent` is 45. It is a goal for the model, not a request limit.
+
+At 80%, the plugin holds the next model request and prepares context compaction. The request can continue when the prepared context is below the 80% limit. A memory job with an error does not stop a request below the 80% limit. Source messages for the memory job stay in the context.
+
+If necessary content is at or above the 80% limit, the plugin gives an error. System instructions, the last user request, active work, task state, and tool groups stay in the request.
 
 The historian makes memory ideas from related memory records that the model does not use. The memory search tool can get initial memory records. A memory correction keeps previous versions and corrects memory ideas that use the previous fact. Worker memory search usage and model memory search usage stay in different usage counters.
 
