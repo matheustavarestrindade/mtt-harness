@@ -14,7 +14,7 @@ import (
 
 func (server *Server) sessionEvents(responseWriter http.ResponseWriter, request *http.Request) {
 	sessionID := atom.SessionID(request.PathValue("id"))
-	session, operationError := server.store.Sessions().Get(request.Context(), sessionID)
+	_, operationError := server.store.Sessions().Get(request.Context(), sessionID)
 	if respondToError(responseWriter, http.StatusNotFound, operationError) {
 		return
 	}
@@ -45,7 +45,7 @@ func (server *Server) sessionEvents(responseWriter http.ResponseWriter, request 
 	for {
 		// Subscribe before replay to close the replay/live gap. A callback only
 		// wakes this reader, so slow clients cannot block runtime publishers.
-		events, operationError := server.store.Events().Since(operationContext, session.InstanceID, cursor)
+		events, operationError := server.store.Events().SinceSession(operationContext, sessionID, cursor)
 		if operationError != nil {
 			return
 		}

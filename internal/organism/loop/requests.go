@@ -90,9 +90,6 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 	if operationError != nil {
 		return nil, operationError
 	}
-	if operationError := validateModelMedia(modelInfo, request.Messages); operationError != nil {
-		return nil, operationError
-	}
 	if operationError := modelInfo.ValidateReasoningEffort(request.ReasoningEffort); operationError != nil {
 		return nil, operationError
 	}

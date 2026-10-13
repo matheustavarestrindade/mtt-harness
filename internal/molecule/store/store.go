@@ -54,6 +54,8 @@ type EventStore interface {
 	Append(operationContext context.Context, event atom.Event) error
 	Record(operationContext context.Context, event atom.Event) (atom.Event, error)
 	Since(operationContext context.Context, instanceID string, sequenceNumber uint64) ([]atom.Event, error)
+	// SinceSession keeps a live cursor within one independently committed stream.
+	SinceSession(operationContext context.Context, sessionID atom.SessionID, sequenceNumber uint64) ([]atom.Event, error)
 }
 
 type ProcessStore interface {

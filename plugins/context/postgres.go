@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type postgresRepository struct{ pool *pgxpool.Pool }
+type postgresRepository struct {
+	pool          *pgxpool.Pool
+	searchIndexes sync.Map
+}
 
 func openRepository(operationContext context.Context, databaseURL string) (*postgresRepository, error) {
 	if databaseURL == "" {
@@ -96,8 +100,14 @@ func (database *postgresRepository) Transact(operationContext context.Context, w
 	return operationTransaction.Commit(operationContext)
 }
 
-func (database *postgresRepository) PendingWorkspaces(operationContext context.Context, limit int) ([]string, error) {
-	rows, operationError := database.pool.Query(operationContext, `SELECT workspace_id FROM context_plugin.documents WHERE (kind='job' AND data->>'status' IN ('pending','running')) OR kind='workspace' GROUP BY workspace_id ORDER BY workspace_id LIMIT $1`, limit)
+func (database *postgresRepository) PendingWorkspaces(operationContext context.Context, after string, limit int) ([]string, error) {
+	rows, operationError := database.pool.Query(operationContext, `
+	 (SELECT DISTINCT workspace_id FROM context_plugin.documents
+	  WHERE workspace_id>$1 AND kind='workspace' ORDER BY workspace_id LIMIT $2)
+	 UNION
+	 (SELECT DISTINCT workspace_id FROM context_plugin.documents
+	  WHERE workspace_id>$1 AND kind='job' AND data->>'status' IN ('pending','running') ORDER BY workspace_id LIMIT $2)
+	 ORDER BY workspace_id LIMIT $2`, after, limit)
 	if operationError != nil {
 		return nil, operationError
 	}

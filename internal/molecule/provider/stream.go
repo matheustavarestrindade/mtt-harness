@@ -65,17 +65,7 @@ type sseChunk struct {
 		} `json:"delta"`
 		FinishReason *string `json:"finish_reason"`
 	} `json:"choices"`
-	Usage *struct {
-		PromptTokens        int `json:"prompt_tokens"`
-		CompletionTokens    int `json:"completion_tokens"`
-		PromptTokensDetails struct {
-			CachedTokens     int `json:"cached_tokens"`
-			CacheWriteTokens int `json:"cache_write_tokens"`
-		} `json:"prompt_tokens_details"`
-		CompletionTokensDetails struct {
-			ReasoningTokens int `json:"reasoning_tokens"`
-		} `json:"completion_tokens_details"`
-	} `json:"usage"`
+	Usage *chatUsage `json:"usage"`
 }
 
 type toolAccumulator struct {
@@ -92,6 +82,7 @@ func parseChatCompletionEvents(operationContext context.Context, body io.ReadClo
 	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	accumulators := map[int]*toolAccumulator{}
 	complete := false
+	var terminationError error
 	audioID := ""
 	var reasoningText strings.Builder
 	send := func(part atom.ResponsePart) bool {
@@ -123,8 +114,11 @@ func parseChatCompletionEvents(operationContext context.Context, body io.ReadClo
 			return
 		}
 		for _, choice := range chunk.Choices {
-			if choice.FinishReason != nil {
+			if choice.FinishReason != nil && *choice.FinishReason != "" {
 				complete = true
+				if reasonError := chatCompletionTermination(providerName, *choice.FinishReason); reasonError != nil {
+					terminationError = reasonError
+				}
 			}
 			reasoning := choice.Delta.ReasoningContent
 			if reasoning == "" {
@@ -195,26 +189,22 @@ func parseChatCompletionEvents(operationContext context.Context, body io.ReadClo
 			}
 		}
 		if chunk.Usage != nil {
-			cached := chunk.Usage.PromptTokensDetails.CachedTokens
-			written := chunk.Usage.PromptTokensDetails.CacheWriteTokens
-			usage := atom.Usage{
-				Input:      chunk.Usage.PromptTokens - cached - written,
-				CacheRead:  cached,
-				CacheWrite: written,
-				Output:     chunk.Usage.CompletionTokens,
-				Reasoning:  chunk.Usage.CompletionTokensDetails.ReasoningTokens,
-			}
-			if usage.Input < 0 || usage.Output < 0 || usage.CacheRead < 0 || usage.CacheWrite < 0 || usage.Reasoning < 0 || usage.Reasoning > usage.Output {
-				stream.operationError = fmt.Errorf("invalid negative token usage")
+			usage, usageError := normalizeProviderUsage(chunk.Usage.PromptTokens, chunk.Usage.CompletionTokens, chunk.Usage.PromptTokensDetails, chunk.Usage.CompletionTokensDetails, chunk.Usage.Cost)
+			if usageError != nil {
+				stream.operationError = usageError
 				return
 			}
-			if !send(atom.ResponsePart{Usage: &usage}) {
+			if !send(atom.ResponsePart{Usage: usage}) {
 				return
 			}
 		}
 	}
 	if operationError := scanner.Err(); operationError != nil {
 		stream.operationError = operationError
+		return
+	}
+	if terminationError != nil {
+		stream.operationError = terminationError
 		return
 	}
 	if !complete {

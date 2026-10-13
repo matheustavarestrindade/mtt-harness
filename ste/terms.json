@@ -2,6 +2,84 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "playback",
+      "category": "technical_noun",
+      "meaning": "presentation of saved audio or video through a media player",
+      "source": "web media rendering"
+    },
+    {
+      "term": "HNSW index",
+      "category": "technical_noun",
+      "approved_forms": [
+        "HNSW indexes"
+      ],
+      "meaning": "a nearest-neighbor index implemented with a hierarchical navigable small-world graph",
+      "source": "pgvector documentation"
+    },
+    {
+      "term": "text index",
+      "category": "technical_noun",
+      "approved_forms": [
+        "text indexes"
+      ],
+      "meaning": "a database search index for words or literal string fragments",
+      "source": "PostgreSQL search"
+    },
+    {
+      "term": "context fitting",
+      "category": "technical_noun",
+      "meaning": "selection of retained conversation turns within the model request token limit",
+      "source": "request budgeting"
+    },
+    {
+      "term": "binary search",
+      "category": "technical_noun",
+      "meaning": "an algorithm that reduces a search interval by half for each comparison",
+      "source": "context fitting"
+    },
+    {
+      "term": "search candidate",
+      "category": "technical_noun",
+      "approved_forms": [
+        "search candidates"
+      ],
+      "meaning": "a retrieved entry considered for final search ranking",
+      "source": "workspace memory search"
+    },
+    {
+      "term": "exact search",
+      "category": "technical_noun",
+      "meaning": "retrieval that evaluates all eligible vectors instead of approximate vector candidates",
+      "source": "pgvector search"
+    },
+    {
+      "term": "memory job dispatcher",
+      "category": "technical_noun",
+      "meaning": "the context plugin worker scheduler that selects and leases pending memory jobs",
+      "source": "context plugin"
+    },
+    {
+      "term": "Blob URL",
+      "category": "technical_noun",
+      "approved_forms": [
+        "Blob URLs"
+      ],
+      "meaning": "a browser object URL for an in-memory media resource",
+      "source": "web media rendering"
+    },
+    {
+      "term": "HNSW",
+      "category": "technical_noun",
+      "meaning": "a hierarchical navigable small-world graph index for approximate nearest-neighbor vector search",
+      "source": "pgvector documentation"
+    },
+    {
+      "term": "pg_trgm",
+      "category": "technical_noun",
+      "meaning": "the PostgreSQL extension for trigram text matching and indexes",
+      "source": "PostgreSQL documentation"
+    },
+    {
       "term": "service tier",
       "category": "technical_noun",
       "approved_forms": [

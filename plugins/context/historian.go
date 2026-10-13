@@ -38,14 +38,12 @@ func (plugin *Plugin) scheduleHistorian(operationContext context.Context, worksp
 		if schedule.Next.After(now) {
 			return nil
 		}
-		jobs, operationError := readTransactionValues[memoryJob](database, "job")
+		activeJobs, operationError := database.HasActiveJobs()
 		if operationError != nil {
 			return operationError
 		}
-		for _, job := range jobs {
-			if job.Status == "pending" || job.Status == "running" {
-				return nil
-			}
+		if activeJobs {
+			return nil
 		}
 		memories, operationError := readTransactionValues[memoryRecord](database, "memory")
 		if operationError != nil {

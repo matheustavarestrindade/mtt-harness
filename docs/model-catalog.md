@@ -95,6 +95,14 @@ Use `billing: subscription` to prevent API token cost estimates. The standard pr
 
 Provider costs can be different from cost estimates. DeepSeek prices can change with time. The UI identifies cost estimates. Use the provider account to get the provider cost.
 
+## Response Error and Cost
+
+A response with `finish_reason: aborted` or `finish_reason: insufficient_system_resource` is an error. A response with `finish_reason: length` or `finish_reason: content_filter` is also an error. An unknown `finish_reason` is an error. The harness keeps available response text and usage. A response error does not increase the task state response counter.
+
+The adapters read `usage.cost` from Chat Completions and Responses. A cost number uses currency `USD`. A cost object keeps the currency, value, and `Estimated` fields.
+
+A cost of 0 differs from a cost that is not available. If the cost field is not in the response, the cost is not available. A `null` value does not give a cost. A provider cost replaces a price estimate.
+
 ## Checks
 
 The test suite uses model IDs for the test and a local HTTP server. The command that follows also reads the live model catalog:

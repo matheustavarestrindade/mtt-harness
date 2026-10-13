@@ -2,6 +2,7 @@ package loop
 
 import (
 	"context"
+	"errors"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/internal/operation"
@@ -22,10 +23,20 @@ func (agentLoop *Loop) runModelRound(session atom.Session, modelCall *preparedMo
 	message, tasks, operationError := agentLoop.receiveModelResponse(roundContext, session, modelCall)
 	if operationError != nil {
 		cancelRound()
-		waitForTools(tasks)
+		results := waitForTools(tasks)
+		// A provider interruption is not a completed response, but its partial
+		// output and charges remain factual history. User cancellation/revert
+		// keeps the existing writer fence and must not publish a late message.
+		if message.ID != "" && operationContext.Err() == nil {
+			saveError := agentLoop.saveModelResponse(operationContext, session, modelCall.modelID, message, "error")
+			if saveError == nil && len(message.ToolCalls) > 0 {
+				saveError = agentLoop.saveToolResults(operationContext, session, message.ToolCalls, results)
+			}
+			operationError = errors.Join(operationError, saveError)
+		}
 		return false, operation.WrapError(operationError, "receive model response")
 	}
-	if operationError := agentLoop.saveModelResponse(operationContext, session, modelCall.modelID, message); operationError != nil {
+	if operationError := agentLoop.saveModelResponse(operationContext, session, modelCall.modelID, message, "completed"); operationError != nil {
 		cancelRound()
 		waitForTools(tasks)
 		return false, operation.WrapError(operationError, "save model response")

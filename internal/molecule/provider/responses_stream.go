@@ -21,17 +21,7 @@ type responseEvent struct {
 	Item         json.RawMessage `json:"item"`
 	Response     struct {
 		Output []json.RawMessage `json:"output"`
-		Usage  *struct {
-			Input        int `json:"input_tokens"`
-			Output       int `json:"output_tokens"`
-			InputDetails struct {
-				Cached     int `json:"cached_tokens"`
-				CacheWrite int `json:"cache_write_tokens"`
-			} `json:"input_tokens_details"`
-			OutputDetails struct {
-				Reasoning int `json:"reasoning_tokens"`
-			} `json:"output_tokens_details"`
-		} `json:"usage"`
+		Usage  *responsesUsage   `json:"usage"`
 	} `json:"response"`
 }
 
@@ -115,6 +105,21 @@ func parseResponsesAPIEvents(operationContext context.Context, body io.ReadClose
 			stream.operationError = fmt.Errorf("invalid Responses stream JSON: %w", operationError)
 			return false
 		}
+		// Terminal failures can still carry billable usage. Deliver it before the
+		// error so chat and workspace-worker accounting retain the reported cost.
+		switch event.Type {
+		case "response.completed", "response.failed", "response.incomplete":
+			if reported := event.Response.Usage; reported != nil {
+				usage, usageError := normalizeProviderUsage(reported.Input, reported.Output, reported.InputDetails, reported.OutputDetails, reported.Cost)
+				if usageError != nil {
+					stream.operationError = usageError
+					return false
+				}
+				if !send(atom.ResponsePart{Usage: usage}) {
+					return false
+				}
+			}
+		}
 		switch event.Type {
 		case "response.reasoning_summary_text.delta":
 			return reasoning.appendDelta(reasoningPartKey(event.OutputIndex, "summary", event.SummaryIndex), event.Delta)
@@ -152,15 +157,6 @@ func parseResponsesAPIEvents(operationContext context.Context, body io.ReadClose
 			}
 			if len(state.Reasoning) > 0 && !send(atom.ResponsePart{ProviderState: state}) {
 				return false
-			}
-			if usage := event.Response.Usage; usage != nil {
-				if usage.Input < 0 || usage.Output < 0 || usage.InputDetails.Cached < 0 || usage.InputDetails.CacheWrite < 0 || usage.InputDetails.Cached+usage.InputDetails.CacheWrite > usage.Input || usage.OutputDetails.Reasoning < 0 || usage.OutputDetails.Reasoning > usage.Output {
-					stream.operationError = fmt.Errorf("invalid Responses token usage")
-					return false
-				}
-				if !send(atom.ResponsePart{Usage: &atom.Usage{Input: usage.Input - usage.InputDetails.Cached - usage.InputDetails.CacheWrite, CacheRead: usage.InputDetails.Cached, CacheWrite: usage.InputDetails.CacheWrite, Output: usage.Output, Reasoning: usage.OutputDetails.Reasoning}}) {
-					return false
-				}
 			}
 			return false
 		case "response.failed", "response.incomplete", "error":

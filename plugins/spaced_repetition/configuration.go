@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
 type intervalConfiguration struct {
@@ -118,26 +120,7 @@ func validateConfiguration(value configuration) error {
 }
 
 func (plugin *Plugin) loadConfiguration(operationContext context.Context, workspaceID string) (configuration, json.RawMessage, error) {
-	global, operationError := plugin.services.Settings.Get(operationContext, "", settingsKey)
-	if operationError != nil {
-		return configuration{}, nil, operationError
-	}
-	var override string
-	if workspaceID != "" {
-		override, operationError = plugin.services.Settings.Get(operationContext, workspaceID, settingsKey)
-		if operationError != nil {
-			return configuration{}, nil, operationError
-		}
-	}
-	value, operationError := mergeConfiguration(json.RawMessage(global), json.RawMessage(override))
-	data := json.RawMessage(override)
-	if workspaceID == "" {
-		data = json.RawMessage(global)
-	}
-	if len(data) == 0 {
-		data = json.RawMessage(`{}`)
-	}
-	return value, data, operationError
+	return harness.LoadPluginConfiguration(operationContext, plugin.services.Settings, workspaceID, settingsKey, mergeConfiguration)
 }
 
 func configurationEqual(first, second configuration) bool { return reflect.DeepEqual(first, second) }

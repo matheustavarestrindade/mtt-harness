@@ -43,13 +43,15 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 	var content []atom.Content
 	var usage *atom.Usage
 	var providerState *atom.ProviderState
+	var streamError error
 	for {
 		part, operationError := responseStream.Recv(operationContext)
 		if errors.Is(operationError, io.EOF) {
 			break
 		}
 		if operationError != nil {
-			return atom.Message{}, tasks, operationError
+			streamError = operationError
+			break
 		}
 		if part.Text != "" {
 			text.WriteString(part.Text)
@@ -104,5 +106,5 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 	if usage != nil {
 		usage.Cost = calculateUsageCost(modelCall.model, usage)
 	}
-	return message, tasks, nil
+	return message, tasks, streamError
 }

@@ -30,11 +30,22 @@ func (eventStore *events) Record(operationContext context.Context, event atom.Ev
 }
 
 func (eventStore *events) Since(operationContext context.Context, instanceID string, sequenceNumber uint64) ([]atom.Event, error) {
+	return eventStore.readEvents(operationContext, instanceID, nil, sequenceNumber)
+}
+
+func (eventStore *events) SinceSession(operationContext context.Context, sessionID atom.SessionID, sequenceNumber uint64) ([]atom.Event, error) {
+	return eventStore.readEvents(operationContext, "", &sessionID, sequenceNumber)
+}
+
+func (eventStore *events) readEvents(operationContext context.Context, instanceID string, sessionID *atom.SessionID, sequenceNumber uint64) ([]atom.Event, error) {
+	if operationError := operationContext.Err(); operationError != nil {
+		return nil, operationError
+	}
 	eventStore.store.mutex.RLock()
 	defer eventStore.store.mutex.RUnlock()
 	var list []atom.Event
 	for _, event := range eventStore.store.events {
-		if event.Seq > sequenceNumber && (instanceID == "" || event.InstanceID == instanceID) {
+		if event.Seq > sequenceNumber && (instanceID == "" || event.InstanceID == instanceID) && (sessionID == nil || event.SessionID == *sessionID) {
 			list = append(list, event)
 			if len(list) == 1000 {
 				break

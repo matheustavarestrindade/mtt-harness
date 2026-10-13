@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS events (
 	payload jsonb,
 	created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS events_session_sequence ON events (session_id, seq);
 CREATE TABLE IF NOT EXISTS processes (
 	id text PRIMARY KEY,
 	instance_id text NOT NULL,

@@ -1,10 +1,8 @@
 package provider
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
@@ -69,35 +67,22 @@ func encodeResponsesAPIContent(contents []atom.Content) (any, error) {
 			parts = append(parts, map[string]any{"type": "input_text", "text": content.Text})
 		case atom.Image:
 			hasMedia = true
-			imageURL := content.URL
-			if imageURL == "" {
-				if len(content.Data) == 0 {
-					return nil, fmt.Errorf("image content has no data")
-				}
-				mime := content.MIME
-				if mime == "" {
-					mime = "image/png"
-				}
-				imageURL = "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(content.Data)
-			}
-			parsed, operationError := url.Parse(imageURL)
-			if operationError != nil || (parsed.Scheme != "http" && parsed.Scheme != "https" && parsed.Scheme != "data") {
-				return nil, fmt.Errorf("image URL requires HTTP, HTTPS or a data URI")
+			imageURL, operationError := encodeImageURL(content)
+			if operationError != nil {
+				return nil, operationError
 			}
 			parts = append(parts, map[string]any{"type": "input_image", "image_url": imageURL})
 		case atom.File:
 			hasMedia = true
-			if len(content.Data) == 0 {
-				return nil, fmt.Errorf("file input requires inline data")
+			fileData, operationError := encodeFileData(content)
+			if operationError != nil {
+				return nil, operationError
 			}
-			filename, mime := content.Filename, content.MIME
+			filename := content.Filename
 			if filename == "" {
 				filename = "attachment.bin"
 			}
-			if mime == "" {
-				mime = "application/octet-stream"
-			}
-			parts = append(parts, map[string]any{"type": "input_file", "filename": filename, "file_data": "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(content.Data)})
+			parts = append(parts, map[string]any{"type": "input_file", "filename": filename, "file_data": fileData})
 		case atom.Video:
 			hasMedia = true
 			videoURL, operationError := encodeVideoURL(content)

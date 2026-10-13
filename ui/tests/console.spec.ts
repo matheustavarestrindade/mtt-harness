@@ -83,13 +83,14 @@ test('explain a missing workspace directory and preserve the form for correction
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog).toContainText('The folder must already exist.');
+  await expect(dialog).not.toContainText('Docker');
   await dialog.getByLabel('Project directory').fill('/teste');
   await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText(
     'The directory "/teste" does not exist on the harness server.',
   );
-  await expect(dialog.getByRole('alert')).toContainText('/workspace');
+  await expect(dialog.getByRole('alert')).not.toContainText('Docker');
+  await expect(dialog.getByRole('alert')).not.toContainText('/workspace');
   await expect(dialog.getByLabel('Project directory')).toHaveValue('/teste');
   expect(fixture.instances).toHaveLength(0);
   await dialog.getByLabel('Project directory').fill('/workspace/existing-project');

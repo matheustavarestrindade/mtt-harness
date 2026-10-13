@@ -1,5 +1,7 @@
 # UI contributor rules
 
+- Healthy WebSockets drive history synchronization. Poll only small session/queue metadata while the stream is live; lifecycle changes and reconnects refresh history, and disconnected streams retain polling recovery. Preserve unchanged message identities and media Blob URLs across authoritative reads. New attachment bytes/MIME/URL replace and revoke the old resource; unrelated state updates must not reset audio/video playback. Workspace errors must describe server paths without assuming Docker.
+
 - Providers is a compact responsive grid. Default cards show only the provider name, authentication/status summary, and Configure/Models buttons. Key forms, sign-in controls, disconnect, and key links belong behind Configure; model names, pricing, reasoning, and refresh belong behind Models. Do not render or fetch closed catalogs just to populate the settings overview. Reuse ProviderCard, keep 44px controls, preserve model access and pending OAuth when a card collapses, and abort/fence stale catalog reads.
 
 - Below 1024px, the top bar contains only Open navigation, the workspace name, and the model/effort line. The navigation drawer owns labeled Tasks, Memory, Session activity, and Settings actions; New session stays above its session list. Opening an action closes navigation before showing its panel/dialog. Closing that view restores focus to Open navigation. Preserve drafts and the Session settings cog beside Send. Desktop toolbar actions remain available at the navigation breakpoint.

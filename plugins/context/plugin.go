@@ -36,6 +36,7 @@ type Plugin struct {
 	closed             bool
 	started            bool
 	lastError          string
+	dispatchCursor     string
 	unsubscribers      []harness.Unsubscribe
 }
 

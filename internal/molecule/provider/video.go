@@ -54,7 +54,7 @@ func encodeVideoURL(content atom.Content) (string, error) {
 	if operationError != nil {
 		return "", operationError
 	}
-	return "data:" + mediaType + ";base64," + base64.StdEncoding.EncodeToString(content.Data), nil
+	return inlineMediaDataURI(content.Data, mediaType), nil
 }
 
 func parseVideoMIME(value string) (string, error) {

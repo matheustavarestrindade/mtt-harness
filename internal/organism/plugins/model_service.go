@@ -120,6 +120,7 @@ func (services *Services) Run(operationContext context.Context, input harness.Wo
 			return response, nil
 		}
 		if streamError != nil {
+			response.Text = text.String()
 			return response, streamError
 		}
 		if part.ToolCall != nil {

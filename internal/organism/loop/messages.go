@@ -7,7 +7,7 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
 
-func (agentLoop *Loop) saveModelResponse(operationContext context.Context, session atom.Session, modelID string, message atom.Message) error {
+func (agentLoop *Loop) saveModelResponse(operationContext context.Context, session atom.Session, modelID string, message atom.Message, status string) error {
 	usage := message.Usage
 	message, operationError := agentLoop.pipeline.Response(operationContext, message)
 	if operationError != nil {
@@ -25,7 +25,7 @@ func (agentLoop *Loop) saveModelResponse(operationContext context.Context, sessi
 	}
 	return agentLoop.configuration.Store.Usage().Save(operationContext, atom.UsageRecord{
 		InstanceID: session.InstanceID, SessionID: session.ID, ModelID: modelID,
-		Usage: *usage, CreatedAt: time.Now(), RequestID: message.ID,
+		Usage: *usage, CreatedAt: time.Now(), RequestID: message.ID, Status: status,
 	})
 }
 

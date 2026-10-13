@@ -3,7 +3,6 @@ package provider
 import (
 	"encoding/base64"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
@@ -99,22 +98,9 @@ func encodeChatMessageContent(contents []atom.Content) (any, error) {
 		case atom.Text:
 			parts = append(parts, map[string]any{"type": "text", "text": content.Text})
 		case atom.Image:
-			imageURL := content.URL
-			if imageURL != "" {
-				parsed, operationError := url.Parse(imageURL)
-				if operationError != nil || (parsed.Scheme != "https" && parsed.Scheme != "http" && parsed.Scheme != "data") {
-					return nil, fmt.Errorf("image URL requires HTTP, HTTPS or a data URI")
-				}
-			}
-			if imageURL == "" {
-				if len(content.Data) == 0 {
-					return nil, fmt.Errorf("image content has no data")
-				}
-				mime := content.MIME
-				if mime == "" {
-					mime = "image/png"
-				}
-				imageURL = "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(content.Data)
+			imageURL, operationError := encodeImageURL(content)
+			if operationError != nil {
+				return nil, operationError
 			}
 			parts = append(parts, map[string]any{"type": "image_url", "image_url": map[string]any{"url": imageURL}})
 		case atom.Audio:
@@ -136,8 +122,9 @@ func encodeChatMessageContent(contents []atom.Content) (any, error) {
 			}
 			parts = append(parts, map[string]any{"type": "video_url", "video_url": map[string]any{"url": videoURL}})
 		case atom.File:
-			if len(content.Data) == 0 {
-				return nil, fmt.Errorf("file input requires inline data")
+			fileData, operationError := encodeFileData(content)
+			if operationError != nil {
+				return nil, operationError
 			}
 			filename := content.Filename
 			if filename == "" {
@@ -146,11 +133,7 @@ func encodeChatMessageContent(contents []atom.Content) (any, error) {
 					filename = "attachment.pdf"
 				}
 			}
-			mime := content.MIME
-			if mime == "" {
-				mime = "application/octet-stream"
-			}
-			parts = append(parts, map[string]any{"type": "file", "file": map[string]any{"filename": filename, "file_data": "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(content.Data)}})
+			parts = append(parts, map[string]any{"type": "file", "file": map[string]any{"filename": filename, "file_data": fileData}})
 		default:
 			return nil, fmt.Errorf("unsupported content type %q", content.Type)
 		}

@@ -173,6 +173,16 @@ The `documents` table keeps memory records, memory versions, source messages, co
 
 Memory search selects the workspace and category data before it compares vectors and literal text. The tool output has a 16 KiB text limit. A cursor continues long source text without a change to UTF-8 bytes.
 
+Memory search uses a text index and a vector index. A memory search request prepares an HNSW index when necessary. An HNSW index has one model ID and a vector dimension value. The pgvector limit for an HNSW index is 2000 vector dimensions. Larger vectors use exact search. Memory search keeps vector data for different model IDs isolated.
+
+Memory search compares text search candidates and vector search candidates. The limit is 64 to 1024 search candidates for a query. Exact search gives more documents when the vector search candidates do not give the necessary number.
+
+Memory search keeps workspace data isolated and keeps category selection. The version and session deletion rules do not change. The `pg_trgm` extension gives a text index for strings.
+
+The memory job dispatcher reads a maximum of 64 memory jobs in a workspace transaction. Completed memory jobs stay in storage. The memory job dispatcher uses `priority`, `created_at`, `next_attempt`, and `lease_until` to select work.
+
+The memory job dispatcher examines a maximum of 64 workspaces at a time. The next operation continues from the previous workspace.
+
 Workers use worker leases and source epochs. The plugin writes source messages to the memory archive before the core history operation. A subsequent process examines the history operation against the conversation store. It does not make a session available after session deletion.
 
 The model request contains stable message IDs in runtime data after conversation messages. Source text is data, not system instructions. The memory archive does not include internal provider continuation data. The primary request keeps necessary provider data with the tool group.

@@ -3,6 +3,7 @@ package contextplugin
 import (
 	"context"
 	"encoding/json"
+	"time"
 )
 
 // repository keeps inference outside transactions. Every operation is scoped
@@ -11,7 +12,7 @@ type repository interface {
 	Read(context.Context, string, string, string) (json.RawMessage, error)
 	List(context.Context, string, string, string, int) ([]json.RawMessage, error)
 	Transact(context.Context, string, func(transaction) error) error
-	PendingWorkspaces(context.Context, int) ([]string, error)
+	PendingWorkspaces(context.Context, string, int) ([]string, error)
 	Search(context.Context, string, searchQuery) ([]searchHit, error)
 	Count(context.Context, string) (map[string]int64, error)
 	Metric(context.Context, string, string, string, int64, int64) error
@@ -21,6 +22,8 @@ type repository interface {
 type transaction interface {
 	Get(string, string) (json.RawMessage, error)
 	List(string) ([]json.RawMessage, error)
+	RunnableJobs(time.Time, int) ([]memoryJob, error)
+	HasActiveJobs() (bool, error)
 	Put(string, string, any) error
 	NextSourceID() (int64, error)
 	ReplaceVectors(string, string, int, string, []string, []vectorChunk, bool, bool) error
