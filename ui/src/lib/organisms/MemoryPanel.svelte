@@ -13,11 +13,11 @@
   import { Button } from '../atoms/ui/button';
   import { Label } from '../atoms/ui/label';
   import type { Instance, Model } from '../atoms/types';
-  import { costLabel, formatTokenCount, modelLabel, workspaceName } from '../atoms/format';
+  import { costLabel, formatTokenCount, workspaceName } from '../atoms/format';
   import { memoryCounter, totalAgentUsage, agentTokenCount } from '../atoms/memory';
   import type { HarnessApi } from '../molecules/api/client';
   import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
-  import SelectField from '../molecules/SelectField.svelte';
+  import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import { MemoryPanelState } from './memory-panel.svelte';
 
   let {
@@ -197,17 +197,12 @@
             >
           </div>
           <div class="space-y-1.5">
-            <Label for="memory-worker-model" class="text-xs">Worker model</Label><SelectField
+            <Label for="memory-worker-model" class="text-xs">Worker model</Label><ModelCombobox
               id="memory-worker-model"
               class="text-xs"
               bind:value={workerModel}
               placeholder="Choose a model"
-              options={[
-                ...(workerModel && !models.some((model) => model.ID === workerModel)
-                  ? [{ value: workerModel, label: workerModel }]
-                  : []),
-                ...models.map((model) => ({ value: model.ID, label: modelLabel(model) })),
-              ]}
+              {models}
               disabled={configurationDisabled}
             />
           </div>

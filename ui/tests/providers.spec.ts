@@ -158,13 +158,13 @@ test('offer every available model and submit model IDs rather than display names
   await expect(page.getByRole('option')).toHaveCount(3);
   await expect(
     page.getByRole('option', {
-      name: 'DeepSeek-V4.1-Flash (deepseek/deepseek-flash)',
+      name: 'DeepSeek-V4.1-Flash',
       exact: true,
     }),
   ).toBeVisible();
   await expect(
     page.getByRole('option', {
-      name: 'DeepSeek-V4-Pro-0813 (deepseek/deepseek-v4-pro)',
+      name: 'DeepSeek-V4-Pro-0813',
       exact: true,
     }),
   ).toBeVisible();
@@ -345,7 +345,11 @@ test('configure API providers, refresh catalogs, and remove a key', async ({ pag
   await page.screenshot({ path: testInfo.outputPath('providers.png'), fullPage: true });
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
-  await expect(page.getByLabel('Default model')).toContainText('deepseek/deepseek-flash');
+  await expect(page.getByLabel('Default model')).toHaveAttribute(
+    'data-value',
+    'deepseek/deepseek-flash',
+  );
+  await expect(page.getByLabel('Default model')).not.toContainText('deepseek/deepseek-flash');
   await expect(page.getByLabel('Default model')).not.toContainText('openai/gpt-6-luna');
 });
 

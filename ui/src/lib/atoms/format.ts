@@ -1,7 +1,7 @@
 import type { Message, Model, Statistics } from './types';
 
-export function modelLabel(model: Model): string {
-  return model.Name ? `${model.Name} (${model.ID})` : model.ID;
+export function modelLabel(model: Pick<Model, 'ID' | 'Name'>): string {
+  return model.Name?.trim() || model.ID.slice(model.ID.indexOf('/') + 1);
 }
 
 export function workspaceName(path: string): string {
