@@ -4,10 +4,9 @@
   import { Label } from '$lib/atoms/ui/label';
   import { Button } from '$lib/atoms/ui/button';
   import type { Model } from '$lib/atoms/types';
-  import { modelLabel } from '$lib/atoms/format';
   import ReasoningSelect from './ReasoningSelect.svelte';
   import ModelPricing from './ModelPricing.svelte';
-  import SelectField from './SelectField.svelte';
+  import ModelCombobox from './ModelCombobox.svelte';
   let {
     open = $bindable(false),
     models = [],
@@ -54,13 +53,10 @@
       }}
     >
       <div class="space-y-2">
-        <Label for="session-model">Model</Label><SelectField
+        <Label for="session-model">Model</Label><ModelCombobox
           id="session-model"
           bind:value={selectedModel}
-          options={models.map((model) => ({
-            value: model.ID,
-            label: `${modelLabel(model)}${model.Tools ? '' : ' · tool support not declared'}`,
-          }))}
+          {models}
           disabled={busy}
           required
         />{#if !models.length}<p class="text-sm text-muted-foreground">

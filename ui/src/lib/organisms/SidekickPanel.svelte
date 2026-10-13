@@ -6,10 +6,10 @@
   import { Button } from '../atoms/ui/button';
   import { Input } from '../atoms/ui/input';
   import { Label } from '../atoms/ui/label';
-  import { costLabel, formatTokenCount, modelLabel, workspaceName } from '../atoms/format';
+  import { costLabel, formatTokenCount, workspaceName } from '../atoms/format';
   import { totalAgentUsage, agentTokenCount } from '../atoms/memory';
   import type { HarnessApi } from '../molecules/api/client';
-  import SelectField from '../molecules/SelectField.svelte';
+  import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
   import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
@@ -189,7 +189,7 @@
         }}
       >
         <div class="space-y-2">
-          <Label for={`${identifier}-model`}>Worker model</Label><SelectField
+          <Label for={`${identifier}-model`}>Worker model</Label><ModelCombobox
             id={`${identifier}-model`}
             value={workerModel}
             onValueChange={(value) => {
@@ -198,12 +198,7 @@
             }}
             {disabled}
             placeholder="Choose a worker model"
-            options={[
-              ...(workerModel && !models.some((model) => model.ID === workerModel)
-                ? [{ value: workerModel, label: workerModel }]
-                : []),
-              ...models.map((model) => ({ value: model.ID, label: modelLabel(model) })),
-            ]}
+            {models}
           />
         </div>
         {#if modelsError}<p role="alert" class="text-sm text-destructive">{modelsError}</p>{/if}

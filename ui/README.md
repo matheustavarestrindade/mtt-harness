@@ -80,16 +80,16 @@ On a small screen, the header shows the workspace name and model. The navigation
 The sidebar shows the session list for the selected workspace. The `Switch workspace` button opens a `DropdownMenu` with workspaces and a `New workspace` action. The sidebar keeps the session list. A navigation drawer stays open until session selection.
 
 1. Connect to the API.
-2. Make a workspace with a server directory and a default model. For the test provider, use `test/test-model`.
+2. Make a workspace with a server directory and a default model.
 3. Make a session.
 4. Send a message.
 5. Read the response and tool results.
 
-With the default Docker configuration, the host directory `./workspace` is at `/workspace` in the harness container. The path is on the harness server, not on the browser device. Put project files in the host directory `./workspace`.
+The directory path is on the harness server, not on the browser device. The directory must be available before a workspace starts. The workspace request does not make a directory. Use a full path, such as `/home/user/projects/project`, on the harness server.
 
-The directory must be available before a workspace starts. The workspace request does not make a directory. For `/workspace/teste`, first make the host directory `./workspace/teste`. A path such as `/teste` refers to a different directory in the container.
+The workspace form starts with an empty directory field. The form does not expand `~`. A path with `~` shows an error before the request. For a container server, use the directory path that is available in the container.
 
-The harness includes the test provider by default in Docker. Open `Settings`, then `Providers`, to connect OpenAI or DeepSeek. The API contracts are in `../routes.md`.
+Open `Settings`, then `Providers`, to connect a provider. The API contracts are in `../routes.md`.
 
 ## File Attachments
 
@@ -132,7 +132,7 @@ ChatGPT subscription: openai-codex/MODEL
 
 Use the `Models` button to get and show model IDs from the API. Use the button again to close the list. The list has the `Refresh models` button. A model list error shows in the list. A list that is closed does not use space in the provider section.
 
-The workspace form shows the models from providers with a connection. The session form shows the model list from the instance API. The forms show the optional model label with the ID. Requests use the ID.
+The workspace form shows the models from providers with a connection. The session form shows the model list from the instance API. Model lists have provider sections in name sequence. Use the text field to find a model or provider. The forms show the model label without the model ID. Requests use the full model ID.
 
 DeepSeek uses the API ID `deepseek-flash` for `DeepSeek-V4.1-Flash`. The other model is `deepseek-v4-pro`, with the label `DeepSeek-V4-Pro-0813`. See the [DeepSeek model data](https://api-docs.deepseek.com/quick_start/pricing). The test model is for connection checks.
 
@@ -202,7 +202,7 @@ Stop active work and remove messages from the queue before session deletion. Sto
 
 The UI can make workspaces and sessions. The user can select an instance or session from the navigation. The UI can start a stopped workspace. It can send text, stop a turn, remove a message from the queue, and accept or deny a permission request.
 
-The UI shows message history, tool input, tool results, events, token usage, and cost data. It reads status and history at an interval of 1.5 seconds. A WebSocket event can also cause a new request. The UI shows model text during the response. Message IDs connect event text to the history.
+The UI shows message history, tool input, tool results, events, token usage, and cost data. It reads session data and status at an interval of 1.5 seconds. WebSocket events cause history requests. A connection error starts full history requests. The UI shows model text during the response. Message IDs connect event text to the history.
 
 The `Tasks` control opens task state on the right side. On large screens, the control is in the header. On small screens, the control is in the navigation drawer. The panel contains task statuses and the `DOING` task title and description.
 

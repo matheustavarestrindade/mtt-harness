@@ -249,7 +249,7 @@ test('revalidate drafts after model changes and reject Responses audio', async (
   await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Session settings', exact: true }).click();
   await chooseSelectOption(
-    page.getByRole('button', { name: 'Session model', exact: true }),
+    page.getByRole('combobox', { name: 'Session model', exact: true }),
     'test/text-only',
   );
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();

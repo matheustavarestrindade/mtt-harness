@@ -52,21 +52,22 @@ test('scroll a large model catalog without horizontal overflow and retain the di
   await connectAndCreate(page);
   if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 640 });
   await page.getByRole('button', { name: 'Session settings', exact: true }).click();
-  const model = page.getByRole('button', { name: 'Session model', exact: true });
+  const model = page.getByRole('combobox', { name: 'Session model', exact: true });
   await model.click();
   const list = page.getByRole('listbox');
   await expect(page.getByRole('option')).toHaveCount(61);
   expect((await list.boundingBox())!.height).toBeLessThanOrEqual(321);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.keyboard.press('End');
-  const last = page.getByRole('option').last();
+  const last = page
+    .getByRole('option')
+    .and(page.locator('[data-option-value="synthetic/catalog-model-59"]'));
+  await last.scrollIntoViewIfNeeded();
   await expect(last).toBeInViewport();
-  await expect(last).toHaveAttribute('data-highlighted');
   await page.screenshot({ path: testInfo.outputPath('shadcn-model-select.png'), fullPage: true });
-  await page.keyboard.press('Enter');
+  await last.click();
   await expect.poll(() => fixture.sessions[0].Model).toBe('synthetic/catalog-model-59');
   await expect(model).toContainText('Catalog model 59');
-  await expect(model).toContainText('synthetic/catalog-model-59');
+  await expect(model).not.toContainText('synthetic/catalog-model-59');
   await expect(model).toHaveAttribute('data-value', 'synthetic/catalog-model-59');
   await expect(page.locator('select:visible')).toHaveCount(0);
 });
