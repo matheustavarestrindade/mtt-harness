@@ -96,8 +96,9 @@ func (plugin *Plugin) PrepareContext(operationContext context.Context, input har
 	forced := budget.InputTokens*100 >= budget.InputLimit*configuration.HardPercent
 	view.InputTokens, view.InputLimit = budget.InputTokens, budget.InputLimit
 	if view.WrapRequested || forced {
-		deadline := time.NewTimer(time.Duration(configuration.JobTimeoutMilliseconds) * time.Millisecond)
-		defer deadline.Stop()
+		// The worker deadline bounds one leased attempt. A checkpoint can span
+		// several resumable attempts and queued jobs; ending the turn on that
+		// same deadline would cancel the preparation it needs to finish.
 		for {
 			prepared, prepareError := plugin.prepareReduction(operationContext, input.Session.InstanceID, view)
 			if prepareError != nil {
@@ -139,9 +140,9 @@ func (plugin *Plugin) PrepareContext(operationContext context.Context, input har
 			case <-operationContext.Done():
 				pause.Stop()
 				return selection, operationContext.Err()
-			case <-deadline.C:
+			case <-plugin.operationContext.Done():
 				pause.Stop()
-				return selection, fmt.Errorf("forced context checkpoint is waiting for memory preparation")
+				return selection, plugin.operationContext.Err()
 			case <-pause.C:
 			}
 		}
