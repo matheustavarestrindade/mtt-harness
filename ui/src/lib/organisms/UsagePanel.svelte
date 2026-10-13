@@ -23,12 +23,12 @@
     statistics
       ? [
           {
-            label: 'Input tokens',
+            label: 'Total input tokens',
             value: integer(statistics.Input + statistics.CacheRead + statistics.CacheWrite),
           },
-          { label: 'Output tokens', value: integer(statistics.Output) },
+          { label: 'Total output tokens', value: integer(statistics.Output) },
           { label: 'Model calls', value: integer(statistics.Calls) },
-          { label: 'Cache hit', value: `${statistics.CacheHitPercentage.toFixed(1)}%` },
+          { label: 'Overall cache hit', value: `${statistics.CacheHitPercentage.toFixed(1)}%` },
           { label: 'Reasoning tokens', value: integer(statistics.Reasoning) },
           {
             label:
@@ -77,7 +77,8 @@
     <div>
       <h2 class="text-xl font-medium tracking-tight">Usage</h2>
       <p class="mt-2 text-sm leading-6 text-muted-foreground">
-        Recorded model usage, including child agents. Totals cover the available history.
+        Cumulative model usage, including child agents. Reused input is counted for every request.
+        Compaction does not subtract historical usage. These totals are not current context usage.
       </p>
     </div>
     <Button

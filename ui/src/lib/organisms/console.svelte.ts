@@ -1,3 +1,4 @@
+import { SvelteMap } from 'svelte/reactivity';
 import { ApiError, HarnessApi } from '../molecules/api/client';
 import { subscribeEvents, type StreamState } from '../molecules/api/events';
 import type {
@@ -15,6 +16,7 @@ import type {
 } from '../atoms/types';
 import { saveConnection, forgetConnection } from '../molecules/connection-storage';
 import { reconcileMessageHistory } from '../atoms/message-history';
+import { latestRequestUsage } from '../atoms/request-usage';
 
 const idleStatus = (): QueueStatus => ({ running: false, queued: 0, messages: [], error: '' });
 export class HarnessConsole {
@@ -48,11 +50,19 @@ export class HarnessConsole {
   private refreshing = false;
   private refreshPending = false;
   private savedMessageIDs = new Set<string>();
+  private requestModels = new SvelteMap<string, string>();
   private removedSessionIDs = new Set<string>();
   private selectionRevision = 0;
   private streamFlushTimer: ReturnType<typeof setTimeout> | undefined;
   private pendingText: string[] = [];
   private pendingReasoning: string[] = [];
+
+  get requestUsage() {
+    return latestRequestUsage(this.messages, this.session?.ID ?? '', this.requestModels, [
+      ...this.models,
+      ...this.catalog,
+    ]);
+  }
 
   async connect(base: string, token: string) {
     this.disconnect(false);
@@ -105,6 +115,7 @@ export class HarnessConsole {
     clearTimeout(this.refreshTimer);
     this.clearLiveMessage();
     this.savedMessageIDs.clear();
+    this.requestModels.clear();
     this.selectionRevision++;
     this.sessionPollTimer = undefined;
     this.refreshTimer = undefined;
@@ -375,11 +386,19 @@ export class HarnessConsole {
   }
 
   private receiveEvent(event: HarnessEvent) {
+    if (event.SessionID !== this.session?.ID) return;
     if (event.Name !== 'model.chunk') this.events = [...this.events.slice(-79), event];
     const payload =
       event.Payload && typeof event.Payload === 'object'
         ? (event.Payload as Record<string, unknown>)
         : {};
+    if (
+      event.Name === 'model.call' &&
+      typeof payload.message_id === 'string' &&
+      typeof payload.model === 'string'
+    ) {
+      this.requestModels.set(payload.message_id, payload.model);
+    }
     if (
       event.Name === 'task_state.updated' &&
       typeof payload.SessionID === 'string' &&

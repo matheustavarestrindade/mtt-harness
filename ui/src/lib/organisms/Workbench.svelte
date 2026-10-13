@@ -634,8 +634,10 @@
               settingsOpen={sessionSettingsOpen}
             />
             <div class="mt-1 flex items-center justify-between gap-2">
-              <UsageBar statistics={workbench.statistics} /><span
-                class="hidden shrink-0 text-[10px] text-muted-foreground/65 sm:block"
+              <UsageBar
+                statistics={workbench.statistics}
+                requestUsage={workbench.requestUsage}
+              /><span class="hidden shrink-0 text-[10px] text-muted-foreground/65 sm:block"
                 >{workbench.session
                   ? workbench.streamState === 'live'
                     ? 'Events connected'
