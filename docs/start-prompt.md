@@ -34,6 +34,14 @@ The default template includes the tool catalog, not full tool definitions. The i
 
 File edits can use information from the user, previous messages, or tool results. The model gets more file data only when necessary for a file edit. The tool definition gives output rules and steps for an error. The model must run the checks necessary for the task.
 
+## Workspace Scope
+
+File work uses the session workspace by default. The model reads `AGENTS.md` files in the workspace and related directories below it. The model does not examine `/`, `/home`, or parent directories to find workspace content.
+
+A file in an external directory can be necessary for a task. The user request or task data must identify the necessary external file. The model uses the file path or the smallest necessary directory.
+
+File tools, shell commands, and MCP tools have the same scope. Permission decisions and tool path rules also apply. Instruction reminder templates also give the workspace scope.
+
 ## Task State
 
 The default template gives the task tracking rules. Task tracking is optional. The model gets the `task_state` definition through tool discovery before a tool call.

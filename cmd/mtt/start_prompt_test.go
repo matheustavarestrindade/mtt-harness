@@ -32,10 +32,10 @@ func TestStartupPromptConfigurationAndFlagPrecedence(test *testing.T) {
 }
 
 func TestShippedStartupTemplateUsesSupportedVariables(test *testing.T) {
-	template, operationError := startprompt.Load(filepath.Join("..", "..", "start_prompt.md"))
-	testutil.RequireNoError(test, operationError)
+	workspace := filepath.Join(test.TempDir(), "project with spaces")
 	searchTool := tools.NewSearch(nil)
-	rendered, operationError := template.Render(context.Background(), startprompt.Values{
+	values := startprompt.Values{
+		Workspace: workspace,
 		ToolList: func() []atom.ToolReference {
 			return []atom.ToolReference{{Name: searchTool.Name(), Categories: searchTool.Categories()}}
 		},
@@ -43,9 +43,27 @@ func TestShippedStartupTemplateUsesSupportedVariables(test *testing.T) {
 			test.Fatalf("default prompt expanded a full tool definition: %s", name)
 			return atom.ToolSpec{}, nil
 		},
-	})
-	testutil.RequireNoError(test, operationError)
-	if strings.Contains(rendered, "{search_tool_info}") || strings.Contains(rendered, "input_schema") || !strings.Contains(rendered, "- search_tool") {
-		test.Fatal("shipped template did not keep tool metadata in the callable definitions")
+	}
+	for _, templatePath := range []string{
+		"start_prompt.md",
+		"plugins/spaced_repetition/prompts/low.md",
+		"plugins/spaced_repetition/prompts/medium.md",
+		"plugins/spaced_repetition/prompts/high.md",
+	} {
+		test.Run(templatePath, func(test *testing.T) {
+			template, operationError := startprompt.Load(filepath.Join("..", "..", filepath.FromSlash(templatePath)))
+			testutil.RequireNoError(test, operationError)
+			rendered, operationError := template.Render(context.Background(), values)
+			testutil.RequireNoError(test, operationError)
+			if !strings.Contains(rendered, workspace) || strings.Contains(rendered, "{workspace}") {
+				test.Fatal("shipped instructions did not render the session workspace")
+			}
+			if strings.Contains(rendered, "{search_tool_info}") || strings.Contains(rendered, "input_schema") {
+				test.Fatal("shipped instructions did not keep tool metadata in the callable definitions")
+			}
+			if templatePath == "start_prompt.md" && !strings.Contains(rendered, "- search_tool") {
+				test.Fatal("startup template omitted the discovery catalog")
+			}
+		})
 	}
 }
