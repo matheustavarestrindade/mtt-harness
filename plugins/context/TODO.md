@@ -66,6 +66,7 @@ The code and test suite are available. The UI control is subsequent work. Use `[
 - [x] Add usage counters for memory search, context compaction, historian work, and embeddings.
 - [x] Reject a worker result from a previous context after the `revert` operation, session deletion, cancellation, or a plugin state change.
 - [x] Keep the memory archive available after session deletion. Do not make the live session available again.
+- [x] The worker timeout applies to one worker attempt. Test worker progress and cancellation.
 - [x] Stop workers before you close the database connection. Keep database content after plugin removal.
 
 ## 7. UI ON/OFF Control

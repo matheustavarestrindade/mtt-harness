@@ -741,6 +741,10 @@ At 80%, the plugin holds the next model request and prepares context compaction.
 
 If necessary content is at or above the 80% limit, the plugin gives an error. System instructions, the last user request, active work, task state, and tool groups stay in the request.
 
+The memory worker timeout applies to one worker attempt. At 80%, a context checkpoint must wait while memory jobs run. The database keeps worker progress after a timeout. A new worker attempt uses the worker progress.
+
+The context checkpoint does not use the worker timeout to stop a turn. The context checkpoint stops when the user cancels the request or the harness stops.
+
 The historian makes memory ideas from related memory records that the model does not use. The memory search tool can get initial memory records. A memory correction keeps previous versions and corrects memory ideas that use the previous fact. Worker memory search usage and model memory search usage stay in different usage counters.
 
 Memory search selects workspace and category data before it compares vectors and literal text. The tool output has a 16 KiB text limit. A cursor continues UTF-8 text. Source data after session deletion is available with `include_deleted`. Previous versions are available with `include_history`. Memory search must not make a session available after session deletion.
