@@ -9,11 +9,13 @@
     type DataNode,
   } from '../../atoms/structured-data';
   import { copyToClipboard } from '../clipboard';
+  import AnsiText from './AnsiText.svelte';
   let {
     value,
     label = 'Data',
     controls = true,
-  }: { value: unknown; label?: string; controls?: boolean } = $props();
+    ansiOutput = false,
+  }: { value: unknown; label?: string; controls?: boolean; ansiOutput?: boolean } = $props();
   let entryLimit = $state(30);
   const root = $derived(structuredData(value, entryLimit));
   function source() {
@@ -52,9 +54,11 @@
         >
         <tbody
           >{#each node.children as row}<tr
-              >{#each columns as column}<td
+              >{#each columns as column}{@const field = row.children.find(
+                  (field) => field.key === column,
+                )}<td
                   class="max-w-72 whitespace-pre-wrap break-words border-b border-border/50 px-2 py-2 align-top"
-                  >{row.children.find((field) => field.key === column)?.text ?? '—'}</td
+                  >{#if field}{@render nodeView(field)}{:else}—{/if}</td
                 >{/each}</tr
             >{/each}</tbody
         >
@@ -78,6 +82,8 @@
           <div class="min-w-0 flex-1">{@render nodeView(child)}</div>
         </li>{/each}
     </ol>
+  {:else if ansiOutput && node.kind === 'text' && node.text.includes('\x1b')}
+    <AnsiText text={node.text} />
   {:else}
     <span
       class="block whitespace-pre-wrap break-words text-xs leading-5 {node.kind === 'text'

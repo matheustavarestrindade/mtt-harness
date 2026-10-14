@@ -1093,7 +1093,7 @@ The inactivity return contains the last 20 lines or 4096 bytes for standard outp
 
 With `wait: false`, a process can send one inactivity notification. The `idle_timeout` must be above 0. The notification mode must not be `none`. With `wait: true`, the inactivity return is the only inactivity notification. The process does not send it again.
 
-A runtime notification has the message role `runtime`. It is process data, not a user request or a system instruction. The queue keeps the message role. The UI shows the message as `Runtime`.
+A runtime notification has the message role `runtime`. It is process data, not a user request or a system instruction. The queue keeps the message role. The UI shows process output in tool sections.
 
 The provider request uses the role `user` for the runtime notification. The notification is context data. It is not a system instruction or a tool result. The content gives the message source.
 

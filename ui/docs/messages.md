@@ -9,6 +9,7 @@ The UI uses the libraries in the list:
 - [Highlight.js](https://highlightjs.org/) gives syntax highlighting.
 - [Papa Parse](https://www.papaparse.com/docs) reads CSV data.
 - [xterm.js](https://xtermjs.org/) shows terminal output with ANSI sequences.
+- [ANSIUp](https://github.com/drudru/ansi_up) shows ANSI text color in data fields.
 
 The dependency versions are in `ui/package-lock.json`. The code is in `ui/src/lib/molecules/content/`.
 
@@ -64,6 +65,8 @@ Tool input uses field labels and lists. The UI uses tables for tool result data.
 
 A data preview has a limit of 400 fields. The preview depth limit is 8. A text field uses a maximum of 32000 characters. The copy button and source download keep the input data. A JSON result above 1000000 characters uses the text view.
 
+JSON result fields and tables can contain ANSI sequences. ANSIUp gives text color and background color to the preview. DOMPurify removes executable markup. Tool input stays the same.
+
 The client prepares content views when the user opens a tool section. The section shows input, output, and the value of `ToolCallID`. The same section shows a new tool result. The UI shows a tool result in a different section if the tool call is not in the history.
 
 Tool sections, reasoning sections, and model text use the UI background. The sections have a line between them. A different color identifies a tool section. When a tool section opens, one panel contains input and output. The panel has a background color and border. Input and output have a line between them.
@@ -87,3 +90,11 @@ The client keeps a maximum of 524288 characters. The limit for output chunks is 
 The copy button uses terminal text. The source download keeps output text with ANSI sequences. When a tool section closes, the output connection stops. A session change also stops the connection. The connection stops when an agent panel closes. It also stops when the UI connection closes.
 
 The process exit status is different from the tool result. A process can continue after an inactivity return. If the process buffer is not available, the UI uses the tool result. The terminal view also shows previous `bash` output.
+
+## Process Notifications
+
+The harness keeps process notifications as `runtime` messages for the model. The UI puts process notifications in the applicable `bash` section. The UI does not show the notification text as a conversation message. The API message history stays the same.
+
+The fields `ToolCallID` and `ToolMessageID` connect a process record to a tool call. For a previous tool call with `wait: false`, the UI can use the process ID in the tool result. Command text and time values do not connect output to a tool call.
+
+If the tool call is not available, the UI shows one process output section. The section is closed by default. Previous exit output stays available after the process buffer is removed. Other runtime messages and user text stay in the conversation.

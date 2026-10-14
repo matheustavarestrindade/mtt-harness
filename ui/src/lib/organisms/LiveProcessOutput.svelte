@@ -18,6 +18,10 @@
   $effect(() => {
     const client = api;
     processID;
+    if (untrack(() => record.Status === 'stopped' && activity.processNotice?.kind === 'exit')) {
+      feed = undefined;
+      return;
+    }
     const current = untrack(() => new ProcessFeed(client, record));
     feed = current;
     return () => current.close();
@@ -48,9 +52,11 @@
         onclick={() => feed?.reconnect()}><RefreshCw class="size-3" />Reconnect terminal</Button
       >{/if}
   </div>
-  {#if feed.state === 'unavailable' && activity.result?.Content?.length}<ToolOutput {activity} />
+  {#if (feed.state === 'unavailable' || !feed.snapshot.chunks.length) && (activity.processNotice || activity.result?.Content?.length)}<ToolOutput
+      {activity}
+    />
   {:else}<TerminalOutput snapshot={feed.snapshot} />{/if}
   {#if feed.error}<p class="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">
       {feed.error}
     </p>{/if}
-{/if}
+{:else if activity.processNotice}<ToolOutput {activity} />{/if}

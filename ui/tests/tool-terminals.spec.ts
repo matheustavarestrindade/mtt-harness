@@ -149,10 +149,21 @@ test('stream ANSI colors and progress updates before bash returns, reconnect wit
   fixture.processChunk(record.ID, 'stderr', 'stderr\n');
   fixture.processChunk(record.ID, 'stdout', new Uint8Array([0x82, 0xac, 0x0a]));
   fixture.processChunk(record.ID, 'stdout', 'Progress 10%\r\x1b[2KProgress 100%\n');
+  fixture.processChunk(
+    record.ID,
+    'stdout',
+    '\x1b[38;2;18;171;99mRGB_FOREGROUND\x1b[0m\n\x1b[48;2;16;100;180mRGB_BACKGROUND\x1b[0m\n',
+  );
   await expect(shell.locator('.xterm-screen')).toBeVisible();
   await expect(shell).toContainText('Build passed');
   await expect(shell).toContainText('Progress 100%');
   await expect(shell).toContainText('€');
+  await expect(
+    shell.locator('.xterm-screen span').filter({ hasText: /^RGB_FOREGROUND$/ }),
+  ).toHaveCSS('color', 'rgb(18, 171, 99)');
+  await expect(
+    shell.locator('.xterm-screen span').filter({ hasText: /^RGB_BACKGROUND$/ }),
+  ).toHaveCSS('background-color', 'rgb(16, 100, 180)');
   expect(await shell.textContent()).not.toContain('\x1b');
   expect(await shell.textContent()).not.toContain('Progress 10%');
   await expect(shell.getByRole('status')).toHaveText('Live');

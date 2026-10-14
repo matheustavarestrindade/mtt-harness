@@ -2,6 +2,12 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "ANSIUp",
+      "category": "technical_noun",
+      "meaning": "the ANSI text-to-HTML formatter used for structured result previews",
+      "source": "web UI"
+    },
+    {
       "term": "ANSI sequence",
       "category": "technical_noun",
       "approved_forms": [

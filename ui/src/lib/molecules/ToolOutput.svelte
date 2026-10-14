@@ -10,7 +10,21 @@
   const path = $derived(plainFileReadPath(activity.call));
   const language = $derived(path ? fileLanguage(path) : 'text');
   const terminal = $derived(['bash', 'process_output'].includes(activity.call.Name));
-  const content = $derived(activity.result?.Content ?? []);
+  const content = $derived(
+    activity.processNotice
+      ? [
+          {
+            Type: 'text' as const,
+            Text: activity.processNotice.output,
+            Data: null,
+            MIME: '',
+            URL: '',
+            Filename: '',
+            AudioID: '',
+          },
+        ]
+      : (activity.result?.Content ?? []),
+  );
 </script>
 
 {#if terminal}
@@ -24,7 +38,7 @@
 {:else}
   {#each content as part}
     {@const data = part.Type === 'text' ? structuredJSON(part.Text) : null}
-    {#if data}<StructuredData value={data.value} label="Tool result" />
+    {#if data}<StructuredData value={data.value} label="Tool result" ansiOutput />
     {:else if part.Type === 'text' && part.Text.includes('\x1b')}<TerminalOutput text={part.Text} />
     {:else}<MessageContent
         content={[part]}

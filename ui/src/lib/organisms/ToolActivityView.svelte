@@ -15,7 +15,8 @@
     running?: boolean;
   } = $props();
   const record = $derived(
-    activity.call.Name === 'bash' ? processes.forCall(messageID, activity.call.ID) : null,
+    activity.processRecord ??
+      (activity.call.Name === 'bash' ? processes.forCall(messageID, activity.call.ID) : null),
   );
 </script>
 
@@ -28,7 +29,9 @@
       : record.Exit
         ? `Exited ${record.Exit.Code}`
         : 'Stopped'
-    : undefined}
+    : activity.processNotice?.kind === 'exit'
+      ? 'Stopped'
+      : undefined}
   renderOutput={record && processes.api ? terminal : undefined}
 />
 {#snippet terminal()}
