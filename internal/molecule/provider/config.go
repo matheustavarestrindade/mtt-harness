@@ -3,6 +3,8 @@ package provider
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -12,10 +14,11 @@ import (
 )
 
 type Config struct {
-	Spec          atom.ProviderSpec
-	Prices        map[string]atom.Prices
-	Models        []ModelConfiguration
-	ModelDefaults ModelMetadata
+	Spec             atom.ProviderSpec
+	Prices           map[string]atom.Prices
+	Models           []ModelConfiguration
+	ModelDefaults    ModelMetadata
+	WebSocketHeaders http.Header
 }
 
 type fileEntry struct {
@@ -23,6 +26,9 @@ type fileEntry struct {
 	Protocol         string               `json:"protocol"`
 	Authentication   string               `json:"authentication"`
 	APIURL           string               `json:"api_url"`
+	Transport        string               `json:"transport"`
+	WebSocketURL     string               `json:"websocket_url"`
+	WebSocketHeaders map[string]string    `json:"websocket_headers"`
 	ModelListURL     string               `json:"model_list_url"`
 	ModelListFormat  string               `json:"model_list_format"`
 	PriceTableURL    string               `json:"price_table_url"`
@@ -98,10 +104,10 @@ func LoadFile(path string) ([]Config, error) {
 		}
 		configurations = append(configurations, Config{
 			Spec: atom.ProviderSpec{Name: entry.Name, Protocol: entry.Protocol, Authentication: entry.Authentication,
-				APIURL: entry.APIURL, ModelListURL: entry.ModelListURL, ModelListFormat: entry.ModelListFormat,
+				APIURL: entry.APIURL, Transport: entry.Transport, WebSocketURL: entry.WebSocketURL, ModelListURL: entry.ModelListURL, ModelListFormat: entry.ModelListFormat,
 				PriceTableURL: entry.PriceTableURL, Interval: time.Duration(entry.RefreshHours) * time.Hour,
 				MetadataURL: entry.MetadataURL, MetadataFormat: entry.MetadataFormat, MetadataProvider: entry.MetadataProvider, Billing: entry.Billing},
-			Prices: prices, Models: entry.Models, ModelDefaults: entry.ModelDefaults,
+			Prices: prices, Models: entry.Models, ModelDefaults: entry.ModelDefaults, WebSocketHeaders: configuredWebSocketHeaders(entry.WebSocketHeaders),
 		})
 	}
 	return configurations, nil
@@ -110,6 +116,9 @@ func LoadFile(path string) ([]Config, error) {
 func validateProviderEntry(entry fileEntry) error {
 	if entry.Name == "" || entry.APIURL == "" {
 		return fmt.Errorf("provider name and api_url are required")
+	}
+	if operationError := validateResponseTransport(entry); operationError != nil {
+		return operationError
 	}
 	switch entry.Protocol {
 	case "", "responses", "chat_completions":
@@ -155,6 +164,42 @@ func validateProviderEntry(entry fileEntry) error {
 		modelIDs[model.ID] = true
 		if operationError := validateModelMetadata(model.ModelMetadata); operationError != nil {
 			return operationError
+		}
+	}
+	return nil
+}
+
+func configuredWebSocketHeaders(values map[string]string) http.Header {
+	headers := make(http.Header, len(values))
+	for name, value := range values {
+		headers.Set(name, value)
+	}
+	return headers
+}
+
+func validateResponseTransport(entry fileEntry) error {
+	switch entry.Transport {
+	case "", "http":
+	case "auto", "websocket":
+		if entry.Protocol != "responses" {
+			return fmt.Errorf("provider %s: %s transport requires the responses protocol", entry.Name, entry.Transport)
+		}
+	default:
+		return fmt.Errorf("provider %s: transport must be http, auto, or websocket", entry.Name)
+	}
+	if entry.WebSocketURL != "" {
+		address, operationError := url.Parse(entry.WebSocketURL)
+		if operationError != nil || address.Host == "" || address.User != nil || address.Fragment != "" || (address.Scheme != "ws" && address.Scheme != "wss") {
+			return fmt.Errorf("provider %s: websocket_url must be an absolute ws or wss URL without user information or a fragment", entry.Name)
+		}
+	}
+	for name, value := range entry.WebSocketHeaders {
+		lowerName := strings.ToLower(name)
+		if lowerName == "authorization" || lowerName == "proxy-authorization" || lowerName == "cookie" || lowerName == "x-api-key" || lowerName == "session_id" || lowerName == "connection" || lowerName == "upgrade" || strings.HasPrefix(lowerName, "sec-websocket-") {
+			return fmt.Errorf("provider %s: websocket_headers cannot set %s", entry.Name, name)
+		}
+		if name == "" || strings.ContainsAny(name, " \t\r\n:") || strings.ContainsAny(value, "\r\n") {
+			return fmt.Errorf("provider %s: invalid websocket header %q", entry.Name, name)
 		}
 	}
 	return nil

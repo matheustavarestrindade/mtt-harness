@@ -13,6 +13,21 @@ import (
 )
 
 func (standardProvider *Standard) streamResponses(operationContext context.Context, request atom.Request) (harness.Stream, error) {
+	payload, operationError := standardProvider.buildResponsesPayload(request)
+	if operationError != nil {
+		return nil, operationError
+	}
+	switch standardProvider.providerSpec.Transport {
+	case "", "http":
+		return standardProvider.streamResponsesHTTP(operationContext, payload, nil)
+	case "auto", "websocket":
+		return standardProvider.streamResponsesWebSocket(operationContext, payload)
+	default:
+		return nil, fmt.Errorf("unsupported Responses transport %q", standardProvider.providerSpec.Transport)
+	}
+}
+
+func (standardProvider *Standard) buildResponsesPayload(request atom.Request) (map[string]any, error) {
 	input, instructions, operationError := encodeResponsesAPIInput(request.Messages, standardProvider.Name())
 	if operationError != nil {
 		return nil, operationError
@@ -46,7 +61,7 @@ func (standardProvider *Standard) streamResponses(operationContext context.Conte
 			continue
 		}
 		switch name {
-		case "model", "input", "instructions", "tools", "stream", "store", "include", "previous_response_id", "conversation":
+		case "model", "input", "instructions", "tools", "stream", "store", "include", "previous_response_id", "conversation", "type", "stream_id", "generate", "background":
 			return nil, fmt.Errorf("request parameter %q is reserved", name)
 		}
 		payload[name] = value
@@ -57,6 +72,23 @@ func (standardProvider *Standard) streamResponses(operationContext context.Conte
 	if operationError := standardProvider.applyModelPreset(payload, request); operationError != nil {
 		return nil, operationError
 	}
+	return payload, nil
+}
+
+func (standardProvider *Standard) streamResponsesHTTP(operationContext context.Context, payload map[string]any, release func()) (harness.Stream, error) {
+	operationContext, cancelRequest := context.WithCancel(operationContext)
+	finishRequest := func() {
+		cancelRequest()
+		if release != nil {
+			release()
+		}
+	}
+	streamStarted := false
+	defer func() {
+		if !streamStarted {
+			finishRequest()
+		}
+	}()
 	body, operationError := json.Marshal(payload)
 	if operationError != nil {
 		return nil, operationError
@@ -67,7 +99,7 @@ func (standardProvider *Standard) streamResponses(operationContext context.Conte
 	}
 	httpRequest.Header.Set("Content-Type", "application/json")
 	httpRequest.Header.Set("Accept", "text/event-stream")
-	if session, found := harness.SessionFrom(operationContext); found {
+	if session, found := harness.SessionFrom(operationContext); found && session.ID != "" {
 		httpRequest.Header.Set("session_id", string(session.ID))
 	}
 	if operationError := standardProvider.applyAuthenticationHeaders(httpRequest); operationError != nil {
@@ -78,10 +110,10 @@ func (standardProvider *Standard) streamResponses(operationContext context.Conte
 		return nil, operationError
 	}
 	if response.StatusCode != http.StatusOK {
-		response.Body.Close()
-		return nil, fmt.Errorf("%s Responses API returned HTTP %d; check provider access and the selected model", standardProvider.Name(), response.StatusCode)
+		return nil, responsesHTTPError(standardProvider.Name(), "HTTP", response, len(body), httpRequest.Header)
 	}
-	stream := &httpStream{parts: make(chan atom.ResponsePart, 64)}
+	stream := &providerStream{parts: make(chan atom.ResponsePart, 64), cancel: cancelRequest, onClose: finishRequest}
+	streamStarted = true
 	go parseResponsesAPIEvents(operationContext, response.Body, stream, standardProvider.Name())
 	return stream, nil
 }

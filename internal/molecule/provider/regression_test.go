@@ -56,7 +56,7 @@ func TestMediaEncodingPreservesPayloadAndToolPairs(test *testing.T) {
 
 func TestMalformedOrTruncatedProviderStreamFails(test *testing.T) {
 	for _, body := range []string{`data: {bad json}` + "\n", `data: {"choices":[{"delta":{"content":"partial"}}]}` + "\n"} {
-		stream := &httpStream{parts: make(chan atom.ResponsePart, 4)}
+		stream := &providerStream{parts: make(chan atom.ResponsePart, 4)}
 		go parseChatCompletionEvents(context.Background(), io.NopCloser(strings.NewReader(body)), stream, "fixture")
 		for {
 			_, operationError := stream.Recv(context.Background())

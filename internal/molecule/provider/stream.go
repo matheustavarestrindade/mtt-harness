@@ -12,13 +12,25 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
 
-type httpStream struct {
+type providerStream struct {
 	parts          chan atom.ResponsePart
 	operationError error
+	cancel         context.CancelFunc
+	onClose        func()
 }
 
-func (responseStream *httpStream) Recv(operationContext context.Context) (atom.ResponsePart, error) {
+func (responseStream *providerStream) finishResponse() {
+	if responseStream.onClose != nil {
+		responseStream.onClose()
+	}
+	close(responseStream.parts)
+}
+
+func (responseStream *providerStream) Recv(operationContext context.Context) (atom.ResponsePart, error) {
 	if operationError := operationContext.Err(); operationError != nil {
+		if responseStream.cancel != nil {
+			responseStream.cancel()
+		}
 		return atom.ResponsePart{}, operationError
 	}
 	select {
@@ -31,6 +43,9 @@ func (responseStream *httpStream) Recv(operationContext context.Context) (atom.R
 		}
 		return part, nil
 	case <-operationContext.Done():
+		if responseStream.cancel != nil {
+			responseStream.cancel()
+		}
 		return atom.ResponsePart{}, operationContext.Err()
 	}
 }
@@ -75,9 +90,9 @@ type toolAccumulator struct {
 	emitted    bool
 }
 
-func parseChatCompletionEvents(operationContext context.Context, body io.ReadCloser, stream *httpStream, providerName string) {
+func parseChatCompletionEvents(operationContext context.Context, body io.ReadCloser, stream *providerStream, providerName string) {
 	defer body.Close()
-	defer close(stream.parts)
+	defer stream.finishResponse()
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	accumulators := map[int]*toolAccumulator{}

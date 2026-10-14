@@ -15,7 +15,10 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/providerauth"
 )
 
-func loadProviders(operationContext context.Context, path string, modelGateway *gateway.Gateway, database store.Store, authentication *providerauth.Service) {
+func loadProviders(operationContext context.Context, path string, modelGateway *gateway.Gateway, database store.Store, authentication *providerauth.Service) func() error {
+	providerContext, cancelProviders := context.WithCancel(operationContext)
+	var providers []*provider.Standard
+	var refreshWorkers []<-chan struct{}
 	configurations, operationError := provider.LoadFile(path)
 	if errors.Is(operationError, os.ErrNotExist) {
 		configurations = nil
@@ -24,6 +27,8 @@ func loadProviders(operationContext context.Context, path string, modelGateway *
 	requireStartupSuccess(operationError, "load provider configuration")
 	for _, configuration := range configurations {
 		standardProvider := provider.New(configuration.Spec)
+		standardProvider.SetWebSocketHeaders(configuration.WebSocketHeaders)
+		providers = append(providers, standardProvider)
 		standardProvider.SetPrices(configuration.Prices)
 		switch configuration.Spec.Authentication {
 		case "chatgpt":
@@ -41,20 +46,35 @@ func loadProviders(operationContext context.Context, path string, modelGateway *
 		requireStartupSuccess(modelGateway.Add(standardProvider), "register provider "+configuration.Spec.Name)
 		requireStartupSuccess(database.Providers().Save(operationContext, configuration.Spec), "save provider "+configuration.Spec.Name)
 		requireStartupSuccess(database.Providers().SaveModels(operationContext, configuration.Spec.Name, standardProvider.Models()), "save configured provider models")
-		startProviderModelRefresh(operationContext, modelGateway, database, configuration.Spec)
-		log.Printf("mtt: the provider %s is in use", configuration.Spec.Name)
+		refreshWorkers = append(refreshWorkers, startProviderModelRefresh(providerContext, modelGateway, database, configuration.Spec))
+		log.Printf("mtt: the provider %s is in use; transport=%s", configuration.Spec.Name, configuration.Spec.Transport)
+	}
+	return func() error {
+		cancelProviders()
+		var closeError error
+		for _, registeredProvider := range providers {
+			closeError = errors.Join(closeError, registeredProvider.Close())
+		}
+		for _, completed := range refreshWorkers {
+			<-completed
+		}
+		return closeError
 	}
 }
 
-func startProviderModelRefresh(operationContext context.Context, modelGateway *gateway.Gateway, database store.Store, providerSpec atom.ProviderSpec) {
+func startProviderModelRefresh(operationContext context.Context, modelGateway *gateway.Gateway, database store.Store, providerSpec atom.ProviderSpec) <-chan struct{} {
+	completed := make(chan struct{})
 	if providerSpec.ModelListURL == "" {
-		return
+		close(completed)
+		return completed
 	}
 	refreshAndSaveProviderModels(operationContext, modelGateway, database, providerSpec.Name)
 	if providerSpec.Interval <= 0 {
-		return
+		close(completed)
+		return completed
 	}
 	go func() {
+		defer close(completed)
 		ticker := time.NewTicker(providerSpec.Interval)
 		defer ticker.Stop()
 		for {
@@ -66,6 +86,7 @@ func startProviderModelRefresh(operationContext context.Context, modelGateway *g
 			refreshAndSaveProviderModels(operationContext, modelGateway, database, providerSpec.Name)
 		}
 	}()
+	return completed
 }
 
 func refreshAndSaveProviderModels(operationContext context.Context, modelGateway *gateway.Gateway, database store.Store, providerName string) {

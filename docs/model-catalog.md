@@ -123,6 +123,8 @@ A cost of 0 differs from a cost that is not available. If the cost field is not 
 
 ## Checks
 
+The Responses adapter uses HTTP or WebSocket transport. See `provider-transports.md` for configuration and continuation rules.
+
 The test suite uses model IDs for the test and a local HTTP server. The command that follows also reads the live model catalog:
 
 ```sh

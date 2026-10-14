@@ -581,7 +581,7 @@ type TokenCounter interface {
 
 The default provider IDs are `openai`, `deepseek`, and `openai-codex`. OpenAI and DeepSeek use API keys. The provider `openai-codex` uses a ChatGPT subscription. The test provider can run with the default providers. The default providers are available in test mode.
 
-The provider file can override the default data. A file entry is not necessary for a default provider. The user sets an API key with the API or the UI. New requests use the new API key. The harness can continue to run during a key change.
+The provider file supplies the provider data. A missing or empty file does not add providers. The user sets an API key with the API or the UI. New requests use the new API key. The harness can continue to run during a key change.
 
 The provider `openai-codex` uses OAuth device authentication. The API gives a URL, a user code, and a login ID. The user opens the OpenAI URL and supplies the code. The harness waits for OpenAI authorization. The user must supply the code in 15 minutes.
 
@@ -591,7 +591,17 @@ Provider responses do not contain API keys or OAuth tokens. The provider data in
 
 The API gives the providers in the provider registry. A database entry without a provider in the registry is not in the response. The response includes the test provider when it is active.
 
-The default providers use the Responses API. The adapter sends a tool call when the input JSON is available. It does not wait until the model stream stops. The database keeps the field `ProviderState` for the next request to the same provider. The message response does not contain the field `ProviderState`. The context estimate includes the bytes in the field `ProviderState`.
+The default providers use the Responses API. The adapter sends a tool call when the input JSON is available. It does not wait until the model stream stops. The database keeps the field `ProviderState` for the next request to the same provider. The message response does not contain the field `ProviderState`. Section 6.3 gives the context measurement rules.
+
+The provider file selects `http`, `websocket`, or `auto` transport. The default is `http`. The OpenAI and Codex configurations use `auto`. The adapter uses one encoder and one Responses event decoder for the 2 transports. See `docs/provider-transports.md` for configuration and limits.
+
+A WebSocket request uses `response.create`. The event `response.completed` can supply `previous_response_id` for the next request.
+
+Continuation is available when the previous input, response output, and request parameters are the same. The adapter then sends only new input. A history change or a model change can make full input necessary. Context measurement and usage use the full logical request, not the transport delta.
+
+WebSocket connections have workspace, session, and credential scope. A connection has a maximum of 1 active response. A stream with an error cannot supply a continuation. Cancellation closes the connection. The provider can have work in progress after a connection closes.
+
+The `auto` mode can use HTTP after handshake status 404, 405, 426, or 501. Before `response.created`, `previous_response_not_found` can cause 1 new request with full input. The adapter does not send the request again after an unknown transmission status or part of a response. The harness keeps available text and usage after a stream error. The harness stops connection readers and catalog workers before it closes storage.
 
 Requirements:
 

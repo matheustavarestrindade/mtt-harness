@@ -2,6 +2,192 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "handshake",
+      "category": "technical_noun",
+      "approved_forms": [
+        "handshakes"
+      ],
+      "meaning": "the initial HTTP exchange that establishes a WebSocket connection",
+      "source": "provider connections"
+    },
+    {
+      "term": "tool argument",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tool arguments"
+      ],
+      "meaning": "a JSON input value supplied to a tool call",
+      "source": "provider connections"
+    },
+    {
+      "term": "connection gate",
+      "category": "technical_noun",
+      "approved_forms": [
+        "connection gates"
+      ],
+      "meaning": "the cancellable owner boundary that serializes responses on a provider connection",
+      "source": "provider connections"
+    },
+    {
+      "term": "connection pool",
+      "category": "technical_noun",
+      "approved_forms": [
+        "connection pools"
+      ],
+      "meaning": "the bounded set of provider WebSocket connections",
+      "source": "provider connections"
+    },
+    {
+      "term": "connection age",
+      "category": "technical_noun",
+      "meaning": "the elapsed time since a provider connection opened",
+      "source": "provider connections"
+    },
+    {
+      "term": "request item",
+      "category": "technical_noun",
+      "approved_forms": [
+        "request items"
+      ],
+      "meaning": "one input or output element retained for a provider continuation",
+      "source": "provider connections"
+    },
+    {
+      "term": "transmission status",
+      "category": "technical_noun",
+      "meaning": "whether a network request was accepted, rejected, or delivered ambiguously",
+      "source": "provider connections"
+    },
+    {
+      "term": "provider log",
+      "category": "technical_noun",
+      "approved_forms": [
+        "provider logs"
+      ],
+      "meaning": "runtime diagnostic output about provider transport operations",
+      "source": "provider connections"
+    },
+    {
+      "term": "transport",
+      "category": "technical_noun",
+      "approved_forms": [
+        "transports"
+      ],
+      "meaning": "the HTTP or WebSocket communication mechanism used for provider requests",
+      "source": "provider connections"
+    },
+    {
+      "term": "SSE",
+      "category": "technical_noun",
+      "meaning": "Server-Sent Events, the HTTP streaming format",
+      "source": "provider connections"
+    },
+    {
+      "term": "WebSocket upgrade",
+      "category": "technical_noun",
+      "approved_forms": [
+        "WebSocket upgrades"
+      ],
+      "meaning": "the HTTP handshake that establishes a WebSocket connection",
+      "source": "provider connections"
+    },
+    {
+      "term": "handshake header",
+      "category": "technical_noun",
+      "approved_forms": [
+        "handshake headers"
+      ],
+      "meaning": "an HTTP header used when opening a provider WebSocket connection",
+      "source": "provider connections"
+    },
+    {
+      "term": "encoder",
+      "category": "technical_noun",
+      "approved_forms": [
+        "encoders"
+      ],
+      "meaning": "code that converts domain values to a provider wire format",
+      "source": "provider connections"
+    },
+    {
+      "term": "continuation",
+      "category": "technical_noun",
+      "approved_forms": [
+        "continuations"
+      ],
+      "meaning": "a provider response linked to an earlier response through its response ID",
+      "source": "provider connections"
+    },
+    {
+      "term": "input fingerprint",
+      "category": "technical_noun",
+      "approved_forms": [
+        "input fingerprints"
+      ],
+      "meaning": "a hash used to verify the unchanged logical input for a continuation",
+      "source": "provider connections"
+    },
+    {
+      "term": "logical request",
+      "category": "technical_noun",
+      "approved_forms": [
+        "logical requests"
+      ],
+      "meaning": "the full selected model input before transport continuation encoding",
+      "source": "provider connections"
+    },
+    {
+      "term": "transport delta",
+      "category": "technical_noun",
+      "approved_forms": [
+        "transport deltas"
+      ],
+      "meaning": "new input sent with a previous provider response ID",
+      "source": "provider connections"
+    },
+    {
+      "term": "idle connection",
+      "category": "technical_noun",
+      "approved_forms": [
+        "idle connections"
+      ],
+      "meaning": "a retained connection without an active model request",
+      "source": "provider connections"
+    },
+    {
+      "term": "reader",
+      "category": "technical_noun",
+      "approved_forms": [
+        "readers"
+      ],
+      "meaning": "a worker that receives provider socket events",
+      "source": "provider connections"
+    },
+    {
+      "term": "catalog worker",
+      "category": "technical_noun",
+      "approved_forms": [
+        "catalog workers"
+      ],
+      "meaning": "a worker that refreshes the provider model catalog",
+      "source": "provider connections"
+    },
+    {
+      "term": "request byte count",
+      "category": "technical_noun",
+      "approved_forms": [
+        "request byte counts"
+      ],
+      "meaning": "the number of bytes in an encoded provider request",
+      "source": "provider connections"
+    },
+    {
+      "term": "connection EOF",
+      "category": "technical_noun",
+      "meaning": "an end-of-stream signal from a provider socket",
+      "source": "provider connections"
+    },
+    {
       "term": "screen reader label",
       "category": "technical_noun",
       "approved_forms": [
