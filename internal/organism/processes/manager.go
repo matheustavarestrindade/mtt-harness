@@ -23,26 +23,27 @@ type Notifier func(context.Context, atom.Session, []atom.Content) error
 // Starts and instance limits are serialized; Close joins every observer before
 // its context or database can be released.
 type Manager struct {
-	mutex          sync.Mutex
-	supervisor     *process.Supervisor
-	store          store.Store
-	harnessRuntime *harness.Harness
-	bus            *eventbus.Bus
-	limits         InstanceLimits
-	instances      map[string]string
-	lifecycle      context.Context
-	cancel         context.CancelFunc
-	observers      sync.WaitGroup
-	closing        bool
-	notifier       Notifier
-	starting       map[string]int
-	starts         sync.WaitGroup
-	instanceStarts map[string]*sync.WaitGroup
+	mutex             sync.Mutex
+	supervisor        *process.Supervisor
+	store             store.Store
+	harnessRuntime    *harness.Harness
+	bus               *eventbus.Bus
+	limits            InstanceLimits
+	instances         map[string]string
+	lifecycle         context.Context
+	cancel            context.CancelFunc
+	observers         sync.WaitGroup
+	closing           bool
+	notifier          Notifier
+	starting          map[string]int
+	starts            sync.WaitGroup
+	instanceStarts    map[string]*sync.WaitGroup
+	stopNotifications chan struct{}
 }
 
 func New(supervisor *process.Supervisor, database store.Store, harnessRuntime *harness.Harness, bus *eventbus.Bus, limits InstanceLimits) *Manager {
 	lifecycle, cancel := context.WithCancel(context.Background())
-	return &Manager{supervisor: supervisor, store: database, harnessRuntime: harnessRuntime, bus: bus, limits: limits, instances: map[string]string{}, lifecycle: lifecycle, cancel: cancel, starting: map[string]int{}, instanceStarts: map[string]*sync.WaitGroup{}}
+	return &Manager{supervisor: supervisor, store: database, harnessRuntime: harnessRuntime, bus: bus, limits: limits, instances: map[string]string{}, lifecycle: lifecycle, cancel: cancel, starting: map[string]int{}, instanceStarts: map[string]*sync.WaitGroup{}, stopNotifications: make(chan struct{})}
 }
 
 func (processManager *Manager) SetNotifier(notifier Notifier) {
@@ -52,6 +53,22 @@ func (processManager *Manager) SetNotifier(notifier Notifier) {
 }
 
 func (processManager *Manager) Start(operationContext context.Context, processSpec atom.ProcessSpec) (harness.Process, error) {
+	return processManager.startProcess(operationContext, processSpec, nil)
+}
+
+// StartForeground suppresses notifications before launch. The caller must release
+// delivery on every path: NotifyNone after exit/cancellation, or a valid background
+// policy after an inactivity return. Release is nonblocking and first-call-wins.
+func (processManager *Manager) StartForeground(operationContext context.Context, processSpec atom.ProcessSpec) (harness.Process, func(atom.NotifyPolicy), error) {
+	delivery := make(chan atom.NotifyPolicy, 1)
+	var once sync.Once
+	release := func(policy atom.NotifyPolicy) { once.Do(func() { delivery <- policy }) }
+	processSpec.Notify = atom.NotifyPolicy{Mode: atom.NotifyNone}
+	runningProcess, operationError := processManager.startProcess(operationContext, processSpec, delivery)
+	return runningProcess, release, operationError
+}
+
+func (processManager *Manager) startProcess(operationContext context.Context, processSpec atom.ProcessSpec, delivery <-chan atom.NotifyPolicy) (harness.Process, error) {
 	if processSpec.Notify.Mode == "" {
 		processSpec.Notify.Mode = atom.NotifyExit
 	}
@@ -64,6 +81,11 @@ func (processManager *Manager) Start(operationContext context.Context, processSp
 	if processSpec.Timeout < 0 {
 		return nil, fmt.Errorf("process timeout cannot be negative")
 	}
+	if processSpec.IdleTimeout < 0 {
+		return nil, fmt.Errorf("process idle timeout cannot be negative")
+	}
+	origin, _ := harness.ToolOriginFrom(operationContext)
+	processSpec.ToolCallID, processSpec.ToolMessageID = origin.CallID, origin.MessageID
 	session, _ := harness.SessionFrom(operationContext)
 	workspace, _ := harness.WorkspaceFrom(operationContext)
 	if processSpec.Cwd == "" {
@@ -91,7 +113,7 @@ func (processManager *Manager) Start(operationContext context.Context, processSp
 	processManager.instances[runningProcess.ID()] = session.InstanceID
 	processManager.mutex.Unlock()
 	processManager.observers.Add(1)
-	go processManager.observeProcessEvents(observerContext, session, runningProcess, record)
+	go processManager.observeProcessEvents(observerContext, session, runningProcess, record, delivery)
 	return runningProcess, nil
 }
 
@@ -175,6 +197,9 @@ func (processManager *Manager) CheckOwner(operationContext context.Context, iden
 
 func (processManager *Manager) Close(operationContext context.Context) error {
 	processManager.mutex.Lock()
+	if !processManager.closing {
+		close(processManager.stopNotifications)
+	}
 	processManager.closing = true
 	processManager.mutex.Unlock()
 	operationError := waitForProcessStarts(operationContext, &processManager.starts)

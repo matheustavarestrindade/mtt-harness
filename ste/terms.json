@@ -2,6 +2,132 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "ANSI sequence",
+      "category": "technical_noun",
+      "approved_forms": [
+        "ANSI sequences"
+      ],
+      "meaning": "a terminal escape sequence for text formatting or cursor control",
+      "source": "terminal rendering"
+    },
+    {
+      "term": "preview depth",
+      "category": "technical_noun",
+      "meaning": "the number of nested levels displayed by a structured-data preview",
+      "source": "web UI"
+    },
+    {
+      "term": "text color",
+      "category": "technical_noun",
+      "approved_forms": [
+        "text colors"
+      ],
+      "meaning": "the foreground color of displayed text",
+      "source": "terminal rendering"
+    },
+    {
+      "term": "character",
+      "category": "technical_noun",
+      "approved_forms": [
+        "characters"
+      ],
+      "meaning": "a text encoding unit used for bounded UI previews",
+      "source": "web UI"
+    },
+    {
+      "term": "output chunk",
+      "category": "technical_noun",
+      "approved_forms": [
+        "output chunks"
+      ],
+      "meaning": "one bounded unit of streamed process text held by a terminal view",
+      "source": "terminal rendering"
+    },
+    {
+      "term": "output gap",
+      "category": "technical_noun",
+      "approved_forms": [
+        "output gaps"
+      ],
+      "meaning": "a detected discontinuity in per-stream output byte offsets",
+      "source": "process streams"
+    },
+    {
+      "term": "ANSI",
+      "category": "technical_noun",
+      "meaning": "terminal control sequences used for colors and cursor operations",
+      "source": "terminal rendering"
+    },
+    {
+      "term": "xterm.js",
+      "category": "technical_noun",
+      "meaning": "the maintained terminal emulator used by the UI",
+      "source": "terminal rendering"
+    },
+    {
+      "term": "inactivity return",
+      "category": "technical_noun",
+      "approved_forms": [
+        "inactivity returns"
+      ],
+      "meaning": "a foreground tool result after a configured no-output period while the command continues",
+      "source": "bash"
+    },
+    {
+      "term": "inactivity notification",
+      "category": "technical_noun",
+      "approved_forms": [
+        "inactivity notifications"
+      ],
+      "meaning": "one factual runtime notice that a process has produced no output for a configured period",
+      "source": "process manager"
+    },
+    {
+      "term": "terminal view",
+      "category": "technical_noun",
+      "approved_forms": [
+        "terminal views"
+      ],
+      "meaning": "a read-only terminal display for retained and live process output",
+      "source": "web UI"
+    },
+    {
+      "term": "output snapshot",
+      "category": "technical_noun",
+      "approved_forms": [
+        "output snapshots"
+      ],
+      "meaning": "retained process output supplied when a subscriber joins",
+      "source": "process streams"
+    },
+    {
+      "term": "byte offset",
+      "category": "technical_noun",
+      "approved_forms": [
+        "byte offsets"
+      ],
+      "meaning": "a zero-based count of bytes before one output frame in a process stream",
+      "source": "process streams"
+    },
+    {
+      "term": "UTF-8 decoder",
+      "category": "technical_noun",
+      "approved_forms": [
+        "UTF-8 decoders"
+      ],
+      "meaning": "a decoder retaining partial encoded characters across process output frames",
+      "source": "process streams"
+    },
+    {
+      "term": "frame",
+      "category": "technical_noun",
+      "approved_forms": [
+        "frames"
+      ],
+      "meaning": "one WebSocket protocol message",
+      "source": "WebSocket"
+    },
+    {
       "term": "context measurement",
       "category": "technical_noun",
       "meaning": "a count or estimate of the selected provider request input",

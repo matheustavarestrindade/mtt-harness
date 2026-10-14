@@ -22,6 +22,7 @@ func (processStore *processes) Save(operationContext context.Context, record ato
 		INSERT INTO processes (id, instance_id, session_id, spec, pid, status, exit, started_at, ended_at)
 		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9 WHERE NOT EXISTS (SELECT 1 FROM session_guard WHERE deleted)
 		ON CONFLICT (id) DO UPDATE SET
+			spec = EXCLUDED.spec,
 			pid = EXCLUDED.pid,
 			status = EXCLUDED.status,
 			exit = EXCLUDED.exit,

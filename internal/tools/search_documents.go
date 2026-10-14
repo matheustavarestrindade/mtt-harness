@@ -8,8 +8,8 @@ func (TaskState) SearchDocument() string {
 // embedding index. They are separate from provider requests and tool results.
 func (bashTool *Bash) SearchDocument() string {
 	return `Use this tool to execute shell commands, run scripts, compile a project, or launch a development server in the instance workspace.
-For a short command, call {"command":"go test ./..."}; the tool waits and returns stdout and stderr once as its tool result, with no separate process notification.
-For a long-running server, call {"command":"npm run dev","wait":false}; then use process_output to read logs or process_kill to stop it. Background notification modes are none, exit (default), error, and interval. They are runtime updates, not new user requests.`
+For a short command, call {"command":"go test ./..."}; normal exit returns stdout and stderr once as its tool result, with no separate process notification. By default, 10000 milliseconds without output returns a running process ID and recent output while the command continues under its background notification policy. This is not an exit result. Use process_output to inspect the process or process_kill to stop it. Set idle_timeout:0 for an intentionally quiet command that must wait until exit. Inactivity never kills the process and does not change timeout.
+For a long-running server, call {"command":"npm run dev","wait":false}; then use process_output to read logs or process_kill to stop it. Background notification modes are none, exit (default), error, and interval. A positive idle_timeout permits one no-output notice per process unless notify is none. The foreground inactivity return already supplies that notice. They are runtime updates, not new user requests.`
 }
 
 func (FileActions) SearchDocument() string {

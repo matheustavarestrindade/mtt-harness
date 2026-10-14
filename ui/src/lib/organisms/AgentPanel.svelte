@@ -11,7 +11,7 @@
   import MessageCard from '../molecules/MessageCard.svelte';
   import RichText from '../molecules/content/RichText.svelte';
   import MessageContent from '../molecules/content/MessageContent.svelte';
-  import ToolActivitySection from '../molecules/ToolActivitySection.svelte';
+  import ToolActivityView from './ToolActivityView.svelte';
   import PermissionCard from '../molecules/PermissionCard.svelte';
   import type { AgentMonitor } from './agent-monitor.svelte';
 
@@ -198,7 +198,12 @@
                     {/each}
                   {/each}
                 {/if}
-              {:else}<ToolActivitySection {activity} running={feed?.active ?? false} />{/if}
+              {:else if feed}<ToolActivityView
+                  {activity}
+                  messageID={entry.message.ID}
+                  processes={feed.processes}
+                  running={feed.active}
+                />{/if}
             {/snippet}
             <MessageCard
               message={entry.message}

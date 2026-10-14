@@ -14,20 +14,22 @@ import (
 // Handle owns its output buffers and subscriptions. The same lock protects
 // publication and closure, so a subscriber is never sent to after it closes.
 type Handle struct {
-	identifier     string
-	command        *exec.Cmd
-	stdin          io.WriteCloser
-	mutex          sync.Mutex
-	subscribers    map[uint64]chan atom.ProcessEvent
-	nextSubscriber uint64
-	stdout, stderr []byte
-	done           chan struct{}
-	completed      bool
-	exit           atom.ExitStatus
-	exitEvent      atom.ProcessEvent
-	startEvent     atom.ProcessEvent
-	operationError error
-	transform      func(atom.ProcessEvent) (atom.ProcessEvent, error)
+	identifier               string
+	command                  *exec.Cmd
+	stdin                    io.WriteCloser
+	mutex                    sync.Mutex
+	subscribers              map[uint64]chan atom.ProcessEvent
+	nextSubscriber           uint64
+	stdout, stderr           []byte
+	stdoutBytes, stderrBytes int64
+	lastOutputAt             time.Time
+	done                     chan struct{}
+	completed                bool
+	exit                     atom.ExitStatus
+	exitEvent                atom.ProcessEvent
+	startEvent               atom.ProcessEvent
+	operationError           error
+	transform                func(atom.ProcessEvent) (atom.ProcessEvent, error)
 }
 
 func (processHandle *Handle) ID() string {
@@ -85,11 +87,13 @@ func (processHandle *Handle) SubscribeContext(operationContext context.Context) 
 			channel <- processHandle.startEvent
 		}
 		data := processHandle.stdout
+		offset := processHandle.stdoutBytes - int64(len(data))
 		if stream == atom.StreamStderr {
 			data = processHandle.stderr
+			offset = processHandle.stderrBytes - int64(len(data))
 		}
 		if len(data) > 0 {
-			channel <- atom.ProcessEvent{ProcessID: processHandle.identifier, Stream: stream, Data: append([]byte(nil), data...), At: time.Now()}
+			channel <- atom.ProcessEvent{ProcessID: processHandle.identifier, Stream: stream, Data: append([]byte(nil), data...), At: processHandle.lastOutputAt, Offset: offset, Snapshot: true}
 		}
 	}
 	if processHandle.completed {
@@ -139,10 +143,17 @@ func (writer outputWriter) Write(data []byte) (int, error) {
 	}
 	writer.handle.mutex.Lock()
 	defer writer.handle.mutex.Unlock()
+	if len(event.Data) > 0 {
+		writer.handle.lastOutputAt = time.Now()
+	}
 	if writer.stream == atom.StreamStderr {
+		event.Offset = writer.handle.stderrBytes
+		writer.handle.stderrBytes += int64(len(event.Data))
 		writer.handle.stderr = appendCapped(writer.handle.stderr, event.Data)
 	}
 	if writer.stream == atom.StreamStdout {
+		event.Offset = writer.handle.stdoutBytes
+		writer.handle.stdoutBytes += int64(len(event.Data))
 		writer.handle.stdout = appendCapped(writer.handle.stdout, event.Data)
 	}
 	for _, channel := range writer.handle.subscribers {
@@ -182,6 +193,7 @@ func (processHandle *Handle) waitForCommandExit() {
 	}
 	processHandle.mutex.Lock()
 	defer processHandle.mutex.Unlock()
+	exitEvent.Exit = &status
 	processHandle.exit, processHandle.operationError, processHandle.completed = status, operationError, true
 	processHandle.exitEvent = exitEvent
 	for identifier, channel := range processHandle.subscribers {

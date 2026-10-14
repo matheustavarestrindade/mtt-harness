@@ -9,6 +9,7 @@
   import { assistantDisplayMessage } from '$lib/atoms/assistant-display';
   import { copyToClipboard } from './clipboard';
   import MessageContent from './content/MessageContent.svelte';
+  import TerminalOutput from './content/TerminalOutput.svelte';
   import ToolActivitySection from './ToolActivitySection.svelte';
   import ThinkingSection from './ThinkingSection.svelte';
   let {
@@ -87,6 +88,11 @@
           <section class="assistant-section" aria-label="Assistant response">
             <MessageContent content={displayMessage.Content} mode="markdown" />
           </section>
+        {:else if message.Role === 'runtime' && text.includes('\x1b')}
+          <TerminalOutput {text} />
+          <MessageContent
+            content={(message.Content ?? []).filter((part) => part.Type !== 'text')}
+          />
         {:else}
           <MessageContent
             content={message.Content}
