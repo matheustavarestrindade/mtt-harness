@@ -89,6 +89,18 @@ OpenAI supplies reasoning summaries. DeepSeek supplies reasoning text. The API g
 
 The database keeps continuation data. The API does not send continuation data. Only the adapter for the same provider uses the data in a subsequent model request.
 
+## Context Measurement
+
+The UI shows the last provider token count for the selected session. New messages and tool results add input tokens.
+
+Standard adapters can use the last provider report without an error. The request must keep the previous message content and sequence. New input adds a token estimate. Input includes cache tokens. Output tokens include reasoning tokens.
+
+The database keeps a context usage anchor. A change to the model, protocol, request parameters, or message history can make the previous report incorrect. New request reminders and tool definitions add full token estimates.
+
+Without a correct previous report, the adapter uses a protocol token estimate. Text uses 4 UTF-8 bytes for a token. Responses uses the reasoning token count from provider usage when available. Without the reasoning token count, the adapter uses the Codex token estimate for ciphertext. The adapter does not count transport bytes as text tokens.
+
+The estimate is not a provider usage report. Provider usage is the billing source. See [OpenAI](https://developers.openai.com/api/docs/guides/reasoning) and [Codex](https://github.com/openai/codex/blob/main/codex-rs/core/src/context_manager/history.rs).
+
 ## Prices
 
 The prices are for 1,000,000 tokens. The harness uses local price configuration before the price table, provider model response, and metadata source. A price of 0 is different from price data that is not available.

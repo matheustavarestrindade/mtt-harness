@@ -206,10 +206,15 @@ func (plugin *Plugin) finishJob(operationContext context.Context, workspaceID st
 			stored.NextAttempt = time.Now().Add(time.Second)
 		} else {
 			stored.Failures++
+			retryFailures := stored.Failures
+			if stored.Kind == "reduce" && stored.Remember && stored.PlanHash != "" {
+				stored.PageFailures++
+				retryFailures = stored.PageFailures
+			}
 			stored.Status = "failed"
-			if stored.Failures <= configuration.RetryLimit {
+			if retryFailures <= configuration.RetryLimit {
 				stored.Status = "pending"
-				stored.NextAttempt = time.Now().Add(time.Duration(1<<min(stored.Failures, 5)) * time.Second)
+				stored.NextAttempt = time.Now().Add(time.Duration(1<<min(retryFailures, 5)) * time.Second)
 			}
 		}
 		return database.Put("job", job.ID, stored)

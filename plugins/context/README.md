@@ -96,6 +96,12 @@ The database keeps worker progress after a timeout. A new worker attempt uses th
 
 The context checkpoint stops when the user cancels the request or the harness stops. The plugin must examine memory data before it removes context.
 
+Context limits use the same context measurement as the core. A standard adapter can use the last provider token count with a token estimate for new content. The bytes in ciphertext are not tokens. The error text identifies a token estimate.
+
+A memory record must contain a source quote. Source quotes keep the source text and whitespace. Do not change source quotes. An incorrect source quote cannot become a memory record. The source context stays available.
+
+The database keeps rejected worker output and the related source ID. A new worker attempt receives the data in the input limit. The retry limit applies to the extraction page with the error. After a correct extraction page, the next extraction page has a new retry count. The database keeps previous worker progress.
+
 ## Memory Snapshots and Cache
 
 After the initial session snapshot, change the memory snapshot only when context compaction removes content. The text, sequence, and position must not change between context refreshes. A memory worker can change the database, but the memory snapshot must wait. A memory search can give new information through tool results.
