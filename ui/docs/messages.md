@@ -63,6 +63,12 @@ For `file_actions`, the section label shows the action sequence and path. The in
 
 Tool input uses field labels and lists. The UI uses tables for tool result data. The file action sections keep the action sequence. The fields show input parameters and file text. JSON text is not the default view.
 
+Icons identify tool input and tool output. Screen reader labels identify the 2 sections. A file path is above the action data. Use `Tool options` for the `return` value and other parameters.
+
+Replacement previews use `−`, `+`, and arrow icons. The source text stays the same. Tool code does not show a format label. The actions menu contains `Copy code` and `Download source`. The tool call ID does not have a label.
+
+A command starts at the top of the input section. Duration values use a short format, such as `90 s`. Other parameters stay below the command. Short output, such as `Updated`, does not use a toolbar.
+
 A data preview has a limit of 400 fields. The preview depth limit is 8. A text field uses a maximum of 32000 characters. The copy button and source download keep the input data. A JSON result above 1000000 characters uses the text view.
 
 JSON result fields and tables can contain ANSI sequences. ANSIUp gives text color and background color to the preview. DOMPurify removes executable markup. Tool input stays the same.

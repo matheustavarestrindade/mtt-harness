@@ -2,7 +2,11 @@
   import { Button } from '../../atoms/ui/button';
   import { parseMarkdown, markdownPreviewLimit } from './markdown';
   import CodeBlock from './CodeBlock.svelte';
-  let { text, embedded = false }: { text: string; embedded?: boolean } = $props();
+  let {
+    text,
+    embedded = false,
+    compact = false,
+  }: { text: string; embedded?: boolean; compact?: boolean } = $props();
   let source = $state(false);
   const preview = $derived(text.slice(0, markdownPreviewLimit));
   const blocks = $derived.by(() => {
@@ -14,7 +18,7 @@
   });
 </script>
 
-{#if source}<CodeBlock {text} {embedded} />
+{#if source}<CodeBlock {text} {embedded} {compact} />
 {:else}
   <div class="rich-text min-w-0" class:embedded-content={embedded}>
     {#each blocks as block, index (index)}
@@ -22,6 +26,7 @@
           text={block.text}
           language={block.language}
           {embedded}
+          {compact}
         />
       {:else}<div class="markdown min-w-0">{@html block.html}</div>{/if}
     {/each}

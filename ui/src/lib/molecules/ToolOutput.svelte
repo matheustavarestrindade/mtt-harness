@@ -38,13 +38,16 @@
 {:else}
   {#each content as part}
     {@const data = part.Type === 'text' ? structuredJSON(part.Text) : null}
-    {#if data}<StructuredData value={data.value} label="Tool result" ansiOutput />
+    {#if data}<StructuredData value={data.value} label="Tool result" ansiOutput compact />
     {:else if part.Type === 'text' && part.Text.includes('\x1b')}<TerminalOutput text={part.Text} />
+    {:else if part.Type === 'text' && language === 'text' && part.Text.length < 180 && !part.Text.includes('\n')}
+      <span class="whitespace-pre-wrap break-words text-xs leading-6">{part.Text}</span>
     {:else}<MessageContent
         content={[part]}
         mode={language === 'markdown' ? 'markdown' : 'code'}
         {language}
         embedded
+        compact
       />{/if}
   {/each}
 {/if}

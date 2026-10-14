@@ -91,6 +91,16 @@ The workspace form starts with an empty directory field. The form does not expan
 
 Open `Settings`, then `Providers`, to connect a provider. The API contracts are in `../routes.md`.
 
+## Navigation URLs
+
+The browser URL keeps the selected workspace and session. Refresh the browser to open the same conversation. Use `Back` or `Forward` for the previous or next selection. The optional `agent` parameter opens a child agent in the parent conversation.
+
+```text
+/?workspace=INSTANCE_ID&session=SESSION_ID
+```
+
+The URL contains IDs, not credentials or message text. An API connection is necessary before a new browser tab opens the selected conversation.
+
 ## Child Agents
 
 The sidebar shows child agents below the parent session. Lines show the parent and child relation. Select an agent to see the agent output in the parent conversation. The parent message draft does not change.

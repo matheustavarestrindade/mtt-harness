@@ -413,12 +413,14 @@
     });
   }
   onMount(() => {
+    const stopNavigation = workbench.observeNavigation();
     const layout = loadLayout();
     navigationCollapsed = layout.navigationCollapsed;
     sidePanelCollapsed = layout.memoryCollapsed;
     layoutReady = true;
     preferences = loadConnection();
     if (preferences.token) void connect(preferences.base, preferences.token);
+    return stopNavigation;
   });
   onDestroy(() => {
     attachmentDrafts.clearAll();

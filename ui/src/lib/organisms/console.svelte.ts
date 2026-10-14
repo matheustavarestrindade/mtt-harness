@@ -21,6 +21,16 @@ import { eventToolCall } from '../atoms/agent-activity';
 import { sessionRoot } from '../atoms/session-tree';
 import { AgentMonitor } from './agent-monitor.svelte';
 import { SessionProcesses } from './session-processes.svelte';
+import {
+  readNavigationRoute,
+  writeNavigationRoute,
+  observeNavigationRoute,
+} from '../molecules/browser-navigation';
+import type {
+  NavigationHistory,
+  NavigationRoute,
+  WorkspaceNavigation,
+} from '../atoms/navigation-route';
 
 const idleStatus = (): QueueStatus => ({ running: false, queued: 0, messages: [], error: '' });
 export class HarnessConsole {
@@ -48,6 +58,13 @@ export class HarnessConsole {
   readonly agents = new AgentMonitor(
     () => this.scheduleSessionListRefresh(),
     (session) => this.updateAgentSession(session),
+    (agent, history) => {
+      if (this.instance && this.session)
+        writeNavigationRoute(
+          { workspace: this.instance.ID, session: this.session.ID, agent },
+          history,
+        );
+    },
   );
   private api: HarnessApi | null = null;
   private lifetime = new AbortController();
@@ -68,6 +85,94 @@ export class HarnessConsole {
   private sessionListTimer: ReturnType<typeof setTimeout> | undefined;
   private refreshingSessionList = false;
   private sessionListPending = false;
+  private navigationRevision = 0;
+
+  observeNavigation() {
+    return observeNavigationRoute((route) => {
+      if (this.connection === 'connected') void this.restoreNavigation(route);
+    });
+  }
+
+  private async restoreNavigation(route: NavigationRoute) {
+    const revision = ++this.navigationRevision;
+    const api = this.api,
+      signal = this.lifetime.signal;
+    if (!api || signal.aborted) return;
+    let workspaceID = route.workspace;
+    try {
+      if (!workspaceID && route.session)
+        workspaceID = (await api.session(route.session, signal)).InstanceID;
+      if (signal.aborted || revision !== this.navigationRevision) return;
+      const instance = workspaceID
+        ? this.instances.find((entry) => entry.ID === workspaceID)
+        : (this.instances.find((entry) => !entry.Stopped) ?? this.instances[0]);
+      if (!instance) {
+        this.selection.abort();
+        this.stopSessionObservers();
+        this.instance = null;
+        this.sessions = [];
+        this.models = [];
+        this.error = workspaceID ? 'The workspace in this URL is not available.' : '';
+        writeNavigationRoute({ workspace: '', session: '', agent: '' }, 'replace');
+        return;
+      }
+      if (this.instance?.ID !== instance.ID || this.loading || !this.sessions.length) {
+        await this.selectInstance(instance, {
+          session: route.session || undefined,
+          agent: route.agent,
+          history: 'replace',
+        });
+        return;
+      }
+      const target = route.session
+        ? this.sessions.find((entry) => entry.ID === route.session)
+        : this.sessions.find((entry) => !entry.Parent);
+      if (!target) {
+        this.stopSessionObservers();
+        this.error = route.session
+          ? 'The session in this URL is not available in this workspace.'
+          : '';
+        writeNavigationRoute({ workspace: instance.ID, session: '', agent: '' }, 'replace');
+        return;
+      }
+      await this.selectNavigationTarget(target, route.agent || '', 'replace');
+    } catch (failure) {
+      if (!signal.aborted && revision === this.navigationRevision)
+        this.error = failure instanceof Error ? failure.message : 'Cannot restore this page.';
+    }
+  }
+
+  private async selectNavigationTarget(
+    target: Session,
+    agentID: string,
+    history: NavigationHistory,
+  ) {
+    const root = sessionRoot(target, this.sessions);
+    if (!root) return;
+    const agent = agentID
+      ? this.sessions.find(
+          (entry) =>
+            entry.ID === agentID &&
+            sessionRoot(entry, this.sessions)?.ID === root.ID &&
+            entry.Parent,
+        )
+      : target.Parent
+        ? target
+        : undefined;
+    writeNavigationRoute(
+      { workspace: root.InstanceID, session: root.ID, agent: agent?.ID ?? '' },
+      history,
+    );
+    const selected = this.selectSession(root, false);
+    const revision = this.navigationRevision;
+    await selected;
+    if (revision !== this.navigationRevision || this.session?.ID !== root.ID) return;
+    if (agent) this.agents.focus(agent.ID);
+    else {
+      this.agents.clearFocus('replace');
+      if (agentID) this.error = 'The agent in this URL is not available in this conversation.';
+    }
+  }
 
   get requestUsage() {
     return latestRequestUsage(this.messages, this.session?.ID ?? '', this.requestModels, [
@@ -90,8 +195,7 @@ export class HarnessConsole {
       this.connection = 'connected';
       saveConnection({ base, token });
       void this.loadProviderCatalog(api, signal);
-      const first = instances.find((instance) => !instance.Stopped) ?? instances[0];
-      if (first) await this.selectInstance(first);
+      await this.restoreNavigation(readNavigationRoute());
     } catch (error) {
       if (signal.aborted) return;
       this.connection = 'error';
@@ -101,6 +205,7 @@ export class HarnessConsole {
   }
 
   disconnect(forget = true) {
+    this.navigationRevision++;
     this.lifetime.abort();
     this.selection.abort();
     this.stopSessionObservers();
@@ -207,7 +312,9 @@ export class HarnessConsole {
     }
   }
 
-  async selectInstance(instance: Instance) {
+  async selectInstance(instance: Instance, navigation: WorkspaceNavigation = {}) {
+    const revision = ++this.navigationRevision;
+    const history = navigation.history === undefined ? 'push' : navigation.history;
     const api = this.requireAPIClient();
     this.selection.abort();
     this.selection = new AbortController();
@@ -218,31 +325,55 @@ export class HarnessConsole {
     this.models = [];
     this.error = '';
     this.loading = true;
+    writeNavigationRoute(
+      { workspace: instance.ID, session: navigation.session ?? '', agent: navigation.agent ?? '' },
+      history,
+    );
     try {
       const [sessions, models] = await Promise.all([
         api.sessions(instance.ID, signal),
         instance.Stopped ? Promise.resolve([]) : api.models(instance.ID, signal),
       ]);
-      if (signal.aborted) return;
+      if (signal.aborted || revision !== this.navigationRevision) return;
       this.sessions = sessions
         .filter((session) => !this.removedSessionIDs.has(session.ID))
         .sort((first, second) => second.CreatedAt.localeCompare(first.CreatedAt));
       this.models = models;
-      const first = this.sessions.find((session) => !session.Parent);
-      if (first) await this.selectSession(first);
+      const target = navigation.session
+        ? this.sessions.find((session) => session.ID === navigation.session)
+        : this.sessions.find((session) => !session.Parent);
+      if (target) await this.selectNavigationTarget(target, navigation.agent ?? '', 'replace');
+      else {
+        writeNavigationRoute({ workspace: instance.ID, session: '', agent: '' }, 'replace');
+        if (navigation.session)
+          this.error = 'The session in this URL is not available in this workspace.';
+      }
     } catch (error) {
-      if (!signal.aborted)
+      if (!signal.aborted && revision === this.navigationRevision)
         this.error = error instanceof Error ? error.message : 'Cannot load workspace.';
     } finally {
-      if (!signal.aborted) this.loading = false;
+      if (!signal.aborted && revision === this.navigationRevision) this.loading = false;
     }
   }
 
-  async selectSession(session: Session) {
+  async selectSession(session: Session, history: NavigationHistory = 'push') {
     if (this.removedSessionIDs.has(session.ID)) return;
     const api = this.requireAPIClient();
+    this.navigationRevision++;
+    if (this.session?.ID === session.ID) {
+      if (history) this.agents.clearFocus(history);
+      writeNavigationRoute(
+        { workspace: session.InstanceID, session: session.ID, agent: '' },
+        history,
+      );
+      return;
+    }
     this.stopSessionObservers();
     this.session = session;
+    writeNavigationRoute(
+      { workspace: session.InstanceID, session: session.ID, agent: '' },
+      history,
+    );
     this.processes.open(api, session.ID);
     this.agents.open(api, session, this.sessions);
     this.error = '';
@@ -417,8 +548,11 @@ export class HarnessConsole {
   async selectAgent(session: Session) {
     const root = sessionRoot(session, this.sessions);
     if (!root || this.removedSessionIDs.has(session.ID)) return null;
-    if (this.session?.ID !== root.ID) await this.selectSession(root);
-    if (this.session?.ID !== root.ID) return null;
+    writeNavigationRoute({ workspace: root.InstanceID, session: root.ID, agent: session.ID });
+    const selecting = this.selectSession(root, false);
+    const revision = this.navigationRevision;
+    await selecting;
+    if (revision !== this.navigationRevision || this.session?.ID !== root.ID) return null;
     return this.agents.focus(session.ID);
   }
 
@@ -624,7 +758,12 @@ export class HarnessConsole {
     this.stopSessionObservers();
     this.error = '';
     const next = this.sessions.find((entry) => !entry.Parent);
-    if (next) await this.selectSession(next);
+    if (next) await this.selectSession(next, 'replace');
+    else
+      writeNavigationRoute(
+        { workspace: this.instance?.ID ?? '', session: '', agent: '' },
+        'replace',
+      );
   }
 
   async setSessionModel(model: string, allowCompaction = false) {
@@ -699,7 +838,12 @@ export class HarnessConsole {
     const resumed = await api.resumeInstance(instance.ID);
     if (this.api === api) {
       await this.refreshInstances();
-      if (this.instance?.ID === instance.ID) await this.selectInstance(resumed);
+      if (this.instance?.ID === instance.ID)
+        await this.selectInstance(resumed, {
+          session: this.session?.ID,
+          agent: this.agents.focusedID,
+          history: 'replace',
+        });
     }
   }
 }
