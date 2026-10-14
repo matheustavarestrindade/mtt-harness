@@ -13,8 +13,10 @@
   } from 'lucide-svelte';
   import { Button } from '$lib/atoms/ui/button';
   import type { HarnessConsole } from '$lib/organisms/console.svelte';
-  import { messageText, shortID } from '$lib/atoms/format';
-  import { buildConversationEntries } from '$lib/atoms/transcript';
+  import { shortID } from '$lib/atoms/format';
+  import { buildConversationEntries, type ToolActivity } from '$lib/atoms/transcript';
+  import ToolActivitySection from '../molecules/ToolActivitySection.svelte';
+  import AgentGroup from './AgentGroup.svelte';
   import MessageCard from '../molecules/MessageCard.svelte';
   import MessageContent from '../molecules/content/MessageContent.svelte';
   import PermissionCard from '../molecules/PermissionCard.svelte';
@@ -47,12 +49,16 @@
       workbench.liveMessage ? [...workbench.messages, workbench.liveMessage] : workbench.messages,
     ),
   );
+  const unplacedAgents = $derived(
+    workbench.agents.unplaced(new Set(entries.map((entry) => entry.message.ID))),
+  );
   $effect(() => {
     const sessionID = workbench.session?.ID ?? '';
     const changes =
       workbench.messages.length +
       workbench.permissions.length +
       workbench.receipts.length +
+      workbench.agents.children(workbench.session?.ID ?? '').length +
       (workbench.liveMessage?.Reasoning?.length ?? 0) +
       (workbench.liveMessage?.Content?.[0]?.Text.length ?? 0);
     if (sessionID !== previousSession) {
@@ -87,7 +93,7 @@
             ><LoaderCircle class="size-4 animate-spin" />Loading conversation…</span
           >
         </div>
-      {:else if !workbench.messages.length && !workbench.receipts.length && !workbench.liveMessage}
+      {:else if !workbench.messages.length && !workbench.receipts.length && !workbench.liveMessage && !unplacedAgents.length}
         <section class="flex flex-1 flex-col items-center justify-center py-8 text-center sm:py-12">
           <div
             class="quiet-grid mb-6 grid size-28 place-items-center rounded-3xl border border-border/50 bg-muted/30"
@@ -150,12 +156,32 @@
         </section>
       {:else}
         <div class="conversation-entries flex flex-col gap-1">
-          {#each entries as entry (entry.message.ID)}<MessageCard
+          {#each entries as entry (entry.message.ID)}
+            {#snippet tools(activity: ToolActivity)}
+              {#if activity.call.Name === 'agent'}
+                {#if activity === entry.tools.find((tool) => tool.call.Name === 'agent')}
+                  <AgentGroup
+                    monitor={workbench.agents}
+                    sessions={workbench.agents.children(entry.message.SessionID, entry.message.ID)}
+                    models={workbench.models}
+                    activities={entry.tools.filter((tool) => tool.call.Name === 'agent')}
+                    running={workbench.status.running}
+                  />
+                {/if}
+              {:else}<ToolActivitySection {activity} running={workbench.status.running} />{/if}
+            {/snippet}
+            <MessageCard
               message={entry.message}
               tools={entry.tools}
+              renderTool={tools}
               running={workbench.status.running}
               streaming={entry.message.ID === workbench.liveMessage?.ID}
             />{/each}
+          {#if unplacedAgents.length}<AgentGroup
+              monitor={workbench.agents}
+              sessions={unplacedAgents}
+              models={workbench.models}
+            />{/if}
           {#each workbench.receipts as receipt (receipt.ID)}<div class="chat-message user-message">
               <div class="mb-1 flex items-center gap-2 text-[10px] text-muted-foreground">
                 <LoaderCircle class="size-3.5 animate-spin" />Message accepted

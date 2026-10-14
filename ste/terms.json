@@ -2,6 +2,51 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "parent",
+      "category": "technical_noun",
+      "approved_forms": [
+        "parents"
+      ],
+      "meaning": "a session or agent that owns a subordinate agent in the session tree",
+      "source": "agent navigation"
+    },
+    {
+      "term": "child",
+      "category": "technical_noun",
+      "approved_forms": [
+        "children"
+      ],
+      "meaning": "an agent linked to the session or agent that started it",
+      "source": "agent navigation"
+    },
+    {
+      "term": "status dot",
+      "category": "technical_noun",
+      "approved_forms": [
+        "status dots"
+      ],
+      "meaning": "a small circular UI indicator for observed agent activity",
+      "source": "agent navigation"
+    },
+    {
+      "term": "animation",
+      "category": "technical_noun",
+      "approved_forms": [
+        "animations"
+      ],
+      "meaning": "visible changes over time used by a UI activity indicator",
+      "source": "UI activity display"
+    },
+    {
+      "term": "text character",
+      "category": "technical_noun",
+      "approved_forms": [
+        "text characters"
+      ],
+      "meaning": "a unit counted by a text preview limit",
+      "source": "UI text display"
+    },
+    {
       "term": "worker attempt",
       "category": "technical_noun",
       "approved_forms": [

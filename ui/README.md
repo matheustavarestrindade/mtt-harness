@@ -91,6 +91,22 @@ The workspace form starts with an empty directory field. The form does not expan
 
 Open `Settings`, then `Providers`, to connect a provider. The API contracts are in `../routes.md`.
 
+## Child Agents
+
+The sidebar shows child agents below the parent session. Lines show the parent and child relation. Select an agent to see the agent output in the parent conversation. The parent message draft does not change.
+
+An open agent panel has a height of 320 pixels. The panel scrollbar is different from the conversation scrollbar. The panel shows model text, `Thinking`, tool calls, and the last result.
+
+Select the button with the label `Task` to read the task text. A child agent can have more child agents. The panel can show child output.
+
+Select the button with the label `Back to parent agent` to see the parent agent.
+
+The selected conversation receives agent events. An active agent has a status dot with animation. An agent with the `Inactive` label has a constant status dot. The UI shows permission requests. The labels `Reconnecting`, `Cancelled`, and `Failed` identify other agent status data.
+
+Select a conversation to get agent status data.
+
+New output moves the panel to the last line. Use the scrollbar to stop automatic movement. Use `Scroll to latest agent output` to start automatic movement again. The preview shows the last 80 output messages. The live text limit is 100,000 text characters. Message history replaces live text after a model response.
+
 ## File Attachments
 
 The `Upload attachments` button opens a `DropdownMenu`. The list shows `Images`, `Documents`, `Video`, and `Audio`. You cannot select a media type with the label `Not supported`. A selection opens a file list for the related file formats.

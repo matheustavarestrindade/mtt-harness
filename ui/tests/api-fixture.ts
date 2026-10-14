@@ -14,7 +14,7 @@ import type {
 
 // Fixtures use the actual Go response casing, nullable lists and 202 queue
 // envelope. They are browser-test data, never a fallback in the shipped UI.
-export async function mockHarness(page: Page) {
+export async function mockHarness(page: Page, options: { replayEvents?: boolean } = {}) {
   const instances: Instance[] = [];
   const sessions: Session[] = [];
   const histories = new Map<string, Message[]>();
@@ -72,7 +72,8 @@ export async function mockHarness(page: Page) {
     ],
     Cost: null,
   };
-  const sockets: WebSocketRoute[] = [];
+  const openSockets = new Set<WebSocketRoute>();
+  const eventHistory: HarnessEvent[] = [];
   let identifier = 0;
   let sequence = 0;
   const model: Model = {
@@ -86,7 +87,16 @@ export async function mockHarness(page: Page) {
   };
   const models: Model[] = [model];
   await page.routeWebSocket(/\/api\/sessions\/.*\/events/, (socket) => {
-    sockets.push(socket);
+    openSockets.add(socket);
+    socket.onClose(() => openSockets.delete(socket));
+    if (options.replayEvents) {
+      const url = new URL(socket.url());
+      const since = Number(url.searchParams.get('since') ?? '0');
+      for (const event of eventHistory) {
+        if (url.pathname.includes(`/sessions/${event.SessionID}/`) && event.Seq > since)
+          socket.send(JSON.stringify(event));
+      }
+    }
   });
   function event(session: Session, name: string, payload: unknown) {
     const value: HarnessEvent = {
@@ -97,7 +107,8 @@ export async function mockHarness(page: Page) {
       Payload: payload,
       Time: new Date().toISOString(),
     };
-    for (const socket of sockets) {
+    eventHistory.push(value);
+    for (const socket of openSockets) {
       if (socket.url().includes(`/sessions/${session.ID}/`)) socket.send(JSON.stringify(value));
     }
   }
@@ -514,5 +525,7 @@ export async function mockHarness(page: Page) {
     sidekickStates,
     sidekickMetrics,
     sidekickUpdates,
+    openSockets,
+    eventHistory,
   };
 }
