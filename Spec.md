@@ -563,7 +563,13 @@ User input or a runtime notification can start a turn. The database keeps the fu
 
 A request-local runtime message does not start a turn. A context policy plugin can select the request view before context fitting. With plugin context selection, the core does not remove turns automatically. The core examines the input budget before the model request.
 
-If the last turn is too large, the harness gives an error. The harness does not send the request. A provider can implement `TokenCounter` for the token count. The default token estimate uses text bytes and a media allowance. The estimate is not the usage. The provider response gives the usage.
+If the last turn is too large, the harness gives an error. The harness does not send the request. A provider can implement `TokenCounter` for the token count. A provider can implement `TokenEstimator` for a protocol token estimate. The default token estimate uses text bytes and a media allowance. The provider response gives the usage.
+
+Standard adapters use a token estimate of 4 UTF-8 bytes for a text token. They do not count transport bytes as text tokens. Responses uses the reasoning token count when available. Without the reasoning token count, the adapter uses a token estimate for ciphertext. The request keeps the continuation data for the correct provider.
+
+The last provider response without an error can give the initial token count. The token count includes input tokens and cache tokens. Add output tokens to the token count one time. New request content adds a token estimate. Billing uses provider usage.
+
+A context usage anchor identifies the provider, model, request parameters, message content, and sequence. Changed history or a different model makes the previous token count incorrect. New request reminders and tool definitions add full token estimates. The database keeps a context usage anchor with the response. Public messages and provider requests do not contain the context usage anchor.
 
 ```go
 type TokenCounter interface {

@@ -103,6 +103,9 @@ type historyMutation struct {
 }
 
 type memoryJob struct {
+	// ValidationOutput retains the rejected page for a bounded repair attempt.
+	// It cannot enter published memory or a foreground conversation.
+	ValidationOutput  string           `json:"validation_output,omitempty"`
 	ID                string           `json:"id"`
 	SessionID         atom.SessionID   `json:"session_id"`
 	Epoch             int64            `json:"epoch"`
@@ -119,6 +122,7 @@ type memoryJob struct {
 	ResultIDs         []string         `json:"result_ids"`
 	Attempts          int              `json:"attempts"`
 	Failures          int              `json:"failures"`
+	PageFailures      int              `json:"page_failures,omitempty"`
 	Page              int              `json:"page"`
 	PlanHash          string           `json:"plan_hash"`
 	Progress          int64            `json:"progress"`

@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/contextbuilder"
 	"github.com/matheustavarestrindade/mtt-harness/internal/operation"
 )
 
@@ -21,6 +22,9 @@ func (agentLoop *Loop) runModelRound(session atom.Session, modelCall *preparedMo
 		}
 	}
 	message, tasks, operationError := agentLoop.receiveModelResponse(roundContext, session, modelCall)
+	if operationError == nil {
+		operationError = operation.WrapError(contextbuilder.CaptureReportedUsage(operationContext, modelCall.request, modelCall.provider, &message), "record request context usage")
+	}
 	if operationError != nil {
 		cancelRound()
 		results := waitForTools(tasks)

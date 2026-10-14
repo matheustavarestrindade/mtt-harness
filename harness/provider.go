@@ -28,6 +28,19 @@ type TokenCounter interface {
 	CountTokens(operationContext context.Context, request atom.Request) (int, error)
 }
 
+// TokenEstimate describes a local estimate, not provider billing or an exact
+// tokenizer result. Identity changes when the protocol/accounting rules change.
+type TokenEstimate struct {
+	InputTokens int
+	Identity    string
+}
+
+// TokenEstimator measures model-visible input without tokenizing transport
+// encodings. Implementations must not run a model or mutate the request.
+type TokenEstimator interface {
+	EstimateTokens(context.Context, atom.Request) (TokenEstimate, error)
+}
+
 func (harnessRuntime *Harness) Provider(provider Provider) Unsubscribe {
 	harnessRuntime.mutex.Lock()
 	identifier := harnessRuntime.nextRegistrationID()

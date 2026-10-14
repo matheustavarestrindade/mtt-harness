@@ -2,6 +2,75 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "context measurement",
+      "category": "technical_noun",
+      "meaning": "a count or estimate of the selected provider request input",
+      "source": "context accounting"
+    },
+    {
+      "term": "ciphertext",
+      "category": "technical_noun",
+      "meaning": "encrypted provider reasoning state retained for later requests",
+      "source": "Responses protocol"
+    },
+    {
+      "term": "transport bytes",
+      "category": "technical_noun",
+      "meaning": "serialized or encoded network payload bytes rather than model tokens",
+      "source": "provider protocol"
+    },
+    {
+      "term": "context usage anchor",
+      "category": "technical_noun",
+      "approved_forms": [
+        "context usage anchors"
+      ],
+      "meaning": "private stored provider-report metadata used only for input-context accounting",
+      "source": "context accounting"
+    },
+    {
+      "term": "public message",
+      "category": "technical_noun",
+      "approved_forms": [
+        "public messages"
+      ],
+      "meaning": "conversation data serialized by the public API without provider-private metadata",
+      "source": "API"
+    },
+    {
+      "term": "source quote",
+      "category": "technical_noun",
+      "approved_forms": [
+        "source quotes"
+      ],
+      "meaning": "an exact literal excerpt cited from a supplied memory source",
+      "source": "memory extraction"
+    },
+    {
+      "term": "whitespace",
+      "category": "technical_noun",
+      "meaning": "space, tab, and line-ending characters preserved in source evidence",
+      "source": "memory extraction"
+    },
+    {
+      "term": "extraction page",
+      "category": "technical_noun",
+      "approved_forms": [
+        "extraction pages"
+      ],
+      "meaning": "one bounded input batch validated and checkpointed by a memory worker",
+      "source": "memory extraction"
+    },
+    {
+      "term": "retry count",
+      "category": "technical_noun",
+      "approved_forms": [
+        "retry counts"
+      ],
+      "meaning": "the number of allowed or recorded attempts after a failure",
+      "source": "worker lifecycle"
+    },
+    {
       "term": "parent",
       "category": "technical_noun",
       "approved_forms": [
