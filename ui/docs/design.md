@@ -27,6 +27,8 @@ ui/
         format.ts              # pure display helpers
         content.ts             # content URL and file helpers
         transcript.ts          # call/result pairing in history order
+        session-tree.ts        # parent and child relations
+        agent-activity.ts      # event values and agent tool data
         settings.ts            # editable settings and section types
         utils.ts               # shared component types and class utility
         Brand.svelte           # application mark
@@ -41,6 +43,9 @@ ui/
         console.svelte.ts      # rune-based client state
         Navigation.svelte      # workspace and session navigation
         Conversation.svelte    # conversation workflow
+        AgentPanel.svelte      # fixed-height child output
+        agent-monitor.svelte.ts # child relations and event ownership
+        agent-feed.svelte.ts   # child history and live output
         ProvidersPanel.svelte  # provider keys and device sign-in workflow
         SettingsDialog.svelte  # settings modal and section selection
         RuntimeSettingsPanel.svelte # harness and workspace limits
@@ -81,6 +86,26 @@ The `Enter` key sends the message. The keys `Shift+Enter`, `Command+Enter`, and 
 The `AttachmentDrafts` organism keeps file attachments for a session. The `Composer` molecule receives files from the browser. The `AttachmentTray` molecule shows attachment drafts and error messages. The `MediaContent` molecule shows content in history and queue receipts.
 
 The selected model gives the input media types. The UI examines input media types before it sends a message. If the API rejects the message, the UI keeps the message draft. After the API accepts a message, the UI removes the file attachments from the message draft. The UI removes object URLs when files are removed.
+
+## Child Agents
+
+The client uses `Session.Parent` for agent navigation. The sidebar shows child agents below the parent session. Agent selection opens the parent conversation and the selected agent panel. A child of an agent opens in the same panel.
+
+The `AgentMonitor` organism controls agent data for the selected conversation. The `AgentFeed` organism controls one event connection, data requests, and the live preview. A session change or workspace change stops previous data requests. Previous responses cannot change the new view. A completed agent closes the event connection.
+
+The UI connects an `agent.start` event to a `model.call` message ID. The model call is the last model call in the parent event stream.
+
+Task text does not identify a tool call. Parallel tool calls can have the same task text. The UI shows an agent without a message ID after the conversation history.
+
+Child agents run directly in the loop. The queue `running` value does not give child agent status.
+
+The UI uses `turn.start`, `turn.end`, permission events, and `Session.Completed`.
+
+The UI also examines the parent queue status and start time. A previous agent from a different turn cannot show active status. The value `Completed: false` does not give active status.
+
+The panel uses `MessageCard`, `ThinkingSection`, and the content components. The organism supplies the agent section through `renderTool`. The `finish` result has a different response section.
+
+An open panel has a height of 320 pixels. Output uses the panel scrollbar. The display interval is 100 ms. An open panel reads message history. The preview keeps 80 output messages. The live text limit is 100,000 text characters in one text field.
 
 ## Task State
 
