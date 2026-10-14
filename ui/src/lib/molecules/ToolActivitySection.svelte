@@ -1,22 +1,26 @@
 <script lang="ts">
   import { ChevronRight } from 'lucide-svelte';
+  import type { Snippet } from 'svelte';
   import type { ToolActivity } from '../atoms/transcript';
-  import { fileLanguage } from '../atoms/content';
-  import { plainFileReadPath, toolActivityLabel } from '../atoms/file-actions';
-  import MessageContent from './content/MessageContent.svelte';
-  import CodeBlock from './content/CodeBlock.svelte';
+  import { toolActivityLabel } from '../atoms/file-actions';
+  import ToolInput from './ToolInput.svelte';
+  import ToolOutput from './ToolOutput.svelte';
   let {
     activity,
     running = false,
     unmatched = false,
-  }: { activity: ToolActivity; running?: boolean; unmatched?: boolean } = $props();
+    renderOutput,
+    status,
+  }: {
+    activity: ToolActivity;
+    running?: boolean;
+    unmatched?: boolean;
+    renderOutput?: Snippet;
+    status?: string;
+  } = $props();
   let open = $state(false);
   const identifier = $props.id();
   const label = $derived(toolActivityLabel(activity.call));
-  const language = $derived.by(() => {
-    const path = plainFileReadPath(activity.call);
-    return path ? fileLanguage(path) : 'text';
-  });
 </script>
 
 <section
@@ -39,7 +43,7 @@
       title={`${activity.call.Name}: ${label}`}>{label}</span
     >
     <span class="shrink-0 text-[10px] text-muted-foreground"
-      >{activity.result ? 'Result' : running ? 'Waiting' : 'No result'}</span
+      >{status ?? (activity.result ? 'Result' : running ? 'Waiting' : 'No result')}</span
     >
   </button>
   {#if open}
@@ -53,21 +57,13 @@
       {:else}
         <section aria-label="Tool input" class="min-w-0">
           <h3 class="eyebrow text-foreground/80">Input</h3>
-          <CodeBlock
-            text={JSON.stringify(activity.call.Input, null, 2) ?? 'null'}
-            language="json"
-            embedded
-          />
+          <ToolInput call={activity.call} />
         </section>
       {/if}
       <section aria-label="Tool output" class="min-w-0 border-t border-border pt-3">
         <h3 class="eyebrow text-foreground/80">Output</h3>
-        {#if activity.result?.Content?.length}<MessageContent
-            content={activity.result.Content}
-            mode={language === 'markdown' ? 'markdown' : 'code'}
-            {language}
-            embedded
-          />
+        {#if renderOutput}{@render renderOutput()}
+        {:else if activity.result?.Content?.length}<ToolOutput {activity} />
         {:else}<p class="mt-2 text-xs leading-5 text-muted-foreground">
             {activity.result
               ? 'No output.'

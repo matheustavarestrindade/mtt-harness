@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import '@fontsource-variable/inter';
+@import '@xterm/xterm/css/xterm.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -26,6 +27,8 @@
   --user-message-accent: #60a5fa;
   --tool-call-accent: #d4a65a;
   --user-message-background: #1c1c1c;
+  --terminal-background: #0c0c0c;
+  --terminal-foreground: #ededed;
   --radius: 0.65rem;
 }
 @theme inline {

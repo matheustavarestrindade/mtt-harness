@@ -8,6 +8,7 @@ The UI uses the libraries in the list:
 - [DOMPurify](https://github.com/cure53/DOMPurify) removes dangerous markup.
 - [Highlight.js](https://highlightjs.org/) gives syntax highlighting.
 - [Papa Parse](https://www.papaparse.com/docs) reads CSV data.
+- [xterm.js](https://xtermjs.org/) shows terminal output with ANSI sequences.
 
 The dependency versions are in `ui/package-lock.json`. The code is in `ui/src/lib/molecules/content/`.
 
@@ -59,6 +60,10 @@ One tool section contains the tool call and tool result. The `transcript.ts` ato
 
 For `file_actions`, the section label shows the action sequence and path. The input has the full action data. One tool call has one result section, with the selected action output.
 
+Tool input uses field labels and lists. The UI uses tables for tool result data. The file action sections keep the action sequence. The fields show input parameters and file text. JSON text is not the default view.
+
+A data preview has a limit of 400 fields. The preview depth limit is 8. A text field uses a maximum of 32000 characters. The copy button and source download keep the input data. A JSON result above 1000000 characters uses the text view.
+
 The client prepares content views when the user opens a tool section. The section shows input, output, and the value of `ToolCallID`. The same section shows a new tool result. The UI shows a tool result in a different section if the tool call is not in the history.
 
 Tool sections, reasoning sections, and model text use the UI background. The sections have a line between them. A different color identifies a tool section. When a tool section opens, one panel contains input and output. The panel has a background color and border. Input and output have a line between them.
@@ -66,3 +71,19 @@ Tool sections, reasoning sections, and model text use the UI background. The sec
 Content views in the panel do not have a card container. Copy buttons, source downloads, and CSV views stay available.
 
 Message history does not include tool status fields. The UI shows the label `Result` when a tool result is available. It does not change error text in the output.
+
+## Terminal Output
+
+A `bash` section can show new output before the tool result is available. The fields `ProcessSpec.ToolCallID` and `ProcessSpec.ToolMessageID` connect the process to the tool call. Child agent panels also use the terminal view.
+
+The user can read terminal output and use the copy button. The terminal view does not send input to the process. The UI gets xterm.js when the terminal view opens. ANSI sequences control text color and cursor position. The cursor can replace a line with new output.
+
+The process output WebSocket is active while the terminal view is open. A new connection gives a new output snapshot. Byte offsets show output gaps. The UTF-8 decoders keep data for standard output and standard error. The output events do not start message history reads.
+
+The terminal height is 288 pixels. The view uses the available width. The user can move through output with the scrollbar.
+
+The client keeps a maximum of 524288 characters. The limit for output chunks is 512. The terminal keeps 2000 lines. The UI removes previous output when the buffer is full.
+
+The copy button uses terminal text. The source download keeps output text with ANSI sequences. When a tool section closes, the output connection stops. A session change also stops the connection. The connection stops when an agent panel closes. It also stops when the UI connection closes.
+
+The process exit status is different from the tool result. A process can continue after an inactivity return. If the process buffer is not available, the UI uses the tool result. The terminal view also shows previous `bash` output.

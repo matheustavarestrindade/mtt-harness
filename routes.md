@@ -34,6 +34,7 @@ A timestamp uses the `RFC 3339` format. A duration in a Go data type is an integ
 ```text
 Provider.Interval
 ProcessSpec.Timeout
+ProcessSpec.IdleTimeout
 ProcessSpec.Notify.Interval
 ToolResult.Duration
 ```
@@ -365,6 +366,20 @@ The `/health` route gives a liveness response. It does not examine the provider 
 
 The harness keeps a maximum of 256 KiB for a process stream. It keeps output from the last 128 completed processes. The database can keep process data after the output is removed. The API does not have an HTTP route to stop a process.
 
+The output connection sends a `start` frame, output snapshots, new output, and an `exit` frame. The snapshots contain standard output and then standard error. A byte offset applies to one stream. A new connection gives new output snapshots. It does not use the session event cursor.
+
+The `data_base64` field contains output bytes in base64. Use a UTF-8 decoder for standard output. Use a different UTF-8 decoder for standard error. An ANSI sequence or UTF-8 data can continue in the next frame. Previous clients can use the `data` field. The exit frame includes the process exit status.
+
+```typescript
+type ProcessOutputFrame = {
+  process_id: string; stream: 'start' | 'stdout' | 'stderr' | 'exit';
+  data: string; data_base64: string | null; offset: number; snapshot: boolean;
+  at: string; error: string; exit: null | { Code: number; Signal: string; Error: string };
+};
+```
+
+The `offset` field is the byte position before the frame data. The minimum byte position is 0. A snapshot can start above 0 after previous output is removed. The field `snapshot: true` shows output from the buffer. After an output gap, open a new connection to get available output.
+
 ## WebSocket Data
 
 Session event URL:
@@ -401,7 +416,8 @@ Event payload data:
 | `run.error` | `{"message_id":"ID","error":"description"}` |
 | `run.cancelled` | `{"message_id":"ID","error":"description"}` |
 | `run.interrupted` | `{"message_id":"ID"}` |
-| `process.start`, `process.output`, `process.exit` | `ProcessEvent` |
+| `process.start`, `process.exit` | `ProcessRecord` |
+| `process.output` | `{"ProcessID":"ID","Stream":"stdout","Offset":0,"Bytes":42}` |
 | `process.notification` | null |
 | `agent.start` | `{"session":"child-session-id","task":"task text"}` |
 | `agent.end` | `{"session":"child-session-id"}` |
@@ -510,10 +526,10 @@ type PermissionDecision = { RequestID: string; InstanceID: string; SessionID: st
 type ProcessRecord = {
   ID: string; InstanceID: string; SessionID: string; PID: number; Status: string;
   Spec: { Command: string; Args: string[] | null; Cwd: string; Env: string[] | null;
-    Notify: { Mode: 'exit' | 'error' | 'interval'; Interval: number }; Timeout: number };
+    Notify: { Mode: 'none' | 'exit' | 'error' | 'interval'; Interval: number }; Timeout: number;
+    IdleTimeout: number; ToolCallID?: string; ToolMessageID?: string };
   Exit: null | { Code: number; Signal: string; Error: string }; StartedAt: string; EndedAt: string;
 };
-type ProcessEvent = { ProcessID: string; Stream: 'start' | 'stdout' | 'stderr' | 'exit'; Data: string | null; Error: string; At: string };
 ```
 
 Model prices apply to 1000000 tokens. The `ContextMax` field is the model token limit. The `Input` and `Output` lists give the media types of the model. The `Tools` field shows if the model can use tools.

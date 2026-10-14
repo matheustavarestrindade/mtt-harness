@@ -15,7 +15,7 @@
   import type { HarnessConsole } from '$lib/organisms/console.svelte';
   import { shortID } from '$lib/atoms/format';
   import { buildConversationEntries, type ToolActivity } from '$lib/atoms/transcript';
-  import ToolActivitySection from '../molecules/ToolActivitySection.svelte';
+  import ToolActivityView from './ToolActivityView.svelte';
   import AgentGroup from './AgentGroup.svelte';
   import MessageCard from '../molecules/MessageCard.svelte';
   import MessageContent from '../molecules/content/MessageContent.svelte';
@@ -168,7 +168,12 @@
                     running={workbench.status.running}
                   />
                 {/if}
-              {:else}<ToolActivitySection {activity} running={workbench.status.running} />{/if}
+              {:else}<ToolActivityView
+                  {activity}
+                  messageID={entry.message.ID}
+                  processes={workbench.processes}
+                  running={workbench.status.running}
+                />{/if}
             {/snippet}
             <MessageCard
               message={entry.message}

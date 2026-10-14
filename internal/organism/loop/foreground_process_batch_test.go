@@ -53,6 +53,11 @@ func TestForegroundProcessesReturnOnlyTheCompleteToolBatch(test *testing.T) {
 		test.Fatalf("duplicate process updates started extra model turns: %d requests", len(testStack.provider.Requests))
 	}
 	request := testStack.provider.Requests[1]
+	for _, record := range records {
+		if record.Spec.ToolMessageID != request.Messages[1].ID || (record.Spec.ToolCallID != "first-command" && record.Spec.ToolCallID != "second-command") {
+			test.Fatalf("process is not bound to its model response and call: %+v", record.Spec)
+		}
+	}
 	if len(request.Messages) != 4 || request.Messages[0].Role != atom.RoleUser || request.Messages[1].Role != atom.RoleAssistant {
 		test.Fatalf("unexpected batch continuation: %+v", request.Messages)
 	}

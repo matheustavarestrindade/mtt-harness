@@ -1,4 +1,5 @@
 import type { Page, WebSocketRoute } from '@playwright/test';
+import type { ProcessRecord } from '../src/lib/atoms/processes';
 import type { MemoryMetrics, MemoryPluginState } from '../src/lib/atoms/memory';
 import type { RepetitionConfiguration, WorkspacePluginState } from '../src/lib/atoms/plugins';
 import type {
@@ -18,6 +19,13 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
   const instances: Instance[] = [];
   const sessions: Session[] = [];
   const histories = new Map<string, Message[]>();
+  const processes = new Map<string, ProcessRecord>();
+  const processSockets = new Map<WebSocketRoute, string>();
+  const processConnections: string[] = [];
+  const processOutput = new Map<
+    string,
+    { stdout: Buffer; stderr: Buffer; stdoutBytes: number; stderrBytes: number }
+  >();
   const queued = new Map<string, Message[]>();
   const running = new Set<string>();
   const taskStates = new Map<string, TaskState>();
@@ -86,6 +94,92 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
     Prices: null,
   };
   const models: Model[] = [model];
+  function outputFrame(
+    identifier: string,
+    stream: string,
+    data: Buffer = Buffer.alloc(0),
+    offset = 0,
+    snapshot = false,
+  ) {
+    return JSON.stringify({
+      process_id: identifier,
+      stream,
+      data: data.toString('utf8'),
+      data_base64: data.toString('base64'),
+      offset,
+      snapshot,
+      at: new Date().toISOString(),
+      error: '',
+      exit: stream === 'exit' ? processes.get(identifier)?.Exit : null,
+    });
+  }
+  await page.routeWebSocket(/\/api\/processes\/.*\/output/, (socket) => {
+    const identifier = new URL(socket.url()).pathname.split('/')[3];
+    processConnections.push(identifier);
+    processSockets.set(socket, identifier);
+    socket.onClose((code, reason) => {
+      processSockets.delete(socket);
+      void socket.close({ code, reason });
+    });
+    socket.send(outputFrame(identifier, 'start'));
+    const output = processOutput.get(identifier);
+    if (output)
+      for (const stream of ['stdout', 'stderr'] as const)
+        if (output[stream].length)
+          socket.send(
+            outputFrame(
+              identifier,
+              stream,
+              output[stream],
+              output[`${stream}Bytes`] - output[stream].length,
+              true,
+            ),
+          );
+    if (processes.get(identifier)?.Status === 'stopped') {
+      socket.send(outputFrame(identifier, 'exit'));
+      socket.close();
+    }
+  });
+  function processChunk(
+    identifier: string,
+    stream: 'stdout' | 'stderr',
+    data: string | Uint8Array,
+  ) {
+    const bytes = Buffer.from(data);
+    const output = processOutput.get(identifier) ?? {
+      stdout: Buffer.alloc(0),
+      stderr: Buffer.alloc(0),
+      stdoutBytes: 0,
+      stderrBytes: 0,
+    };
+    const offset = output[`${stream}Bytes`];
+    output[`${stream}Bytes`] += bytes.length;
+    output[stream] = Buffer.concat([output[stream], bytes]).subarray(-262144);
+    processOutput.set(identifier, output);
+    for (const [socket, process] of processSockets)
+      if (process === identifier) socket.send(outputFrame(identifier, stream, bytes, offset));
+  }
+  function processExit(identifier: string, code = 0) {
+    const record = processes.get(identifier)!;
+    record.Status = 'stopped';
+    record.Exit = { Code: code, Error: code ? `exit status ${code}` : '', Signal: '' };
+    record.EndedAt = new Date().toISOString();
+    const session = sessions.find((session) => session.ID === record.SessionID)!;
+    event(session, 'process.exit', record);
+    for (const [socket, process] of processSockets)
+      if (process === identifier) {
+        socket.send(outputFrame(identifier, 'exit'));
+        processSockets.delete(socket);
+        socket.close();
+      }
+  }
+  function disconnectProcess(identifier: string) {
+    for (const [socket, process] of processSockets)
+      if (process === identifier) {
+        processSockets.delete(socket);
+        socket.close();
+      }
+  }
   await page.routeWebSocket(/\/api\/sessions\/.*\/events/, (socket) => {
     openSockets.add(socket);
     socket.onClose(() => openSockets.delete(socket));
@@ -402,6 +496,10 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
           return reply(session);
         }
         if (parts[2] === 'messages' && method === 'GET') return reply(histories.get(session.ID));
+        if (parts[2] === 'processes' && method === 'GET')
+          return reply(
+            [...processes.values()].filter((process) => process.SessionID === session.ID),
+          );
         if (parts[2] === 'status')
           return reply({
             running: running.has(session.ID),
@@ -509,6 +607,12 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
     instances,
     sessions,
     histories,
+    processes,
+    processSockets,
+    processConnections,
+    processChunk,
+    processExit,
+    disconnectProcess,
     settings,
     model,
     models,

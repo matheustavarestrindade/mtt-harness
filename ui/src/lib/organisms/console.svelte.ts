@@ -20,9 +20,11 @@ import { latestRequestUsage } from '../atoms/request-usage';
 import { eventToolCall } from '../atoms/agent-activity';
 import { sessionRoot } from '../atoms/session-tree';
 import { AgentMonitor } from './agent-monitor.svelte';
+import { SessionProcesses } from './session-processes.svelte';
 
 const idleStatus = (): QueueStatus => ({ running: false, queued: 0, messages: [], error: '' });
 export class HarnessConsole {
+  readonly processes = new SessionProcesses();
   connection = $state<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   error = $state('');
   catalogError = $state('');
@@ -118,6 +120,7 @@ export class HarnessConsole {
   }
 
   private stopSessionObservers() {
+    this.processes.close();
     this.agents.close();
     clearTimeout(this.sessionListTimer);
     this.sessionListTimer = undefined;
@@ -240,6 +243,7 @@ export class HarnessConsole {
     const api = this.requireAPIClient();
     this.stopSessionObservers();
     this.session = session;
+    this.processes.open(api, session.ID);
     this.agents.open(api, session, this.sessions);
     this.error = '';
     this.loading = true;
@@ -255,7 +259,10 @@ export class HarnessConsole {
         if (signal.aborted) return;
         const previous = this.streamState;
         this.streamState = state;
-        if (state === 'live' && previous !== 'live') this.scheduleSessionRefresh();
+        if (state === 'live' && previous !== 'live') {
+          this.scheduleSessionRefresh();
+          this.processes.scheduleRefresh();
+        }
       },
     );
     const pollSessionStatus = async () => {
@@ -461,6 +468,8 @@ export class HarnessConsole {
 
   private receiveEvent(event: HarnessEvent) {
     if (event.SessionID !== this.session?.ID) return;
+    this.processes.observe(event);
+    if (['process.start', 'process.output', 'process.exit'].includes(event.Name)) return;
     this.agents.observe(event);
     if (event.Name !== 'model.chunk') this.events = [...this.events.slice(-79), event];
     const payload =

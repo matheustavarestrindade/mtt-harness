@@ -9,6 +9,7 @@ import (
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
+	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/process"
 	"github.com/matheustavarestrindade/mtt-harness/internal/organism/processes"
 )
 
@@ -25,7 +26,7 @@ func (bashTool *Bash) Name() string {
 }
 
 func (bashTool *Bash) Description() string {
-	return "Execute a shell command or script with sh -c in the instance workspace. By default, wait for exit and return retained stdout and stderr (last 256 KiB per stream) as the tool result, without a separate process notification. Set wait=false to return a process ID immediately for process_output or process_kill and enable background notifications. timeout and interval are in milliseconds."
+	return "Execute a shell command or script with sh -c in the instance workspace. By default, wait for exit or 10000 milliseconds without output. Exit returns retained stdout and stderr (last 256 KiB per stream) without a duplicate notification. Inactivity returns a running process ID and recent output (last 20 lines / 4096 bytes per stream), leaving the command alive and enabling its background notify policy. Silence does not prove completion or failure. Use process_output to inspect it or process_kill to stop it. Set idle_timeout=0 to wait until exit without inactivity handling. Set wait=false to return the process ID immediately. Background processes can send one inactivity notice, plus the selected notification policy; notify=none suppresses background updates. timeout, idle_timeout and interval are milliseconds."
 }
 
 func (bashTool *Bash) Categories() []string {
@@ -43,22 +44,30 @@ func (bashTool *Bash) InputSchema() atom.Schema {
 			"wait": {
 				"type": "boolean",
 				"default": true,
-				"description": "Wait for process exit and return its retained output only as the tool result; no separate session notifications are sent. Set false to return the process ID immediately and use the notify policy. Cancelling the wait does not stop the process; use process_kill to stop it."
+				"description": "Wait for exit or the idle_timeout quiet period. An inactivity return leaves the command running and activates notify; it is not a completed command. Exit returns output only through this tool result. False starts in the background immediately. Cancelling a foreground wait does not stop the command and does not enable background notifications; use process_kill to stop it."
 			},
 			"notify": {
 				"type": "string",
 				"enum": ["none", "exit", "error", "interval"],
 				"default": "exit",
-				"description": "Background notification policy for wait=false: none disables updates; exit sends a runtime update when the process stops; error only reports an error exit; interval sends periodic updates and a final exit update. Ignored when wait=true, which returns output only through the tool result. Default: exit."
+				"description": "Notification policy after wait=false or an inactivity return: none disables updates; exit reports exit; error reports an error exit; interval reports periodic output and exit. With a positive idle_timeout, non-none policies also allow one no-output status notice per process. A foreground inactivity return is that process's notice, so it is not queued again. Runtime notifications are process data, not user messages. Default: exit."
 			},
 			"interval": {
 				"type": "integer",
-				"description": "Background notification interval in milliseconds (ms). Required and greater than zero when wait=false and notify is interval; ignored when wait=true or for other modes. For example, 1000 means one second."
+				"minimum": 0,
+				"description": "Background output notification interval in milliseconds (ms). Required and greater than zero when notify=interval, including after a foreground inactivity return. Ignored for other modes. For example, 1000 means one second."
 			},
 			"timeout": {
 				"type": "integer",
 				"default": 0,
+				"minimum": 0,
 				"description": "Maximum process runtime in milliseconds (ms). A positive value stops the process when elapsed; omitted or zero means no automatic timeout. Applies to both wait=true and wait=false. For example, 60000 means 60 seconds."
+			},
+			"idle_timeout": {
+				"type": "integer",
+				"default": 10000,
+				"minimum": 0,
+				"description": "No-output period in milliseconds (ms). Default 10000 (10 seconds); zero disables inactivity handling. For wait=true, a quiet running command returns its process ID and recent output before timeout, then continues in the background. For wait=false and notify other than none, one quiet-period runtime notice is allowed. New stdout/stderr bytes postpone the notice; silence is not proof of exit or failure. Inactivity never kills the process or changes its runtime timeout."
 			}
 		},
 		"required": ["command"]
@@ -70,11 +79,12 @@ func (bashTool *Bash) Check(operationContext context.Context, call atom.ToolCall
 }
 
 type bashInput struct {
-	Command  string `json:"command"`
-	Wait     *bool  `json:"wait"`
-	Notify   string `json:"notify"`
-	Interval int    `json:"interval"`
-	Timeout  int    `json:"timeout"`
+	Command     string `json:"command"`
+	Wait        *bool  `json:"wait"`
+	Notify      string `json:"notify"`
+	Interval    int    `json:"interval"`
+	Timeout     int    `json:"timeout"`
+	IdleTimeout *int64 `json:"idle_timeout"`
 }
 
 func (bashTool *Bash) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
@@ -83,16 +93,32 @@ func (bashTool *Bash) Run(operationContext context.Context, call atom.ToolCall) 
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "bash: the input is not correct"}, operationError
 	}
 	waitForExit := input.Wait == nil || *input.Wait
+	idleMilliseconds := int64(10000)
+	if input.IdleTimeout != nil {
+		idleMilliseconds = *input.IdleTimeout
+	}
+	const maximumMilliseconds = int64((1<<63 - 1) / int64(time.Millisecond))
+	if idleMilliseconds < 0 || idleMilliseconds > maximumMilliseconds || input.Timeout < 0 || int64(input.Timeout) > maximumMilliseconds || input.Interval < 0 || int64(input.Interval) > maximumMilliseconds {
+		return atom.ToolResult{}, fmt.Errorf("bash: process durations must be between 0 and %d milliseconds", maximumMilliseconds)
+	}
+	policy := atom.NotifyPolicy{Mode: atom.NotifyMode(input.Notify), Interval: time.Duration(input.Interval) * time.Millisecond}
+	if policy.Mode == "" {
+		policy.Mode = atom.NotifyExit
+	}
+	if policy.Mode != atom.NotifyNone && policy.Mode != atom.NotifyExit && policy.Mode != atom.NotifyError && policy.Mode != atom.NotifyInterval {
+		return atom.ToolResult{}, fmt.Errorf("invalid process notification mode")
+	}
+	if policy.Mode == atom.NotifyInterval && policy.Interval <= 0 {
+		return atom.ToolResult{}, fmt.Errorf("interval notifications require a positive interval")
+	}
 	processSpec := atom.ProcessSpec{
-		Command: "sh",
-		Args:    []string{"-c", input.Command},
-		Notify:  atom.NotifyPolicy{Mode: atom.NotifyMode(input.Notify)},
+		Command:     "sh",
+		Args:        []string{"-c", input.Command},
+		Notify:      policy,
+		IdleTimeout: time.Duration(idleMilliseconds) * time.Millisecond,
 	}
 	// The tool owns foreground output. Set delivery before Start so even an
 	// immediately exiting command cannot queue a duplicate notification.
-	if waitForExit {
-		processSpec.Notify.Mode = atom.NotifyNone
-	}
 	workspace, found := harness.WorkspaceFrom(operationContext)
 	if !found {
 		return atom.ToolResult{}, fmt.Errorf("bash: no instance workspace")
@@ -104,7 +130,18 @@ func (bashTool *Bash) Run(operationContext context.Context, call atom.ToolCall) 
 	if input.Timeout > 0 {
 		processSpec.Timeout = time.Duration(input.Timeout) * time.Millisecond
 	}
-	runningProcess, operationError := bashTool.manager.Start(operationContext, processSpec)
+	if _, found := harness.ToolOriginFrom(operationContext); !found {
+		operationContext = harness.WithToolOrigin(operationContext, harness.ToolOrigin{CallID: call.ID})
+	}
+	var runningProcess harness.Process
+	var operationError error
+	var release func(atom.NotifyPolicy)
+	if waitForExit {
+		runningProcess, release, operationError = bashTool.manager.StartForeground(operationContext, processSpec)
+		defer release(atom.NotifyPolicy{Mode: atom.NotifyNone})
+	} else {
+		runningProcess, operationError = bashTool.manager.Start(operationContext, processSpec)
+	}
 	if operationError != nil {
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: operationError.Error()}, operationError
 	}
@@ -115,23 +152,16 @@ func (bashTool *Bash) Run(operationContext context.Context, call atom.ToolCall) 
 			Content: []atom.Content{{Type: atom.Text, Text: fmt.Sprintf("process %s is started", runningProcess.ID())}},
 		}, nil
 	}
-	type waitResult struct {
-		status         atom.ExitStatus
-		operationError error
-	}
-	waited := make(chan waitResult, 1)
-	go func() {
-		status, operationError := runningProcess.Wait()
-		waited <- waitResult{status: status, operationError: operationError}
-	}()
-	var status atom.ExitStatus
-	select {
-	case result := <-waited:
-		status, operationError = result.status, result.operationError
-	case <-operationContext.Done():
+	processHandle := runningProcess.(*process.Handle)
+	status, inactivity, operationError := processHandle.WaitForExitOrIdle(operationContext, processSpec.IdleTimeout)
+	if operationContext.Err() != nil {
 		return atom.ToolResult{CallID: call.ID, Status: atom.StatusError, Error: "the wait is cancelled"}, nil
 	}
-	stdout, stderr, _ := bashTool.manager.Output(runningProcess.ID())
+	stdout, stderr := processHandle.Output()
+	if inactivity != nil {
+		release(policy)
+		return atom.ToolResult{CallID: call.ID, Status: atom.StatusOK, Content: []atom.Content{{Type: atom.Text, Text: processes.InactivityReport(runningProcess.ID(), *inactivity, inactivity.Stdout, inactivity.Stderr)}}}, nil
+	}
 	var builder strings.Builder
 	if len(stdout) > 0 {
 		builder.Write(stdout)

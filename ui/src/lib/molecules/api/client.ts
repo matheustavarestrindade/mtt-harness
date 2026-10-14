@@ -17,6 +17,7 @@ import type {
 import type { RuntimeSettings, RuntimeSettingKey } from '../../atoms/settings';
 import type { MemoryMetrics, MemoryConfiguration } from '../../atoms/memory';
 import type { WorkspacePluginState } from '../../atoms/plugins';
+import type { ProcessRecord } from '../../atoms/processes';
 
 export class ApiError extends Error {
   constructor(
@@ -109,6 +110,22 @@ export class HarnessApi {
 
   async instances(signal?: AbortSignal) {
     return (await this.request<Instance[] | null>('instances', 'GET', undefined, signal)) ?? [];
+  }
+  async processes(sessionID: string, signal?: AbortSignal) {
+    return (
+      (await this.request<ProcessRecord[] | null>(
+        `sessions/${encodeURIComponent(sessionID)}/processes`,
+        'GET',
+        undefined,
+        signal,
+      )) ?? []
+    );
+  }
+  processOutputURL(identifier: string): URL {
+    const url = this.url(`processes/${encodeURIComponent(identifier)}/output`);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    if (this.token) url.searchParams.set('token', this.token);
+    return url;
   }
   async taskState(sessionID: string, signal?: AbortSignal): Promise<TaskState> {
     const state = await this.request<TaskState>(
