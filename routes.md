@@ -227,6 +227,7 @@ The provider list contains providers in the registry and the test provider when 
 
 ```typescript
 Protocol: '' | 'responses' | 'chat_completions';
+Transport?: 'http' | 'auto' | 'websocket'; WebSocketURL?: string;
 Authentication: '' | 'api_key' | 'chatgpt' | 'none';
 Connected: boolean; // stored credential, not a guarantee of model access
 ModelCount: number; // cached model count
@@ -502,6 +503,7 @@ type Statistics = Usage & {
 type Provider = {
   Name: string; APIURL: string; ModelListURL: string; PriceTableURL: string; Interval: number;
   Protocol: '' | 'responses' | 'chat_completions';
+  Transport?: 'http' | 'auto' | 'websocket'; WebSocketURL?: string;
   ModelListFormat?: 'openai' | 'codex';
   Authentication: '' | 'api_key' | 'chatgpt' | 'none';
   Connected: boolean; ModelCount: number;

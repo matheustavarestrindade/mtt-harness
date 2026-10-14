@@ -13,7 +13,7 @@ import (
 
 func readScriptedStream(test *testing.T, protocol, encoded string) (string, *atom.Usage, error) {
 	test.Helper()
-	stream := &httpStream{parts: make(chan atom.ResponsePart, 64)}
+	stream := &providerStream{parts: make(chan atom.ResponsePart, 64)}
 	if protocol == "responses" {
 		go parseResponsesAPIEvents(context.Background(), io.NopCloser(strings.NewReader(encoded)), stream, "synthetic")
 	} else {

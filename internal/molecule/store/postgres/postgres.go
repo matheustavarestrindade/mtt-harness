@@ -168,6 +168,8 @@ ALTER TABLE providers ADD COLUMN IF NOT EXISTS metadata_url text NOT NULL DEFAUL
 ALTER TABLE providers ADD COLUMN IF NOT EXISTS metadata_format text NOT NULL DEFAULT '';
 ALTER TABLE providers ADD COLUMN IF NOT EXISTS metadata_provider text NOT NULL DEFAULT '';
 ALTER TABLE providers ADD COLUMN IF NOT EXISTS billing text NOT NULL DEFAULT '';
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS transport text NOT NULL DEFAULT '';
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS websocket_url text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS provider_oauth (
 	provider text PRIMARY KEY,
 	access_token text NOT NULL,

@@ -50,6 +50,7 @@ func runApplication(configuration config.File) (operationError error) {
 	closeMCP := func() error {
 		return nil
 	}
+	closeProviders := func() error { return nil }
 	defer func() {
 		// HTTP has its own shutdown deadline. Resource owners must finish before
 		// the deferred database close, even when an earlier caller stopped waiting.
@@ -63,6 +64,7 @@ func runApplication(configuration config.File) (operationError error) {
 		if pluginHost != nil {
 			operationError = errors.Join(operationError, pluginHost.Close(shutdownContext))
 		}
+		operationError = errors.Join(operationError, closeProviders())
 		if pluginEmbeddingCloser != nil {
 			operationError = errors.Join(operationError, pluginEmbeddingCloser.Close())
 		}
@@ -109,7 +111,7 @@ func runApplication(configuration config.File) (operationError error) {
 		requireStartupSuccess(modelGateway.Add(testProvider), "attach test provider")
 		log.Printf("mtt: the test provider is in use")
 	}
-	loadProviders(operationContext, configuration.ProvidersFile, modelGateway, database, providerAuthentication)
+	closeProviders = loadProviders(operationContext, configuration.ProvidersFile, modelGateway, database, providerAuthentication)
 	pluginEmbeddingCloser, operationError = attachContextPlugin(operationContext, pluginHost, database, instanceManager, modelGateway, configuration.DatabaseURL, configuration.ProvidersFile)
 	requireStartupSuccess(operationError, "attach context plugin")
 	requireStartupSuccess(attachSpacedRepetition(operationContext, pluginHost, database, instanceManager, modelGateway, agentLoop, configuration.DatabaseURL, configuration.SpacedRepetitionPrompts, startupPrompt), "attach spaced repetition plugin")

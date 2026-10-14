@@ -12,17 +12,18 @@ type providers struct{ store *Store }
 
 func (providerStore *providers) Save(operationContext context.Context, providerSpec atom.ProviderSpec) error {
 	_, operationError := providerStore.store.pool.Exec(operationContext, `
-		INSERT INTO providers (name, api_url, model_list_url, price_table_url, interval_seconds, protocol, authentication, model_list_format, metadata_url, metadata_format, metadata_provider, billing)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		INSERT INTO providers (name, api_url, model_list_url, price_table_url, interval_seconds, protocol, authentication, model_list_format, metadata_url, metadata_format, metadata_provider, billing, transport, websocket_url)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		ON CONFLICT (name) DO UPDATE SET
 			api_url = EXCLUDED.api_url,
 			model_list_url = EXCLUDED.model_list_url,
 			price_table_url = EXCLUDED.price_table_url,
 			interval_seconds = EXCLUDED.interval_seconds,
 			protocol = EXCLUDED.protocol, authentication = EXCLUDED.authentication, model_list_format = EXCLUDED.model_list_format,
-			metadata_url = EXCLUDED.metadata_url, metadata_format = EXCLUDED.metadata_format, metadata_provider = EXCLUDED.metadata_provider, billing = EXCLUDED.billing`,
+			metadata_url = EXCLUDED.metadata_url, metadata_format = EXCLUDED.metadata_format, metadata_provider = EXCLUDED.metadata_provider, billing = EXCLUDED.billing,
+			transport = EXCLUDED.transport, websocket_url = EXCLUDED.websocket_url`,
 		providerSpec.Name, providerSpec.APIURL, providerSpec.ModelListURL, providerSpec.PriceTableURL, int64(providerSpec.Interval/time.Second), providerSpec.Protocol, providerSpec.Authentication, providerSpec.ModelListFormat,
-		providerSpec.MetadataURL, providerSpec.MetadataFormat, providerSpec.MetadataProvider, providerSpec.Billing)
+		providerSpec.MetadataURL, providerSpec.MetadataFormat, providerSpec.MetadataProvider, providerSpec.Billing, providerSpec.Transport, providerSpec.WebSocketURL)
 	return operationError
 }
 
@@ -30,17 +31,17 @@ func (providerStore *providers) Get(operationContext context.Context, identifier
 	var providerSpec atom.ProviderSpec
 	var seconds int64
 	operationError := providerStore.store.pool.QueryRow(operationContext, `
-		SELECT name, api_url, model_list_url, price_table_url, interval_seconds, protocol, authentication, model_list_format, metadata_url, metadata_format, metadata_provider, billing
+		SELECT name, api_url, model_list_url, price_table_url, interval_seconds, protocol, authentication, model_list_format, metadata_url, metadata_format, metadata_provider, billing, transport, websocket_url
 		FROM providers WHERE name = $1`, identifier).
 		Scan(&providerSpec.Name, &providerSpec.APIURL, &providerSpec.ModelListURL, &providerSpec.PriceTableURL, &seconds, &providerSpec.Protocol, &providerSpec.Authentication, &providerSpec.ModelListFormat,
-			&providerSpec.MetadataURL, &providerSpec.MetadataFormat, &providerSpec.MetadataProvider, &providerSpec.Billing)
+			&providerSpec.MetadataURL, &providerSpec.MetadataFormat, &providerSpec.MetadataProvider, &providerSpec.Billing, &providerSpec.Transport, &providerSpec.WebSocketURL)
 	providerSpec.Interval = time.Duration(seconds) * time.Second
 	return providerSpec, operationError
 }
 
 func (providerStore *providers) All(operationContext context.Context) ([]atom.ProviderSpec, error) {
 	rows, operationError := providerStore.store.pool.Query(operationContext, `
-		SELECT name, api_url, model_list_url, price_table_url, interval_seconds, protocol, authentication, model_list_format, metadata_url, metadata_format, metadata_provider, billing
+		SELECT name, api_url, model_list_url, price_table_url, interval_seconds, protocol, authentication, model_list_format, metadata_url, metadata_format, metadata_provider, billing, transport, websocket_url
 		FROM providers ORDER BY name`)
 	if operationError != nil {
 		return nil, operationError
@@ -51,7 +52,7 @@ func (providerStore *providers) All(operationContext context.Context) ([]atom.Pr
 		var providerSpec atom.ProviderSpec
 		var seconds int64
 		if operationError := rows.Scan(&providerSpec.Name, &providerSpec.APIURL, &providerSpec.ModelListURL, &providerSpec.PriceTableURL, &seconds, &providerSpec.Protocol, &providerSpec.Authentication, &providerSpec.ModelListFormat,
-			&providerSpec.MetadataURL, &providerSpec.MetadataFormat, &providerSpec.MetadataProvider, &providerSpec.Billing); operationError != nil {
+			&providerSpec.MetadataURL, &providerSpec.MetadataFormat, &providerSpec.MetadataProvider, &providerSpec.Billing, &providerSpec.Transport, &providerSpec.WebSocketURL); operationError != nil {
 			return nil, operationError
 		}
 		providerSpec.Interval = time.Duration(seconds) * time.Second
