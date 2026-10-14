@@ -74,6 +74,8 @@ test('deleting the current last session clears the conversation', async ({ page 
   await expect(page.getByLabel('Message', { exact: true })).toBeDisabled();
   await expect(page.getByRole('article', { name: 'assistant message' })).toHaveCount(0);
   expect(fixture.sessions).toHaveLength(0);
+  expect(new URL(page.url()).searchParams.get('session')).toBeNull();
+  expect(new URL(page.url()).searchParams.get('workspace')).toBe(session.InstanceID);
   await page.reload();
   await expect(
     page

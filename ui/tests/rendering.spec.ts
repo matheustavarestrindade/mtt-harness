@@ -149,7 +149,7 @@ test('combine calls and out-of-order results and attach later output to an open 
   await expect(page.getByText('Command failed: exit code 1', { exact: true })).toHaveCount(0);
   await read.getByRole('button', { name: /^read Waiting/ }).click();
   await expect(read).toContainText('Waiting for the tool result');
-  const inputHeading = read.getByRole('heading', { name: 'Input', exact: true });
+  const inputHeading = read.getByRole('region', { name: 'Tool input', exact: true });
   await inputHeading.scrollIntoViewIfNeeded();
   const headerBounds = await read.getByRole('button', { name: /^read Waiting/ }).boundingBox();
   const inputBounds = await inputHeading.boundingBox();
@@ -211,7 +211,8 @@ test('bound large code and CSV previews and retain full downloadable source', as
   await expect(sections.nth(1).getByRole('row')).toHaveCount(201);
   await expect(sections.nth(1)).toContainText('Preview limited');
   const downloaded = page.waitForEvent('download');
-  await sections.nth(0).getByRole('button', { name: 'Download source' }).last().click();
+  await sections.nth(0).getByRole('button', { name: 'Code actions' }).last().click();
+  await page.getByRole('menuitem', { name: 'Download source' }).click();
   const download = await downloaded;
   expect(await readFile((await download.path())!, 'utf8')).toBe(large);
   fixture.histories.get(session.ID)!.push(

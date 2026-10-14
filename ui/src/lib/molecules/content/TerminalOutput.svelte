@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
-  import { ArrowDown, Copy, Download } from 'lucide-svelte';
+  import { ArrowDown } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
   import type { Terminal } from '@xterm/xterm';
   import type { TerminalSnapshot } from '../../atoms/processes';
   import { Button } from '../../atoms/ui/button';
   import { copyToClipboard } from '../clipboard';
+  import ContentActions from '../ContentActions.svelte';
   let {
     text = '',
     snapshot,
@@ -140,32 +141,24 @@
 </script>
 
 <section aria-label={label} class="terminal-output min-w-0">
-  <div class="flex min-h-11 items-center gap-1 text-[10px] text-muted-foreground">
-    <span class="min-w-0 flex-1">Read-only terminal</span>
+  <div class="flex min-h-7 items-center justify-end gap-1 text-[10px] text-muted-foreground">
     {#if !following}<Button
         variant="ghost"
         size="icon"
-        class="icon-button"
+        class="size-7 pointer-coarse:size-11"
         aria-label="Follow terminal output"
         onclick={() => {
           terminal?.scrollToBottom();
           following = true;
         }}><ArrowDown class="size-3.5" /></Button
       >{/if}
-    <Button
-      variant="ghost"
-      size="icon"
-      class="icon-button"
-      aria-label="Copy terminal output"
-      onclick={() => void copy()}><Copy class="size-3.5" /></Button
-    >
-    <Button
-      variant="ghost"
-      size="icon"
-      class="icon-button"
-      aria-label="Download terminal log"
-      onclick={download}><Download class="size-3.5" /></Button
-    >
+    <ContentActions
+      label="Terminal actions"
+      actions={[
+        { label: 'Copy terminal output', select: copy },
+        { label: 'Download terminal log', select: download },
+      ]}
+    />
   </div>
   {#if !ready}<p class="text-xs text-muted-foreground" role="status">
       {failure || 'Loading terminal…'}

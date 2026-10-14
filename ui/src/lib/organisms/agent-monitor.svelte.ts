@@ -3,6 +3,7 @@ import { eventPayload } from '../atoms/agent-activity';
 import { sessionChildren, sessionDescendants, topLevelAgent } from '../atoms/session-tree';
 import type { HarnessEvent, Session } from '../atoms/types';
 import type { HarnessApi } from '../molecules/api/client';
+import type { NavigationHistory } from '../atoms/navigation-route';
 import { AgentFeed } from './agent-feed.svelte';
 
 interface AgentOrigin {
@@ -29,6 +30,7 @@ export class AgentMonitor {
   constructor(
     private refreshSessions: () => void,
     private updateSession: (session: Session) => void,
+    private onFocus?: (sessionID: string, history: NavigationHistory) => void,
   ) {}
 
   open(api: HarnessApi, root: Session, sessions: Session[]) {
@@ -59,7 +61,7 @@ export class AgentMonitor {
       feed.parentRunning = running;
       feed.parentStartedAt = this.rootStartedAt;
     }
-    if (this.focusedID && !included.has(this.focusedID)) this.focusedID = '';
+    if (this.focusedID && !included.has(this.focusedID)) this.clearFocus('replace');
   }
 
   observe(event: HarnessEvent) {
@@ -106,7 +108,14 @@ export class AgentMonitor {
     if (!top) return null;
     this.focusedID = sessionID;
     this.focusRevision++;
+    this.onFocus?.(sessionID, 'push');
     return top.ID;
+  }
+
+  clearFocus(history: NavigationHistory = 'push') {
+    if (!this.focusedID) return;
+    this.focusedID = '';
+    this.onFocus?.('', history);
   }
 
   close() {

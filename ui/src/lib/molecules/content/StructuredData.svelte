@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Copy, Download } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
   import { Button } from '../../atoms/ui/button';
   import {
@@ -10,12 +9,20 @@
   } from '../../atoms/structured-data';
   import { copyToClipboard } from '../clipboard';
   import AnsiText from './AnsiText.svelte';
+  import ContentActions from '../ContentActions.svelte';
   let {
     value,
     label = 'Data',
     controls = true,
     ansiOutput = false,
-  }: { value: unknown; label?: string; controls?: boolean; ansiOutput?: boolean } = $props();
+    compact = false,
+  }: {
+    value: unknown;
+    label?: string;
+    controls?: boolean;
+    ansiOutput?: boolean;
+    compact?: boolean;
+  } = $props();
   let entryLimit = $state(30);
   const root = $derived(structuredData(value, entryLimit));
   function source() {
@@ -65,9 +72,11 @@
       </table>
     </div>
   {:else if node.kind === 'object' && node.children.length}
-    <dl class="min-w-0 space-y-2">
+    <dl class="min-w-0 {compact ? 'space-y-1' : 'space-y-2'}">
       {#each node.children as child}<div
-          class="grid min-w-0 grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-[minmax(5rem,9rem)_minmax(0,1fr)]"
+          class="grid min-w-0 gap-x-2 gap-y-1 {compact
+            ? 'grid-cols-[auto_minmax(0,1fr)]'
+            : 'grid-cols-1 sm:grid-cols-[minmax(5rem,9rem)_minmax(0,1fr)]'}"
         >
           <dt class="break-words text-[11px] font-medium text-muted-foreground" title={child.key}>
             {dataLabel(child.key)}
@@ -99,26 +108,30 @@
 {/snippet}
 
 <section aria-label={label} class="min-w-0">
-  {@render nodeView(root)}
-  {#if controls}<div class="mt-1 flex flex-wrap items-center justify-end gap-1">
+  <div class={compact ? 'flex min-w-0 items-start gap-1' : ''}>
+    <div class="min-w-0 flex-1">{@render nodeView(root)}</div>
+    {#if compact && controls}<ContentActions
+        label={`${label} actions`}
+        actions={[
+          { label: `Copy ${label.toLowerCase()}`, select: copy },
+          { label: `Download ${label.toLowerCase()}`, select: download },
+        ]}
+      />{/if}
+  </div>
+  {#if controls && (!compact || (root.omitted > 0 && entryLimit < 100 && root.kind !== 'text'))}<div
+      class="mt-1 flex flex-wrap items-center justify-end gap-1"
+    >
       {#if root.omitted > 0 && entryLimit < 100 && root.kind !== 'text'}<Button
           variant="ghost"
           class="h-11 text-xs"
           onclick={() => (entryLimit = Math.min(100, entryLimit + 30))}>Show more entries</Button
         >{/if}
-      <Button
-        variant="ghost"
-        size="icon"
-        class="icon-button"
-        aria-label={`Copy ${label.toLowerCase()}`}
-        onclick={() => void copy()}><Copy class="size-3.5" /></Button
-      >
-      <Button
-        variant="ghost"
-        size="icon"
-        class="icon-button"
-        aria-label={`Download ${label.toLowerCase()}`}
-        onclick={download}><Download class="size-3.5" /></Button
-      >
+      {#if !compact}<ContentActions
+          label={`${label} actions`}
+          actions={[
+            { label: `Copy ${label.toLowerCase()}`, select: copy },
+            { label: `Download ${label.toLowerCase()}`, select: download },
+          ]}
+        />{/if}
     </div>{/if}
 </section>

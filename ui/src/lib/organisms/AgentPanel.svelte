@@ -105,7 +105,15 @@
       class="flex min-h-10 min-w-0 flex-1 items-center gap-2 text-left text-xs pointer-coarse:min-h-11"
       aria-label={`${open ? 'Collapse' : 'Expand'} agent ${shortID(session.ID)}`}
       aria-expanded={open}
-      onclick={() => (open = !open)}
+      onclick={() => {
+        open = !open;
+        if (
+          !open &&
+          monitor.focusedID &&
+          topLevelAgent(monitor.focusedID, monitor.rootID, monitor.sessions)?.ID === session.ID
+        )
+          monitor.clearFocus();
+      }}
     >
       <span class="min-w-0 flex-1 truncate" title={task || selected.ID}
         >Agent {shortID(selected.ID)}</span

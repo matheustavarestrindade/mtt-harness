@@ -10,11 +10,13 @@
     mode = 'markdown',
     language = 'text',
     embedded = false,
+    compact = false,
   }: {
     content: Content[] | null;
     mode?: 'markdown' | 'plain' | 'code';
     language?: string;
     embedded?: boolean;
+    compact?: boolean;
   } = $props();
   const parts = $derived.by(() => {
     const result: Content[] = [];
@@ -36,10 +38,11 @@
       language={fileLanguage(item.Filename)}
       filename={item.Filename}
       {embedded}
+      {compact}
     />
   {:else if item.Type === 'text' && item.Text}
-    {#if mode === 'markdown'}<RichText text={item.Text} {embedded} />
-    {:else if mode === 'code'}<CodeBlock text={item.Text} {language} {embedded} />
+    {#if mode === 'markdown'}<RichText text={item.Text} {embedded} {compact} />
+    {:else if mode === 'code'}<CodeBlock text={item.Text} {language} {embedded} {compact} />
     {:else}<p class="message-copy">{item.Text}</p>{/if}
   {:else if item.Type === 'file' && (item.MIME?.startsWith('text/') || item.MIME === 'application/json') && contentFileText(item) !== null}
     <CodeBlock
@@ -51,6 +54,7 @@
           : fileLanguage(item.Filename)}
       filename={item.Filename}
       {embedded}
+      {compact}
     />
   {:else if item.Type !== 'text'}
     <MediaContent {item} />

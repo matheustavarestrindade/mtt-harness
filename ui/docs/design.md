@@ -87,6 +87,20 @@ The `AttachmentDrafts` organism keeps file attachments for a session. The `Compo
 
 The selected model gives the input media types. The UI examines input media types before it sends a message. If the API rejects the message, the UI keeps the message draft. After the API accepts a message, the UI removes the file attachments from the message draft. The UI removes object URLs when files are removed.
 
+## URL Navigation
+
+The URL uses the query parameters `workspace`, `session`, and `agent`. The workspace value is an instance ID. The session value is a parent session ID. The optional agent value is a child session ID.
+
+```text
+/?workspace=INSTANCE_ID&session=SESSION_ID&agent=AGENT_ID
+```
+
+Refresh the browser to open the same workspace and conversation. Use `Back` or `Forward` for the previous or next selection. The client uses API requests for the selection. The selection parameters contain IDs only.
+
+The client keeps other query parameters and the URL fragment. A previous request must not replace a new selection. The client changes the URL after session deletion. If a workspace or session is not available, the client shows an error. It does not make a workspace or session.
+
+Route data is in the atom `navigation-route.ts`. Browser history is in the molecule `browser-navigation.ts`. The `HarnessConsole` organism controls selection, API requests, and cancellation.
+
 ## Child Agents
 
 The client uses `Session.Parent` for agent navigation. The sidebar shows child agents below the parent session. Agent selection opens the parent conversation and the selected agent panel. A child of an agent opens in the same panel.

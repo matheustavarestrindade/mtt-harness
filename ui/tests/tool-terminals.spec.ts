@@ -98,8 +98,9 @@ test('show arguments and structured results as readable fields and tables', asyn
   await expect(data.locator('pre')).toHaveCount(0);
   const edit = page.locator('[data-call-id="edit-call"]');
   await edit.locator('.activity-toggle').click();
-  await expect(edit.getByRole('heading', { name: '1. Replace' })).toBeVisible();
-  await expect(edit.getByText('Replace with', { exact: true })).toBeVisible();
+  await expect(edit.getByRole('region', { name: 'Original text', exact: true })).toBeVisible();
+  await expect(edit.getByRole('region', { name: 'Replacement text', exact: true })).toBeVisible();
+  await expect(edit.getByText('Replace with', { exact: true })).toHaveCount(0);
   await expect(edit.locator('code').filter({ hasText: 'DescriptiveName' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({
@@ -177,7 +178,8 @@ test('stream ANSI colors and progress updates before bash returns, reconnect wit
   await expect.poll(() => fixture.processSockets.size).toBe(1);
   await expect(shell).toContainText('Build passed');
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-  await shell.getByRole('button', { name: 'Copy terminal output', exact: true }).click();
+  await shell.getByRole('button', { name: 'Terminal actions', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Copy terminal output', exact: true }).click();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied.match(/Build passed/g)).toHaveLength(1);
   expect(copied).not.toContain('\x1b');
