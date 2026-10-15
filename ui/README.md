@@ -91,6 +91,10 @@ The workspace form starts with an empty directory field. The form does not expan
 
 Open `Settings`, then `Providers`, to connect a provider. The API contracts are in `../routes.md`.
 
+Open the workspace menu. Use `Unlink workspace` to remove the workspace reference. The dialog shows the path. Files and directories stay the same. The harness keeps session data, memory records, and usage records. Active work can prevent the unlink operation.
+
+After the unlink operation, the UI can select a different workspace. If a different workspace is not available, the UI shows an empty workspace list. The URL changes with the selection. A new request for the same directory makes a new workspace reference.
+
 ## Navigation URLs
 
 The browser URL keeps the selected workspace and session. Refresh the browser to open the same conversation. Use `Back` or `Forward` for the previous or next selection. The optional `agent` parameter opens a child agent in the parent conversation.

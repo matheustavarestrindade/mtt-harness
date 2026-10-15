@@ -38,12 +38,13 @@ type Manager struct {
 	starting          map[string]int
 	starts            sync.WaitGroup
 	instanceStarts    map[string]*sync.WaitGroup
+	instanceBlocks    map[string]error
 	stopNotifications chan struct{}
 }
 
 func New(supervisor *process.Supervisor, database store.Store, harnessRuntime *harness.Harness, bus *eventbus.Bus, limits InstanceLimits) *Manager {
 	lifecycle, cancel := context.WithCancel(context.Background())
-	return &Manager{supervisor: supervisor, store: database, harnessRuntime: harnessRuntime, bus: bus, limits: limits, instances: map[string]string{}, lifecycle: lifecycle, cancel: cancel, starting: map[string]int{}, instanceStarts: map[string]*sync.WaitGroup{}, stopNotifications: make(chan struct{})}
+	return &Manager{supervisor: supervisor, store: database, harnessRuntime: harnessRuntime, bus: bus, limits: limits, instances: map[string]string{}, lifecycle: lifecycle, cancel: cancel, starting: map[string]int{}, instanceStarts: map[string]*sync.WaitGroup{}, instanceBlocks: map[string]error{}, stopNotifications: make(chan struct{})}
 }
 
 func (processManager *Manager) SetNotifier(notifier Notifier) {
@@ -225,6 +226,9 @@ func (processManager *Manager) reserveStart(operationContext context.Context, in
 	defer processManager.mutex.Unlock()
 	if processManager.closing {
 		return nil, fmt.Errorf("process manager is closing")
+	}
+	if blocked := processManager.instanceBlocks[instanceID]; blocked != nil {
+		return nil, blocked
 	}
 	if instanceID != "" && processManager.limits != nil {
 		if owner, supported := processManager.limits.(interface{ IsRunning(string) bool }); supported && !owner.IsRunning(instanceID) {

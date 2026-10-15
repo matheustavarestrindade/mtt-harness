@@ -27,6 +27,7 @@
   import WorkspaceDialog from '$lib/molecules/WorkspaceDialog.svelte';
   import SessionDialog from '$lib/molecules/SessionDialog.svelte';
   import DeleteSessionDialog from '$lib/molecules/DeleteSessionDialog.svelte';
+  import UnlinkWorkspaceDialog from '$lib/molecules/UnlinkWorkspaceDialog.svelte';
   import ActivityDialog from '$lib/molecules/ActivityDialog.svelte';
   import Conversation from '$lib/organisms/Conversation.svelte';
   import Composer from '$lib/molecules/Composer.svelte';
@@ -54,6 +55,10 @@
   let deleteTarget = $state<Session | null>(null);
   let deletionError = $state('');
   let deletingSession = $state(false);
+  let unlinkWorkspaceOpen = $state(false);
+  let unlinkTarget = $state<Instance | null>(null);
+  let unlinkingWorkspace = $state(false);
+  let unlinkError = $state('');
   let sessionSettingsOpen = $state(false);
   let settingsSessionID = $state('');
   let sessionSettingsError = $state('');
@@ -180,6 +185,7 @@
       !sessionOpen &&
       !workspaceOpen &&
       !deleteSessionOpen &&
+      !unlinkWorkspaceOpen &&
       !sidePanelDrawerOpen
     ) {
       navigationActionOpen = false;
@@ -382,6 +388,33 @@
       deletingSession = false;
     }
   }
+  function requestWorkspaceUnlink(instance: Instance) {
+    openNavigationAction(() => {
+      unlinkTarget = instance;
+      unlinkError = '';
+      unlinkWorkspaceOpen = true;
+    });
+  }
+  async function confirmWorkspaceUnlink() {
+    const selected = unlinkTarget;
+    if (!selected || unlinkingWorkspace) return;
+    unlinkError = '';
+    unlinkingWorkspace = true;
+    try {
+      const removed = await workbench.unlinkInstance(selected);
+      if (unlinkTarget?.ID === selected.ID) unlinkWorkspaceOpen = false;
+      if (removed) toast.success('Workspace unlinked');
+    } catch (failure) {
+      if (unlinkTarget?.ID === selected.ID)
+        unlinkError = failure instanceof Error ? failure.message : 'Cannot unlink this workspace.';
+      if (failure instanceof ApiError && failure.status === 401) {
+        unlinkWorkspaceOpen = false;
+        openSettings('connection');
+      }
+    } finally {
+      unlinkingWorkspace = false;
+    }
+  }
   async function sendDraftMessage() {
     const identifier = sessionID;
     const content = drafts[identifier] ?? '';
@@ -443,6 +476,7 @@
     onSelectSession={selectSession}
     onSelectAgent={selectAgent}
     onDeleteSession={requestSessionDeletion}
+    onUnlinkWorkspace={requestWorkspaceUnlink}
     onRefresh={() => void runWorkbenchAction('refresh', () => workbench.refreshInstances())}
   />
 {/snippet}
@@ -767,6 +801,13 @@
   onDelete={() => void confirmSessionDeletion()}
 />
 <ActivityDialog bind:open={activityOpen} events={workbench.events} />
+<UnlinkWorkspaceDialog
+  bind:open={unlinkWorkspaceOpen}
+  instance={unlinkTarget}
+  busy={unlinkingWorkspace}
+  error={unlinkError}
+  onUnlink={() => void confirmWorkspaceUnlink()}
+/>
 <Toaster
   theme="dark"
   closeButton

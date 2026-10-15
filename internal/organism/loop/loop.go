@@ -48,6 +48,7 @@ type Loop struct {
 	runLocks       sync.Map
 	activeRuns     map[atom.SessionID]*activeRun
 	sessionBlocks  map[atom.SessionID]error
+	instanceBlocks map[string]error
 	contextBuilder *contextbuilder.Builder
 }
 
@@ -66,6 +67,7 @@ func New(harnessRuntime *harness.Harness, configuration Config) *Loop {
 		finished:       map[atom.SessionID]string{},
 		activeRuns:     map[atom.SessionID]*activeRun{},
 		sessionBlocks:  map[atom.SessionID]error{},
+		instanceBlocks: map[string]error{},
 		contextBuilder: contextbuilder.New(configuration.Store.Sessions()),
 	}
 }
@@ -97,6 +99,10 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 	defer cancel()
 	active := &activeRun{cancel: cancel, done: make(chan struct{}), session: session}
 	agentLoop.mutex.Lock()
+	if blocked := agentLoop.instanceBlocks[session.InstanceID]; blocked != nil {
+		agentLoop.mutex.Unlock()
+		return blocked
+	}
 	if blocked := agentLoop.sessionBlocks[session.ID]; blocked != nil {
 		agentLoop.mutex.Unlock()
 		return blocked

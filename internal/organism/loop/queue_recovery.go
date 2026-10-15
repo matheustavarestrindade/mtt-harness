@@ -59,6 +59,11 @@ func (messageQueue *Queue) controlSessions(command queueCommand, coordinators []
 	if command.kind == closeQueue {
 		kind = closeSession
 	}
+	operationError := messageQueue.controlInstanceCoordinators(operationContext, command.instanceID, kind, coordinators)
+	messageQueue.completed <- directoryCompletion{command: command, operationError: operationError}
+}
+
+func (messageQueue *Queue) controlInstanceCoordinators(operationContext context.Context, instanceID string, kind sessionCommandKind, coordinators []*sessionCoordinator) error {
 	results := make(chan error, len(coordinators))
 	for _, coordinator := range coordinators {
 		go func() {
@@ -70,11 +75,11 @@ func (messageQueue *Queue) controlSessions(command queueCommand, coordinators []
 		}()
 	}
 	var operationError error
-	if command.kind == stopInstance {
-		operationError = messageQueue.loop.cancelInstance(operationContext, command.instanceID)
+	if kind == stopSession {
+		operationError = messageQueue.loop.cancelInstance(operationContext, instanceID)
 	}
 	for range coordinators {
 		operationError = errors.Join(operationError, <-results)
 	}
-	messageQueue.completed <- directoryCompletion{command: command, operationError: operationError}
+	return operationError
 }

@@ -35,6 +35,9 @@ func (sessionStore *sessions) Save(operationContext context.Context, session ato
 	if sessionStore.store.deletedSessions[session.ID] || sessionStore.store.deletedSessions[session.Parent] {
 		return store.ErrSessionDeleted
 	}
+	if sessionStore.store.unlinkedInstances[session.InstanceID] {
+		return store.ErrInstanceUnlinked
+	}
 	if stored, found := sessionStore.store.sessions[session.ID]; found {
 		session.Model = stored.Model
 		session.ReasoningEffort = stored.ReasoningEffort

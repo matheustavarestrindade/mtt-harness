@@ -12,7 +12,14 @@ type InstanceStore interface {
 	Get(operationContext context.Context, identifier string) (atom.InstanceSpec, error)
 	All(operationContext context.Context) ([]atom.InstanceSpec, error)
 	Delete(operationContext context.Context, identifier string) error
+	// Unlink retires an idle workspace reference without deleting its data or files.
+	// Get/All hide it, and subsequent lifecycle Save calls must reject the old ID.
+	Unlink(operationContext context.Context, identifier string) error
 }
+
+var ErrInstanceNotFound = errors.New("workspace is not linked")
+var ErrInstanceUnlinked = errors.New("workspace has been unlinked")
+var ErrInstanceBusy = errors.New("workspace has active or queued work")
 
 // ErrSessionSelectionChanged means the caller validated a stale selection or
 // the session completed before the change. Read current state before retrying.

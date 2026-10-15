@@ -2,6 +2,71 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "idle workspace",
+      "category": "technical_noun",
+      "approved_forms": [
+        "idle workspaces"
+      ],
+      "meaning": "a workspace with no active conversation, queued message, or managed process",
+      "source": "workspace lifecycle"
+    },
+    {
+      "term": "unlink operation",
+      "category": "technical_noun",
+      "approved_forms": [
+        "unlink operations"
+      ],
+      "meaning": "an instance lifecycle operation that removes a workspace reference without deleting filesystem content",
+      "source": "workspace lifecycle"
+    },
+    {
+      "term": "unlinked workspace",
+      "category": "technical_noun",
+      "approved_forms": [
+        "unlinked workspaces"
+      ],
+      "meaning": "a workspace whose instance reference is excluded from normal lookup and restoration",
+      "source": "workspace lifecycle"
+    },
+    {
+      "term": "workspace menu",
+      "category": "technical_noun",
+      "approved_forms": [
+        "workspace menus"
+      ],
+      "meaning": "the UI control for choosing, creating, or unlinking workspace references",
+      "source": "workspace lifecycle"
+    },
+    {
+      "term": "instance lifecycle gate",
+      "category": "technical_noun",
+      "approved_forms": [
+        "instance lifecycle gates"
+      ],
+      "meaning": "the queue directory ownership boundary for stop, resume, and unlink operations",
+      "source": "workspace lifecycle"
+    },
+    {
+      "term": "unlink",
+      "category": "technical_verb",
+      "approved_forms": [
+        "unlinks",
+        "unlinked",
+        "unlinking"
+      ],
+      "meaning": "remove a harness workspace reference without deleting filesystem content",
+      "source": "workspace lifecycle"
+    },
+    {
+      "term": "workspace reference",
+      "category": "technical_noun",
+      "approved_forms": [
+        "workspace references"
+      ],
+      "meaning": "the harness instance registration for a workspace directory",
+      "source": "workspace lifecycle"
+    },
+    {
       "term": "activity entry",
       "category": "technical_noun",
       "approved_forms": [

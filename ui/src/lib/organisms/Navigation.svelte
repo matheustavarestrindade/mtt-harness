@@ -30,6 +30,7 @@
     onSelectSession,
     onSelectAgent,
     onDeleteSession,
+    onUnlinkWorkspace,
     onRefresh,
     onTasks,
     onMemory,
@@ -45,6 +46,7 @@
     onSelectSession: (session: Session) => void;
     onSelectAgent: (session: Session) => void;
     onDeleteSession: (session: Session) => void;
+    onUnlinkWorkspace: (instance: Instance) => void;
     onRefresh: () => void;
     onTasks?: () => void;
     onMemory?: () => void;
@@ -157,6 +159,7 @@
       onSelect={onSelectInstance}
       onCreate={onWorkspace}
       {onRefresh}
+      onUnlink={onUnlinkWorkspace}
     />
     {#if onClose}<Button
         variant="ghost"

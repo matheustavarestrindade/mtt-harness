@@ -18,6 +18,7 @@ import type {
 // envelope. They are browser-test data, never a fallback in the shipped UI.
 export async function mockHarness(page: Page, options: { replayEvents?: boolean } = {}) {
   const instances: Instance[] = [];
+  const unlinkedInstances: string[] = [];
   const sessions: Session[] = [];
   const histories = new Map<string, Message[]>();
   const processes = new Map<string, ProcessRecord>();
@@ -242,6 +243,23 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
         return reply(instance, 201);
       }
       const parts = path.split('/').filter(Boolean);
+      if (parts[0] === 'instances' && parts[2] === 'unlink' && method === 'POST') {
+        const index = instances.findIndex((instance) => instance.ID === parts[1]);
+        if (index < 0) return reply({ error: 'workspace is not linked' }, 404);
+        const busy =
+          sessions.some(
+            (session) =>
+              session.InstanceID === parts[1] &&
+              (running.has(session.ID) || (queued.get(session.ID)?.length ?? 0) > 0),
+          ) ||
+          [...processes.values()].some(
+            (process) => process.InstanceID === parts[1] && process.Status === 'running',
+          );
+        if (busy) return reply({ error: 'workspace has active or queued work' }, 409);
+        unlinkedInstances.push(parts[1]);
+        instances.splice(index, 1);
+        return reply({ id: parts[1], status: 'unlinked' });
+      }
       if (parts[0] === 'instances' && parts[2] === 'plugins' && parts[3] === 'sidekick') {
         const workspaceID = parts[1];
         if (!sidekickStates.has(workspaceID))
@@ -617,6 +635,7 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
   );
   return {
     instances,
+    unlinkedInstances,
     sessions,
     histories,
     processes,
