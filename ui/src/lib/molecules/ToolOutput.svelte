@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ToolActivity } from '../atoms/transcript';
+  import { bashOutputKind } from '../atoms/bash-output';
   import { plainFileReadPath } from '../atoms/file-actions';
   import { fileLanguage } from '../atoms/content';
   import { structuredJSON } from '../atoms/structured-data';
@@ -10,8 +11,9 @@
   const path = $derived(plainFileReadPath(activity.call));
   const language = $derived(path ? fileLanguage(path) : 'text');
   const terminal = $derived(['bash', 'process_output'].includes(activity.call.Name));
+  const outputKind = $derived(bashOutputKind(activity));
   const content = $derived(
-    activity.processNotice
+    activity.processNotice && ['missing', 'started'].includes(outputKind)
       ? [
           {
             Type: 'text' as const,
@@ -35,6 +37,16 @@
       .join('\n')}
   />
   <MessageContent content={content.filter((part) => part.Type !== 'text')} embedded />
+  {#if outputKind === 'inactivity' && activity.processNotice}
+    <details class="mt-1 min-w-0 text-xs text-muted-foreground">
+      <summary class="min-h-7 cursor-pointer py-1 pointer-coarse:min-h-11"
+        >{activity.processNotice.kind === 'exit'
+          ? 'Completion output'
+          : 'Background output'}</summary
+      >
+      <TerminalOutput text={activity.processNotice.output} label="Background process output" />
+    </details>
+  {/if}
 {:else}
   {#each content as part}
     {@const data = part.Type === 'text' ? structuredJSON(part.Text) : null}

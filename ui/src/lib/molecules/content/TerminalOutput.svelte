@@ -80,6 +80,7 @@
           fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
           screenReaderMode: true,
           drawBoldTextInBrightColors: false,
+          minimumContrastRatio: 4.5,
           logLevel: 'off',
           linkHandler: { activate() {} },
           theme: { background, foreground, cursor: background },

@@ -15,13 +15,13 @@
   }: { api: HarnessApi; record: ProcessRecord; activity: ToolActivity } = $props();
   let feed = $state<ProcessFeed>();
   const processID = $derived(record.ID);
+  const showConnectionStatus = $derived(
+    record.Status === 'running' ||
+      !(feed?.snapshot.chunks.length || activity.processNotice || activity.result),
+  );
   $effect(() => {
     const client = api;
     processID;
-    if (untrack(() => record.Status === 'stopped' && activity.processNotice?.kind === 'exit')) {
-      feed = undefined;
-      return;
-    }
     const current = untrack(() => new ProcessFeed(client, record));
     feed = current;
     return () => current.close();
@@ -33,7 +33,9 @@
     class="flex flex-wrap items-center gap-x-2 text-[10px] text-muted-foreground"
     title={record.ID}
   >
-    <span role="status" class:sr-only={feed.state === 'live' || feed.state === 'stopped'}
+    <span
+      role="status"
+      class:sr-only={feed.state === 'live' || feed.state === 'stopped' || !showConnectionStatus}
       >{feed.state === 'stopped'
         ? feed.exit
           ? `Exited ${feed.exit.Code}`
@@ -48,17 +50,19 @@
               ? 'Live output unavailable'
               : 'Connecting…'}</span
     >
-    {#if feed.state === 'unavailable'}<Button
+    {#if feed.state === 'unavailable' && showConnectionStatus}<Button
         variant="ghost"
         class="h-11 text-xs"
         onclick={() => feed?.reconnect()}><RefreshCw class="size-3" />Reconnect terminal</Button
       >{/if}
   </div>
-  {#if (feed.state === 'unavailable' || !feed.snapshot.chunks.length) && (activity.processNotice || activity.result?.Content?.length)}<ToolOutput
+  {#if !feed.snapshot.chunks.length && (activity.processNotice || activity.result?.Content?.length)}<ToolOutput
       {activity}
     />
   {:else}<TerminalOutput snapshot={feed.snapshot} />{/if}
-  {#if feed.error}<p class="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">
+  {#if feed.error && showConnectionStatus}<p
+      class="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground"
+    >
       {feed.error}
     </p>{/if}
-{:else if activity.processNotice}<ToolOutput {activity} />{/if}
+{:else}<ToolOutput {activity} />{/if}
