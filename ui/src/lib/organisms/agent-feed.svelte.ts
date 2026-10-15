@@ -1,5 +1,6 @@
 import { ApiError, HarnessApi } from '../molecules/api/client';
 import { SessionProcesses } from './session-processes.svelte';
+import { SessionActivity } from './session-activity.svelte';
 import { subscribeEvents, type StreamState } from '../molecules/api/events';
 import {
   eventPayload,
@@ -16,6 +17,7 @@ const liveTextLimit = 100_000;
 // A read-only child feed owns its socket, reads, and bounded live preview. Child
 // agents run directly in the loop; their queue status is not an activity signal.
 export class AgentFeed {
+  readonly sidekick = new SessionActivity();
   readonly processes = new SessionProcesses();
   session = $state<Session>();
   messages = $state<Message[]>([]);
@@ -93,6 +95,7 @@ export class AgentFeed {
     if (!this.previewEnabled) {
       this.previewEnabled = true;
       if (this.session) this.processes.open(this.api, this.session.ID);
+      if (this.session) this.sidekick.open(this.api, this.session.ID);
       this.loading = !this.messages.length;
       void this.refresh();
       this.observe();
@@ -105,6 +108,7 @@ export class AgentFeed {
       if (this.previewReaders > 0) return;
       this.previewEnabled = false;
       this.processes.close();
+      this.sidekick.close();
       clearTimeout(this.refreshTimer);
       this.refreshTimer = undefined;
     };
@@ -122,6 +126,7 @@ export class AgentFeed {
         if (state === 'live' && this.previewEnabled) {
           this.scheduleRefresh();
           this.processes.scheduleRefresh();
+          this.sidekick.scheduleRefresh();
         }
       },
     );
@@ -156,6 +161,7 @@ export class AgentFeed {
     if (this.lifetime.signal.aborted || event.SessionID !== this.session?.ID) return;
     this.onEvent(event);
     this.processes.observe(event);
+    this.sidekick.observe(event);
     if (['process.start', 'process.output', 'process.exit'].includes(event.Name)) return;
     const payload = eventPayload(event);
     if (event.Name === 'turn.start' || event.Name === 'model.call') {
@@ -300,6 +306,7 @@ export class AgentFeed {
       );
       this.omittedMessages = Math.max(0, output.length - previewMessageLimit);
       this.messages = reconcileMessageHistory(this.messages, output.slice(-previewMessageLimit));
+      if (this.previewEnabled) this.sidekick.scheduleRefresh();
       if (this.liveMessage && this.savedIDs.has(this.liveMessage.ID)) this.clearLiveMessage();
       if (tasks) this.applyTasks(tasks);
       this.updateSession(updated);
@@ -360,6 +367,7 @@ export class AgentFeed {
 
   close() {
     this.processes.close();
+    this.sidekick.close();
     this.lifetime.abort();
     this.stopObserving();
     clearTimeout(this.refreshTimer);

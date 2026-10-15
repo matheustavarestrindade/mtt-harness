@@ -51,6 +51,10 @@ The API gives usage by workspace agent and model. The panel shows model calls, i
 
 The model input total includes `Input`, `CacheRead`, and `CacheWrite`. The output total uses `Output`. The UI does not add `Reasoning` again.
 
+The label `Reported worker tokens` gives input and output from model calls by workspace memory workers. The total includes requests for memory extraction across the workspace history. It does not give the token count of memory text or the conversation. The total uses provider usage data. A model call without usage data stays in `Calls`. The tokens from the model call are not known.
+
+The value `Estimated tokens removed` gives token estimates across context checkpoints. The value is not provider usage data. The value can include token estimates from previous models and harness versions. The UI uses `≈` for the value.
+
 The UI does not add costs from different currencies. A cost estimate has a label. The value `0` stays `0`. An empty usage record shows `0.0`. Model usage without a price shows `Unavailable`. Subscription models do not receive API token prices.
 
 Costs include only model calls with price data from the API. The API does not identify the price status of a model call in a usage total. The `remember` tool uses embeddings but does not send a model request.

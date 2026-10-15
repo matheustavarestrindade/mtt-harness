@@ -86,6 +86,20 @@ Worker usage uses the agent name `sidekick.context`. The core usage store keeps 
 
 The plugin gives usage counters for retrieval sources and model calls. The statistics API does not give the text from a Sidekick note.
 
+The session API gives Sidekick notes and source references after the request boundary:
+
+```text
+GET /sessions/{id}/plugins/sidekick/activity?limit=50
+```
+
+The UI has a disclosure control for a Sidekick note at the reminder anchor. A request for activity data does not start a worker. The model receives the same runtime data. Worker reasoning is not part of the response. The API gives a Sidekick note only after the request boundary.
+
+The plugin keeps Sidekick notes in worker records after context removal. The `revert` operation removes activity entries without a reminder anchor in the session history. Session deletion removes the activity entries.
+
+The API can read previous Sidekick notes from active reminders. The next plugin data change stores the Sidekick notes in worker records. Usage counters do not contain Sidekick note text.
+
+The default activity page limit is 50, with a maximum of 100. The API gives a cursor for more activity entries. The cursor has session and history scope. See `routes.md` for the response fields and HTTP status values.
+
 Cancellation stops the worker. Revert and session removal stop the related workers before the history change. Session removal removes worker records but keeps tombstones and workspace usage. The harness closes dependencies after the workers stop.
 
 ## UI and API

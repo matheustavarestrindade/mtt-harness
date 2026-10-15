@@ -815,6 +815,10 @@ The plugin uses the `sidekick` Postgres schema. Task state, user messages, confi
 
 Workspace usage includes worker model calls. The input for a Sidekick note is part of session usage. See `plugins/sidekick/README.md`.
 
+The API can give Sidekick notes to the UI for a session. A Sidekick note is available after the request boundary. A request for a Sidekick note does not start a worker or change the conversation. The UI uses the reminder anchor to put a disclosure control in the conversation.
+
+Sidekick keeps Sidekick notes and source references in worker records after request context removal. The `revert` operation removes activity entries without a reminder anchor in the session history. Session deletion removes the activity entries. The API uses activity pages and a history revision.
+
 ## 10. Tools
 
 The Go interface of a tool is:

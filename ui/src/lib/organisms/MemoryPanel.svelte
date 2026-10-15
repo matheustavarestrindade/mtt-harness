@@ -269,7 +269,12 @@
             <p class="mt-0.5 text-[10px] text-muted-foreground">Messages and notes</p>
           </div>
           <div>
-            <dt class="text-[11px] text-muted-foreground">Agent tokens</dt>
+            <dt
+              class="text-[11px] text-muted-foreground"
+              title="Cumulative provider-reported input and output for memory workers. Cached input is included; reasoning is already part of output."
+            >
+              Reported worker tokens
+            </dt>
             <dd
               class="mt-1 text-xl font-medium tracking-tight tabular-nums"
               title={agentTokenCount(usage.statistics).toLocaleString()}
@@ -277,16 +282,16 @@
               {formatTokenCount(agentTokenCount(usage.statistics))}
             </dd>
             <p class="mt-0.5 text-[10px] text-muted-foreground">
-              {usage.statistics.Calls.toLocaleString()} model calls
+              {usage.statistics.Calls.toLocaleString()} calls · Workspace total
             </p>
           </div>
           <div class="min-w-0">
             <dt class="text-[11px] text-muted-foreground">
               {usage.unpricedCalls && usage.statistics.Costs?.length
-                ? 'Known agent cost'
+                ? 'Known worker cost'
                 : costEstimated
-                  ? 'Estimated agent cost'
-                  : 'Agent cost'}
+                  ? 'Estimated worker cost'
+                  : 'Worker cost'}
             </dt>
             <dd class="mt-1 break-words text-xl font-medium tracking-tight tabular-nums">
               {costLabel(usage.statistics)}
@@ -318,14 +323,14 @@
             </p>{/if}
         </section>
         <section class="border-b border-border py-4" aria-label="Memory agent usage">
-          <h3 class="mb-1 text-xs font-medium">Agents</h3>
+          <h3 class="mb-1 text-xs font-medium">Workers</h3>
           {#each panel.metrics.Agents as agent (`${agent.Agent}/${agent.ModelID}`)}<MemoryAgentUsage
               {agent}
             />{:else}<p class="py-3 text-xs leading-5 text-muted-foreground">
-              No agent calls yet. Direct memory saves do not use a language model.
+              No worker calls yet. Direct memory saves do not use a language model.
             </p>{/each}
           <p class="mt-2 text-[10px] leading-5 text-muted-foreground">
-            Agent usage belongs to this workspace, not the current chat.
+            Worker usage is cumulative across workspace sessions.
           </p>
         </section>
         <section class="py-4" aria-label="Memory activity">
@@ -335,7 +340,15 @@
                 class="flex justify-between gap-3"
               >
                 <dt class="text-muted-foreground">{label}</dt>
-                <dd>{count(key).toLocaleString()}</dd>
+                <dd
+                  title={key === 'context.compactor/estimated_tokens_removed'
+                    ? 'Cumulative checkpoint estimates; not provider-reported token savings or current memory size.'
+                    : undefined}
+                >
+                  {key === 'context.compactor/estimated_tokens_removed' ? '≈ ' : ''}{count(
+                    key,
+                  ).toLocaleString()}
+                </dd>
               </div>{/each}
             <div class="flex justify-between gap-3">
               <dt class="text-muted-foreground">Embedding chunks</dt>

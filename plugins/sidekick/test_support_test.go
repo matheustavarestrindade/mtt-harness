@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -41,15 +42,34 @@ func (database *memoryRepository) UpdateSession(operationContext context.Context
 	defer database.mutex.Unlock()
 	key := workspaceID + sessionID
 	state := cloneState(database.states[key])
+	var legacy []hintEvent
+	if !state.ActivityRecorded && !state.Deleted {
+		legacy = append(legacy, state.Events...)
+		state.ActivityRecorded = true
+	}
 	changes, operationError := update(&state)
 	if operationError != nil {
 		return state, operationError
 	}
 	state.Revision++
 	database.states[key] = cloneState(state)
+	for _, event := range legacy {
+		run, found := database.runs[event.ID]
+		if !found {
+			run = workerRun{ID: event.ID, WorkspaceID: workspaceID, SessionID: atom.SessionID(sessionID), Status: "delivered"}
+		}
+		if run.Hint == nil {
+			hint := event
+			run.Hint = &hint
+			database.runs[event.ID] = run
+		}
+	}
 	if changes.PurgeRuns {
 		for identifier, run := range database.runs {
 			if run.WorkspaceID == workspaceID && string(run.SessionID) == sessionID {
+				if run.Hint != nil && slices.Contains(changes.RetainHintAnchors, run.Hint.Anchor) {
+					continue
+				}
 				delete(database.runs, identifier)
 			}
 		}
@@ -60,6 +80,10 @@ func (database *memoryRepository) UpdateSession(operationContext context.Context
 	if changes.RunID != "" {
 		run := database.runs[changes.RunID]
 		run.Status = changes.RunStatus
+		if changes.Hint != nil {
+			hint := *changes.Hint
+			run.Hint = &hint
+		}
 		database.runs[changes.RunID] = run
 	}
 	for name, value := range changes.Counters {
@@ -77,6 +101,30 @@ func (database *memoryRepository) Counters(context.Context, string) (map[string]
 	return result, nil
 }
 func (database *memoryRepository) Close() {}
+
+func (database *memoryRepository) ReadActivity(operationContext context.Context, workspaceID, sessionID string, cursor activityCursor, limit int) (activitySnapshot, error) {
+	if operationError := operationContext.Err(); operationError != nil {
+		return activitySnapshot{}, operationError
+	}
+	database.mutex.Lock()
+	defer database.mutex.Unlock()
+	state := cloneState(database.states[workspaceID+sessionID])
+	result := activitySnapshot{Revision: state.Revision, Epoch: state.ActivityEpoch}
+	if state.Deleted {
+		return result, nil
+	}
+	if state.Fenced || (cursor.ID != "" && cursor.Epoch != state.ActivityEpoch) {
+		return result, harness.ErrPluginActivityChanged
+	}
+	var delivered []hintEvent
+	for _, run := range database.runs {
+		if run.WorkspaceID == workspaceID && string(run.SessionID) == sessionID && run.Hint != nil {
+			delivered = append(delivered, *run.Hint)
+		}
+	}
+	result.Events = mergeActivityEvents(delivered, state.Events, cursor, limit)
+	return result, nil
+}
 
 type fixtureServices struct {
 	mutex         sync.Mutex

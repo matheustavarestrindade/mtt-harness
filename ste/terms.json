@@ -2,6 +2,48 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "activity entry",
+      "category": "technical_noun",
+      "approved_forms": [
+        "activity entries"
+      ],
+      "meaning": "a read-only record of reference data inserted at a model request boundary",
+      "source": "session plugin activity"
+    },
+    {
+      "term": "activity page",
+      "category": "technical_noun",
+      "approved_forms": [
+        "activity pages"
+      ],
+      "meaning": "a bounded API page containing plugin activity entries",
+      "source": "session plugin activity"
+    },
+    {
+      "term": "activity data",
+      "category": "technical_noun",
+      "meaning": "read-only plugin delivery records shown in the client",
+      "source": "session plugin activity"
+    },
+    {
+      "term": "history revision",
+      "category": "technical_noun",
+      "approved_forms": [
+        "history revisions"
+      ],
+      "meaning": "a monotonic version that fences activity reads across history mutations",
+      "source": "session plugin activity"
+    },
+    {
+      "term": "disclosure control",
+      "category": "technical_noun",
+      "approved_forms": [
+        "disclosure controls"
+      ],
+      "meaning": "a UI control that expands or collapses supplementary content",
+      "source": "Sidekick display"
+    },
+    {
       "term": "handshake",
       "category": "technical_noun",
       "approved_forms": [
