@@ -1,5 +1,13 @@
 <script lang="ts">
-  import { FolderOpen, Layers, ChevronsUpDown, Plus, RefreshCw, Check } from 'lucide-svelte';
+  import {
+    FolderOpen,
+    Layers,
+    ChevronsUpDown,
+    Plus,
+    RefreshCw,
+    Check,
+    Unlink,
+  } from 'lucide-svelte';
   import * as DropdownMenu from '../atoms/ui/dropdown-menu';
   import type { Instance } from '../atoms/types';
   import { workspaceName } from '../atoms/format';
@@ -11,6 +19,7 @@
     onSelect,
     onCreate,
     onRefresh,
+    onUnlink,
   }: {
     instances: Instance[];
     instance: Instance | null;
@@ -18,6 +27,7 @@
     onSelect: (instance: Instance) => void;
     onCreate: () => void;
     onRefresh: () => void;
+    onUnlink: (instance: Instance) => void;
   } = $props();
 </script>
 
@@ -72,5 +82,13 @@
       closeOnSelect={false}
       onSelect={onRefresh}><RefreshCw class="size-4" />Refresh workspaces</DropdownMenu.Item
     >
+    {#if instance}<DropdownMenu.Separator />
+      <DropdownMenu.Item
+        class="min-h-9 pointer-coarse:min-h-11"
+        onSelect={() => instance && onUnlink(instance)}
+      >
+        <Unlink class="size-4" />Unlink workspace
+      </DropdownMenu.Item>
+    {/if}
   </DropdownMenu.Content>
 </DropdownMenu.Root>

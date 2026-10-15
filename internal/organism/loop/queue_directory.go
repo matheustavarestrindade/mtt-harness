@@ -13,6 +13,7 @@ type queueDirectory struct {
 	queue         *Queue
 	sessions      map[atom.SessionID]*sessionCoordinator
 	stopped       map[string]bool
+	unlinked      map[string]bool
 	controlling   map[string]bool
 	deleted       map[atom.SessionID]bool
 	deleting      map[string]bool
@@ -25,7 +26,7 @@ type queueDirectory struct {
 }
 
 func (messageQueue *Queue) runDirectory() {
-	directory := &queueDirectory{queue: messageQueue, sessions: map[atom.SessionID]*sessionCoordinator{}, stopped: map[string]bool{}, controlling: map[string]bool{}, deleted: map[atom.SessionID]bool{}, deleting: map[string]bool{}, blocked: map[atom.SessionID]bool{}}
+	directory := &queueDirectory{queue: messageQueue, sessions: map[atom.SessionID]*sessionCoordinator{}, stopped: map[string]bool{}, unlinked: map[string]bool{}, controlling: map[string]bool{}, deleted: map[atom.SessionID]bool{}, deleting: map[string]bool{}, blocked: map[atom.SessionID]bool{}}
 	defer close(messageQueue.done)
 	for {
 		select {
@@ -58,6 +59,10 @@ func (directory *queueDirectory) handleDirectoryCommand(command queueCommand) {
 		return
 	}
 	if command.kind == findSession {
+		if command.create && directory.unlinked[command.session.InstanceID] {
+			command.respond(queueReply{operationError: store.ErrInstanceUnlinked})
+			return
+		}
 		if directory.deleted[command.session.ID] {
 			command.respond(queueReply{operationError: store.ErrSessionDeleted})
 			return
@@ -73,7 +78,8 @@ func (directory *queueDirectory) handleDirectoryCommand(command queueCommand) {
 		}
 		coordinator := directory.sessions[command.session.ID]
 		if coordinator == nil && command.create {
-			coordinator = newSessionCoordinator(directory.queue.loop, command.session, nil, directory.stopped[command.session.InstanceID])
+			stopped := directory.stopped[command.session.InstanceID] || directory.queue.loop.configuration.Instances != nil && !directory.queue.loop.configuration.Instances.IsRunning(command.session.InstanceID)
+			coordinator = newSessionCoordinator(directory.queue.loop, command.session, nil, stopped)
 			directory.sessions[command.session.ID] = coordinator
 		}
 		command.respond(queueReply{coordinator: coordinator})
@@ -84,6 +90,18 @@ func (directory *queueDirectory) handleDirectoryCommand(command queueCommand) {
 		return
 	}
 	switch command.kind {
+	case stopStoredInstance, resumeStoredInstance, unlinkInstance:
+		if directory.controlling[command.instanceID] {
+			command.respond(queueReply{operationError: ErrSessionBusy})
+			return
+		}
+		if directory.unlinked[command.instanceID] {
+			command.respond(queueReply{operationError: store.ErrInstanceUnlinked})
+			return
+		}
+		directory.controlling[command.instanceID] = true
+		directory.operations++
+		go directory.queue.controlStoredInstance(command, directory.coordinatorsForInstance(command.instanceID))
 	case fenceConversationDeletion:
 		if !directory.deleting[command.instanceID] {
 			command.respond(queueReply{operationError: ErrSessionBusy})
@@ -182,13 +200,25 @@ func (directory *queueDirectory) handleCompletion(completed directoryCompletion)
 			directory.deleted[identifier] = true
 			delete(directory.sessions, identifier)
 		}
-		if command.kind == resumeInstance && completed.operationError == nil {
+		if (command.kind == resumeInstance || command.kind == resumeStoredInstance) && completed.operationError == nil {
 			delete(directory.stopped, command.instanceID)
 		}
+		if completed.instanceStopped {
+			directory.stopped[command.instanceID] = true
+		}
+		if completed.unlinked {
+			directory.unlinked[command.instanceID] = true
+			directory.stopped[command.instanceID] = true
+			for identifier, coordinator := range directory.sessions {
+				if coordinator.session.InstanceID == command.instanceID {
+					delete(directory.sessions, identifier)
+				}
+			}
+		}
 	}
-	if directory.closing && command.kind != deleteConversation {
+	if directory.closing && command.kind != deleteConversation && command.kind != unlinkInstance {
 		command.respond(queueReply{operationError: ErrQueueClosed})
 		return
 	}
-	command.respond(queueReply{deleted: completed.deleted, operationError: completed.operationError})
+	command.respond(queueReply{instance: completed.instance, deleted: completed.deleted, operationError: completed.operationError})
 }

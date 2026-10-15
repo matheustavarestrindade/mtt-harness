@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 	created_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE instances ADD COLUMN IF NOT EXISTS stopped boolean NOT NULL DEFAULT false;
+ALTER TABLE instances ADD COLUMN IF NOT EXISTS unlinked boolean NOT NULL DEFAULT false;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS completed boolean NOT NULL DEFAULT false;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS reasoning_effort text NOT NULL DEFAULT '';
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;

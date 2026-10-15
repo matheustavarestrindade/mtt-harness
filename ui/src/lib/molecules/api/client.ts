@@ -122,6 +122,14 @@ export class HarnessApi {
   async instances(signal?: AbortSignal) {
     return (await this.request<Instance[] | null>('instances', 'GET', undefined, signal)) ?? [];
   }
+  unlinkInstance(instanceID: string, signal?: AbortSignal) {
+    return this.request<{ id: string; status: 'unlinked' }>(
+      `instances/${encodeURIComponent(instanceID)}/unlink`,
+      'POST',
+      undefined,
+      signal,
+    );
+  }
   async processes(sessionID: string, signal?: AbortSignal) {
     return (
       (await this.request<ProcessRecord[] | null>(

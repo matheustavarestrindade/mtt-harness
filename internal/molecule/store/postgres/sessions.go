@@ -44,15 +44,24 @@ func (sessionStore *sessions) List(operationContext context.Context, instanceID 
 
 func (sessionStore *sessions) Save(operationContext context.Context, session atom.Session) error {
 	result, operationError := sessionStore.store.pool.Exec(operationContext, `
-		WITH parent_state AS MATERIALIZED (SELECT deleted FROM sessions WHERE id=$3 FOR SHARE)
+		WITH instance_state AS MATERIALIZED (SELECT unlinked FROM instances WHERE id=$2 FOR SHARE),
+		parent_state AS MATERIALIZED (SELECT deleted FROM sessions WHERE id=$3 AND NOT EXISTS(SELECT 1 FROM instance_state WHERE unlinked) FOR SHARE)
 		INSERT INTO sessions (id, instance_id, parent_id, depth, model, created_at, completed, reasoning_effort)
-		SELECT $1, $2, $3, $4, $5, $6, $7, $8 WHERE NOT EXISTS (SELECT 1 FROM parent_state WHERE deleted)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8 WHERE NOT EXISTS (SELECT 1 FROM parent_state WHERE deleted) AND NOT EXISTS(SELECT 1 FROM instance_state WHERE unlinked)
 		ON CONFLICT (id) DO UPDATE SET
 			parent_id = EXCLUDED.parent_id,
 			depth = EXCLUDED.depth,
 			completed = EXCLUDED.completed WHERE NOT sessions.deleted`,
 		string(session.ID), session.InstanceID, string(session.Parent), session.Depth, session.Model, session.CreatedAt, session.Completed, session.ReasoningEffort)
 	if operationError == nil && result.RowsAffected() == 0 {
+		var unlinked bool
+		lookupError := sessionStore.store.pool.QueryRow(operationContext, `SELECT unlinked FROM instances WHERE id=$1`, session.InstanceID).Scan(&unlinked)
+		if lookupError != nil && !errors.Is(lookupError, pgx.ErrNoRows) {
+			return lookupError
+		}
+		if unlinked {
+			return store.ErrInstanceUnlinked
+		}
 		return store.ErrSessionDeleted
 	}
 	return operationError

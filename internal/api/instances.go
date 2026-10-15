@@ -59,6 +59,13 @@ func (server *Server) getInstance(responseWriter http.ResponseWriter, request *h
 
 func (server *Server) stopInstance(responseWriter http.ResponseWriter, request *http.Request) {
 	identifier := request.PathValue("id")
+	if server.queue != nil {
+		if respondToInstanceLifecycleError(responseWriter, server.queue.StopStoredInstance(request.Context(), identifier)) {
+			return
+		}
+		writeJSON(responseWriter, http.StatusOK, map[string]string{"status": "stopped"})
+		return
+	}
 	instance, operationError := server.store.Instances().Get(request.Context(), identifier)
 	if respondToError(responseWriter, http.StatusNotFound, operationError) {
 		return
@@ -73,9 +80,6 @@ func (server *Server) stopInstance(responseWriter http.ResponseWriter, request *
 		}
 	}
 	var stopError error
-	if server.queue != nil {
-		stopError = server.queue.StopInstance(request.Context(), identifier)
-	}
 	if server.processes != nil {
 		_, processError := server.processes.StopInstance(request.Context(), identifier)
 		stopError = errors.Join(stopError, processError)
@@ -87,6 +91,14 @@ func (server *Server) stopInstance(responseWriter http.ResponseWriter, request *
 }
 
 func (server *Server) resumeInstance(responseWriter http.ResponseWriter, request *http.Request) {
+	if server.queue != nil {
+		instanceSpec, operationError := server.queue.ResumeStoredInstance(request.Context(), request.PathValue("id"))
+		if respondToInstanceLifecycleError(responseWriter, operationError) {
+			return
+		}
+		writeJSON(responseWriter, http.StatusOK, instanceSpec)
+		return
+	}
 	instanceSpec, operationError := server.store.Instances().Get(request.Context(), request.PathValue("id"))
 	if respondToError(responseWriter, http.StatusNotFound, operationError) {
 		return
@@ -98,11 +110,6 @@ func (server *Server) resumeInstance(responseWriter http.ResponseWriter, request
 	}
 	if respondToError(responseWriter, http.StatusInternalServerError, server.store.Instances().Save(request.Context(), instance.Spec())) {
 		return
-	}
-	if server.queue != nil {
-		if respondToError(responseWriter, http.StatusConflict, server.queue.ResumeInstance(request.Context(), instance.ID())) {
-			return
-		}
 	}
 	writeJSON(responseWriter, http.StatusOK, instance.Spec())
 }

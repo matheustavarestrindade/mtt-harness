@@ -59,6 +59,8 @@ The client uses Svelte 5 runes, TypeScript, Tailwind CSS, shadcn-svelte, Lucide,
 
 ## Components
 
+The workspace menu has an `Unlink workspace` action. The `UnlinkWorkspaceDialog` molecule shows the workspace path. The `HarnessConsole` organism removes the workspace reference after the API accepts the operation. A previous API response cannot put an unlinked workspace back in the list. Message drafts for different workspaces stay the same. The URL changes with the workspace selection.
+
 The UI uses the `neutral` color configuration from shadcn-svelte. Components use the same color values. User approval is necessary before a color change.
 
 The dependency direction is `atoms <- molecules <- organisms`. An atom import must not refer to a molecule or organism. A molecule import must not refer to an organism. The `check:layers` command examines TypeScript and Svelte imports. The shadcn-svelte configuration puts new primitives in `atoms/ui`.
