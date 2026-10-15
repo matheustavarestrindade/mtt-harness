@@ -2,6 +2,7 @@ import type { Page, WebSocketRoute } from '@playwright/test';
 import type { ProcessRecord } from '../src/lib/atoms/processes';
 import type { MemoryMetrics, MemoryPluginState } from '../src/lib/atoms/memory';
 import type { RepetitionConfiguration, WorkspacePluginState } from '../src/lib/atoms/plugins';
+import type { PluginActivityPage } from '../src/lib/atoms/plugin-activity';
 import type {
   HarnessEvent,
   Instance,
@@ -40,6 +41,7 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
     WorkspacePluginState<import('../src/lib/atoms/plugins').SidekickConfiguration>
   >();
   const sidekickMetrics = new Map<string, MemoryMetrics>();
+  const sidekickActivity = new Map<string, PluginActivityPage>();
   const sidekickUpdates: { workspaceID: string; patch: Record<string, unknown> }[] = [];
   const settings = new Map<string, Record<string, string>>([
     ['', { agent_depth_limit: '2', process_limit: '8' }],
@@ -496,6 +498,16 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
           return reply(session);
         }
         if (parts[2] === 'messages' && method === 'GET') return reply(histories.get(session.ID));
+        if (parts[2] === 'plugins' && parts[3] === 'sidekick' && parts[4] === 'activity')
+          return reply(
+            sidekickActivity.get(session.ID) ?? {
+              Name: 'sidekick',
+              SessionID: session.ID,
+              Revision: 0,
+              HistoryRevision: 0,
+              Entries: [],
+            },
+          );
         if (parts[2] === 'processes' && method === 'GET')
           return reply(
             [...processes.values()].filter((process) => process.SessionID === session.ID),
@@ -628,6 +640,7 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
     repetitionUpdates,
     sidekickStates,
     sidekickMetrics,
+    sidekickActivity,
     sidekickUpdates,
     openSockets,
     eventHistory,

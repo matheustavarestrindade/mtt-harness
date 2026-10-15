@@ -52,6 +52,41 @@ function metrics(workspaceID: string): MemoryMetrics {
   };
 }
 
+test('label recorded workspace worker totals and keep cache/reasoning as included subsets', async ({
+  page,
+}) => {
+  const fixture = await mockHarness(page);
+  await connectAndCreate(page);
+  const value = metrics(fixture.instances[0].ID);
+  value.Agents[0].Statistics = {
+    Calls: 97,
+    Input: 596336,
+    CacheRead: 130560,
+    CacheWrite: 0,
+    Output: 54387,
+    Reasoning: 13749,
+    Cost: null,
+    Costs: null,
+    CacheHitRate: 130560 / 726896,
+    CacheHitPercentage: (100 * 130560) / 726896,
+  };
+  value.Agents[0].FailedCalls = 3;
+  value.Counters['context.compactor/estimated_tokens_removed'] = 752031;
+  fixture.memoryMetrics.set(value.WorkspaceID, value);
+  const panel = await openMemory(page);
+  await panel.getByRole('button', { name: 'Refresh memory', exact: true }).click();
+  await expect(panel.getByText('Reported worker tokens', { exact: true })).toBeVisible();
+  await expect(panel.locator('[title="781,283"]')).toBeVisible();
+  await expect(panel.getByText('97 calls · Workspace total', { exact: true })).toBeVisible();
+  await panel.locator('summary').filter({ hasText: 'Compactor' }).click();
+  const details = panel.getByRole('region', { name: 'Memory agent usage' });
+  await expect(details.getByText('726,896', { exact: true })).toBeVisible();
+  await expect(details.getByText('54,387', { exact: true })).toBeVisible();
+  await expect(details.getByText('Cache read (included)', { exact: true })).toBeVisible();
+  await expect(details.getByText('Reasoning (included)', { exact: true })).toBeVisible();
+  await expect(panel.getByRole('region', { name: 'Memory activity' })).toContainText('≈ 752,031');
+});
+
 test('show real memory counters and agent usage without double-counting versions or reasoning', async ({
   page,
 }, testInfo) => {

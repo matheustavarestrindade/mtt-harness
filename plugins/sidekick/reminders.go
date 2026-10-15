@@ -153,13 +153,16 @@ func (plugin *Plugin) PrepareReminder(operationContext context.Context, input ha
 				return mutation{}, errRetired
 			}
 			current.Events = append(current.Events, event)
+			current.Events[len(current.Events)-1].InputTokens = &delivery.Tokens
+			current.Events[len(current.Events)-1].Estimated = delivery.Estimated
 			current.Pending = nil
 			current.LastStatus = "delivered"
 			counts := map[string]int64{"hints/delivered": 1, "hints/input_tokens": int64(delivery.Tokens)}
 			if delivery.Estimated {
 				counts["hints/estimated_tokens"] = int64(delivery.Tokens)
 			}
-			return mutation{RunID: pending.ID, RunStatus: "delivered", Counters: counts}, nil
+			delivered := current.Events[len(current.Events)-1]
+			return mutation{RunID: pending.ID, RunStatus: "delivered", Hint: &delivered, Counters: counts}, nil
 		})
 		return operationError
 	}

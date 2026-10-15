@@ -196,7 +196,9 @@ The panel shows `low`, `medium`, `high`, and `deferred` reminders. It also shows
 
 The `Sidekick` section is in the settings dialog. The task panel also has a `Sidekick settings` button. A worker model is necessary before the plugin state can be `ON`.
 
-The panel shows Sidekick notes and worker usage. Workspace memory and project files are different retrieval sources. The harness gives Sidekick notes to the agent in a model request.
+The panel shows `Notes delivered` and worker usage. Workspace memory and project files are different retrieval sources. The harness gives Sidekick notes to the agent in a model request.
+
+The conversation has disclosure controls for Sidekick notes and source references. Open a Sidekick note to examine the context added to a model request. Child agent previews also show activity entries. The section `Earlier Sidekick context` contains activity entries without a reminder anchor in the view.
 
 ## Workspace Memory
 

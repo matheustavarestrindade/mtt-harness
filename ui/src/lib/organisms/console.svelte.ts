@@ -21,6 +21,7 @@ import { eventToolCall } from '../atoms/agent-activity';
 import { sessionRoot } from '../atoms/session-tree';
 import { AgentMonitor } from './agent-monitor.svelte';
 import { SessionProcesses } from './session-processes.svelte';
+import { SessionActivity } from './session-activity.svelte';
 import {
   readNavigationRoute,
   writeNavigationRoute,
@@ -34,6 +35,7 @@ import type {
 
 const idleStatus = (): QueueStatus => ({ running: false, queued: 0, messages: [], error: '' });
 export class HarnessConsole {
+  readonly sidekick = new SessionActivity();
   readonly processes = new SessionProcesses();
   connection = $state<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   error = $state('');
@@ -225,6 +227,7 @@ export class HarnessConsole {
   }
 
   private stopSessionObservers() {
+    this.sidekick.close();
     this.processes.close();
     this.agents.close();
     clearTimeout(this.sessionListTimer);
@@ -375,6 +378,7 @@ export class HarnessConsole {
       history,
     );
     this.processes.open(api, session.ID);
+    this.sidekick.open(api, session.ID);
     this.agents.open(api, session, this.sessions);
     this.error = '';
     this.loading = true;
@@ -393,6 +397,7 @@ export class HarnessConsole {
         if (state === 'live' && previous !== 'live') {
           this.scheduleSessionRefresh();
           this.processes.scheduleRefresh();
+          this.sidekick.scheduleRefresh();
         }
       },
     );
@@ -432,6 +437,7 @@ export class HarnessConsole {
       ]);
       if (signal.aborted || this.session?.ID !== session.ID) return;
       this.messages = reconcileMessageHistory(this.messages, messages);
+      this.sidekick.scheduleRefresh();
       this.session = {
         ...updatedSession,
         Model:
@@ -602,6 +608,7 @@ export class HarnessConsole {
 
   private receiveEvent(event: HarnessEvent) {
     if (event.SessionID !== this.session?.ID) return;
+    this.sidekick.observe(event);
     this.processes.observe(event);
     if (['process.start', 'process.output', 'process.exit'].includes(event.Name)) return;
     this.agents.observe(event);

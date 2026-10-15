@@ -25,13 +25,15 @@
       <span class="block" title={estimated ? 'Estimated cost' : 'Recorded cost'}
         >{estimated ? '≈ ' : ''}{costLabel(usage)}</span
       >
-      <span class="mt-1 block text-[10px] text-muted-foreground"
+      <span
+        class="mt-1 block text-[10px] text-muted-foreground"
+        title="Cumulative provider-reported input and output. Cached input is included, and output already includes reasoning."
         >{formatTokenCount(agentTokenCount(usage))} tokens</span
       >
     </span>
   </summary>
   <dl class="grid grid-cols-2 gap-x-3 gap-y-2 pb-3 pl-5 text-[11px] tabular-nums">
-    {#each [['Model calls', usage.Calls], ['Input tokens', usage.Input + usage.CacheRead + usage.CacheWrite], ['Output tokens', usage.Output], ['Cache read', usage.CacheRead], ['Reasoning tokens', usage.Reasoning], ['Failed calls', agent.FailedCalls]] as [label, value]}
+    {#each [['Model calls', usage.Calls], ['Input tokens', usage.Input + usage.CacheRead + usage.CacheWrite], ['Output tokens', usage.Output], ['Cache read (included)', usage.CacheRead], ['Reasoning (included)', usage.Reasoning], ['Failed calls', agent.FailedCalls]] as [label, value]}
       <div class="min-w-0">
         <dt class="text-muted-foreground">{label}</dt>
         <dd class="mt-0.5 font-medium">{Number(value).toLocaleString()}</dd>

@@ -338,6 +338,36 @@ The plugin name `sidekick` uses the same settings and statistics routes. The def
 
 The usage counters include `jobs/active`, `hints/delivered`, `hints/input_tokens`, `hints/estimated_tokens`, `sources/memories`, `sources/files`, and `sources/duplicates`. The text from a Sidekick note is not in the statistics response.
 
+### Session Plugin Data
+
+```text
+GET /sessions/{id}/plugins/{plugin}/activity?limit=50&cursor=CURSOR
+```
+
+The optional `SessionActivityPlugin` interface gives activity data for a session. Sidekick uses the interface for Sidekick notes after the request boundary. Authentication is necessary. The route gets the workspace ID from the session.
+
+The default `limit` is 50. The range is 1–100. The API gives an activity page at the end of the history when `cursor` is empty. The `NextCursor` value gives access to previous activity entries. A cursor can be used only in the same workspace, plugin, session, and history revision. The maximum cursor length is 2048 bytes.
+
+```typescript
+type PluginActivityPage = {
+  Name: string; SessionID: string; Revision: number; HistoryRevision: number;
+  Entries: PluginActivityEntry[]; NextCursor?: string;
+};
+type PluginActivityEntry = {
+  ID: string; SessionID: string; AnchorID: string; AnchorSequence: number;
+  Title: string; CreatedAt: string; Notes: { Text: string; References: string[] | null }[];
+  InputTokens?: number; Estimated: boolean;
+};
+```
+
+The reminder anchor identifies a message in the session history. A tool result can be a reminder anchor. The UI can put the activity entry after the tool section. Source references are text. The response does not contain worker reasoning or provider credentials.
+
+The value `InputTokens` is optional. It measures input added to the primary request, not more worker usage.
+
+A plugin state change increases `Revision`. A history change makes a new `HistoryRevision` value. After a history change or session change, a previous response must not replace new activity data. A data request does not start a model or change the plugin state.
+
+A parameter error or cursor scope error gives `400`. A missing session, plugin, or `SessionActivityPlugin` interface gives `404`. A history change in progress or a previous history revision gives `409`. A storage error gives `500`.
+
 See `plugins/context/README.md`, `plugins/spaced_repetition/README.md`, and `plugins/sidekick/README.md` for configuration and behavior.
 
 ## Permission and Process Routes

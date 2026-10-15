@@ -72,14 +72,18 @@ func (plugin *Plugin) BeginHistoryChange(operationContext context.Context, chang
 					return mutation{}, nil
 				}
 				if change.Kind == harness.HistoryDelete {
-					*state = sessionState{Epoch: item.epoch, Deleted: true}
+					*state = sessionState{Revision: state.Revision, Epoch: item.epoch, ActivityEpoch: state.ActivityEpoch, ActivityRecorded: true, Deleted: true}
 					return mutation{PurgeRuns: true}, nil
 				}
 				state.Events = slices.DeleteFunc(state.Events, func(event hintEvent) bool { return !item.retained[event.Anchor] })
 				state.LastKey = ""
 				state.TaskKey = ""
 				state.SourceUser = ""
-				return mutation{PurgeRuns: true}, nil
+				anchors := make([]string, 0, len(item.retained))
+				for identifier := range item.retained {
+					anchors = append(anchors, identifier)
+				}
+				return mutation{PurgeRuns: true, RetainHintAnchors: anchors}, nil
 			})
 			result = errors.Join(result, operationError)
 			plugin.mutex.Lock()
@@ -97,6 +101,7 @@ func (plugin *Plugin) BeginHistoryChange(operationContext context.Context, chang
 		state, operationError := plugin.database.UpdateSession(operationContext, snapshot.Session.InstanceID, string(snapshot.Session.ID), func(state *sessionState) (mutation, error) {
 			wasDeleted = state.Deleted
 			state.Epoch++
+			state.ActivityEpoch++
 			state.Fenced = true
 			state.Pending = nil
 			return mutation{}, nil

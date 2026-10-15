@@ -17,6 +17,9 @@
   import { buildConversationEntries, type ToolActivity } from '$lib/atoms/transcript';
   import ToolActivityView from './ToolActivityView.svelte';
   import ProcessNoticeSection from '../molecules/ProcessNoticeSection.svelte';
+  import SidekickSection from '../molecules/SidekickSection.svelte';
+  import SidekickHistory from '../molecules/SidekickHistory.svelte';
+  import { placePluginActivity } from '../atoms/plugin-activity';
   import AgentGroup from './AgentGroup.svelte';
   import MessageCard from '../molecules/MessageCard.svelte';
   import MessageContent from '../molecules/content/MessageContent.svelte';
@@ -54,10 +57,12 @@
   const unplacedAgents = $derived(
     workbench.agents.unplaced(new Set(entries.map((entry) => entry.message.ID))),
   );
+  const sidekick = $derived(placePluginActivity(entries, workbench.sidekick.entries));
   $effect(() => {
     const sessionID = workbench.session?.ID ?? '';
     const changes =
       workbench.messages.length +
+      workbench.sidekick.entries.length +
       workbench.permissions.length +
       workbench.receipts.length +
       workbench.agents.children(workbench.session?.ID ?? '').length +
@@ -95,7 +100,7 @@
             ><LoaderCircle class="size-4 animate-spin" />Loading conversation…</span
           >
         </div>
-      {:else if !workbench.messages.length && !workbench.receipts.length && !workbench.liveMessage && !unplacedAgents.length}
+      {:else if !workbench.messages.length && !workbench.receipts.length && !workbench.liveMessage && !unplacedAgents.length && !workbench.sidekick.entries.length && !workbench.sidekick.error}
         <section class="flex flex-1 flex-col items-center justify-center py-8 text-center sm:py-12">
           <div
             class="quiet-grid mb-6 grid size-28 place-items-center rounded-3xl border border-border/50 bg-muted/30"
@@ -158,6 +163,14 @@
         </section>
       {:else}
         <div class="conversation-entries flex flex-col gap-1">
+          <SidekickHistory
+            entries={sidekick.unplaced}
+            more={!!workbench.sidekick.nextCursor}
+            loading={workbench.sidekick.loading}
+            error={workbench.sidekick.error}
+            onMore={() => void workbench.sidekick.more()}
+            onRefresh={() => void workbench.sidekick.refresh()}
+          />
           {#each entries as entry (entry.message.ID)}
             {#snippet tools(activity: ToolActivity)}
               {#if activity.call.Name === 'agent'}
@@ -186,7 +199,11 @@
                 renderTool={tools}
                 running={workbench.status.running}
                 streaming={entry.message.ID === workbench.liveMessage?.ID}
-              />{/if}{/each}
+              />{/if}
+            {#each sidekick.anchored.get(entry.message.ID) ?? [] as hint (hint.ID)}<SidekickSection
+                entry={hint}
+              />{/each}
+          {/each}
           {#if unplacedAgents.length}<AgentGroup
               monitor={workbench.agents}
               sessions={unplacedAgents}

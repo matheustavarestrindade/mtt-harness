@@ -13,6 +13,9 @@
   import MessageContent from '../molecules/content/MessageContent.svelte';
   import ToolActivityView from './ToolActivityView.svelte';
   import ProcessNoticeSection from '../molecules/ProcessNoticeSection.svelte';
+  import SidekickSection from '../molecules/SidekickSection.svelte';
+  import SidekickHistory from '../molecules/SidekickHistory.svelte';
+  import { placePluginActivity } from '../atoms/plugin-activity';
   import PermissionCard from '../molecules/PermissionCard.svelte';
   import type { AgentMonitor } from './agent-monitor.svelte';
 
@@ -37,6 +40,7 @@
       feed?.processes.records.values() ?? [],
     ),
   );
+  const sidekick = $derived(placePluginActivity(entries, feed?.sidekick.entries ?? []));
 
   $effect(() => {
     if (monitor.focusRevision === previousFocusRevision) return;
@@ -53,6 +57,7 @@
   $effect(() => {
     const changes =
       (feed?.messages.length ?? 0) +
+      (feed?.sidekick.entries.length ?? 0) +
       (feed?.liveMessage?.Reasoning?.length ?? 0) +
       (feed?.liveMessage?.Content?.[0]?.Text.length ?? 0) +
       (feed?.liveMessage?.ToolCalls?.length ?? 0);
@@ -168,6 +173,14 @@
           {#if feed?.omittedMessages}<p class="pb-2 text-[10px] text-muted-foreground">
               Latest 80 output messages shown.
             </p>{/if}
+          {#if feed}<SidekickHistory
+              entries={sidekick.unplaced}
+              more={!!feed.sidekick.nextCursor}
+              loading={feed.sidekick.loading}
+              error={feed.sidekick.error}
+              onMore={() => void feed?.sidekick.more()}
+              onRefresh={() => void feed?.sidekick.refresh()}
+            />{/if}
           {#each entries as entry (entry.message.ID)}
             {#snippet tools(activity: ToolActivity)}
               {@const result = agentResult(activity.call)}
@@ -225,6 +238,9 @@
                 running={feed?.active ?? false}
                 streaming={entry.message.ID === feed?.liveMessage?.ID}
               />{/if}
+            {#each sidekick.anchored.get(entry.message.ID) ?? [] as hint (hint.ID)}<SidekickSection
+                entry={hint}
+              />{/each}
           {/each}
           {#if !feed?.loading && !entries.length}<p class="py-2 text-xs text-muted-foreground">
               No agent output yet.

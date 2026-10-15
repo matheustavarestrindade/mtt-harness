@@ -26,6 +26,8 @@ type hintEvent struct {
 	Text           string    `json:"text"`
 	Sources        []string  `json:"sources"`
 	CreatedAt      time.Time `json:"created_at"`
+	InputTokens    *int      `json:"input_tokens,omitempty"`
+	Estimated      bool      `json:"estimated,omitempty"`
 }
 
 type preparedHint struct {
@@ -44,6 +46,8 @@ type preparedHint struct {
 
 type sessionState struct {
 	Revision          int64         `json:"revision"`
+	ActivityEpoch     int64         `json:"activity_epoch,omitempty"`
+	ActivityRecorded  bool          `json:"activity_recorded,omitempty"`
 	Epoch             int64         `json:"epoch"`
 	Deleted           bool          `json:"deleted"`
 	Fenced            bool          `json:"fenced"`
@@ -70,14 +74,17 @@ type workerRun struct {
 	CompletedAt time.Time      `json:"completed_at"`
 	MemoryCount int            `json:"memory_count"`
 	FileCount   int            `json:"file_count"`
+	Hint        *hintEvent     `json:"hint,omitempty"`
 }
 
 type mutation struct {
-	Counters  map[string]int64
-	Run       *workerRun
-	PurgeRuns bool
-	RunID     string
-	RunStatus string
+	Counters          map[string]int64
+	Run               *workerRun
+	PurgeRuns         bool
+	RunID             string
+	RunStatus         string
+	Hint              *hintEvent
+	RetainHintAnchors []string
 }
 
 type sourceData struct {

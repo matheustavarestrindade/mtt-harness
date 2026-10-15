@@ -7,12 +7,14 @@ export interface ToolActivity {
   result: Message | null;
   processRecord?: ProcessRecord;
   processNotice?: ProcessNotice;
+  relatedMessageIDs?: string[];
 }
 export interface ConversationEntry {
   message: Message;
   tools: ToolActivity[];
   processNotice?: ProcessNotice;
   processRecord?: ProcessRecord;
+  relatedMessageIDs?: string[];
 }
 
 // Match only preceding calls in the same session. Unmatched results remain visible.
@@ -82,12 +84,14 @@ function attachProcessNotices(
     const key = `${entry.message.SessionID}:${notice.processID}`;
     const owner = owners.get(key);
     if (owner) {
+      (owner.relatedMessageIDs ??= []).push(entry.message.ID);
       if (owner.processNotice?.kind !== 'exit' || notice.kind === 'exit')
         owner.processNotice = notice;
       continue;
     }
     const previous = unlinked.get(key);
     if (previous) {
+      (previous.relatedMessageIDs ??= []).push(entry.message.ID);
       if (previous.processNotice?.kind !== 'exit' || notice.kind === 'exit')
         previous.processNotice = notice;
       continue;
