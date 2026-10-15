@@ -98,7 +98,12 @@ test('show one reported request instead of cumulative input, output, or cache to
   await page.getByRole('dialog').getByRole('button', { name: 'Usage', exact: true }).click();
   const overview = page.getByRole('region', { name: 'Usage overview' });
   await expect(overview).toContainText('Total input tokens');
-  await expect(overview).toContainText('2,500,000');
+  await expect(
+    overview.getByText('Total input tokens', { exact: true }).locator('..'),
+  ).toContainText('2,000,000');
+  await expect(overview.getByText('Cache read', { exact: true }).locator('..')).toContainText(
+    '500,000',
+  );
   await expect(overview).toContainText('Overall cache hit');
 });
 

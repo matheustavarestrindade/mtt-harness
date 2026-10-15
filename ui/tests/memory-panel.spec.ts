@@ -52,7 +52,7 @@ function metrics(workspaceID: string): MemoryMetrics {
   };
 }
 
-test('label recorded workspace worker totals and keep cache/reasoning as included subsets', async ({
+test('show uncached worker input and output with cache separate and reasoning included once', async ({
   page,
 }) => {
   const fixture = await mockHarness(page);
@@ -76,13 +76,16 @@ test('label recorded workspace worker totals and keep cache/reasoning as include
   const panel = await openMemory(page);
   await panel.getByRole('button', { name: 'Refresh memory', exact: true }).click();
   await expect(panel.getByText('Reported worker tokens', { exact: true })).toBeVisible();
-  await expect(panel.locator('[title="781,283"]')).toBeVisible();
+  await expect(panel.locator('[title="650,723"]')).toBeVisible();
   await expect(panel.getByText('97 calls · Workspace total', { exact: true })).toBeVisible();
   await panel.locator('summary').filter({ hasText: 'Compactor' }).click();
   const details = panel.getByRole('region', { name: 'Memory agent usage' });
-  await expect(details.getByText('726,896', { exact: true })).toBeVisible();
+  await expect(details.getByText('596,336', { exact: true })).toBeVisible();
   await expect(details.getByText('54,387', { exact: true })).toBeVisible();
-  await expect(details.getByText('Cache read (included)', { exact: true })).toBeVisible();
+  await expect(details.getByText('Cache read', { exact: true }).locator('..')).toContainText(
+    '130,560',
+  );
+  await expect(details.getByText('Cache write', { exact: true }).locator('..')).toContainText('0');
   await expect(details.getByText('Reasoning (included)', { exact: true })).toBeVisible();
   await expect(panel.getByRole('region', { name: 'Memory activity' })).toContainText('≈ 752,031');
 });
@@ -116,11 +119,20 @@ test('show real memory counters and agent usage without double-counting versions
   await expect(summary).toContainText('10');
   await expect(summary).not.toContainText('99');
   await expect(summary).toContainText('2 retained in history');
-  await expect(summary).toContainText('2,000');
+  await expect(summary).toContainText('1,500');
   await expect(summary).toContainText('$0.0125');
   await expect(panel.getByRole('region', { name: 'Memory jobs' })).toContainText('Prepared');
   await panel.locator('summary').filter({ hasText: 'Compactor' }).click();
-  await expect(panel.getByRole('region', { name: 'Memory agent usage' })).toContainText('1,500');
+  const agentUsage = panel.getByRole('region', { name: 'Memory agent usage' });
+  await expect(agentUsage.getByText('Input tokens', { exact: true }).locator('..')).toContainText(
+    '1,000',
+  );
+  await expect(agentUsage.getByText('Cache read', { exact: true }).locator('..')).toContainText(
+    '300',
+  );
+  await expect(agentUsage.getByText('Cache write', { exact: true }).locator('..')).toContainText(
+    '200',
+  );
   await expect(panel.getByRole('region', { name: 'Memory agent usage' })).toContainText('2.3 s');
   await expect(panel.getByRole('region', { name: 'Memory activity' })).toContainText('24,000');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -222,6 +234,10 @@ test('preserve explicit zero and mixed currencies in memory-agent totals', () =>
     { Currency: 'EUR', Value: 0, Estimated: false },
     { Currency: 'USD', Value: 0.0125, Estimated: true },
   ]);
-  expect(agentTokenCount(summary.statistics)).toBe(4000);
+  expect(agentTokenCount(summary.statistics)).toBe(3000);
+  expect(summary.statistics.CacheRead).toBe(600);
+  expect(summary.statistics.CacheWrite).toBe(400);
+  expect(summary.statistics.CacheHitPercentage).toBe(20);
+  expect(agentTokenCount({ ...summary.statistics, Input: 0, Output: 0 })).toBe(0);
   expect(summary.unpricedCalls).toBe(0);
 });

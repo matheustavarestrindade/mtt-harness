@@ -271,7 +271,7 @@
           <div>
             <dt
               class="text-[11px] text-muted-foreground"
-              title="Cumulative provider-reported input and output for memory workers. Cached input is included; reasoning is already part of output."
+              title="Uncached input + output for memory workers. Cache is shown separately; output includes reasoning."
             >
               Reported worker tokens
             </dt>

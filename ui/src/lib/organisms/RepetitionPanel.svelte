@@ -340,7 +340,12 @@
           </p>
         </div>
         <div>
-          <p class="text-xs text-muted-foreground">Recovery worker tokens</p>
+          <p
+            class="text-xs text-muted-foreground"
+            title="Uncached input + output. Cache is shown separately in worker usage."
+          >
+            Recovery worker tokens
+          </p>
           <p class="mt-1 text-sm tabular-nums">
             {formatTokenCount(agentTokenCount(usage.statistics))}
           </p>
