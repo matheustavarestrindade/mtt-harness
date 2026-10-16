@@ -15,13 +15,19 @@ import type {
   TaskState,
 } from '../atoms/types';
 import { saveConnection, forgetConnection } from '../molecules/connection-storage';
-import { reconcileMessageHistory } from '../atoms/message-history';
+import {
+  historyUsageMessage,
+  rememberPermissionDecision,
+  type SessionViewState,
+} from '../atoms/session-view';
+import { boundedReceipts } from '../atoms/message-history';
 import { latestRequestUsage } from '../atoms/request-usage';
 import { eventToolCall } from '../atoms/agent-activity';
 import { sessionRoot } from '../atoms/session-tree';
 import { AgentMonitor } from './agent-monitor.svelte';
 import { SessionProcesses } from './session-processes.svelte';
 import { SessionActivity } from './session-activity.svelte';
+import { SessionHistory } from './session-history.svelte';
 import {
   readNavigationRoute,
   writeNavigationRoute,
@@ -37,6 +43,15 @@ const idleStatus = (): QueueStatus => ({ running: false, queued: 0, messages: []
 export class HarnessConsole {
   readonly sidekick = new SessionActivity();
   readonly processes = new SessionProcesses();
+  readonly history = new SessionHistory((records, messages) => {
+    this.processes.applyHistory(
+      records,
+      messages.map((message) => message.ID),
+    );
+    this.savedMessageIDs = new Set(messages.map((message) => message.ID));
+    this.receipts = this.receipts.filter((message) => !this.savedMessageIDs.has(message.ID));
+    if (this.liveMessage && this.savedMessageIDs.has(this.liveMessage.ID)) this.clearLiveMessage();
+  });
   connection = $state<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   error = $state('');
   catalogError = $state('');
@@ -46,7 +61,9 @@ export class HarnessConsole {
   sessions = $state<Session[]>([]);
   instance = $state<Instance | null>(null);
   session = $state<Session | null>(null);
-  messages = $state<Message[]>([]);
+  get messages() {
+    return this.history.window;
+  }
   liveMessage = $state<Message | null>(null);
   receipts = $state<Message[]>([]);
   permissions = $state<PermissionRequest[]>([]);
@@ -90,6 +107,13 @@ export class HarnessConsole {
   private refreshingSessionList = false;
   private sessionListPending = false;
   private navigationRevision = 0;
+  private stateVersion = 0;
+  private liveCoverage = 0;
+  private liveRevision = 0;
+  private taskEventSequence = 0;
+  private resolvedPermissions = new Set<string>();
+  private haveSnapshot = false;
+  liveTruncated = $state(false);
 
   observeNavigation() {
     return observeNavigationRoute((route) => {
@@ -179,7 +203,11 @@ export class HarnessConsole {
   }
 
   get requestUsage() {
-    return latestRequestUsage(this.messages, this.session?.ID ?? '', this.requestModels, [
+    const latest = this.history.latest;
+    const messages = latest ? [historyUsageMessage(latest, this.session?.ID ?? '')] : [];
+    const models = new Map(this.requestModels);
+    if (latest?.Model) models.set(latest.MessageID, latest.Model);
+    return latestRequestUsage(messages, this.session?.ID ?? '', models, [
       ...this.models,
       ...this.catalog,
     ]);
@@ -233,6 +261,7 @@ export class HarnessConsole {
   private stopSessionObservers() {
     this.sidekick.close();
     this.processes.close();
+    this.history.close();
     this.agents.close();
     clearTimeout(this.sessionListTimer);
     this.sessionListTimer = undefined;
@@ -253,9 +282,15 @@ export class HarnessConsole {
     this.refreshing = false;
     this.refreshPending = false;
     this.session = null;
-    this.messages = [];
+    this.stateVersion++;
+    this.liveCoverage = 0;
+    this.liveRevision = 0;
+    this.liveTruncated = false;
+    this.taskEventSequence = 0;
     this.receipts = [];
     this.permissions = [];
+    this.resolvedPermissions.clear();
+    this.haveSnapshot = false;
     this.events = [];
     this.statistics = null;
     this.taskState = null;
@@ -389,33 +424,34 @@ export class HarnessConsole {
     this.processes.open(api, session.ID);
     this.sidekick.open(api, session.ID);
     this.agents.open(api, session, this.sessions);
+    this.history.open(api, session.ID);
     this.error = '';
     this.loading = true;
     const signal = this.sessionReads.signal;
-    await this.refreshSession();
-    if (signal.aborted) return;
-    this.loading = false;
     this.closeStream = subscribeEvents(
       api,
       session.ID,
       (event) => this.receiveEvent(event),
       (state) => {
         if (signal.aborted) return;
-        const previous = this.streamState;
         this.streamState = state;
-        if (state === 'live' && previous !== 'live') {
-          this.scheduleSessionRefresh();
-          this.processes.scheduleRefresh();
-          this.sidekick.scheduleRefresh();
-        }
+        if (state === 'live') {
+          clearTimeout(this.sessionPollTimer);
+          this.sessionPollTimer = undefined;
+        } else if (state !== 'closed') this.scheduleFallback();
+      },
+      {
+        snapshot: (state, initial, covered) => this.receiveState(state, initial, covered),
+        recent: (events) => {
+          this.events = this.boundedEvents(events);
+          this.agents.restoreOrigins(events);
+        },
+        deleted: () => void this.handleMissingSession(session.ID),
       },
     );
-    const pollSessionStatus = async () => {
-      if (signal.aborted) return;
-      await this.pollSessionMetadata();
-      if (!signal.aborted) this.sessionPollTimer = setTimeout(pollSessionStatus, 1500);
-    };
-    this.sessionPollTimer = setTimeout(pollSessionStatus, 1500);
+    this.scheduleFallback();
+    await this.history.loadLatest();
+    if (!signal.aborted) this.loading = false;
   }
 
   async refreshSession() {
@@ -423,53 +459,21 @@ export class HarnessConsole {
     const session = this.session;
     const signal = this.sessionReads.signal;
     if (!api || !session || signal.aborted) return;
+    if (this.streamState === 'live') {
+      await this.history.refresh();
+      return;
+    }
     if (this.refreshing) {
       this.refreshPending = true;
       return;
     }
     this.refreshing = true;
-    const selectionRevision = this.selectionRevision;
-    const taskRevision = this.taskState?.Revision ?? -1;
+    const stateVersion = this.stateVersion;
     try {
-      const [messages, status, statistics, updatedSession, tasks] = await Promise.all([
-        api.messages(session.ID, signal),
-        api.status(session.ID, signal),
-        api.statistics(session.ID, signal),
-        api.session(session.ID, signal),
-        api.taskState(session.ID, signal).then(
-          (state) => ({ state, error: '' }),
-          (error: unknown) => ({
-            state: null,
-            error: error instanceof Error ? error.message : 'Cannot load task progress.',
-          }),
-        ),
-      ]);
+      const state = await api.sessionView(session.ID, true, signal);
       if (signal.aborted || this.session?.ID !== session.ID) return;
-      this.messages = reconcileMessageHistory(this.messages, messages);
-      this.sidekick.scheduleRefresh();
-      this.session = {
-        ...updatedSession,
-        Model:
-          selectionRevision === this.selectionRevision ? updatedSession.Model : this.session.Model,
-        ReasoningEffort:
-          selectionRevision === this.selectionRevision
-            ? updatedSession.ReasoningEffort
-            : this.session.ReasoningEffort,
-      };
-      this.status = { ...status, messages: status.messages ?? [] };
-      this.agents.sync(this.sessions, status.running);
-      this.statistics = statistics;
-      if (tasks.state) this.applyTaskState(tasks.state);
-      else if (taskRevision === (this.taskState?.Revision ?? -1)) this.taskStateError = tasks.error;
-      this.error = '';
-      const saved = new Set(messages.map((message) => message.ID));
-      this.savedMessageIDs = saved;
-      if (this.liveMessage && saved.has(this.liveMessage.ID)) this.clearLiveMessage();
-      this.receipts = this.receipts.filter(
-        (message) =>
-          !saved.has(message.ID) && (status.running || status.messages?.includes(message.ID)),
-      );
-      if (!status.running) this.permissions = [];
+      if (stateVersion === this.stateVersion) this.receiveState(state, false, this.liveCoverage);
+      await this.history.refresh();
     } catch (error) {
       if (
         !signal.aborted &&
@@ -477,18 +481,7 @@ export class HarnessConsole {
         error instanceof ApiError &&
         error.status === 404
       ) {
-        // Another client may delete the conversation while this one is open.
-        const removed = new Set([session.ID]);
-        for (let changed = true; changed;) {
-          changed = false;
-          for (const entry of this.sessions) {
-            if (entry.Parent && removed.has(entry.Parent) && !removed.has(entry.ID)) {
-              removed.add(entry.ID);
-              changed = true;
-            }
-          }
-        }
-        await this.removeSessionEntries(removed);
+        await this.handleMissingSession(session.ID);
         return;
       }
       if (!signal.aborted)
@@ -502,6 +495,126 @@ export class HarnessConsole {
         }
       }
     }
+  }
+
+  private async handleMissingSession(sessionID: string) {
+    if (this.session?.ID !== sessionID) return;
+    const removed = new Set([sessionID]);
+    for (let changed = true; changed;) {
+      changed = false;
+      for (const session of this.sessions) {
+        if (session.Parent && removed.has(session.Parent) && !removed.has(session.ID)) {
+          removed.add(session.ID);
+          changed = true;
+        }
+      }
+    }
+    await this.removeSessionEntries(removed);
+  }
+
+  private scheduleFallback() {
+    if (this.sessionPollTimer || this.sessionReads.signal.aborted || this.streamState === 'live')
+      return;
+    const signal = this.sessionReads.signal;
+    this.sessionPollTimer = setTimeout(async () => {
+      this.sessionPollTimer = undefined;
+      if (signal.aborted || this.streamState === 'live') return;
+      await this.refreshSession();
+      if (!signal.aborted) this.scheduleFallback();
+    }, 5000);
+  }
+
+  private receiveState(state: SessionViewState, initial: boolean, covered: number) {
+    if (state.Session.ID !== this.session?.ID || this.sessionReads.signal.aborted) return;
+    const recovery = initial && this.haveSnapshot;
+    this.haveSnapshot = true;
+    this.stateVersion++;
+    this.liveCoverage = initial ? covered : Math.max(this.liveCoverage, covered);
+    const current = this.session;
+    const selectionCurrent =
+      (state.Session.SelectionRevision ?? 0) >= (current.SelectionRevision ?? 0);
+    this.session = {
+      ...state.Session,
+      Model: selectionCurrent ? state.Session.Model : current.Model,
+      ReasoningEffort: selectionCurrent ? state.Session.ReasoningEffort : current.ReasoningEffort,
+      SelectionRevision: Math.max(
+        state.Session.SelectionRevision ?? 0,
+        current.SelectionRevision ?? 0,
+      ),
+    };
+    this.sessions = this.sessions.map((session) =>
+      session.ID === this.session?.ID ? this.session : session,
+    );
+    this.status = { ...state.Status, messages: state.Status.messages ?? [] };
+    this.statistics = state.Statistics;
+    if (state.TaskState) this.applyTaskState(state.TaskState);
+    else if (state.TaskStateError && (initial || covered >= this.taskEventSequence))
+      this.taskStateError = state.TaskStateError;
+    this.permissions = (state.Permissions ?? []).filter(
+      (request) => !this.resolvedPermissions.has(request.ID),
+    );
+    const previousHead = this.history.headSeq,
+      previousRevision = this.history.revision,
+      previousLive = this.liveMessage?.ID;
+    this.history.observeMetadata(state.History);
+    if (recovery) void this.history.recover();
+    this.processes.applyRecords(state.Processes ?? []);
+    this.agents.setActiveSessions(state.ActiveSessions ?? []);
+    this.agents.sync(this.sessions, this.status.running);
+    if (
+      state.Live &&
+      state.Live.Message.ID !== this.history.latest?.MessageID &&
+      !this.savedMessageIDs.has(state.Live.Message.ID)
+    ) {
+      this.clearLiveMessage();
+      this.liveMessage = state.Live.Message;
+      this.liveRevision = state.Live.Revision;
+      this.liveTruncated = state.Live.Truncated;
+      this.requestModels.set(state.Live.Message.ID, state.Live.Model);
+    } else if (
+      !this.status.running ||
+      this.liveMessage?.ID === this.history.latest?.MessageID ||
+      this.savedMessageIDs.has(this.liveMessage?.ID ?? '')
+    )
+      this.clearLiveMessage();
+    if (
+      initial ||
+      previousHead !== this.history.headSeq ||
+      previousRevision !== this.history.revision ||
+      previousLive !== state.Live?.Message.ID
+    )
+      this.sidekick.scheduleRefresh();
+    this.receipts = this.receipts.filter(
+      (message) =>
+        !this.savedMessageIDs.has(message.ID) &&
+        (this.status.running || this.status.messages?.includes(message.ID)),
+    );
+    for (const identifier of this.requestModels.keys())
+      if (
+        !this.savedMessageIDs.has(identifier) &&
+        identifier !== this.liveMessage?.ID &&
+        identifier !== this.history.latest?.MessageID
+      )
+        this.requestModels.delete(identifier);
+    if (state.WorkspaceLinked === false) void this.refreshInstances();
+    else if (this.instance?.ID === state.Session.InstanceID)
+      this.instance = { ...this.instance, Stopped: state.WorkspaceStopped };
+    this.error = '';
+  }
+
+  private boundedEvents(events: HarnessEvent[]) {
+    const retained: HarnessEvent[] = [];
+    let bytes = 0;
+    for (let index = events.length - 1; index >= 0 && retained.length < 40; index--) {
+      const event = events[index];
+      if (event.Name === 'model.chunk') continue;
+      const size = JSON.stringify(event.Payload ?? null).length;
+      const bounded = size > 16384 ? { ...event, Payload: { omitted_bytes: size } } : event;
+      if (bytes + Math.min(size, 16384) > 262144) break;
+      bytes += Math.min(size, 16384);
+      retained.unshift(bounded);
+    }
+    return retained;
   }
 
   private scheduleSessionRefresh() {
@@ -556,6 +669,12 @@ export class HarnessConsole {
   }
 
   private updateAgentSession(session: Session) {
+    const previous = this.sessions.find((entry) => entry.ID === session.ID);
+    session = {
+      ...session,
+      ParentMessageID: session.ParentMessageID || previous?.ParentMessageID,
+      ParentToolCallID: session.ParentToolCallID || previous?.ParentToolCallID,
+    };
     if (this.removedSessionIDs.has(session.ID) || session.InstanceID !== this.instance?.ID) return;
     this.sessions = this.sessions.map((entry) => (entry.ID === session.ID ? session : entry));
   }
@@ -571,57 +690,17 @@ export class HarnessConsole {
     return this.agents.focus(session.ID);
   }
 
-  private async pollSessionMetadata() {
-    const api = this.api;
-    const session = this.session;
-    const signal = this.sessionReads.signal;
-    if (!api || !session || signal.aborted) return;
-    // Events drive history synchronization. A disconnected stream falls back to
-    // full reads; a healthy idle stream needs only small lifecycle metadata.
-    if (this.streamState !== 'live') {
-      await this.refreshSession();
-      return;
-    }
-    const selectionRevision = this.selectionRevision;
-    try {
-      const [status, updatedSession] = await Promise.all([
-        api.status(session.ID, signal),
-        api.session(session.ID, signal),
-      ]);
-      if (signal.aborted || this.session?.ID !== session.ID) return;
-      const queued = status.messages ?? [];
-      const previousQueued = this.status.messages ?? [];
-      const changed =
-        status.running !== this.status.running ||
-        status.queued !== this.status.queued ||
-        status.error !== this.status.error ||
-        queued.length !== previousQueued.length ||
-        queued.some((identifier, index) => identifier !== previousQueued[index]) ||
-        updatedSession.Completed !== this.session.Completed;
-      this.session = {
-        ...updatedSession,
-        Model:
-          selectionRevision === this.selectionRevision ? updatedSession.Model : this.session.Model,
-        ReasoningEffort:
-          selectionRevision === this.selectionRevision
-            ? updatedSession.ReasoningEffort
-            : this.session.ReasoningEffort,
-      };
-      if (changed) await this.refreshSession();
-      if (status.running) this.scheduleSessionListRefresh();
-    } catch {
-      // The authoritative refresh handles deletion, cancellation and API errors.
-      if (!signal.aborted) await this.refreshSession();
-    }
-  }
-
   private receiveEvent(event: HarnessEvent) {
     if (event.SessionID !== this.session?.ID) return;
+    if (event.Seq <= this.liveCoverage) {
+      if (event.Name === 'agent.start' || event.Name === 'agent.end') this.agents.observe(event);
+      return;
+    }
     this.sidekick.observe(event);
     this.processes.observe(event);
     if (['process.start', 'process.output', 'process.exit'].includes(event.Name)) return;
     this.agents.observe(event);
-    if (event.Name !== 'model.chunk') this.events = [...this.events.slice(-79), event];
+    if (event.Name !== 'model.chunk') this.events = this.boundedEvents([...this.events, event]);
     const payload =
       event.Payload && typeof event.Payload === 'object'
         ? (event.Payload as Record<string, unknown>)
@@ -640,6 +719,7 @@ export class HarnessConsole {
       Array.isArray(payload.Todo)
     ) {
       this.applyTaskState(payload as unknown as TaskState);
+      this.taskEventSequence = Math.max(this.taskEventSequence, event.Seq);
     }
     if (
       (event.Name === 'model.call' || event.Name === 'model.chunk') &&
@@ -662,6 +742,10 @@ export class HarnessConsole {
         };
       }
       if (event.Name === 'model.chunk') {
+        if (typeof payload.chunk_index === 'number' && payload.chunk_index > 0) {
+          if (payload.chunk_index <= this.liveRevision) return;
+          this.liveRevision = payload.chunk_index;
+        }
         if (typeof payload.text === 'string') this.pendingText.push(payload.text);
         if (typeof payload.reasoning === 'string') this.pendingReasoning.push(payload.reasoning);
         // Batch DOM/Markdown work rather than rerendering on every token.
@@ -675,25 +759,31 @@ export class HarnessConsole {
       typeof payload.Target === 'string'
     ) {
       const request = payload as unknown as PermissionRequest;
-      this.permissions = [...this.permissions.filter((entry) => entry.ID !== request.ID), request];
+      if (!this.resolvedPermissions.has(request.ID))
+        this.permissions = [
+          ...this.permissions.filter((entry) => entry.ID !== request.ID),
+          request,
+        ];
     }
     if (event.Name === 'action.received' && this.liveMessage) {
       const call = eventToolCall(event.Payload);
       if (call && !this.liveMessage.ToolCalls?.some((entry) => entry.ID === call.ID))
         this.liveMessage = {
           ...this.liveMessage,
-          ToolCalls: [...(this.liveMessage.ToolCalls ?? []), call],
+          ToolCalls: [...(this.liveMessage.ToolCalls ?? []), call].slice(-32),
         };
     }
-    if (event.Name === 'permission.decision')
+    if (event.Name === 'permission.decision' && typeof payload.RequestID === 'string') {
+      rememberPermissionDecision(this.resolvedPermissions, payload.RequestID);
       this.permissions = this.permissions.filter((entry) => entry.ID !== payload.RequestID);
+    }
     if (['turn.end', 'run.cancelled', 'run.error', 'run.interrupted'].includes(event.Name))
       this.permissions = [];
     if (['turn.end', 'run.cancelled', 'run.error', 'run.interrupted'].includes(event.Name))
       this.scheduleSessionListRefresh();
     if (['run.cancelled', 'run.error', 'run.interrupted'].includes(event.Name))
       this.clearLiveMessage();
-    if (event.Name !== 'model.chunk') this.scheduleSessionRefresh();
+    if (this.streamState !== 'live' && event.Name !== 'model.chunk') this.scheduleSessionRefresh();
   }
 
   private clearLiveMessage() {
@@ -702,6 +792,8 @@ export class HarnessConsole {
     this.pendingText = [];
     this.pendingReasoning = [];
     this.liveMessage = null;
+    this.liveRevision = 0;
+    this.liveTruncated = false;
   }
 
   private applyTaskState(state: TaskState) {
@@ -720,11 +812,23 @@ export class HarnessConsole {
       return;
     }
     const text = (message.Content?.[0]?.Text ?? '') + this.pendingText.join('');
+    const reasoning = (message.Reasoning ?? '') + this.pendingReasoning.join('');
+    if (text.length > 100000 || reasoning.length > 100000) this.liveTruncated = true;
     this.liveMessage = {
       ...message,
-      Reasoning: (message.Reasoning ?? '') + this.pendingReasoning.join(''),
+      Reasoning: reasoning.slice(-100000),
       Content: text
-        ? [{ Type: 'text', Text: text, Data: null, MIME: '', URL: '', Filename: '', AudioID: '' }]
+        ? [
+            {
+              Type: 'text',
+              Text: text.slice(-100000),
+              Data: null,
+              MIME: '',
+              URL: '',
+              Filename: '',
+              AudioID: '',
+            },
+          ]
         : [],
     };
     this.pendingText = [];
@@ -841,7 +945,8 @@ export class HarnessConsole {
     if (!session) throw new Error('Create a session first.');
     const receipt = await api.sendMessage(session.ID, content);
     if (this.api === api && this.session?.ID === session.ID) {
-      this.receipts = [...this.receipts, receipt.message];
+      if (!this.savedMessageIDs.has(receipt.message.ID))
+        this.receipts = boundedReceipts([...this.receipts, receipt.message]);
       // Acceptance is authoritative even if the subsequent status read fails.
       // Keeping a sent attachment as a retryable draft would duplicate the turn.
       try {
@@ -869,7 +974,11 @@ export class HarnessConsole {
     }
   }
   async resolvePermissionRequest(requestID: string, kind: 'allow' | 'deny') {
-    await this.requireAPIClient().resolvePermission(requestID, kind);
+    const api = this.requireAPIClient(),
+      sessionID = this.session?.ID;
+    await api.resolvePermission(requestID, kind);
+    if (api !== this.api || sessionID !== this.session?.ID) return;
+    rememberPermissionDecision(this.resolvedPermissions, requestID);
     this.permissions = this.permissions.filter((entry) => entry.ID !== requestID);
     this.scheduleSessionRefresh();
   }

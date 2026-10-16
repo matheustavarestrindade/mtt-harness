@@ -5,6 +5,7 @@ go 1.26
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.2
 	github.com/coder/websocket v1.8.15
+	github.com/creack/pty v1.1.24
 	github.com/daulet/tokenizers v1.26.0
 	github.com/gomlx/go-huggingface v0.3.5-0.20260327162928-af20e4f3e7b5
 	github.com/jackc/pgx/v5 v5.7.6
@@ -12,6 +13,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/yalue/onnxruntime_go v1.27.0
+	golang.org/x/sys v0.42.0
 )
 
 require (
@@ -35,7 +37,6 @@ require (
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
 	golang.org/x/image v0.38.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/term v0.41.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect

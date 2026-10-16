@@ -39,17 +39,19 @@ type Config struct {
 }
 
 type Loop struct {
-	harnessRuntime *harness.Harness
-	pipeline       *pipeline.Pipeline
-	configuration  Config
-	mutex          sync.Mutex
-	groups         map[atom.SessionID][]atom.ToolSpec
-	finished       map[atom.SessionID]string
-	runLocks       sync.Map
-	activeRuns     map[atom.SessionID]*activeRun
-	sessionBlocks  map[atom.SessionID]error
-	instanceBlocks map[string]error
-	contextBuilder *contextbuilder.Builder
+	harnessRuntime    *harness.Harness
+	pipeline          *pipeline.Pipeline
+	configuration     Config
+	mutex             sync.Mutex
+	groups            map[atom.SessionID][]atom.ToolSpec
+	finished          map[atom.SessionID]string
+	runLocks          sync.Map
+	activeRuns        map[atom.SessionID]*activeRun
+	sessionBlocks     map[atom.SessionID]error
+	instanceBlocks    map[string]error
+	stateListeners    map[uint64]sessionStateListener
+	nextStateListener uint64
+	contextBuilder    *contextbuilder.Builder
 }
 
 func New(harnessRuntime *harness.Harness, configuration Config) *Loop {
@@ -73,9 +75,10 @@ func New(harnessRuntime *harness.Harness, configuration Config) *Loop {
 }
 
 type activeRun struct {
-	cancel  context.CancelFunc
-	done    chan struct{}
-	session atom.Session
+	response *liveResponseState
+	cancel   context.CancelFunc
+	done     chan struct{}
+	session  atom.Session
 }
 
 // Run owns one session turn. Queue serializes user turns; child agents call Run
@@ -112,10 +115,12 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 		return blocked
 	}
 	agentLoop.activeRuns[session.ID] = active
+	agentLoop.notifySessionStateLocked(session.ID, session.InstanceID)
 	agentLoop.mutex.Unlock()
 	defer func() {
 		agentLoop.mutex.Lock()
 		delete(agentLoop.activeRuns, session.ID)
+		agentLoop.notifySessionStateLocked(session.ID, session.InstanceID)
 		close(active.done)
 		agentLoop.mutex.Unlock()
 	}()

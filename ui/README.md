@@ -242,13 +242,21 @@ Stop active work and remove messages from the queue before session deletion. Sto
 
 The UI can make workspaces and sessions. The user can select an instance or session from the navigation. The UI can start a stopped workspace. It can send text, stop a turn, remove a message from the queue, and accept or deny a permission request.
 
-The UI shows message history, tool input, tool results, events, token usage, and cost data. It reads session data and status at an interval of 1.5 seconds. WebSocket events cause history requests. A connection error starts full history requests. The UI shows model text during the response. Message IDs connect event text to the history.
+The UI shows message history, tool input, tool results, events, token usage, and cost data. A session WebSocket gives view snapshots and live events. The UI reads status from state frames. After a socket error, `GET /sessions/{id}/state` can give the status data. The HTTP request interval is 5 seconds.
+
+The conversation starts with 50 messages. Use the scrollbar to read history pages. The history window has a limit of 150 messages. The byte limit is 8 MiB. The UI can keep one larger message. The message bytes stay the same.
+
+The `Latest` control puts the view at the end of the conversation. The history window then contains 50 messages. The last response usage does not change with the history page.
+
+The `bash` tool uses a pseudo-terminal. The terminal view uses xterm.js. The user can send input. Terminal resize and `Ctrl-C` are available.
+
+When a terminal view closes, the socket stops but the process continues. Process exit closes the socket.
 
 The `Tasks` control opens task state on the right side. On large screens, the control is in the header. On small screens, the control is in the navigation drawer. The panel contains task statuses and the `DOING` task title and description.
 
 A task item with status `done` stays in the list while a task item has status `pending` or `in_progress`. The harness removes content from TODO and `DOING` when the last task item becomes `done` or `cancelled`. Empty task state shows `No active tasks` in the panel.
 
-The UI does not have a file editor, media upload, process terminal, or revert control. See `docs/design.md` for the UI boundary and plans.
+The UI does not have a file editor or revert control. See `docs/design.md` for the UI boundary and plans.
 
 ## UI Compilation
 

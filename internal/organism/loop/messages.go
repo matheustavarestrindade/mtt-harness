@@ -8,6 +8,7 @@ import (
 )
 
 func (agentLoop *Loop) saveModelResponse(operationContext context.Context, session atom.Session, modelID string, message atom.Message, status string) error {
+	defer agentLoop.NotifySessionState(session.ID)
 	usage := message.Usage
 	message, operationError := agentLoop.pipeline.Response(operationContext, message)
 	if operationError != nil {
@@ -23,14 +24,17 @@ func (agentLoop *Loop) saveModelResponse(operationContext context.Context, sessi
 	if usage == nil {
 		usage = &atom.Usage{}
 	}
-	return agentLoop.configuration.Store.Usage().Save(operationContext, atom.UsageRecord{
+	operationError = agentLoop.configuration.Store.Usage().Save(operationContext, atom.UsageRecord{
 		InstanceID: session.InstanceID, SessionID: session.ID, ModelID: modelID,
 		Usage: *usage, CreatedAt: time.Now(), RequestID: message.ID, Status: status,
 	})
+	agentLoop.notifyWorkspaceState(session.InstanceID)
+	return operationError
 }
 
 // Results are stored in model call order, regardless of tool completion order.
 func (agentLoop *Loop) saveToolResults(operationContext context.Context, session atom.Session, calls []atom.ToolCall, results []atom.ToolResult) error {
+	defer agentLoop.NotifySessionState(session.ID)
 	for index, call := range calls {
 		result, operationError := agentLoop.pipeline.Result(operationContext, results[index])
 		if operationError != nil {

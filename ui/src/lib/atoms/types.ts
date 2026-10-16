@@ -18,6 +18,10 @@ export interface Session {
   ReasoningEffort?: string;
   CreatedAt: string;
   Completed: boolean;
+  HistoryRevision?: number;
+  SelectionRevision?: number;
+  ParentMessageID?: string;
+  ParentToolCallID?: string;
 }
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'cancelled';
 export interface TaskItem {

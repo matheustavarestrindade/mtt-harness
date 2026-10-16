@@ -8,10 +8,10 @@ import {
   streamedMessage,
   type AgentPhase,
 } from '../atoms/agent-activity';
-import { reconcileMessageHistory } from '../atoms/message-history';
+import { SessionHistory } from './session-history.svelte';
+import { rememberPermissionDecision, type SessionViewState } from '../atoms/session-view';
 import type { HarnessEvent, Message, PermissionRequest, Session, TaskState } from '../atoms/types';
 
-const previewMessageLimit = 80;
 const liveTextLimit = 100_000;
 
 // A read-only child feed owns its socket, reads, and bounded live preview. Child
@@ -19,8 +19,20 @@ const liveTextLimit = 100_000;
 export class AgentFeed {
   readonly sidekick = new SessionActivity();
   readonly processes = new SessionProcesses();
+  readonly history = new SessionHistory((records, messages) => {
+    this.processes.applyHistory(
+      records,
+      messages.map((message) => message.ID),
+    );
+    this.savedIDs = new Set(messages.map((message) => message.ID));
+    if (this.liveMessage && this.savedIDs.has(this.liveMessage.ID)) this.clearLiveMessage();
+  });
   session = $state<Session>();
-  messages = $state<Message[]>([]);
+  get messages() {
+    return this.history.window.filter(
+      (message) => message.Role !== 'user' && message.Role !== 'system',
+    );
+  }
   liveMessage = $state<Message | null>(null);
   task = $state('');
   taskState = $state<TaskState | null>(null);
@@ -47,6 +59,12 @@ export class AgentFeed {
   private reasoning = '';
   private refreshing = false;
   private refreshPending = false;
+  private serverActive = $state(false);
+  private viewVersion = 0;
+  private liveRevision = 0;
+  private covered = 0;
+  private resolvedPermissions = new Set<string>();
+  private haveSnapshot = false;
 
   constructor(
     private api: HarnessApi,
@@ -55,16 +73,14 @@ export class AgentFeed {
     private onSession: (session: Session) => void,
   ) {
     this.session = session;
-    if (!session.Completed) this.observe();
   }
 
   get active() {
     return (
-      this.parentRunning &&
+      this.serverActive &&
       !this.session?.Completed &&
       this.phase === 'working' &&
-      this.streamState === 'live' &&
-      (!this.parentStartedAt || Date.parse(this.lastActivityAt) >= Date.parse(this.parentStartedAt))
+      this.streamState === 'live'
     );
   }
 
@@ -72,11 +88,19 @@ export class AgentFeed {
     if (this.phase === 'error') return 'Failed';
     if (this.phase === 'cancelled') return 'Cancelled';
     if (this.phase === 'completed') return 'Finished';
-    if (this.session?.Completed || !this.parentRunning) return 'Inactive';
+    if (this.session?.Completed || !this.serverActive) return 'Inactive';
     if (this.streamState === 'retrying') return 'Reconnecting';
     if (this.phase === 'waiting' && this.permissions.length) return 'Waiting for approval';
     if (this.active) return 'Working';
     return this.streamState === 'connecting' ? 'Connecting' : 'Inactive';
+  }
+  setActive(active: boolean) {
+    if (this.lifetime.signal.aborted) return;
+    const changed = this.serverActive !== active;
+    this.serverActive = active;
+    if (active && !this.session?.Completed) {
+      this.observe();
+    } else if (changed && !this.previewEnabled) this.stopObserving();
   }
 
   updateSession(session: Session) {
@@ -96,8 +120,12 @@ export class AgentFeed {
       this.previewEnabled = true;
       if (this.session) this.processes.open(this.api, this.session.ID);
       if (this.session) this.sidekick.open(this.api, this.session.ID);
+      if (this.session) this.history.open(this.api, this.session.ID);
       this.loading = !this.messages.length;
-      void this.refresh();
+      void this.history.loadLatest().finally(() => {
+        if (!this.lifetime.signal.aborted) this.loading = false;
+      });
+      this.stopObserving();
       this.observe();
     }
     let released = false;
@@ -109,8 +137,13 @@ export class AgentFeed {
       this.previewEnabled = false;
       this.processes.close();
       this.sidekick.close();
+      this.history.close();
+      this.savedIDs.clear();
+      this.clearLiveMessage();
       clearTimeout(this.refreshTimer);
       this.refreshTimer = undefined;
+      this.stopObserving();
+      if (this.serverActive) this.observe();
     };
   }
 
@@ -123,11 +156,21 @@ export class AgentFeed {
       (state) => {
         if (this.lifetime.signal.aborted) return;
         this.streamState = state;
-        if (state === 'live' && this.previewEnabled) {
-          this.scheduleRefresh();
-          this.processes.scheduleRefresh();
-          this.sidekick.scheduleRefresh();
-        }
+        if (state === 'live') {
+          clearTimeout(this.pollTimer);
+          this.pollTimer = undefined;
+        } else if (state !== 'closed') this.schedulePoll();
+      },
+      {
+        details: this.previewEnabled,
+        snapshot: (state, initial, covered) => this.receiveState(state, initial, covered),
+        recent: (events) => {
+          for (const event of events) this.onEvent(event);
+        },
+        deleted: () => {
+          this.error = 'This agent is no longer available.';
+          this.close();
+        },
       },
     );
     this.schedulePoll();
@@ -137,7 +180,8 @@ export class AgentFeed {
     if (
       this.lifetime.signal.aborted ||
       this.pollTimer ||
-      ['completed', 'cancelled', 'error'].includes(this.phase)
+      this.streamState === 'live' ||
+      (!this.previewEnabled && !this.serverActive)
     )
       return;
     this.pollTimer = setTimeout(async () => {
@@ -145,20 +189,72 @@ export class AgentFeed {
       const session = this.session;
       if (!session || this.lifetime.signal.aborted) return;
       try {
-        const updated = await this.api.session(session.ID, this.lifetime.signal);
-        if (this.lifetime.signal.aborted) return;
-        this.updateSession(updated);
-        this.onSession(updated);
-        if (this.previewEnabled && this.streamState !== 'live') await this.refresh();
+        if (this.streamState !== 'live') await this.refresh();
       } catch (failure) {
         this.reportReadFailure(failure);
       }
-      if (!this.session?.Completed) this.schedulePoll();
-    }, 2500);
+      this.schedulePoll();
+    }, 5000);
+  }
+
+  private receiveState(state: SessionViewState, initial: boolean, covered: number) {
+    if (this.lifetime.signal.aborted || state.Session.ID !== this.session?.ID) return;
+    const recovery = initial && this.haveSnapshot;
+    this.haveSnapshot = true;
+    this.viewVersion++;
+    this.covered = initial ? covered : Math.max(this.covered, covered);
+    this.session = state.Session;
+    this.onSession(state.Session);
+    this.serverActive = state.Status.running;
+    this.permissions = (state.Permissions ?? []).filter(
+      (request) => !this.resolvedPermissions.has(request.ID),
+    );
+    this.phase = this.permissions.length
+      ? 'waiting'
+      : this.serverActive
+        ? 'working'
+        : state.Outcome === 'cancelled'
+          ? 'cancelled'
+          : state.Status.error || state.Outcome === 'error'
+            ? 'error'
+            : state.Session.Completed
+              ? 'completed'
+              : 'unknown';
+    this.task = state.History.Task ?? this.task;
+    if (state.TaskState) this.applyTasks(state.TaskState);
+    if (this.previewEnabled) {
+      const previousHead = this.history.headSeq;
+      this.history.observeMetadata(state.History);
+      if (recovery) void this.history.recover();
+      this.processes.applyRecords(state.Processes ?? []);
+      if (
+        initial ||
+        previousHead !== state.History.HeadSeq ||
+        state.Live?.Message.ID !== this.liveMessage?.ID
+      )
+        this.sidekick.scheduleRefresh();
+      if (
+        state.Live &&
+        state.Live.Message.ID !== this.history.latest?.MessageID &&
+        !this.savedIDs.has(state.Live.Message.ID)
+      ) {
+        this.clearLiveMessage();
+        this.liveMessage = state.Live.Message;
+        this.liveRevision = state.Live.Revision;
+        this.liveTruncated = state.Live.Truncated;
+      } else if (!this.serverActive || this.liveMessage?.ID === this.history.latest?.MessageID)
+        this.clearLiveMessage();
+    }
+    this.error = '';
+    if (!this.serverActive) this.scheduleClose();
   }
 
   private receiveEvent(event: HarnessEvent) {
     if (this.lifetime.signal.aborted || event.SessionID !== this.session?.ID) return;
+    if (event.Seq <= this.covered) {
+      if (event.Name === 'agent.start' || event.Name === 'agent.end') this.onEvent(event);
+      return;
+    }
     this.onEvent(event);
     this.processes.observe(event);
     this.sidekick.observe(event);
@@ -179,6 +275,7 @@ export class AgentFeed {
     if (
       event.Name === 'permission.request' &&
       typeof payload.ID === 'string' &&
+      !this.resolvedPermissions.has(payload.ID) &&
       payload.SessionID === this.session.ID
     ) {
       this.permissions = [
@@ -188,10 +285,13 @@ export class AgentFeed {
       this.phase = 'waiting';
     }
     if (event.Name === 'permission.decision') {
+      if (typeof payload.RequestID === 'string')
+        rememberPermissionDecision(this.resolvedPermissions, payload.RequestID);
       this.permissions = this.permissions.filter((request) => request.ID !== payload.RequestID);
       if (!this.permissions.length && this.phase === 'waiting') this.phase = 'working';
     }
     if (
+      this.previewEnabled &&
       ['model.call', 'model.chunk'].includes(event.Name) &&
       typeof payload.message_id === 'string' &&
       !this.savedIDs.has(payload.message_id)
@@ -201,6 +301,10 @@ export class AgentFeed {
         this.liveMessage = streamedMessage(event, payload.message_id);
       }
       if (event.Name === 'model.chunk') {
+        if (typeof payload.chunk_index === 'number' && payload.chunk_index > 0) {
+          if (payload.chunk_index <= this.liveRevision) return;
+          this.liveRevision = payload.chunk_index;
+        }
         if (typeof payload.text === 'string') this.text += payload.text;
         if (typeof payload.reasoning === 'string') this.reasoning += payload.reasoning;
         if (this.text.length > liveTextLimit || this.reasoning.length > liveTextLimit)
@@ -215,7 +319,7 @@ export class AgentFeed {
       if (call && !this.liveMessage.ToolCalls?.some((entry) => entry.ID === call.ID))
         this.liveMessage = {
           ...this.liveMessage,
-          ToolCalls: [...(this.liveMessage.ToolCalls ?? []), call],
+          ToolCalls: [...(this.liveMessage.ToolCalls ?? []), call].slice(-32),
         };
     }
     if (
@@ -230,9 +334,10 @@ export class AgentFeed {
           : payload.status === 'error' || ['run.error', 'run.interrupted'].includes(event.Name)
             ? 'error'
             : 'completed';
+      if (this.streamState !== 'live') this.scheduleRefresh();
+      if (!this.previewEnabled) this.scheduleClose();
+    } else if (event.Name !== 'model.chunk' && this.previewEnabled && this.streamState !== 'live')
       this.scheduleRefresh();
-      this.scheduleClose();
-    } else if (event.Name !== 'model.chunk' && this.previewEnabled) this.scheduleRefresh();
   }
 
   private flushChunks() {
@@ -270,6 +375,7 @@ export class AgentFeed {
     this.reasoning = '';
     this.liveMessage = null;
     this.liveTruncated = false;
+    this.liveRevision = 0;
   }
 
   private scheduleRefresh() {
@@ -284,34 +390,21 @@ export class AgentFeed {
     const session = this.session;
     const signal = this.lifetime.signal;
     if (!session || signal.aborted) return;
+    if (this.streamState === 'live') {
+      if (this.previewEnabled) await this.history.refresh();
+      return;
+    }
     if (this.refreshing) {
       this.refreshPending = true;
       return;
     }
     this.refreshing = true;
+    const version = this.viewVersion;
     try {
-      const [messages, updated, tasks] = await Promise.all([
-        this.api.messages(session.ID, signal),
-        this.api.session(session.ID, signal),
-        this.api.taskState(session.ID, signal).catch(() => null),
-      ]);
+      const state = await this.api.sessionView(session.ID, this.previewEnabled, signal);
       if (signal.aborted) return;
-      this.savedIDs = new Set(messages.map((message) => message.ID));
-      this.task = (messages.find((message) => message.Role === 'user')?.Content ?? [])
-        .filter((content) => content.Type === 'text')
-        .map((content) => content.Text)
-        .join('\n');
-      const output = messages.filter(
-        (message) => message.Role !== 'user' && message.Role !== 'system',
-      );
-      this.omittedMessages = Math.max(0, output.length - previewMessageLimit);
-      this.messages = reconcileMessageHistory(this.messages, output.slice(-previewMessageLimit));
-      if (this.previewEnabled) this.sidekick.scheduleRefresh();
-      if (this.liveMessage && this.savedIDs.has(this.liveMessage.ID)) this.clearLiveMessage();
-      if (tasks) this.applyTasks(tasks);
-      this.updateSession(updated);
-      this.onSession(updated);
-      if (updated.Completed) this.scheduleClose();
+      if (version === this.viewVersion) this.receiveState(state, false, this.covered);
+      if (this.previewEnabled) await this.history.refresh();
       this.error = '';
     } catch (failure) {
       this.reportReadFailure(failure);
@@ -345,6 +438,7 @@ export class AgentFeed {
   async decide(requestID: string, kind: 'allow' | 'deny') {
     await this.api.resolvePermission(requestID, kind);
     if (this.lifetime.signal.aborted) return;
+    rememberPermissionDecision(this.resolvedPermissions, requestID);
     this.permissions = this.permissions.filter((request) => request.ID !== requestID);
     if (!this.permissions.length && this.phase === 'waiting') this.phase = 'working';
     this.scheduleRefresh();
@@ -354,7 +448,13 @@ export class AgentFeed {
     if (this.settleTimer) return;
     this.settleTimer = setTimeout(() => {
       this.settleTimer = undefined;
-      this.stopObserving();
+      if (
+        !this.serverActive &&
+        (!this.previewEnabled ||
+          this.session?.Completed ||
+          ['completed', 'cancelled', 'error'].includes(this.phase))
+      )
+        this.stopObserving();
     }, 500);
   }
 
@@ -368,6 +468,8 @@ export class AgentFeed {
   close() {
     this.processes.close();
     this.sidekick.close();
+    this.history.close();
+    this.savedIDs.clear();
     this.lifetime.abort();
     this.stopObserving();
     clearTimeout(this.refreshTimer);

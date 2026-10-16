@@ -3,6 +3,8 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 
@@ -11,6 +13,31 @@ import (
 )
 
 type events struct{ store *Store }
+
+func (eventStore *events) LatestSessionEvent(operationContext context.Context, sessionID atom.SessionID, name atom.EventName) (*atom.Event, error) {
+	rows, operationError := eventStore.store.pool.Query(operationContext, `SELECT seq,instance_id,session_id,name,payload,created_at FROM events WHERE session_id=$1 AND name=$2 ORDER BY seq DESC LIMIT 1`, string(sessionID), string(name))
+	if operationError != nil {
+		return nil, operationError
+	}
+	events, operationError := scanEvents(rows)
+	if operationError != nil || len(events) == 0 {
+		return nil, operationError
+	}
+	return &events[0], nil
+}
+
+func (eventStore *events) RecentSession(operationContext context.Context, sessionID atom.SessionID, limit int) ([]atom.Event, error) {
+	if limit < 1 || limit > 1000 {
+		return nil, fmt.Errorf("event limit must be between 1 and 1000")
+	}
+	rows, operationError := eventStore.store.pool.Query(operationContext, `SELECT seq,instance_id,session_id,name,CASE WHEN octet_length(payload::text)>65536 THEN jsonb_build_object('omitted_bytes',octet_length(payload::text)) ELSE payload END,created_at FROM events WHERE session_id=$1 ORDER BY seq DESC LIMIT $2`, string(sessionID), limit)
+	if operationError != nil {
+		return nil, operationError
+	}
+	result, operationError := scanEvents(rows)
+	slices.Reverse(result)
+	return result, operationError
+}
 
 func (eventStore *events) Append(operationContext context.Context, event atom.Event) error {
 	_, operationError := eventStore.Record(operationContext, event)

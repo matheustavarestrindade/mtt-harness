@@ -51,6 +51,9 @@ func (sessionStore *sessions) DeleteConversation(operationContext context.Contex
 		session := database.sessions[identifier]
 		session.Model, session.ReasoningEffort, session.Completed = "", "", true
 		database.sessions[identifier] = session
+		for _, message := range database.messages[identifier] {
+			delete(database.messageSequences, message.ID)
+		}
 		delete(database.messages, identifier)
 		delete(database.taskStates, identifier)
 	}

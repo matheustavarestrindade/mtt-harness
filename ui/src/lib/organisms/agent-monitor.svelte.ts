@@ -26,6 +26,7 @@ export class AgentMonitor {
   rootStartedAt = $state('');
   private currentResponses = new Map<string, string>();
   private api: HarnessApi | null = null;
+  private activeIDs = new Set<string>();
 
   constructor(
     private refreshSessions: () => void,
@@ -53,15 +54,42 @@ export class AgentMonitor {
       this.origins.delete(identifier);
     }
     for (const session of descendants) {
+      if (session.ParentMessageID)
+        this.origins.set(session.ID, {
+          parentID: session.Parent,
+          messageID: session.ParentMessageID,
+          task: this.origins.get(session.ID)?.task ?? '',
+        });
       let feed = this.feeds.get(session.ID);
       if (!feed) {
         feed = new AgentFeed(this.api, session, (event) => this.observe(event), this.updateSession);
         this.feeds.set(session.ID, feed);
       } else feed.updateSession(session);
+      feed.setActive(this.activeIDs.has(session.ID));
       feed.parentRunning = running;
       feed.parentStartedAt = this.rootStartedAt;
     }
     if (this.focusedID && !included.has(this.focusedID)) this.clearFocus('replace');
+  }
+  setActiveSessions(identifiers: string[]) {
+    this.activeIDs = new Set(identifiers);
+    for (const [identifier, feed] of this.feeds) feed.setActive(this.activeIDs.has(identifier));
+  }
+  restoreOrigins(events: HarnessEvent[]) {
+    for (const event of [...events].sort((first, second) => first.Seq - second.Seq)) {
+      const payload = eventPayload(event);
+      if (event.Name === 'model.call' && typeof payload.message_id === 'string')
+        this.currentResponses.set(event.SessionID, payload.message_id);
+      if (event.Name === 'agent.start' && typeof payload.session === 'string')
+        this.origins.set(payload.session, {
+          parentID: event.SessionID,
+          messageID:
+            typeof payload.message_id === 'string' && payload.message_id
+              ? payload.message_id
+              : (this.currentResponses.get(event.SessionID) ?? ''),
+          task: typeof payload.task === 'string' ? payload.task : '',
+        });
+    }
   }
 
   observe(event: HarnessEvent) {
@@ -76,8 +104,11 @@ export class AgentMonitor {
     if (event.Name === 'agent.start' && typeof payload.session === 'string') {
       this.origins.set(payload.session, {
         parentID: event.SessionID,
-        messageID: this.currentResponses.get(event.SessionID) ?? '',
-        task: typeof payload.task === 'string' ? payload.task : '',
+        messageID:
+          typeof payload.message_id === 'string' && payload.message_id
+            ? payload.message_id
+            : (this.currentResponses.get(event.SessionID) ?? ''),
+        task: typeof payload.task === 'string' ? payload.task.slice(0, 4096) : '',
       });
       this.refreshSessions();
     }
@@ -93,10 +124,15 @@ export class AgentMonitor {
   }
 
   unplaced(messageIDs: Set<string>) {
-    return this.children(this.rootID).filter((session) => {
-      const origin = this.origins.get(session.ID);
-      return !origin || origin.parentID !== this.rootID || !messageIDs.has(origin.messageID);
-    });
+    const focused = topLevelAgent(this.focusedID, this.rootID, this.sessions)?.ID;
+    return this.children(this.rootID)
+      .filter((session) => {
+        const origin = this.origins.get(session.ID);
+        return (
+          (session.ID === focused && !messageIDs.has(origin?.messageID ?? '')) || !origin?.messageID
+        );
+      })
+      .slice(-20);
   }
 
   task(sessionID: string) {
@@ -123,6 +159,7 @@ export class AgentMonitor {
     this.feeds.clear();
     this.origins.clear();
     this.currentResponses.clear();
+    this.activeIDs.clear();
     this.rootID = '';
     this.focusedID = '';
     this.rootRunning = false;

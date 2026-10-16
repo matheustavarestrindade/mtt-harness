@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"sync"
@@ -45,34 +46,45 @@ func (processSupervisor *Supervisor) StartWithTransform(operationContext context
 	command := exec.Command(processSpec.Command, processSpec.Args...)
 	command.Dir, command.Env = processSpec.Cwd, append(os.Environ(), processSpec.Env...)
 	prepareCommand(command)
-	stdin, operationError := command.StdinPipe()
-	if operationError != nil {
-		return nil, operationError
+	var stdin io.WriteCloser
+	var operationError error
+	if !processSpec.Terminal {
+		stdin, operationError = command.StdinPipe()
+		if operationError != nil {
+			return nil, operationError
+		}
+	}
+	closeInput := func() {
+		if stdin != nil {
+			_ = stdin.Close()
+		}
 	}
 	var identifierBytes [16]byte
 	if _, operationError := rand.Read(identifierBytes[:]); operationError != nil {
-		stdin.Close()
+		closeInput()
 		return nil, operationError
 	}
-	handle := &Handle{identifier: hex.EncodeToString(identifierBytes[:]), command: command, stdin: stdin, done: make(chan struct{}), subscribers: map[uint64]chan atom.ProcessEvent{}}
+	handle := &Handle{identifier: hex.EncodeToString(identifierBytes[:]), command: command, stdin: stdin, inputGate: make(chan struct{}, 1), done: make(chan struct{}), subscribers: map[uint64]chan atom.ProcessEvent{}}
 	handle.transform = transform
 	handle.startEvent = atom.ProcessEvent{ProcessID: handle.identifier, Stream: atom.StreamStart, At: time.Now()}
 	if transform != nil {
 		handle.startEvent, operationError = transform(handle.startEvent)
 		if operationError != nil {
-			stdin.Close()
+			closeInput()
 			return nil, operationError
 		}
 	}
-	command.Stdout, command.Stderr = outputWriter{handle, atom.StreamStdout}, outputWriter{handle, atom.StreamStderr}
+	if !processSpec.Terminal {
+		command.Stdout, command.Stderr = outputWriter{handle, atom.StreamStdout}, outputWriter{handle, atom.StreamStderr}
+	}
 	processSupervisor.mutex.Lock()
 	defer processSupervisor.mutex.Unlock()
 	if operationError := operationContext.Err(); operationError != nil {
-		stdin.Close()
+		closeInput()
 		return nil, operationError
 	}
 	if processSupervisor.closed {
-		stdin.Close()
+		closeInput()
 		return nil, fmt.Errorf("process supervisor is closed")
 	}
 	active := 0
@@ -82,11 +94,36 @@ func (processSupervisor *Supervisor) StartWithTransform(operationContext context
 		}
 	}
 	if processSupervisor.limit > 0 && active >= processSupervisor.limit {
-		stdin.Close()
+		closeInput()
 		return nil, fmt.Errorf("process limit reached")
 	}
-	if operationError := command.Start(); operationError != nil {
-		stdin.Close()
+	if processSpec.Terminal {
+		columns, rows := processSpec.Columns, processSpec.Rows
+		if columns == 0 {
+			columns = 120
+		}
+		if rows == 0 {
+			rows = 30
+		}
+		if columns < 2 || columns > 500 || rows < 1 || rows > 200 {
+			return nil, fmt.Errorf("terminal size must be 2–500 columns and 1–200 rows")
+		}
+		handle.terminal, operationError = startTerminal(command, columns, rows, processSpec.Env)
+		if operationError != nil {
+			return nil, operationError
+		}
+		handle.stdin = handle.terminal
+		handle.terminalReadDone = make(chan error, 1)
+		go func() {
+			_, readError := io.Copy(outputWriter{handle, atom.StreamStdout}, handle.terminal)
+			readError = terminalReadError(readError)
+			if readError != nil {
+				_ = handle.Kill("")
+			}
+			handle.terminalReadDone <- readError
+		}()
+	} else if operationError = command.Start(); operationError != nil {
+		closeInput()
 		return nil, operationError
 	}
 	processSupervisor.runningProcesses[handle.identifier] = handle

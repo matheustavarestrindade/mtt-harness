@@ -46,6 +46,9 @@ func (agentLoop *Loop) RunAgentTask(operationContext context.Context, task atom.
 		ReasoningEffort: task.ReasoningEffort,
 		CreatedAt:       time.Now(),
 	}
+	if origin, found := harness.ToolOriginFrom(operationContext); found {
+		child.ParentMessageID, child.ParentToolCallID = origin.MessageID, origin.CallID
+	}
 	modelInfo, _, operationError := agentLoop.resolveModel(child.InstanceID, child.Model)
 	if operationError != nil {
 		return atom.ToolResult{}, operationError
@@ -72,7 +75,7 @@ func (agentLoop *Loop) RunAgentTask(operationContext context.Context, task atom.
 	if operationError := agentLoop.configuration.Store.Sessions().Append(operationContext, taskMessage); operationError != nil {
 		return atom.ToolResult{Status: atom.StatusError, Error: operationError.Error()}, nil
 	}
-	agentLoop.emitSessionEvent(operationContext, parent, atom.EventAgentStart, map[string]any{"session": child.ID, "task": task.Task})
+	agentLoop.emitSessionEvent(operationContext, parent, atom.EventAgentStart, map[string]any{"session": child.ID, "task": task.Task, "message_id": child.ParentMessageID, "call_id": child.ParentToolCallID})
 	if operationError := agentLoop.Run(operationContext, child); operationError != nil {
 		return atom.ToolResult{Status: atom.StatusError, Error: operationError.Error()}, nil
 	}

@@ -15,6 +15,8 @@ type Store struct {
 	deletedSessions   map[atom.SessionID]bool
 	taskStates        map[atom.SessionID]atom.TaskState
 	messages          map[atom.SessionID][]atom.Message
+	messageSequence   int64
+	messageSequences  map[string]int64
 	events            []atom.Event
 	sequenceNumber    uint64
 	processes         map[string]atom.ProcessRecord
@@ -37,6 +39,7 @@ func New() *Store {
 		deletedSessions:   map[atom.SessionID]bool{},
 		taskStates:        map[atom.SessionID]atom.TaskState{},
 		messages:          map[atom.SessionID][]atom.Message{},
+		messageSequences:  map[string]int64{},
 		processes:         map[string]atom.ProcessRecord{},
 		permissions:       map[string]atom.PermissionDecision{},
 		providers:         map[string]atom.ProviderSpec{},

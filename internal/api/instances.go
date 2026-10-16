@@ -156,6 +156,9 @@ func (server *Server) listSessions(responseWriter http.ResponseWriter, request *
 	if sessions == nil {
 		sessions = []atom.Session{}
 	}
+	if respondToError(responseWriter, http.StatusInternalServerError, server.resolveAgentOrigins(request.Context(), instanceID, sessions)) {
+		return
+	}
 	writeJSON(responseWriter, http.StatusOK, sessions)
 }
 

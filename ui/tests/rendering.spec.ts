@@ -223,6 +223,11 @@ test('bound large code and CSV previews and retain full downloadable source', as
   );
   fixture.event(session, 'turn.end', {});
   const orphan = page.getByRole('group', { name: 'Tool Tool result', exact: true });
+  const latest = page.getByRole('button', { name: 'Scroll to latest message', exact: true });
+  await expect
+    .poll(async () => (await orphan.count()) > 0 || (await latest.isVisible()))
+    .toBe(true);
+  if (await latest.isVisible()) await latest.click();
   await orphan.getByRole('button', { name: /^Tool result/ }).click();
   await expect(orphan).toContainText('Unmatched output remains available');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

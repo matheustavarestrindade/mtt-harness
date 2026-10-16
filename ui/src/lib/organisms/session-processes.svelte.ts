@@ -16,6 +16,7 @@ export class SessionProcesses {
   private pending = false;
   private revision = 0;
   private revisions = new Map<string, number>();
+  private visible = new Set<string>();
 
   open(api: HarnessApi, sessionID: string) {
     if (this.api === api && this.sessionID === sessionID) return;
@@ -23,7 +24,6 @@ export class SessionProcesses {
     this.lifetime = new AbortController();
     this.api = api;
     this.sessionID = sessionID;
-    void this.refresh();
   }
   close() {
     this.lifetime.abort();
@@ -33,6 +33,7 @@ export class SessionProcesses {
     this.sessionID = '';
     this.records.clear();
     this.revisions.clear();
+    this.visible.clear();
     this.reading = this.pending = false;
     this.error = '';
   }
@@ -54,10 +55,59 @@ export class SessionProcesses {
       this.revisions.set(record.ID, ++this.revision);
       const previous = this.records.get(record.ID);
       if (previous?.Status === 'stopped' && record.Status !== 'stopped') return;
-      this.records.set(record.ID, record);
+      this.records.set(record.ID, this.metadata(record));
+      this.prune();
       return;
     }
     this.scheduleRefresh();
+  }
+  private metadata(record: ProcessRecord): ProcessRecord {
+    return { ...record, Spec: { ...record.Spec, Args: null, Env: null } };
+  }
+  applyRecords(records: ProcessRecord[]) {
+    for (const record of records) {
+      if (record.SessionID !== this.sessionID) continue;
+      if (this.records.get(record.ID)?.Status === 'stopped' && record.Status !== 'stopped')
+        continue;
+      this.records.set(record.ID, this.metadata(record));
+    }
+    this.prune();
+  }
+  applyHistory(records: ProcessRecord[], messageIDs: string[]) {
+    this.visible = new Set(messageIDs);
+    this.applyRecords(records);
+  }
+  private prune() {
+    const recent = new Set(
+      [...this.records.values()]
+        .sort((first, second) => Date.parse(second.StartedAt) - Date.parse(first.StartedAt))
+        .slice(0, 128)
+        .map((record) => record.ID),
+    );
+    for (const [identifier, record] of this.records) {
+      if (
+        record.Status !== 'running' &&
+        !recent.has(identifier) &&
+        !this.visible.has(record.Spec.ToolMessageID ?? '')
+      ) {
+        this.records.delete(identifier);
+        this.revisions.delete(identifier);
+      }
+    }
+    while (this.records.size > 1000) {
+      const candidate =
+        [...this.records.values()].find(
+          (record) =>
+            record.Status !== 'running' && !this.visible.has(record.Spec.ToolMessageID ?? ''),
+        ) ??
+        [...this.records.values()].find(
+          (record) => !this.visible.has(record.Spec.ToolMessageID ?? ''),
+        ) ??
+        this.records.values().next().value;
+      if (!candidate) break;
+      this.records.delete(candidate.ID);
+      this.revisions.delete(candidate.ID);
+    }
   }
   scheduleRefresh() {
     if (!this.api || this.refreshTimer) return;
@@ -78,16 +128,17 @@ export class SessionProcesses {
     this.reading = true;
     const revision = this.revision;
     try {
-      const records = await api.processes(sessionID, signal);
+      const records = await api.processes(sessionID, signal, 128);
       if (signal.aborted) return;
       for (const record of records) {
         if (record.SessionID !== sessionID || (this.revisions.get(record.ID) ?? 0) > revision)
           continue;
         if (this.records.get(record.ID)?.Status === 'stopped' && record.Status !== 'stopped')
           continue;
-        this.records.set(record.ID, record);
+        this.records.set(record.ID, this.metadata(record));
       }
       this.error = '';
+      this.prune();
     } catch (failure) {
       if (!signal.aborted)
         this.error = failure instanceof Error ? failure.message : 'Cannot load processes.';

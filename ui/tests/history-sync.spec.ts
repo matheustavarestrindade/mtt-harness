@@ -3,9 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { mockHarness } from './api-fixture';
 import { connectAndCreate } from './helpers';
 
-test('retain playing media through idle polling and authoritative recovery reads', async ({
-  page,
-}) => {
+test('retain playing media through idle snapshots and bounded recovery reads', async ({ page }) => {
   const fixture = await mockHarness(page);
   await connectAndCreate(page);
   const session = fixture.sessions[0]!;
@@ -46,14 +44,15 @@ test('retain playing media through idle polling and authoritative recovery reads
   const originalSource = await player.getAttribute('src');
   let historyReads = 0;
   page.on('request', (request) => {
-    if (new URL(request.url()).pathname.endsWith('/messages') && request.method() === 'GET')
+    if (new URL(request.url()).pathname.endsWith('/history') && request.method() === 'GET')
       historyReads++;
   });
   await page.waitForTimeout(3300);
   expect(historyReads).toBe(0);
   await expect(player).toHaveAttribute('src', originalSource!);
   expect(await player.evaluate((element: HTMLVideoElement) => element.paused)).toBe(false);
-  fixture.event(session, 'turn.end', {});
+  for (const socket of [...fixture.openSockets])
+    if (socket.url().includes(`/sessions/${session.ID}/`)) socket.close();
   await expect.poll(() => historyReads).toBeGreaterThan(0);
   await expect(player).toHaveAttribute('src', originalSource!);
   expect(await player.evaluate((element: HTMLVideoElement) => element.paused)).toBe(false);
@@ -62,6 +61,15 @@ test('retain playing media through idle polling and authoritative recovery reads
     video,
     Buffer.from([0]),
   ]).toString('base64');
-  fixture.event(session, 'turn.end', {});
+  await expect
+    .poll(
+      () =>
+        [...fixture.openSockets].filter((socket) =>
+          socket.url().includes(`/sessions/${session.ID}/`),
+        ).length,
+    )
+    .toBeGreaterThan(0);
+  for (const socket of [...fixture.openSockets])
+    if (socket.url().includes(`/sessions/${session.ID}/`)) socket.close();
   await expect.poll(() => player.getAttribute('src')).not.toBe(originalSource);
 });
