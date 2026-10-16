@@ -51,6 +51,9 @@ type SessionStore interface {
 
 type QueueStore interface {
 	Enqueue(operationContext context.Context, message atom.Message, limit int) error
+	// PendingMessage returns one complete waiting message in the selected session.
+	// Already claimed, removed, and foreign-session IDs are not returned.
+	PendingMessage(operationContext context.Context, sessionID atom.SessionID, messageID string) (atom.Message, error)
 	All(operationContext context.Context) ([]atom.QueuedMessage, error)
 	Start(operationContext context.Context, messageID string) error
 	// StartBatch claims and appends an ordered session batch atomically. A failure

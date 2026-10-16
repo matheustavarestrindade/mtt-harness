@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -60,7 +61,24 @@ func TestQueueBatchClaimsAreAtomicAndOrdered(test *testing.T) {
 					}
 				}
 			}
+			pending, readError := database.Queue().PendingMessage(operationContext, session.ID, identifiers[0])
+			testutil.RequireNoError(test, readError)
+			if pending.Content[0].Text != identifiers[0] || pending.Role != atom.RoleUser {
+				test.Fatal("pending-message read changed input")
+			}
+			pending.Content[0].Text = "local change"
+			again, readError := database.Queue().PendingMessage(operationContext, session.ID, identifiers[0])
+			testutil.RequireNoError(test, readError)
+			if again.Content[0].Text != identifiers[0] {
+				test.Fatal("pending read aliases stored content")
+			}
+			if _, readError = database.Queue().PendingMessage(operationContext, "foreign-session", identifiers[0]); !errors.Is(readError, store.ErrQueuedMessageNotFound) {
+				test.Fatal("pending read crossed sessions")
+			}
 			testutil.RequireNoError(test, database.Queue().StartBatch(operationContext, session.ID, identifiers))
+			if _, readError = database.Queue().PendingMessage(operationContext, session.ID, identifiers[0]); !errors.Is(readError, store.ErrQueuedMessageNotFound) {
+				test.Fatal("admitted input remained readable as pending")
+			}
 			messages, operationError := database.Sessions().Messages(operationContext, session.ID)
 			testutil.RequireNoError(test, operationError)
 			if len(messages) != 3 {

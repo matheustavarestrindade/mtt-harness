@@ -32,6 +32,7 @@ type sessionViewState struct {
 	WorkspaceLinked  bool
 	WorkspaceStopped bool
 	ActiveSessions   []atom.SessionID
+	QueuedMessages   []atom.QueuedMessagePreview `json:",omitempty"`
 }
 
 func (server *Server) readSessionView(operationContext context.Context, sessionID atom.SessionID, details bool) (sessionViewState, error) {
@@ -50,7 +51,12 @@ func (server *Server) readSessionView(operationContext context.Context, sessionI
 	}
 	if server.queue != nil {
 		state.ActiveSessions = server.queue.ActiveSessions(session.InstanceID)
-		status, operationError := server.queue.Status(operationContext, sessionID)
+		var status loop.QueueStatus
+		if details {
+			status, operationError = server.queue.StatusWithMessages(operationContext, sessionID)
+		} else {
+			status, operationError = server.queue.Status(operationContext, sessionID)
+		}
 		if operationError != nil && !errors.Is(operationError, loop.ErrQueueClosed) {
 			return state, operationError
 		}
@@ -59,6 +65,7 @@ func (server *Server) readSessionView(operationContext context.Context, sessionI
 		state.Status.Messages = status.Messages
 		state.Status.Queued = len(status.Messages)
 		state.Status.Error = status.Error
+		state.QueuedMessages = status.Previews
 		if details {
 			state.Live = live
 		}

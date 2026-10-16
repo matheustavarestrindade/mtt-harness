@@ -32,6 +32,7 @@ type QueueStatus struct {
 	Running  bool
 	Messages []string
 	Error    string
+	Previews []atom.QueuedMessagePreview
 }
 
 func NewQueue(agentLoop *Loop) *Queue {
