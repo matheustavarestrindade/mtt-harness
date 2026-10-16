@@ -163,6 +163,8 @@ Response keys agree with the Go types. For example, an instance has `Workspace` 
 
 A `202` response shows that the queue accepted a message. It is not a model response. The UI keeps a message receipt until history or queue status gives the result. A queue message from a different client can have an ID without text in the UI.
 
+The `QueuedMessage` molecule shows `Queued` and an `X` control on the message. The UI does not show a queue panel or a `Message accepted` label. A cancellation error keeps the message. A previous state frame must not put the message back after cancellation.
+
 A session change cancels previous data requests and event connections. A previous response must not change the new selected view. The UI does not automatically send a message again after a request error. The API can accept the message before the client receives the error.
 
 The UI sends `DELETE /sessions/{id}` after the user accepts the dialog. The API response gives the IDs of the sessions that the operation removed. The client uses the IDs to remove sessions from the navigation and stop event connections. A previous response must not put the sessions back into the navigation.
@@ -176,6 +178,8 @@ The UI reads status from state frames. After a socket error, `GET /sessions/{id}
 The `SessionHistory` organism starts with the last 50 messages. The history window has a limit of 150 messages. The byte limit is 8 MiB. The UI can keep one larger message. The message bytes stay the same.
 
 The `HistoryScroll` organism gets history pages. A DOM anchor keeps the reading position. The `Latest` control puts the view at the end of the conversation. The history window then contains 50 messages.
+
+If the user moves up the conversation, the UI stops automatic movement to the end. A small distance has the same effect. New output and state frames must not move the view down. Automatic movement can start again when the user moves to the end or uses `Latest`.
 
 The UI removes previous views with `URL.revokeObjectURL`, `Terminal.dispose`, and `WebSocket.close`.
 

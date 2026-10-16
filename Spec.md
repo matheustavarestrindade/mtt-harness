@@ -84,7 +84,11 @@ The basic loop is:
 
 ```
 run(instance, session):
+    finished = false
     repeat
+        pending = admit_pending_messages(session)       # one ordered transaction
+        if finished and pending is empty:
+            return
         context = build_context(session)
         request = pipe("model.request", context)
         stream  = model.stream(request)               # boundary 2
@@ -104,8 +108,7 @@ run(instance, session):
             result = pipe("tool.result", completed_result)
             write(result)
 
-        if tasks is empty:
-            return
+        finished = tasks is empty
 ```
 
 Requirements:
@@ -117,12 +120,14 @@ Requirements:
 - R5: The loop must run the tool calls of one message at the same time.
 - R6: The loop must write a tool result when the tool call stops.
 - R7: The loop must wait for the full tool result group before the next model call. One request must contain the full group.
-- R8: The loop must stop when the model message does not have a tool call.
+- R8: The loop must stop when the model message has an empty tool plan and the queue is empty.
 - R9: The loop must send the value of a stage through the pipeline of the stage.
 - R10: The harness must run the messages of a session in sequence.
 - R11: The harness must keep the new messages of a session in a queue.
 
-The messages of a session wait in a queue. The harness runs one message at a time. Thus, the user can send a new message while the harness runs a message.
+The messages of a session wait in a queue. Before the next model request, the harness selects the messages that wait as a message batch. The request contains the full message batch in queue sequence. The message IDs, content, and roles stay the same. They stay as different message records.
+
+The active model response and the tool result group finish before the next message batch starts. The user can remove a message before the message batch starts. A message that the API receives after the message batch starts is input for the next model request. See `docs/message-queue.md`.
 
 The database keeps a message in the queue before the API gives status `202`. The queue has the limits:
 
@@ -1713,6 +1718,8 @@ type QueueStore interface {
     Enqueue(operationContext context.Context, message atom.Message, limit int) error
     All(operationContext context.Context) ([]atom.QueuedMessage, error)
     Start(operationContext context.Context, messageID string) error
+    StartBatch(operationContext context.Context, sessionID atom.SessionID, messageIDs []string) error
+    StartedBatch(operationContext context.Context, sessionID atom.SessionID, messageIDs []string) ([]string, error)
     Finish(operationContext context.Context, messageID string) error
     Remove(operationContext context.Context, sessionID atom.SessionID, messageID string) (bool, error)
     ClearPending(operationContext context.Context, sessionID atom.SessionID) (int, error)

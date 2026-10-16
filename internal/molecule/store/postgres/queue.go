@@ -11,6 +11,26 @@ import (
 
 type queueStore struct{ store *Store }
 
+func (queue *queueStore) StartedBatch(operationContext context.Context, sessionID atom.SessionID, messageIDs []string) ([]string, error) {
+	if operationError := store.ValidateQueuedBatch(messageIDs); operationError != nil {
+		return nil, operationError
+	}
+	rows, operationError := queue.store.pool.Query(operationContext, `SELECT id FROM message_queue WHERE session_id=$1 AND id=ANY($2::text[]) AND running ORDER BY seq`, string(sessionID), messageIDs)
+	if operationError != nil {
+		return nil, operationError
+	}
+	defer rows.Close()
+	var started []string
+	for rows.Next() {
+		var identifier string
+		if operationError = rows.Scan(&identifier); operationError != nil {
+			return nil, operationError
+		}
+		started = append(started, identifier)
+	}
+	return started, rows.Err()
+}
+
 func (queue *queueStore) Enqueue(operationContext context.Context, message atom.Message, limit int) error {
 	data, operationError := json.Marshal(message)
 	if operationError != nil {
@@ -97,6 +117,48 @@ func (queue *queueStore) Start(operationContext context.Context, messageID strin
 func (queue *queueStore) Finish(operationContext context.Context, messageID string) error {
 	_, operationError := queue.store.pool.Exec(operationContext, `DELETE FROM message_queue WHERE id=$1`, messageID)
 	return operationError
+}
+
+func (queue *queueStore) StartBatch(operationContext context.Context, sessionID atom.SessionID, messageIDs []string) error {
+	if operationError := store.ValidateQueuedBatch(messageIDs); operationError != nil {
+		return operationError
+	}
+	transaction, operationError := queue.store.pool.Begin(operationContext)
+	if operationError != nil {
+		return operationError
+	}
+	defer transaction.Rollback(context.WithoutCancel(operationContext))
+	var deleted bool
+	if operationError = transaction.QueryRow(operationContext, `WITH session_guard AS MATERIALIZED (SELECT deleted FROM sessions WHERE id=$1 FOR SHARE) SELECT EXISTS(SELECT 1 FROM session_guard WHERE deleted)`, string(sessionID)).Scan(&deleted); operationError != nil {
+		return operationError
+	}
+	if deleted {
+		return store.ErrSessionDeleted
+	}
+	var previous int64
+	for _, identifier := range messageIDs {
+		var data []byte
+		var sequence int64
+		if operationError = transaction.QueryRow(operationContext, `UPDATE message_queue SET running=true WHERE id=$1 AND session_id=$2 AND NOT running RETURNING message,seq`, identifier, string(sessionID)).Scan(&data, &sequence); operationError != nil {
+			return operationError
+		}
+		if sequence <= previous {
+			return fmt.Errorf("queued batch is not ordered")
+		}
+		previous = sequence
+		var message atom.Message
+		if operationError = json.Unmarshal(data, &message); operationError != nil {
+			return operationError
+		}
+		content, encodeError := json.Marshal(message.Content)
+		if encodeError != nil {
+			return encodeError
+		}
+		if _, operationError = transaction.Exec(operationContext, `INSERT INTO messages(id,session_id,role,content,created_at) VALUES($1,$2,$3,$4,$5)`, message.ID, string(sessionID), string(message.Role), content, message.CreatedAt); operationError != nil {
+			return operationError
+		}
+	}
+	return transaction.Commit(operationContext)
 }
 func (queue *queueStore) Remove(operationContext context.Context, sessionID atom.SessionID, messageID string) (bool, error) {
 	tag, operationError := queue.store.pool.Exec(operationContext, `DELETE FROM message_queue WHERE id=$1 AND session_id=$2 AND NOT running`, messageID, string(sessionID))

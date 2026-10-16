@@ -176,12 +176,14 @@
         onscroll={() => {
           if (!showTask) scroll?.onScroll();
         }}
+        onpointerdown={() => scroll?.interact()}
         onwheel={(event) => {
-          if (event.deltaY < 0) scroll?.interact();
+          if (event.deltaY) scroll?.interact(event.deltaY < 0 ? 'up' : 'down');
         }}
         ontouchstart={() => scroll?.interact()}
         onkeydown={(event) => {
           if (['PageUp', 'ArrowUp', 'Home'].includes(event.key)) scroll?.interact();
+          else if (['PageDown', 'ArrowDown', 'End'].includes(event.key)) scroll?.interact('down');
         }}
       >
         {#if showTask}

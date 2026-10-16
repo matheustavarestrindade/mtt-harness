@@ -84,10 +84,10 @@ type activeRun struct {
 // Run owns one session turn. Queue serializes user turns; child agents call Run
 // with their own session. Cancellation is passed to providers, tools, and stores.
 func (agentLoop *Loop) Run(operationContext context.Context, session atom.Session) error {
-	return agentLoop.runSession(operationContext, session, "")
+	return agentLoop.runSession(operationContext, session, "", nil)
 }
 
-func (agentLoop *Loop) runSession(operationContext context.Context, session atom.Session, queuedMessageID string) (operationError error) {
+func (agentLoop *Loop) runSession(operationContext context.Context, session atom.Session, queuedMessageID string, admit func(context.Context) ([]string, error)) (operationError error) {
 	value, _ := agentLoop.runLocks.LoadOrStore(session.ID, make(chan struct{}, 1))
 	lock := value.(chan struct{})
 	select {
@@ -173,9 +173,24 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 	if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventTurnStart, nil); operationError != nil {
 		return operationError
 	}
+	finished := false
 	for round := 0; round < agentLoop.configuration.MaxRounds; round++ {
 		if operationError := operationContext.Err(); operationError != nil {
 			return operationError
+		}
+		var admitted []string
+		if admit != nil {
+			identifiers, admissionError := admit(operationContext)
+			if admissionError != nil {
+				return admissionError
+			}
+			if finished && len(identifiers) == 0 {
+				return nil
+			}
+			admitted = identifiers
+		}
+		if round == 0 && queuedMessageID != "" {
+			admitted = append(admitted, queuedMessageID)
 		}
 		modelCall, operationError := agentLoop.prepareModelCall(operationContext, session)
 		if operationError != nil {
@@ -184,10 +199,17 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 		if modelCall == nil {
 			return nil
 		}
-		finished, operationError := agentLoop.runModelRound(session, modelCall)
-		if operationError != nil || finished {
+		if admissionError := validateAdmittedInput(modelCall.request.Messages, admitted); admissionError != nil {
+			modelCall.release()
+			return admissionError
+		}
+		finished, operationError = agentLoop.runModelRound(session, modelCall)
+		if operationError != nil || (finished && (admit == nil || session.Parent != "")) {
 			return operationError
 		}
+	}
+	if finished {
+		return nil
 	}
 	return fmt.Errorf("model round limit reached")
 }

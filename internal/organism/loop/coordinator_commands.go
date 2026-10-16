@@ -19,6 +19,7 @@ const (
 	closeSession
 	prepareSessionDeletion
 	releaseSessionDeletion
+	admitQueuedMessages
 )
 
 // A command gets exactly one reply. The single-slot reply channel lets a
@@ -28,6 +29,7 @@ type sessionCommand struct {
 	operationContext context.Context
 	message          atom.Message
 	messageID        string
+	messageIDs       []string
 	reply            chan sessionReply
 }
 
@@ -37,6 +39,7 @@ type sessionReply struct {
 	removed        int
 	status         QueueStatus
 	operationError error
+	messageIDs     []string
 }
 
 type sessionOperation struct {

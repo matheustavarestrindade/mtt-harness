@@ -39,9 +39,11 @@ test('accept messages during generation and cancel pending/current work', async 
   await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
   await page.getByLabel('Message', { exact: true }).fill('A second request');
   await page.getByRole('button', { name: 'Queue message', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Queued messages' })).toContainText('1 queued');
+  await expect(
+    page.locator('[data-queued-message]').filter({ hasText: 'A second request' }),
+  ).toContainText('Queued');
   await page.getByRole('button', { name: /Cancel queued message/ }).click();
-  await expect(page.getByRole('region', { name: 'Queued messages' })).toHaveCount(0);
+  await expect(page.locator('[data-queued-message]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Stop', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0);
 });

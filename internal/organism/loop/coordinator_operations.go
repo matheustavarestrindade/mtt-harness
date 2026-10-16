@@ -4,12 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
 func (coordinator *sessionCoordinator) startOperation(command sessionCommand) {
+	if command.kind == admitQueuedMessages {
+		for _, message := range coordinator.pending {
+			command.messageIDs = append(command.messageIDs, message.ID)
+		}
+		if len(command.messageIDs) == 0 {
+			command.respond(sessionReply{})
+			return
+		}
+	}
 	operationContext, cancel := context.WithCancel(command.operationContext)
 	coordinator.working = &sessionOperation{command: command, cancel: cancel}
 	active := coordinator.active
@@ -21,6 +31,21 @@ func (coordinator *sessionCoordinator) startOperation(command sessionCommand) {
 			completed.response.operationError = coordinator.loop.configuration.Store.Queue().Enqueue(operationContext, command.message, pendingMessageLimit)
 		case cancelPending:
 			completed.response.cancelled, completed.response.operationError = coordinator.loop.configuration.Store.Queue().Remove(operationContext, coordinator.session.ID, command.messageID)
+		case admitQueuedMessages:
+			completed.response.operationError = coordinator.loop.configuration.Store.Queue().StartBatch(operationContext, coordinator.session.ID, command.messageIDs)
+			if completed.response.operationError != nil {
+				// Cancellation can race a successful database commit. Read only
+				// claim metadata with a separate bounded context before releasing
+				// the model worker; it must clean every observed committed ID.
+				inspectionContext, finishInspection := context.WithTimeout(context.WithoutCancel(operationContext), 5*time.Second)
+				var inspectionError error
+				completed.response.messageIDs, inspectionError = coordinator.loop.configuration.Store.Queue().StartedBatch(inspectionContext, coordinator.session.ID, command.messageIDs)
+				finishInspection()
+				completed.response.operationError = errors.Join(completed.response.operationError, inspectionError)
+				completed.response.operationError = errors.Join(errQueuedAdmission, completed.response.operationError)
+			} else {
+				completed.response.messageIDs = command.messageIDs
+			}
 		case revertConversation:
 			completed = coordinator.revertHistory(operationContext, command, active)
 		default:
@@ -50,6 +75,21 @@ func (coordinator *sessionCoordinator) handleOperation(completed operationComple
 					break
 				}
 			}
+		}
+	case admitQueuedMessages:
+		if len(response.messageIDs) > 0 {
+			claimed := make(map[string]bool, len(response.messageIDs))
+			for _, identifier := range response.messageIDs {
+				claimed[identifier] = true
+			}
+			remaining := coordinator.pending[:0]
+			for _, message := range coordinator.pending {
+				if !claimed[message.ID] {
+					remaining = append(remaining, message)
+				}
+			}
+			clear(coordinator.pending[len(remaining):])
+			coordinator.pending = remaining
 		}
 	case revertConversation:
 		coordinator.revert = nil

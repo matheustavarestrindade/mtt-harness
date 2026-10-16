@@ -100,12 +100,12 @@ test('use socket state while healthy and restore idle/queue/model state without 
   const pending = message(session, 1);
   fixture.queued.set(session.ID, [pending]);
   fixture.state(session);
-  await expect(page.getByRole('region', { name: 'Queued messages' })).toContainText('1 queued');
+  await expect(page.locator('[data-queued-message]')).toContainText('Queued');
   fixture.queued.set(session.ID, []);
   fixture.running.delete(session.ID);
   fixture.state(session);
   await expect(page.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('region', { name: 'Queued messages' })).toHaveCount(0);
+  await expect(page.locator('[data-queued-message]')).toHaveCount(0);
 });
 
 test('discard a late older page after the history revision changes', async ({ page }) => {
@@ -229,6 +229,15 @@ test('evict offscreen terminal and media resources when returning to the latest 
   fixture.processes.set(record.ID, record);
   fixture.processChunk(record.ID, 'stdout', '\x1b[32mkept while open\x1b[0m\r\n');
   fixture.state(session);
+  await expect(page.getByRole('region', { name: 'Conversation', exact: true })).toHaveAttribute(
+    'data-history-count',
+    '50',
+  );
+  await page
+    .getByRole('region', { name: 'Conversation', exact: true })
+    .evaluate((element) =>
+      element.dispatchEvent(new WheelEvent('wheel', { deltaY: -24, bubbles: true })),
+    );
   await page.getByLabel('small.png', { exact: true }).scrollIntoViewIfNeeded();
   await expect
     .poll(() =>
