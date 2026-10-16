@@ -11,6 +11,22 @@ import (
 
 type queueStore struct{ store *Store }
 
+func (queue *queueStore) StartedBatch(operationContext context.Context, sessionID atom.SessionID, messageIDs []string) ([]string, error) {
+	if operationError := store.ValidateQueuedBatch(messageIDs); operationError != nil {
+		return nil, operationError
+	}
+	queue.store.mutex.RLock()
+	defer queue.store.mutex.RUnlock()
+	var started []string
+	for _, identifier := range messageIDs {
+		entry, found := queue.store.queued[identifier]
+		if found && entry.Running && entry.Message.SessionID == sessionID {
+			started = append(started, identifier)
+		}
+	}
+	return started, operationContext.Err()
+}
+
 func (queue *queueStore) Enqueue(operationContext context.Context, message atom.Message, limit int) error {
 	queue.store.mutex.Lock()
 	defer queue.store.mutex.Unlock()
@@ -75,6 +91,37 @@ func (queue *queueStore) Finish(operationContext context.Context, messageID stri
 		return operationError
 	}
 	delete(queue.store.queued, messageID)
+	return nil
+}
+
+func (queue *queueStore) StartBatch(operationContext context.Context, sessionID atom.SessionID, messageIDs []string) error {
+	if operationError := store.ValidateQueuedBatch(messageIDs); operationError != nil {
+		return operationError
+	}
+	queue.store.mutex.Lock()
+	defer queue.store.mutex.Unlock()
+	if operationError := operationContext.Err(); operationError != nil {
+		return operationError
+	}
+	if queue.store.deletedSessions[sessionID] {
+		return store.ErrSessionDeleted
+	}
+	var previous uint64
+	for _, identifier := range messageIDs {
+		entry, found := queue.store.queued[identifier]
+		if !found || entry.Running || entry.Message.SessionID != sessionID || entry.Sequence <= previous {
+			return fmt.Errorf("queued batch is not an ordered pending session batch")
+		}
+		previous = entry.Sequence
+	}
+	for _, identifier := range messageIDs {
+		entry := queue.store.queued[identifier]
+		entry.Running = true
+		queue.store.queued[identifier] = entry
+		queue.store.messages[sessionID] = append(queue.store.messages[sessionID], entry.Message)
+		queue.store.messageSequence++
+		queue.store.messageSequences[identifier] = queue.store.messageSequence
+	}
 	return nil
 }
 

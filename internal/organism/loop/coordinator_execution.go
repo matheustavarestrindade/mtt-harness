@@ -17,15 +17,31 @@ func (coordinator *sessionCoordinator) startQueuedTurn() {
 	coordinator.active = active
 	coordinator.lastError = ""
 	go func() {
-		operationError := coordinator.loop.runSession(operationContext, coordinator.session, message.ID)
+		claimedIDs := []string{message.ID}
+		var admissionFailure error
+		admit := func(boundaryContext context.Context) ([]string, error) {
+			identifiers, admissionError := coordinator.admitInput(boundaryContext)
+			claimedIDs = append(claimedIDs, identifiers...)
+			if errors.Is(admissionError, errQueuedAdmission) && !errors.Is(admissionError, context.Canceled) {
+				admissionFailure = admissionError
+			}
+			if boundaryContext.Err() != nil {
+				return nil, boundaryContext.Err()
+			}
+			return identifiers, admissionError
+		}
+		operationError := coordinator.loop.runSession(operationContext, coordinator.session, message.ID, admit)
 		completionContext, finish := context.WithTimeout(context.Background(), 5*time.Second)
-		finishError := coordinator.loop.configuration.Store.Queue().Finish(completionContext, message.ID)
+		finishError := admissionFailure
+		for _, identifier := range claimedIDs {
+			finishError = errors.Join(finishError, coordinator.loop.configuration.Store.Queue().Finish(completionContext, identifier))
+		}
 		if operationError != nil {
 			status := "error"
 			if errors.Is(operationError, context.Canceled) {
 				status = "cancelled"
 			}
-			if eventError := coordinator.loop.emitSessionEvent(completionContext, coordinator.session, atom.EventName("run."+status), map[string]any{"message_id": message.ID, "error": operationError.Error()}); eventError != nil {
+			if eventError := coordinator.loop.emitSessionEvent(completionContext, coordinator.session, atom.EventName("run."+status), map[string]any{"message_id": message.ID, "message_ids": claimedIDs, "error": operationError.Error()}); eventError != nil {
 				log.Printf("mtt: record run outcome: %v", eventError)
 			}
 		}

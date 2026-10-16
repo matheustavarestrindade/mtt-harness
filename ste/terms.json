@@ -2,6 +2,15 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "message batch",
+      "category": "technical_noun",
+      "approved_forms": [
+        "message batches"
+      ],
+      "meaning": "ordered queued messages admitted together for the next model request",
+      "source": "message queue"
+    },
+    {
       "term": "metadata signal",
       "category": "technical_noun",
       "approved_forms": [

@@ -6,14 +6,13 @@
     FolderOpen,
     ArrowDown,
     LoaderCircle,
-    X,
     Cable,
     MessageSquarePlus,
     Play,
   } from 'lucide-svelte';
   import { Button } from '$lib/atoms/ui/button';
   import type { HarnessConsole } from '$lib/organisms/console.svelte';
-  import { shortID } from '$lib/atoms/format';
+  import { queuedMessageViews } from '../atoms/queued-messages';
   import { buildConversationEntries, type ToolActivity } from '$lib/atoms/transcript';
   import ToolActivityView from './ToolActivityView.svelte';
   import ProcessNoticeSection from '../molecules/ProcessNoticeSection.svelte';
@@ -22,7 +21,7 @@
   import { placePluginActivity } from '../atoms/plugin-activity';
   import AgentGroup from './AgentGroup.svelte';
   import MessageCard from '../molecules/MessageCard.svelte';
-  import MessageContent from '../molecules/content/MessageContent.svelte';
+  import QueuedMessage from '../molecules/QueuedMessage.svelte';
   import PermissionCard from '../molecules/PermissionCard.svelte';
   import { HistoryScroll } from './history-scroll.svelte';
   let {
@@ -61,13 +60,20 @@
     workbench.agents.unplaced(new Set(entries.map((entry) => entry.message.ID))),
   );
   const sidekick = $derived(placePluginActivity(entries, workbench.sidekick.entries));
+  const queued = $derived(
+    queuedMessageViews(
+      workbench.receipts,
+      workbench.status.messages ?? [],
+      new Set(workbench.messages.map((message) => message.ID)),
+    ),
+  );
   $effect(() => {
     const sessionID = workbench.session?.ID ?? '';
     const changes =
       workbench.messages.length +
       workbench.sidekick.entries.length +
       workbench.permissions.length +
-      workbench.receipts.length +
+      queued.length +
       workbench.agents.children(workbench.session?.ID ?? '').length +
       (workbench.liveMessage?.Reasoning?.length ?? 0) +
       (workbench.liveMessage?.Content?.[0]?.Text.length ?? 0);
@@ -87,12 +93,14 @@
     bind:this={feed}
     class="h-full min-w-0 overflow-y-auto overscroll-y-contain"
     onscroll={updateScrollPosition}
+    onpointerdown={() => scroll.interact()}
     onwheel={(event) => {
-      if (event.deltaY < 0) scroll.interact();
+      if (event.deltaY) scroll.interact(event.deltaY < 0 ? 'up' : 'down');
     }}
     ontouchstart={() => scroll.interact()}
     onkeydown={(event) => {
       if (['PageUp', 'ArrowUp', 'Home'].includes(event.key)) scroll.interact();
+      else if (['PageDown', 'ArrowDown', 'End'].includes(event.key)) scroll.interact('down');
     }}
     role="region"
     aria-label="Conversation"
@@ -108,7 +116,7 @@
             ><LoaderCircle class="size-4 animate-spin" />Loading conversation…</span
           >
         </div>
-      {:else if !workbench.messages.length && !workbench.receipts.length && !workbench.liveMessage && !unplacedAgents.length && !workbench.sidekick.entries.length && !workbench.sidekick.error}
+      {:else if !workbench.messages.length && !queued.length && !workbench.liveMessage && !unplacedAgents.length && !workbench.sidekick.entries.length && !workbench.sidekick.error}
         <section class="flex flex-1 flex-col items-center justify-center py-8 text-center sm:py-12">
           <div
             class="quiet-grid mb-6 grid size-28 place-items-center rounded-3xl border border-border/50 bg-muted/30"
@@ -242,12 +250,11 @@
               sessions={unplacedAgents}
               models={workbench.models}
             />{/if}
-          {#each workbench.receipts as receipt (receipt.ID)}<div class="chat-message user-message">
-              <div class="mb-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                <LoaderCircle class="size-3.5 animate-spin" />Message accepted
-              </div>
-              <MessageContent content={receipt.Content} />
-            </div>{/each}
+          {#each queued as entry (entry.id)}<QueuedMessage
+              {entry}
+              cancelling={workbench.cancellingQueued.has(entry.id)}
+              onCancel={onCancelQueued}
+            />{/each}
         </div>
       {/if}
       {#if workbench.instance?.Stopped}<div
@@ -274,26 +281,6 @@
       {#each workbench.permissions as request (request.ID)}<div class="mt-5">
           <PermissionCard {request} busy={busy === request.ID} {onDecision} />
         </div>{/each}
-      {#if workbench.status.queued > 0}
-        <section aria-label="Queued messages" class="mt-6 rounded-xl border border-border p-3">
-          <h3 class="eyebrow px-1 py-2">{workbench.status.queued} queued</h3>
-          {#each workbench.status.messages ?? [] as identifier (identifier)}<div
-              class="flex min-h-12 items-center gap-3 border-t border-border px-1"
-            >
-              <span class="min-w-0 flex-1 truncate text-xs text-muted-foreground"
-                >{workbench.receipts.find((entry) => entry.ID === identifier)?.Content?.[0]?.Text ||
-                  `Message ${shortID(identifier)}`}</span
-              ><Button
-                variant="ghost"
-                size="icon"
-                class="icon-button"
-                aria-label={`Cancel queued message ${shortID(identifier)}`}
-                disabled={busy === identifier}
-                onclick={() => onCancelQueued(identifier)}><X class="size-4" /></Button
-              >
-            </div>{/each}
-        </section>
-      {/if}
     </div>
   </div>
   {#if (!scroll.following || workbench.history.hasNewer) && workbench.messages.length}<Button

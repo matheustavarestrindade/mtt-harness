@@ -1,4 +1,4 @@
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { ApiError, HarnessApi } from '../molecules/api/client';
 import { subscribeEvents, type StreamState } from '../molecules/api/events';
 import type {
@@ -66,6 +66,8 @@ export class HarnessConsole {
   }
   liveMessage = $state<Message | null>(null);
   receipts = $state<Message[]>([]);
+  readonly cancellingQueued = new SvelteSet<string>();
+  private cancelledQueued = new Set<string>();
   permissions = $state<PermissionRequest[]>([]);
   events = $state<HarnessEvent[]>([]);
   status = $state<QueueStatus>(idleStatus());
@@ -288,6 +290,8 @@ export class HarnessConsole {
     this.liveTruncated = false;
     this.taskEventSequence = 0;
     this.receipts = [];
+    this.cancellingQueued.clear();
+    this.cancelledQueued.clear();
     this.permissions = [];
     this.resolvedPermissions.clear();
     this.haveSnapshot = false;
@@ -545,7 +549,10 @@ export class HarnessConsole {
     this.sessions = this.sessions.map((session) =>
       session.ID === this.session?.ID ? this.session : session,
     );
-    this.status = { ...state.Status, messages: state.Status.messages ?? [] };
+    const pending = (state.Status.messages ?? []).filter(
+      (identifier) => !this.cancelledQueued.has(identifier),
+    );
+    this.status = { ...state.Status, messages: pending, queued: pending.length };
     this.statistics = state.Statistics;
     if (state.TaskState) this.applyTaskState(state.TaskState);
     else if (state.TaskStateError && (initial || covered >= this.taskEventSequence))
@@ -967,10 +974,21 @@ export class HarnessConsole {
     }
   }
   async cancelQueuedMessage(messageID: string) {
-    if (this.session) {
-      await this.requireAPIClient().cancelQueuedMessage(this.session.ID, messageID);
-      this.receipts = this.receipts.filter((entry) => entry.ID !== messageID);
-      await this.refreshSession();
+    const session = this.session,
+      api = this.requireAPIClient();
+    if (!session || this.cancellingQueued.has(messageID)) return;
+    this.cancellingQueued.add(messageID);
+    try {
+      await api.cancelQueuedMessage(session.ID, messageID);
+      if (this.api !== api || this.session?.ID !== session.ID) return;
+      this.cancelledQueued.add(messageID);
+      if (this.cancelledQueued.size > 256)
+        this.cancelledQueued.delete(this.cancelledQueued.values().next().value!);
+      this.receipts = this.receipts.filter((message) => message.ID !== messageID);
+      const pending = (this.status.messages ?? []).filter((identifier) => identifier !== messageID);
+      this.status = { ...this.status, messages: pending, queued: pending.length };
+    } finally {
+      this.cancellingQueued.delete(messageID);
     }
   }
   async resolvePermissionRequest(requestID: string, kind: 'allow' | 'deny') {

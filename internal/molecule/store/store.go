@@ -53,6 +53,11 @@ type QueueStore interface {
 	Enqueue(operationContext context.Context, message atom.Message, limit int) error
 	All(operationContext context.Context) ([]atom.QueuedMessage, error)
 	Start(operationContext context.Context, messageID string) error
+	// StartBatch claims and appends an ordered session batch atomically. A failure
+	// leaves every member pending and adds no messages to conversation history.
+	StartBatch(operationContext context.Context, sessionID atom.SessionID, messageIDs []string) error
+	// StartedBatch reads durable claims after an ambiguous admission failure.
+	StartedBatch(operationContext context.Context, sessionID atom.SessionID, messageIDs []string) ([]string, error)
 	Finish(operationContext context.Context, messageID string) error
 	Remove(operationContext context.Context, sessionID atom.SessionID, messageID string) (bool, error)
 	ClearPending(operationContext context.Context, sessionID atom.SessionID) (int, error)

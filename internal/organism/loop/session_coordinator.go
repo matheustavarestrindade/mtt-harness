@@ -114,6 +114,12 @@ func (coordinator *sessionCoordinator) handleSessionCommand(command sessionComma
 		command.respond(sessionReply{cancelled: cancelled})
 	case submitMessage, cancelPending:
 		coordinator.handleMutation(command)
+	case admitQueuedMessages:
+		if coordinator.mode != sessionAccepting || coordinator.active == nil {
+			command.respond(sessionReply{operationError: context.Canceled})
+			return
+		}
+		coordinator.mutations = append(coordinator.mutations, command)
 	case revertConversation:
 		coordinator.handleRevert(command)
 	case stopSession, closeSession:
@@ -210,7 +216,11 @@ func (coordinator *sessionCoordinator) handleStop(command sessionCommand) {
 
 func (coordinator *sessionCoordinator) rejectMutations(operationError error) {
 	for _, command := range coordinator.mutations {
-		command.respond(sessionReply{operationError: operationError})
+		failure := operationError
+		if command.kind == admitQueuedMessages {
+			failure = context.Canceled
+		}
+		command.respond(sessionReply{operationError: failure})
 	}
 	coordinator.mutations = nil
 }
