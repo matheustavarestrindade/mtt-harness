@@ -2,6 +2,42 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "queue preview",
+      "category": "technical_noun",
+      "approved_forms": [
+        "queue previews"
+      ],
+      "meaning": "bounded display projection of a pending message that preserves its session, role and literal text",
+      "source": "message queue"
+    },
+    {
+      "term": "user message bar",
+      "category": "technical_noun",
+      "approved_forms": [
+        "user message bars"
+      ],
+      "meaning": "blue left-side border that identifies a user message in the transcript",
+      "source": "web UI"
+    },
+    {
+      "term": "full message read",
+      "category": "technical_noun",
+      "approved_forms": [
+        "full message reads"
+      ],
+      "meaning": "read-only retrieval of one original pending message without queue admission",
+      "source": "message queue"
+    },
+    {
+      "term": "page refresh",
+      "category": "technical_noun",
+      "approved_forms": [
+        "page refreshes"
+      ],
+      "meaning": "reload of the browser page",
+      "source": "web UI"
+    },
+    {
       "term": "message batch",
       "category": "technical_noun",
       "approved_forms": [

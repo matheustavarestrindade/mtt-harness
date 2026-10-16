@@ -11,6 +11,24 @@ import (
 
 type queueStore struct{ store *Store }
 
+func (queue *queueStore) PendingMessage(operationContext context.Context, sessionID atom.SessionID, messageID string) (atom.Message, error) {
+	if operationError := operationContext.Err(); operationError != nil {
+		return atom.Message{}, operationError
+	}
+	queue.store.mutex.RLock()
+	defer queue.store.mutex.RUnlock()
+	entry, found := queue.store.queued[messageID]
+	if !found || entry.Running || entry.Message.SessionID != sessionID || queue.store.deletedSessions[sessionID] {
+		return atom.Message{}, store.ErrQueuedMessageNotFound
+	}
+	message := entry.Message
+	message.Content = append([]atom.Content(nil), message.Content...)
+	for index := range message.Content {
+		message.Content[index].Data = append([]byte(nil), message.Content[index].Data...)
+	}
+	return message, nil
+}
+
 func (queue *queueStore) StartedBatch(operationContext context.Context, sessionID atom.SessionID, messageIDs []string) ([]string, error) {
 	if operationError := store.ValidateQueuedBatch(messageIDs); operationError != nil {
 		return nil, operationError

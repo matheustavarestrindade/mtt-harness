@@ -34,4 +34,17 @@ Runtime notifications keep the `runtime` role. They do not become user messages.
 
 The message has a `Queued` label and an `X` control. The UI does not show a queue panel. The UI removes the label and control when history includes the message. An error from cancellation keeps the message in the view.
 
-The UI can show a message ID without content when a different client sent it. The UI does not add content to the message.
+The view snapshot includes `QueuedMessages`. The field contains queue previews from the session coordinator. The queue preview keeps the ID, session ID, role, and text. The UI can show the text, user message bar, and `X` control after a page refresh or a new connection.
+
+```text
+Queued message preview limits
+Text and metadata budget       4096 UTF-8 bytes per message
+Content parts                  32 per message
+Maximum waiting messages       128 per session
+Inline data and media URLs      omitted
+Truncated                      true when content is omitted
+```
+
+The full message stays in the queue. The `Show full message` control uses `GET /sessions/{id}/queue/{message_id}` to read the full content. The route does not start a message batch or add conversation history. The route gives `404` if the message does not wait in the queue. The route cannot read a message from a different session.
+
+The UI uses the view snapshot for a queue preview. It does not keep message content in browser storage. The UI accepts the `GET` response only while the ID is in the queue. A previous response must not put a message back after cancellation.

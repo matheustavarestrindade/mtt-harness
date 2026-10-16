@@ -3,13 +3,29 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
 type queueStore struct{ store *Store }
+
+func (queue *queueStore) PendingMessage(operationContext context.Context, sessionID atom.SessionID, messageID string) (atom.Message, error) {
+	var data []byte
+	operationError := queue.store.pool.QueryRow(operationContext, `SELECT queued.message FROM message_queue queued LEFT JOIN sessions session ON session.id=queued.session_id WHERE queued.id=$1 AND queued.session_id=$2 AND NOT queued.running AND NOT COALESCE(session.deleted,false)`, messageID, string(sessionID)).Scan(&data)
+	if errors.Is(operationError, pgx.ErrNoRows) {
+		return atom.Message{}, store.ErrQueuedMessageNotFound
+	}
+	if operationError != nil {
+		return atom.Message{}, operationError
+	}
+	var message atom.Message
+	operationError = json.Unmarshal(data, &message)
+	return message, operationError
+}
 
 func (queue *queueStore) StartedBatch(operationContext context.Context, sessionID atom.SessionID, messageIDs []string) ([]string, error) {
 	if operationError := store.ValidateQueuedBatch(messageIDs); operationError != nil {

@@ -21,6 +21,7 @@ import {
   type SessionViewState,
 } from '../atoms/session-view';
 import { boundedReceipts } from '../atoms/message-history';
+import type { QueuedMessagePreview } from '../atoms/queued-messages';
 import { latestRequestUsage } from '../atoms/request-usage';
 import { eventToolCall } from '../atoms/agent-activity';
 import { sessionRoot } from '../atoms/session-tree';
@@ -66,6 +67,9 @@ export class HarnessConsole {
   }
   liveMessage = $state<Message | null>(null);
   receipts = $state<Message[]>([]);
+  queuedPreviews = $state<QueuedMessagePreview[]>([]);
+  readonly loadingQueued = new SvelteSet<string>();
+  readonly queuedReadErrors = new SvelteMap<string, string>();
   readonly cancellingQueued = new SvelteSet<string>();
   private cancelledQueued = new Set<string>();
   permissions = $state<PermissionRequest[]>([]);
@@ -290,6 +294,9 @@ export class HarnessConsole {
     this.liveTruncated = false;
     this.taskEventSequence = 0;
     this.receipts = [];
+    this.queuedPreviews = [];
+    this.loadingQueued.clear();
+    this.queuedReadErrors.clear();
     this.cancellingQueued.clear();
     this.cancelledQueued.clear();
     this.permissions = [];
@@ -553,6 +560,17 @@ export class HarnessConsole {
       (identifier) => !this.cancelledQueued.has(identifier),
     );
     this.status = { ...state.Status, messages: pending, queued: pending.length };
+    const pendingIDs = new Set(pending);
+    this.queuedPreviews = (state.QueuedMessages ?? [])
+      .filter(
+        (preview) =>
+          preview.SessionID === state.Session.ID &&
+          pendingIDs.has(preview.ID) &&
+          !this.savedMessageIDs.has(preview.ID),
+      )
+      .slice(0, 128);
+    for (const identifier of this.queuedReadErrors.keys())
+      if (!pendingIDs.has(identifier)) this.queuedReadErrors.delete(identifier);
     this.statistics = state.Statistics;
     if (state.TaskState) this.applyTaskState(state.TaskState);
     else if (state.TaskStateError && (initial || covered >= this.taskEventSequence))
@@ -985,10 +1003,59 @@ export class HarnessConsole {
       if (this.cancelledQueued.size > 256)
         this.cancelledQueued.delete(this.cancelledQueued.values().next().value!);
       this.receipts = this.receipts.filter((message) => message.ID !== messageID);
+      this.queuedPreviews = this.queuedPreviews.filter((message) => message.ID !== messageID);
+      this.queuedReadErrors.delete(messageID);
       const pending = (this.status.messages ?? []).filter((identifier) => identifier !== messageID);
       this.status = { ...this.status, messages: pending, queued: pending.length };
     } finally {
       this.cancellingQueued.delete(messageID);
+    }
+  }
+  async loadQueuedMessage(messageID: string) {
+    const session = this.session,
+      api = this.api,
+      signal = this.sessionReads.signal;
+    if (
+      !session ||
+      !api ||
+      signal.aborted ||
+      !this.status.messages?.includes(messageID) ||
+      this.loadingQueued.has(messageID)
+    )
+      return;
+    this.loadingQueued.add(messageID);
+    this.queuedReadErrors.delete(messageID);
+    try {
+      const message = await api.queuedMessage(session.ID, messageID, signal);
+      if (
+        signal.aborted ||
+        api !== this.api ||
+        session.ID !== this.session?.ID ||
+        message.ID !== messageID ||
+        message.SessionID !== session.ID ||
+        !this.status.messages?.includes(messageID) ||
+        this.cancelledQueued.has(messageID) ||
+        this.savedMessageIDs.has(messageID)
+      )
+        return;
+      this.receipts = boundedReceipts([
+        ...this.receipts.filter((entry) => entry.ID !== messageID),
+        message,
+      ]);
+    } catch (failure) {
+      if (
+        !signal.aborted &&
+        api === this.api &&
+        session.ID === this.session?.ID &&
+        this.status.messages?.includes(messageID) &&
+        !this.cancelledQueued.has(messageID)
+      )
+        this.queuedReadErrors.set(
+          messageID,
+          failure instanceof Error ? failure.message : 'Cannot read queued message.',
+        );
+    } finally {
+      if (!signal.aborted && session.ID === this.session?.ID) this.loadingQueued.delete(messageID);
     }
   }
   async resolvePermissionRequest(requestID: string, kind: 'allow' | 'deny') {

@@ -267,6 +267,54 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
         messages: queued.get(session.ID)?.map((message) => message.ID) ?? [],
         error: '',
       },
+      QueuedMessages: details
+        ? (queued.get(session.ID) ?? []).map((message) => {
+            let budget = 4096,
+              truncated = false;
+            const take = (value: string) => {
+              let result = '';
+              for (const character of value) {
+                const bytes = Buffer.byteLength(character);
+                if (bytes > budget) {
+                  truncated = true;
+                  break;
+                }
+                budget -= bytes;
+                result += character;
+              }
+              return result;
+            };
+            const content: Message['Content'] = [];
+            for (const item of message.Content ?? []) {
+              if (content.length >= 32 || budget < 128) {
+                truncated = true;
+                break;
+              }
+              budget -= 128;
+              const MIME = take(item.MIME),
+                Filename = take(item.Filename),
+                Text = item.Type === 'text' ? take(item.Text) : '';
+              if (item.Type !== 'text' || item.Data || item.URL || item.AudioID) truncated = true;
+              content.push({
+                Type: item.Type,
+                Text,
+                Filename,
+                MIME,
+                Data: null,
+                URL: '',
+                AudioID: '',
+              });
+            }
+            return {
+              ID: message.ID,
+              SessionID: message.SessionID,
+              Role: message.Role,
+              CreatedAt: message.CreatedAt,
+              Content: content,
+              Truncated: truncated,
+            };
+          })
+        : undefined,
       Statistics: sessionUsage,
       TaskState: taskStates.get(session.ID) ?? {
         SessionID: session.ID,
@@ -926,6 +974,12 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
             event(session, 'turn.end', { status: 'completed' });
           }
           return reply({ status: 'queued', position: 1, message }, 202);
+        }
+        if (parts[2] === 'queue' && method === 'GET') {
+          const message = queued.get(session.ID)?.find((message) => message.ID === parts[3]);
+          return message
+            ? reply(message)
+            : reply({ error: 'message is not pending in the session' }, 404);
         }
         if (parts[2] === 'queue' && method === 'DELETE') {
           queued.set(

@@ -65,6 +65,7 @@
       workbench.receipts,
       workbench.status.messages ?? [],
       new Set(workbench.messages.map((message) => message.ID)),
+      workbench.queuedPreviews,
     ),
   );
   $effect(() => {
@@ -254,6 +255,9 @@
               {entry}
               cancelling={workbench.cancellingQueued.has(entry.id)}
               onCancel={onCancelQueued}
+              onLoad={(identifier) => void workbench.loadQueuedMessage(identifier)}
+              loading={workbench.loadingQueued.has(entry.id)}
+              error={workbench.queuedReadErrors.get(entry.id) ?? ''}
             />{/each}
         </div>
       {/if}

@@ -9,6 +9,7 @@ import type {
   Usage,
 } from './types';
 import type { ProcessRecord } from './processes';
+import type { QueuedMessagePreview } from './queued-messages';
 
 export interface ResponseUsageSnapshot {
   MessageID: string;
@@ -54,6 +55,7 @@ export interface SessionViewState {
   WorkspaceLinked: boolean;
   WorkspaceStopped: boolean;
   ActiveSessions: string[];
+  QueuedMessages?: QueuedMessagePreview[];
 }
 export interface SessionViewFrame {
   type: 'state';

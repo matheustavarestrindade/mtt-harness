@@ -25,12 +25,13 @@ const (
 // A command gets exactly one reply. The single-slot reply channel lets a
 // caller cancel its wait without blocking the owner that completes the work.
 type sessionCommand struct {
-	kind             sessionCommandKind
-	operationContext context.Context
-	message          atom.Message
-	messageID        string
-	messageIDs       []string
-	reply            chan sessionReply
+	kind                 sessionCommandKind
+	operationContext     context.Context
+	message              atom.Message
+	messageID            string
+	messageIDs           []string
+	includeQueuedContent bool
+	reply                chan sessionReply
 }
 
 type sessionReply struct {

@@ -84,6 +84,7 @@ func (server *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /sessions/{id}/messages", server.sendMessage)
 	mux.HandleFunc("POST /sessions/{id}/cancel", server.cancelMessage)
 	mux.HandleFunc("DELETE /sessions/{id}/queue/{message_id}", server.cancelQueuedMessage)
+	mux.HandleFunc("GET /sessions/{id}/queue/{message_id}", server.queuedMessage)
 	mux.HandleFunc("GET /sessions/{id}/status", server.sessionStatus)
 	mux.HandleFunc("GET /sessions/{id}/task-state", server.sessionTaskState)
 	mux.HandleFunc("POST /sessions/{id}/revert", server.revertSession)

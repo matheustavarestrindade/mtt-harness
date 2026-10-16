@@ -101,10 +101,14 @@ func (coordinator *sessionCoordinator) handleSessionCommand(command sessionComma
 		coordinator.handleDeletion(command)
 	case readStatus:
 		identifiers := make([]string, 0, len(coordinator.pending))
+		var previews []atom.QueuedMessagePreview
 		for _, message := range coordinator.pending {
 			identifiers = append(identifiers, message.ID)
+			if command.includeQueuedContent {
+				previews = append(previews, previewQueuedMessage(message))
+			}
 		}
-		command.respond(sessionReply{status: QueueStatus{Running: coordinator.active != nil, Messages: identifiers, Error: coordinator.lastError}})
+		command.respond(sessionReply{status: QueueStatus{Running: coordinator.active != nil, Messages: identifiers, Error: coordinator.lastError, Previews: previews}})
 	case cancelCurrent:
 		cancelled := coordinator.loop.CancelRun(coordinator.session.ID)
 		if coordinator.active != nil {
