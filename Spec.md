@@ -1092,6 +1092,10 @@ type ProcessWatcher interface {
 }
 ```
 
+The `bash` tool uses a pseudo-terminal by default. With `terminal: false`, the process uses pipes. The default terminal dimensions are 120 columns and 30 rows. Terminal output keeps ANSI sequences and carriage returns. Standard output and standard error use the same terminal stream.
+
+The optional `InteractiveProcess` interface gives access to input with cancellation and terminal resize. The process socket accepts input frames and `resize` or `interrupt` data. Process exit closes the socket. When a terminal view closes, the socket stops but the process continues. See `docs/interactive-terminals.md`.
+
 ### 11.1 Notification Policy
 
 The tool call gives the notification policy for a background process. The policy has the mode and the interval. The mode is one of 4 values:
@@ -1248,6 +1252,8 @@ The initial API paths are:
 - `PUT /sessions/{id}/reasoning`: set the reasoning effort for a session.
 - `PUT /sessions/{id}/model`: change the model of a session.
 - `GET /sessions/{id}/messages`: read the messages of a session.
+- `GET /sessions/{id}/history`: read a history page.
+- `GET /sessions/{id}/state`: read a session view snapshot.
 - `POST /sessions/{id}/cancel`: stop the current run.
 - `DELETE /sessions/{id}/queue/{message_id}`: remove a message from the queue.
 - `GET /sessions/{id}/status`: read the status of the current run and the messages in the queue.
@@ -1288,6 +1294,16 @@ The message input can have text or content items:
 ```
 
 The event path accepts `?since=N`. The database gives the sequence number. The API sends the events after the sequence number, then the new events. A slow client must not stop the loop.
+
+The `view=true` mode gives a view snapshot before new events. The queue and loop send a metadata signal after a session update. The UI reads status from state frames. The UI uses the live response revision and does not show the same output chunk again.
+
+The history route uses message sequence positions. The default history page has 50 messages. The byte limit is 2 MiB. The API can give one larger message. The message bytes stay the same.
+
+The `Context` field connects a tool result to the tool owner. The `revert` operation increases `Revision`. A request with a different revision gives `409`. The history page does not include `ProviderState`.
+
+The UI uses a history window with a limit of 150 messages. The byte limit is 8 MiB. The UI can keep one larger message. The scrollbar gives access to history pages. The `Latest` control puts the view at the end of the conversation. The history window then contains 50 messages.
+
+The UI removes previous views with `URL.revokeObjectURL`, `Terminal.dispose`, and `WebSocket.close`. See `docs/session-views.md` for limits and connection rules.
 
 An event cursor identifies one session. The database keeps the event sequence for a session through commit. Event storage for different sessions can run at the same time. Cancellation stops an event storage request that has not started. Event handlers run after event storage.
 

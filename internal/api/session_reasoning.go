@@ -47,6 +47,12 @@ func (server *Server) setSessionReasoningEffort(responseWriter http.ResponseWrit
 	if respondToSessionSelectionError(responseWriter, server.store.Sessions().SetModelSelection(request.Context(), session.ID, session.ModelSelection(), selection)) {
 		return
 	}
-	session.ReasoningEffort = *input.Effort
+	session, operationError = server.store.Sessions().Get(request.Context(), session.ID)
+	if respondToError(responseWriter, http.StatusInternalServerError, operationError) {
+		return
+	}
+	if server.queue != nil {
+		server.queue.NotifySessionState(session.ID)
+	}
 	writeJSON(responseWriter, http.StatusOK, session)
 }

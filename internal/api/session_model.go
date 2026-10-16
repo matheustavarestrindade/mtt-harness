@@ -67,7 +67,13 @@ func (server *Server) setSessionModel(responseWriter http.ResponseWriter, reques
 	if respondToSessionSelectionError(responseWriter, server.store.Sessions().SetModelSelection(request.Context(), session.ID, session.ModelSelection(), selection)) {
 		return
 	}
-	session.Model, session.ReasoningEffort = selection.Model, selection.ReasoningEffort
+	session, operationError = server.store.Sessions().Get(request.Context(), session.ID)
+	if respondToError(responseWriter, http.StatusInternalServerError, operationError) {
+		return
+	}
+	if server.queue != nil {
+		server.queue.NotifySessionState(session.ID)
+	}
 	writeJSON(responseWriter, http.StatusOK, session)
 }
 

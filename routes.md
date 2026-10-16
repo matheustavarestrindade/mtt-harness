@@ -94,6 +94,8 @@ An active conversation, child agent, message in the queue, or active process giv
 | PUT | `/sessions/{id}/reasoning` | `{"effort":"high"}` | `200`, `Session` | `404`, `400`, `409`, `500` |
 | PUT | `/sessions/{id}/model` | `{"model":"provider/model","allow_compaction":false}` | `200`, `Session` | `404`, `400`, `409`, `500` |
 | GET | `/sessions/{id}/messages` | none | `200`, `Message[]` | `500` |
+| GET | `/sessions/{id}/history` | optional `before`, `after`, `limit`, `revision`, `metadata` | `200`, `HistoryPage` | `400`, `404`, `409`, `500` |
+| GET | `/sessions/{id}/state` | optional `details` | `200`, `SessionViewState` | `404`, `500` |
 | POST | `/sessions/{id}/messages` | `{"content":"text"}` or content array | `202`, `AcceptedMessage` | `404`, `400`, `409`, `429`, `500` |
 | GET | `/sessions/{id}/status` | none | `200`, `QueueStatus` | `404`, `500` |
 | GET | `/sessions/{id}/task-state` | none | `200`, `TaskState` | `404`, `500` |
@@ -392,7 +394,7 @@ See `plugins/context/README.md`, `plugins/spaced_repetition/README.md`, and `plu
 
 Permission type is `allow` or `deny`. Scope is `once`, `session`, or `always`. An empty scope or a request without a scope uses `once`. A decision in the database applies in the instance of the decision. A request that is not open gives `404`.
 
-The API does not have a route to read open permission requests. Session events give the requests and decisions.
+Session events give permission requests and decisions. The session view snapshot also contains open permission requests.
 
 Session statistics include the usage of child agents. The cost list has an entry for a currency. A `null` cost value does not show free usage. It shows that cost data is not available.
 
@@ -404,19 +406,75 @@ The harness keeps a maximum of 256 KiB for a process stream. It keeps output fro
 
 The output connection sends a `start` frame, output snapshots, new output, and an `exit` frame. The snapshots contain standard output and then standard error. A byte offset applies to one stream. A new connection gives new output snapshots. It does not use the session event cursor.
 
+The start frame has `terminal` and `input` fields. A terminal process has one output stream in `stdout`. When input is available, the client can send input or an `interrupt` control.
+
+A terminal also accepts `resize`. The process continues when the terminal view closes. See `docs/interactive-terminals.md`.
+
 The `data_base64` field contains output bytes in base64. Use a UTF-8 decoder for standard output. Use a different UTF-8 decoder for standard error. An ANSI sequence or UTF-8 data can continue in the next frame. Previous clients can use the `data` field. The exit frame includes the process exit status.
 
 ```typescript
 type ProcessOutputFrame = {
-  process_id: string; stream: 'start' | 'stdout' | 'stderr' | 'exit';
+  process_id: string; stream: 'start' | 'stdout' | 'stderr' | 'exit' | 'control';
+  terminal?: boolean; input?: boolean;
   data: string; data_base64: string | null; offset: number; snapshot: boolean;
   at: string; error: string; exit: null | { Code: number; Signal: string; Error: string };
 };
+type ProcessInputFrame =
+  | { type: 'input'; data_base64?: string; data?: string }
+  | { type: 'resize'; columns: number; rows: number }
+  | { type: 'signal'; signal: 'interrupt' };
 ```
+
+```text
+Input byte limit after base64 decoding   4096
+Socket frame limit                      16 KiB
+Resize columns                          2..500
+Resize rows                             1..200
+Input write time limit                  2 seconds
+```
+
+A control error uses `stream: control`. Input is not a user message.
 
 The `offset` field is the byte position before the frame data. The minimum byte position is 0. A snapshot can start above 0 after previous output is removed. The field `snapshot: true` shows output from the buffer. After an output gap, open a new connection to get available output.
 
 ## WebSocket Data
+
+### Session View Mode
+
+The session view URL is `/sessions/{id}/events?view=true&details=true`. The connection starts with a `state` frame. New events have type `event`.
+
+The socket sends state frames after session updates. The `details=false` mode does not send live text or tool data. The `deleted` frame shows that the harness removed the session.
+
+```typescript
+type SessionViewFrame =
+  | { type: 'state'; session_id: string; cursor: number; covered_cursor: number;
+      initial: boolean; state: SessionViewState; recent?: Event[] }
+  | { type: 'event'; event: Event }
+  | { type: 'deleted'; session_id: string };
+type SessionViewState = {
+  Session: Session; Status: QueueStatus; Statistics: Statistics;
+  TaskState: TaskState | null; TaskStateError: string; Outcome: string;
+  Permissions: PermissionRequest[]; History: HistoryPage; Processes: ProcessRecord[];
+  Live?: { Message: Message; Model: string; Revision: number; Truncated: boolean };
+  WorkspaceLinked: boolean; WorkspaceStopped: boolean; ActiveSessions: string[];
+};
+type QueueStatus = { running: boolean; queued: number; messages: string[]; error: string };
+type HistoryPage = {
+  SessionID: string; Revision: number; Messages: Message[]; Context: Message[];
+  Models: Record<string,string>; Sizes: Record<string,number>; Processes?: ProcessRecord[];
+  FirstSeq: number; LastSeq: number; HeadSeq: number; HasOlder: boolean; HasNewer: boolean;
+  LatestResponse?: { MessageID: string; Seq: number; Model: string; Usage: Usage | null; CreatedAt: string };
+  Task?: string;
+};
+```
+
+The history query accepts a `before` or `after` position. It cannot accept the 2 parameters together. The message at the specified position is not in the history page. The default `limit` is `50` and the maximum is `100`. A different `revision` gives `409`.
+
+The `metadata=true` mode has an empty history window. The byte limit for message content is `2 MiB`. The API can give one larger message. The message bytes stay the same.
+
+The last response usage does not change with the history page. See `docs/session-views.md`.
+
+### Session Events
 
 Session event URL:
 
@@ -442,7 +500,7 @@ Event payload data:
 | `turn.start` | null |
 | `turn.end` | `{"status":"completed"}`, `cancelled`, or `error` |
 | `model.call` | `{"model":"provider/model","message_id":"ID","reasoning_effort":"high"}` |
-| `model.chunk` | `{"message_id":"ID","text":"fragment"}` or `{"message_id":"ID","reasoning":"text"}` |
+| `model.chunk` | `{"message_id":"ID","text":"fragment","chunk_index":1}` or a `reasoning` field |
 | `action.received` | `ToolCall` |
 | `tool.start` | `ToolCall` |
 | `tool.end` | `{"call":ToolCall,"status":"ok","result":ToolResult}` |
@@ -455,7 +513,7 @@ Event payload data:
 | `process.start`, `process.exit` | `ProcessRecord` |
 | `process.output` | `{"ProcessID":"ID","Stream":"stdout","Offset":0,"Bytes":42}` |
 | `process.notification` | null |
-| `agent.start` | `{"session":"child-session-id","task":"task text"}` |
+| `agent.start` | `{"session":"child-session-id","task":"task text","message_id":"ID","call_id":"ID"}` |
 | `agent.end` | `{"session":"child-session-id"}` |
 ```
 
@@ -512,9 +570,11 @@ type Instance = {
 type Session = {
   ID: string; InstanceID: string; Parent: string; Depth: number;
   Model: string; ReasoningEffort?: string; CreatedAt: string; Completed: boolean;
+  HistoryRevision?: number; SelectionRevision?: number;
+  ParentMessageID?: string; ParentToolCallID?: string;
 };
 type Content = {
-  Type: 'text' | 'image' | 'audio' | 'file'; Text: string;
+  Type: 'text' | 'image' | 'audio' | 'video' | 'file'; Text: string;
   Data: string | null; MIME: string; URL: string; Filename: string; AudioID: string;
 };
 type ToolCall = { ID: string; Name: string; Input: unknown };
@@ -564,7 +624,8 @@ type ProcessRecord = {
   ID: string; InstanceID: string; SessionID: string; PID: number; Status: string;
   Spec: { Command: string; Args: string[] | null; Cwd: string; Env: string[] | null;
     Notify: { Mode: 'none' | 'exit' | 'error' | 'interval'; Interval: number }; Timeout: number;
-    IdleTimeout: number; ToolCallID?: string; ToolMessageID?: string };
+    IdleTimeout: number; ToolCallID?: string; ToolMessageID?: string;
+    Terminal?: boolean; Columns?: number; Rows?: number };
   Exit: null | { Code: number; Signal: string; Error: string }; StartedAt: string; EndedAt: string;
 };
 ```

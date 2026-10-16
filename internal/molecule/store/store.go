@@ -42,6 +42,7 @@ type SessionStore interface {
 	List(operationContext context.Context, instanceID string) ([]atom.Session, error)
 	Append(operationContext context.Context, message atom.Message) error
 	Messages(operationContext context.Context, sessionID atom.SessionID) ([]atom.Message, error)
+	History(operationContext context.Context, sessionID atom.SessionID, query HistoryQuery) (atom.HistoryPage, error)
 	DeleteAfter(operationContext context.Context, sessionID atom.SessionID, messageID string) (int, error)
 	// DeleteConversation removes saved conversation data for a session tree.
 	// ID/parent tombstones and usage records remain; stale writes must fail.
@@ -63,12 +64,17 @@ type EventStore interface {
 	Since(operationContext context.Context, instanceID string, sequenceNumber uint64) ([]atom.Event, error)
 	// SinceSession keeps a live cursor within one independently committed stream.
 	SinceSession(operationContext context.Context, sessionID atom.SessionID, sequenceNumber uint64) ([]atom.Event, error)
+	RecentSession(operationContext context.Context, sessionID atom.SessionID, limit int) ([]atom.Event, error)
+	LatestSessionEvent(operationContext context.Context, sessionID atom.SessionID, name atom.EventName) (*atom.Event, error)
+	AgentOrigins(operationContext context.Context, instanceID string, sessionIDs []atom.SessionID) ([]atom.AgentOrigin, error)
 }
 
 type ProcessStore interface {
 	Save(operationContext context.Context, process atom.ProcessRecord) error
 	Get(operationContext context.Context, identifier string) (atom.ProcessRecord, error)
 	List(operationContext context.Context, session atom.SessionID) ([]atom.ProcessRecord, error)
+	Recent(operationContext context.Context, session atom.SessionID, limit int) ([]atom.ProcessRecord, error)
+	ForMessages(operationContext context.Context, session atom.SessionID, messageIDs []string) ([]atom.ProcessRecord, error)
 	CountRunning(operationContext context.Context, instanceID string) (int, error)
 }
 

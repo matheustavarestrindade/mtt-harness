@@ -18,6 +18,8 @@ export async function openWorkbenchAction(
     await headerControl.click();
     return;
   }
+  // A closing mobile sheet is still rendered during its exit transition.
+  await expect(page.locator('[data-slot="sheet-content"][data-state="closed"]')).toHaveCount(0);
   const navigation = page.getByRole('navigation', { name: 'Workspaces and sessions', exact: true });
   if (!(await navigation.isVisible()))
     await page.getByRole('button', { name: 'Open navigation', exact: true }).click();

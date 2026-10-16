@@ -81,7 +81,7 @@ func TestZeroInactivityWaitAndCancellationDoNotEnableNotifications(test *testing
 			defer cancel()
 			results := make(chan atom.ToolResult, 1)
 			go func() {
-				result, _ := NewBash(manager).Run(operationContext, atom.ToolCall{ID: "quiet", Input: []byte(`{"command":"read reply; printf done","idle_timeout":0}`)})
+				result, _ := NewBash(manager).Run(operationContext, atom.ToolCall{ID: "quiet", Input: []byte(`{"command":"read reply; printf done","idle_timeout":0,"terminal":false}`)})
 				results <- result
 			}()
 			var runningProcess harness.Process

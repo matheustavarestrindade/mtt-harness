@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { untrack } from 'svelte';
   import {
     Terminal,
     Sparkles,
@@ -24,6 +24,7 @@
   import MessageCard from '../molecules/MessageCard.svelte';
   import MessageContent from '../molecules/content/MessageContent.svelte';
   import PermissionCard from '../molecules/PermissionCard.svelte';
+  import { HistoryScroll } from './history-scroll.svelte';
   let {
     console: workbench,
     busy = '',
@@ -46,11 +47,13 @@
     onPrompt: (text: string) => void;
   } = $props();
   let feed: HTMLDivElement;
-  let following = $state(true);
-  let previousSession = '';
+  const scroll = new HistoryScroll(untrack(() => workbench.history));
+  $effect(() => () => scroll.dispose());
   const entries = $derived(
     buildConversationEntries(
-      workbench.liveMessage ? [...workbench.messages, workbench.liveMessage] : workbench.messages,
+      workbench.liveMessage && workbench.history.tailAttached
+        ? [...workbench.messages, workbench.liveMessage]
+        : workbench.messages,
       workbench.processes.records.values(),
     ),
   );
@@ -68,32 +71,37 @@
       workbench.agents.children(workbench.session?.ID ?? '').length +
       (workbench.liveMessage?.Reasoning?.length ?? 0) +
       (workbench.liveMessage?.Content?.[0]?.Text.length ?? 0);
-    if (sessionID !== previousSession) {
-      previousSession = sessionID;
-      following = true;
-    }
-    if (following && changes >= 0)
-      void tick().then(() => {
-        if (feed) feed.scrollTop = feed.scrollHeight;
-      });
+    workbench.history.version;
+    workbench.history.loading;
+    scroll.element = feed;
+    scroll.track(sessionID, changes);
   });
   function updateScrollPosition() {
-    if (feed) following = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 100;
+    scroll.onScroll();
   }
 </script>
 
 <div class="relative min-h-0 flex-1">
-  <!-- svelte-ignore a11y_no_noninteractive_tabindex (Keyboard users need focus here for Page Up/Down scrolling.) -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (Observe navigation input without replacing native keyboard or touch scrolling.) -->
   <div
     bind:this={feed}
     class="h-full min-w-0 overflow-y-auto overscroll-y-contain"
     onscroll={updateScrollPosition}
+    onwheel={(event) => {
+      if (event.deltaY < 0) scroll.interact();
+    }}
+    ontouchstart={() => scroll.interact()}
+    onkeydown={(event) => {
+      if (['PageUp', 'ArrowUp', 'Home'].includes(event.key)) scroll.interact();
+    }}
     role="region"
     aria-label="Conversation"
+    data-history-count={workbench.history.messages.length}
+    data-history-bytes={workbench.history.bytes}
     tabindex="0"
   >
     <div class="mx-auto flex min-h-full w-full max-w-4xl flex-col px-4 py-4 sm:px-6 sm:py-5">
-      {#if workbench.loading && !workbench.messages.length}<div
+      {#if (workbench.loading || workbench.history.loading) && !workbench.messages.length}<div
           class="grid flex-1 place-items-center py-16"
         >
           <span class="flex items-center gap-2 text-sm text-muted-foreground"
@@ -163,6 +171,15 @@
         </section>
       {:else}
         <div class="conversation-entries flex flex-col gap-1">
+          {#if workbench.history.hasOlder}<Button
+              variant="ghost"
+              class="h-11 self-center text-xs"
+              disabled={workbench.history.loading}
+              onclick={() => void scroll.older()}>Load earlier messages</Button
+            >{/if}
+          {#if workbench.history.error}<p role="alert" class="text-xs text-muted-foreground">
+              {workbench.history.error}
+            </p>{/if}
           <SidekickHistory
             entries={sidekick.unplaced}
             more={!!workbench.sidekick.nextCursor}
@@ -172,38 +189,54 @@
             onRefresh={() => void workbench.sidekick.refresh()}
           />
           {#each entries as entry (entry.message.ID)}
-            {#snippet tools(activity: ToolActivity)}
-              {#if activity.call.Name === 'agent'}
-                {#if activity === entry.tools.find((tool) => tool.call.Name === 'agent')}
-                  <AgentGroup
-                    monitor={workbench.agents}
-                    sessions={workbench.agents.children(entry.message.SessionID, entry.message.ID)}
-                    models={workbench.models}
-                    activities={entry.tools.filter((tool) => tool.call.Name === 'agent')}
+            <div data-history-id={entry.message.ID} data-history-seq={entry.message.Seq}>
+              {#snippet tools(activity: ToolActivity)}
+                {#if activity.call.Name === 'agent'}
+                  {#if activity === entry.tools.find((tool) => tool.call.Name === 'agent')}
+                    <AgentGroup
+                      monitor={workbench.agents}
+                      sessions={workbench.agents.children(
+                        entry.message.SessionID,
+                        entry.message.ID,
+                      )}
+                      models={workbench.models}
+                      activities={entry.tools.filter((tool) => tool.call.Name === 'agent')}
+                      running={workbench.status.running}
+                    />
+                  {/if}
+                {:else}<ToolActivityView
+                    {activity}
+                    messageID={entry.message.ID}
+                    processes={workbench.processes}
                     running={workbench.status.running}
-                  />
-                {/if}
-              {:else}<ToolActivityView
-                  {activity}
-                  messageID={entry.message.ID}
-                  processes={workbench.processes}
+                  />{/if}
+              {/snippet}
+              {#if entry.processNotice}<ProcessNoticeSection
+                  notice={entry.processNotice}
+                  record={entry.processRecord}
+                />{:else}<MessageCard
+                  message={entry.message}
+                  tools={entry.tools}
+                  renderTool={tools}
                   running={workbench.status.running}
+                  streaming={entry.message.ID === workbench.liveMessage?.ID}
                 />{/if}
-            {/snippet}
-            {#if entry.processNotice}<ProcessNoticeSection
-                notice={entry.processNotice}
-                record={entry.processRecord}
-              />{:else}<MessageCard
-                message={entry.message}
-                tools={entry.tools}
-                renderTool={tools}
-                running={workbench.status.running}
-                streaming={entry.message.ID === workbench.liveMessage?.ID}
-              />{/if}
-            {#each sidekick.anchored.get(entry.message.ID) ?? [] as hint (hint.ID)}<SidekickSection
-                entry={hint}
-              />{/each}
+              {#each sidekick.anchored.get(entry.message.ID) ?? [] as hint (hint.ID)}<SidekickSection
+                  entry={hint}
+                />{/each}
+            </div>
           {/each}
+          {#if workbench.history.hasNewer}<Button
+              variant="ghost"
+              class="h-11 self-center text-xs"
+              disabled={workbench.history.loading}
+              onclick={() => void scroll.newer()}>Load newer messages</Button
+            >{/if}
+          {#if workbench.liveTruncated && workbench.history.following}<p
+              class="text-[10px] text-muted-foreground"
+            >
+              Earlier live output omitted. The saved response remains available in history.
+            </p>{/if}
           {#if unplacedAgents.length}<AgentGroup
               monitor={workbench.agents}
               sessions={unplacedAgents}
@@ -263,13 +296,10 @@
       {/if}
     </div>
   </div>
-  {#if !following && workbench.messages.length}<Button
+  {#if (!scroll.following || workbench.history.hasNewer) && workbench.messages.length}<Button
       size="icon"
       class="absolute right-5 bottom-4 size-11 rounded-full shadow-lg"
       aria-label="Scroll to latest message"
-      onclick={() => {
-        following = true;
-        feed.scrollTo({ top: feed.scrollHeight, behavior: 'smooth' });
-      }}><ArrowDown class="size-4" /></Button
+      onclick={() => void scroll.latest()}><ArrowDown class="size-4" /></Button
     >{/if}
 </div>

@@ -109,19 +109,17 @@ The client uses `Session.Parent` for agent navigation. The sidebar shows child a
 
 The `AgentMonitor` organism controls agent data for the selected conversation. The `AgentFeed` organism controls one event connection, data requests, and the live preview. A session change or workspace change stops previous data requests. Previous responses cannot change the new view. A completed agent closes the event connection.
 
-The UI connects an `agent.start` event to a `model.call` message ID. The model call is the last model call in the parent event stream.
+The session data gives `ParentMessageID` and `ParentToolCallID` for new agents. The API uses the sequence of events for previous agent origins.
 
 Task text does not identify a tool call. Parallel tool calls can have the same task text. The UI shows an agent without a message ID after the conversation history.
 
-Child agents run directly in the loop. The queue `running` value does not give child agent status.
-
-The UI uses `turn.start`, `turn.end`, permission events, and `Session.Completed`.
-
-The UI also examines the parent queue status and start time. A previous agent from a different turn cannot show active status. The value `Completed: false` does not give active status.
+Child agents run directly in the loop. The view snapshot gives active session IDs, permissions, and the last turn status. The value `Completed: false` does not give active status.
 
 The panel uses `MessageCard`, `ThinkingSection`, and the content components. The organism supplies the agent section through `renderTool`. The `finish` result has a different response section.
 
-An open panel has a height of 320 pixels. Output uses the panel scrollbar. The display interval is 100 ms. An open panel reads message history. The preview keeps 80 output messages. The live text limit is 100,000 text characters in one text field.
+An open panel has a height of 320 pixels. Output uses the panel scrollbar. The display interval is 100 ms. An open panel reads history pages.
+
+When an agent panel closes, an active agent uses `details=false`. The UI removes the body window when the panel closes. The same history limits apply to the parent conversation and agent previews.
 
 ## Task State
 
@@ -129,7 +127,7 @@ The `Tasks` control opens the `TaskPanel` organism on the right side. On large s
 
 The `TaskProgress` molecule shows session task state in the panel. The content has a task title, description, and task items with task status. A button opens or closes the content. The panel has a scrollbar.
 
-The console reads `GET /sessions/{id}/task-state` and receives `task_state.updated` events. It accepts data only for the selected session and the same or newer revision. An empty TODO list with `DOING: null` removes the progress panel. An error on the task state route does not remove the session or message draft.
+The view snapshot contains task state. The console also receives `task_state.updated` events. It accepts data only for the selected session and the same or newer revision. An empty TODO list with `DOING: null` removes the progress panel. An error for task state does not remove the session or message draft.
 
 ## Memory Panel
 
@@ -171,9 +169,15 @@ The UI sends `DELETE /sessions/{id}` after the user accepts the dialog. The API 
 
 The message draft and view of a different session do not change. The dialog shows an error from session deletion.
 
-A new session view reads events from sequence 0. Permission requests and decisions come from the event stream. A new connection after an error uses the last event sequence. Message history from the API is the source for completed responses.
+A new session view uses `/events?view=true`. The connection starts with a state frame. The connection then gives events and new state frames. The connection does not send the full output history.
 
-The client reads session data and queue status with an interval of 1500 ms. An active WebSocket gives events for message history. The client reads history after a turn event, status change, or new connection. If the WebSocket has an error, the client reads full history with the same interval.
+The UI reads status from state frames. After a socket error, `GET /sessions/{id}/state` can give the status data. The HTTP request interval is 5 seconds. A new state frame stops the HTTP timer.
+
+The `SessionHistory` organism starts with the last 50 messages. The history window has a limit of 150 messages. The byte limit is 8 MiB. The UI can keep one larger message. The message bytes stay the same.
+
+The `HistoryScroll` organism gets history pages. A DOM anchor keeps the reading position. The `Latest` control puts the view at the end of the conversation. The history window then contains 50 messages.
+
+The UI removes previous views with `URL.revokeObjectURL`, `Terminal.dispose`, and `WebSocket.close`.
 
 The client keeps message data when message content does not change. Source bytes, MIME type, and URL control Blob URLs. A file attachment keeps the source URL when the content does not change. A content change releases the previous Blob URL.
 
@@ -191,9 +195,9 @@ See `messages.md` for the libraries, content limits, and source buttons.
 
 ## Settings
 
-The `UsageBar` molecule uses `Message.Usage` from the last model response in the selected session. It does not use token values from `Statistics`. `Last context` is the sum of `Input`, `CacheRead`, `CacheWrite`, and `Output`. Output includes reasoning tokens. `Out` and `Cache` use the same request.
+The `UsageBar` molecule uses `LatestResponse.Usage` from the history metadata. It does not use token values from `Statistics` or from the history page. `Last context` is the sum of `Input`, `CacheRead`, `CacheWrite`, and `Output`. Output includes reasoning tokens. `Out` and `Cache` use the same request.
 
-The client connects a message ID to the model in the `model.call` event. The model supplies the context limit. The model for a previous response can be different from the selected model. The UI shows `—` when usage data is not available.
+The `LatestResponse.Model` field identifies the model for the response. The model supplies the context limit. The model for a previous response can be different from the selected model. The UI shows `—` when usage data is not available.
 
 The client removes previous model IDs on session selection. The conversation cost includes child agents. The label `Total` identifies the scope. The settings dialog gives usage statistics. Context compaction does not remove previous usage from the statistics.
 
@@ -217,13 +221,13 @@ The provider `openai-codex` uses OpenAI device authentication. OAuth tokens stay
 
 ## API Limits
 
-- The API does not have a route to read open permission requests. Session events give the permission requests and decisions.
+- The session view snapshot contains open permission requests. Session events give new requests and decisions.
 - Queue status gives message IDs only. The UI can show text from the local message receipt or message history.
 - The API does not have a route to set a session title. The UI shows a short session ID and the model ID.
-- The message route does not have pagination. The UI reads the full history.
-- The API does not have an HTTP route to stop a process. The UI does not add a route to the harness.
+- The history route gives history pages. The history revision changes after a `revert` operation.
+- Process socket input and terminal resize are available.
 - The API does not have a CORS handler. The UI uses a same-origin proxy.
 
 ## Plans
 
-The next UI version can add media upload, a revert control, and process output. Use the API contracts for a new function. User approval is necessary before a change to the harness.
+The next UI version can add a file editor and a revert control. Use the API contracts for a new function. User approval is necessary before a change to the harness.

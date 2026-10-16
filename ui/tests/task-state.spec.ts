@@ -88,7 +88,7 @@ test('show task progress, keep accomplishments during work, and clear finished s
   expect(failures).toEqual([]);
 });
 
-test('ignore an older task-state read after a newer completion event', async ({ page }) => {
+test('ignore an older task-state snapshot after a newer completion event', async ({ page }) => {
   const fixture = await mockHarness(page);
   await connectAndCreate(page);
   const session = fixture.sessions[0];
@@ -104,34 +104,11 @@ test('ignore an older task-state read after a newer completion event', async ({ 
   fixture.event(session, 'task_state.updated', state);
   await openTasks(page);
   await expect(progress).toContainText('Old activity');
-  let releaseRead!: () => void;
-  let enteredRead!: () => void;
-  const blocked = new Promise<void>((resolve) => {
-    releaseRead = resolve;
-  });
-  const entered = new Promise<void>((resolve) => {
-    enteredRead = resolve;
-  });
-  let delayed = false;
-  await page.route(`**/sessions/${session.ID}/task-state`, async (route) => {
-    if (delayed) return route.fallback();
-    delayed = true;
-    enteredRead();
-    await blocked;
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(state) });
-  });
-  fixture.event(session, 'turn.end', {});
-  await entered;
   const cleared: TaskState = { ...state, Todo: [], Doing: null, Revision: 2 };
   fixture.taskStates.set(session.ID, cleared);
   fixture.event(session, 'task_state.updated', cleared);
   await expect(progress).toHaveCount(0);
-  const oldResponse = page.waitForResponse(
-    (response) =>
-      response.url().endsWith(`/sessions/${session.ID}/task-state`) && response.status() === 200,
-  );
-  releaseRead();
-  await oldResponse;
+  fixture.state(session, { TaskState: state });
   await page.evaluate(
     () =>
       new Promise<void>((resolve) =>
@@ -143,20 +120,13 @@ test('ignore an older task-state read after a newer completion event', async ({ 
   await expect(progress).toHaveCount(0);
 });
 
-test('task-progress API failure preserves the selected conversation', async ({ page }) => {
+test('task-progress snapshot failure preserves the selected conversation', async ({ page }) => {
   const fixture = await mockHarness(page);
   await connectAndCreate(page);
   const session = fixture.sessions[0];
   await page.getByLabel('Message', { exact: true }).fill('Keep the session');
   await openTasks(page);
-  await page.route(`**/sessions/${session.ID}/task-state`, (route) =>
-    route.fulfill({
-      status: 503,
-      contentType: 'application/json',
-      body: JSON.stringify({ error: 'Progress store unavailable' }),
-    }),
-  );
-  fixture.event(session, 'turn.end', {});
+  fixture.state(session, { TaskState: null, TaskStateError: 'Progress store unavailable' });
   await expect(page.getByRole('region', { name: 'Task progress' })).toContainText(
     'Progress store unavailable',
   );

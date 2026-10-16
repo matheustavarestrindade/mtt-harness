@@ -184,6 +184,7 @@ test('stream concurrent agents in fixed-height chat panels with active tree chil
     )
     .toBe('none');
   await childNode.getByRole('button', { name: `Agent ${shortID(first.ID)}`, exact: true }).click();
+  if (page.viewportSize()!.width < 1024) await expect(menu).toBeHidden();
   await expectParentSelected(page, parent);
   await expect(firstPanel).toBeVisible();
 
@@ -364,8 +365,8 @@ test('reconnect a live child, show approval waits, and mute cancellation', async
   });
   const panel = page.locator(`[data-agent-id="${child.ID}"]`);
   await expect(panel).toContainText('Before reconnect.');
-  // Direct child execution does not appear as a running queued turn.
-  expect(fixture.running.has(child.ID)).toBe(false);
+  // The view snapshot includes direct child execution, not just queued turns.
+  expect(fixture.viewState(child).Status.running).toBe(true);
   await expect(panel.getByRole('img', { name: 'Working', exact: true })).toBeVisible();
   const socket = [...fixture.openSockets].find((socket) =>
     socket.url().includes(`/sessions/${child.ID}/`),
@@ -407,12 +408,28 @@ test('abort old agent reads and subscriptions when changing conversations', asyn
   let releaseRead = () => {};
   const readGate = new Promise<void>((resolve) => (releaseRead = resolve));
   let reads = 0;
-  await page.route(`**/api/sessions/${child.ID}/messages`, async (route) => {
+  await page.route(`**/api/sessions/${child.ID}/history?*`, async (route) => {
     reads++;
     await readGate;
     await route
       .fulfill({
-        json: [message(child, 'stale-output', 'assistant', 'Late output from the previous agent.')],
+        json: {
+          ...fixture.historyPage(child),
+          Messages: [
+            {
+              ...message(
+                child,
+                'stale-output',
+                'assistant',
+                'Late output from the previous agent.',
+              ),
+              Seq: 999,
+            },
+          ],
+          FirstSeq: 999,
+          LastSeq: 999,
+          HeadSeq: 999,
+        },
       })
       .catch(() => {});
   });

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"os/exec"
 	"sync"
 	"time"
@@ -17,6 +18,9 @@ type Handle struct {
 	identifier               string
 	command                  *exec.Cmd
 	stdin                    io.WriteCloser
+	terminal                 *os.File
+	terminalReadDone         chan error
+	inputGate                chan struct{}
 	mutex                    sync.Mutex
 	subscribers              map[uint64]chan atom.ProcessEvent
 	nextSubscriber           uint64
@@ -47,11 +51,9 @@ func (processHandle *Handle) PID() int {
 	return processHandle.command.Process.Pid
 }
 func (processHandle *Handle) Write(data []byte) error {
-	if processHandle.stdin == nil {
-		return errors.New("process input is not open")
-	}
-	_, operationError := processHandle.stdin.Write(data)
-	return operationError
+	operationContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return processHandle.WriteContext(operationContext, data)
 }
 
 func (processHandle *Handle) Kill(signal atom.Signal) error {
@@ -165,10 +167,13 @@ func (writer outputWriter) Write(data []byte) (int, error) {
 	return len(data), nil
 }
 
-// exec.Cmd owns the stdout/stderr copying goroutines and Wait joins them before
-// this method publishes completion. No trailing output can race the exit event.
+// Wait joins pipe copies and the PTY reader before publishing completion. No
+// trailing output can race the exit event, including output after Ctrl-C.
 func (processHandle *Handle) waitForCommandExit() {
 	operationError := processHandle.command.Wait()
+	if processHandle.terminalReadDone != nil {
+		operationError = errors.Join(operationError, <-processHandle.terminalReadDone)
+	}
 	status := atom.ExitStatus{}
 	if operationError != nil {
 		var exitError *exec.ExitError

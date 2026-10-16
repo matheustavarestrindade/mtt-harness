@@ -2,6 +2,342 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "metadata signal",
+      "category": "technical_noun",
+      "approved_forms": [
+        "metadata signals"
+      ],
+      "meaning": "a coalesced notification that causes a socket worker to read current session data",
+      "source": "session views"
+    },
+    {
+      "term": "WebSocket ping",
+      "category": "technical_noun",
+      "approved_forms": [
+        "WebSocket pings"
+      ],
+      "meaning": "a protocol ping that checks connection health",
+      "source": "session views"
+    },
+    {
+      "term": "agent origin",
+      "category": "technical_noun",
+      "approved_forms": [
+        "agent origins"
+      ],
+      "meaning": "the recorded parent message and tool call of a child agent",
+      "source": "session views"
+    },
+    {
+      "term": "output history",
+      "category": "technical_noun",
+      "meaning": "previously stored model and tool output events",
+      "source": "session views"
+    },
+    {
+      "term": "metadata",
+      "category": "technical_noun",
+      "meaning": "descriptive runtime data about messages, processes, or a session",
+      "source": "session views"
+    },
+    {
+      "term": "session socket",
+      "category": "technical_noun",
+      "approved_forms": [
+        "session sockets"
+      ],
+      "meaning": "the authenticated WebSocket for session state and events",
+      "source": "session views"
+    },
+    {
+      "term": "socket worker",
+      "category": "technical_noun",
+      "approved_forms": [
+        "socket workers"
+      ],
+      "meaning": "the request worker that reads and writes a WebSocket",
+      "source": "session views"
+    },
+    {
+      "term": "view snapshot",
+      "category": "technical_noun",
+      "approved_forms": [
+        "view snapshots"
+      ],
+      "meaning": "a bounded authoritative projection for one session view",
+      "source": "session views"
+    },
+    {
+      "term": "request interval",
+      "category": "technical_noun",
+      "approved_forms": [
+        "request intervals"
+      ],
+      "meaning": "the time between HTTP recovery requests",
+      "source": "session views"
+    },
+    {
+      "term": "HTTP timer",
+      "category": "technical_noun",
+      "approved_forms": [
+        "HTTP timers"
+      ],
+      "meaning": "a client timer for disconnected-state recovery",
+      "source": "session views"
+    },
+    {
+      "term": "reading position",
+      "category": "technical_noun",
+      "approved_forms": [
+        "reading positions"
+      ],
+      "meaning": "the visible scroll position held during a history page change",
+      "source": "session views"
+    },
+    {
+      "term": "session update",
+      "category": "technical_noun",
+      "approved_forms": [
+        "session updates"
+      ],
+      "meaning": "a persisted change to a session record",
+      "source": "session views"
+    },
+    {
+      "term": "pipe",
+      "category": "technical_noun",
+      "approved_forms": [
+        "pipes"
+      ],
+      "meaning": "an operating-system byte stream between a process and its caller",
+      "source": "process I/O"
+    },
+    {
+      "term": "dimension",
+      "category": "technical_noun",
+      "approved_forms": [
+        "dimensions"
+      ],
+      "meaning": "the row or column size of a process terminal",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "terminal view",
+      "category": "technical_noun",
+      "approved_forms": [
+        "terminal views"
+      ],
+      "meaning": "an xterm.js view of process output and optional input",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "input handler",
+      "category": "technical_noun",
+      "approved_forms": [
+        "input handlers"
+      ],
+      "meaning": "a callback that accepts terminal keyboard or socket input",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "process socket",
+      "category": "technical_noun",
+      "approved_forms": [
+        "process sockets"
+      ],
+      "meaning": "the bidirectional WebSocket for a running harness process",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "carriage return",
+      "category": "technical_noun",
+      "approved_forms": [
+        "carriage returns"
+      ],
+      "meaning": "the terminal control character that returns the cursor to the start of a line",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "PTY",
+      "category": "technical_noun",
+      "approved_forms": [
+        "PTYs"
+      ],
+      "meaning": "a pseudo-terminal that connects a process to terminal input and output",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "pseudo-terminal",
+      "category": "technical_noun",
+      "approved_forms": [
+        "pseudo-terminals"
+      ],
+      "meaning": "an operating-system terminal pair used by a command and its controller",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "terminal input",
+      "category": "technical_noun",
+      "meaning": "bytes sent to a running terminal-backed process",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "terminal output",
+      "category": "technical_noun",
+      "meaning": "the raw combined output of a terminal-backed process",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "terminal resize",
+      "category": "technical_noun",
+      "meaning": "a change to the columns and rows of a process terminal",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "input frame",
+      "category": "technical_noun",
+      "approved_forms": [
+        "input frames"
+      ],
+      "meaning": "a bounded WebSocket message that carries process input",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "control frame",
+      "category": "technical_noun",
+      "approved_forms": [
+        "control frames"
+      ],
+      "meaning": "a process socket message that carries a control result",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "socket frame",
+      "category": "technical_noun",
+      "approved_forms": [
+        "socket frames"
+      ],
+      "meaning": "a WebSocket protocol data frame",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "resize observer",
+      "category": "technical_noun",
+      "approved_forms": [
+        "resize observers"
+      ],
+      "meaning": "a browser observer for terminal display dimensions",
+      "source": "interactive terminals"
+    },
+    {
+      "term": "history page",
+      "category": "technical_noun",
+      "approved_forms": [
+        "history pages"
+      ],
+      "meaning": "a bounded saved-message page with sequence positions and revision metadata",
+      "source": "session views"
+    },
+    {
+      "term": "history window",
+      "category": "technical_noun",
+      "approved_forms": [
+        "history windows"
+      ],
+      "meaning": "the bounded set of messages retained in a client view",
+      "source": "session views"
+    },
+    {
+      "term": "state frame",
+      "category": "technical_noun",
+      "approved_forms": [
+        "state frames"
+      ],
+      "meaning": "a WebSocket frame that contains a session view snapshot",
+      "source": "session views"
+    },
+    {
+      "term": "session view",
+      "category": "technical_noun",
+      "approved_forms": [
+        "session views"
+      ],
+      "meaning": "the bounded client-facing state and event projection of a session",
+      "source": "session views"
+    },
+    {
+      "term": "live response",
+      "category": "technical_noun",
+      "approved_forms": [
+        "live responses"
+      ],
+      "meaning": "the currently streamed, bounded public model response",
+      "source": "session views"
+    },
+    {
+      "term": "live preview",
+      "category": "technical_noun",
+      "approved_forms": [
+        "live previews"
+      ],
+      "meaning": "a bounded display of a response that is still streaming",
+      "source": "session views"
+    },
+    {
+      "term": "DOM anchor",
+      "category": "technical_noun",
+      "approved_forms": [
+        "DOM anchors"
+      ],
+      "meaning": "a visible element used to preserve scroll position while the history window changes",
+      "source": "session views"
+    },
+    {
+      "term": "sequence position",
+      "category": "technical_noun",
+      "approved_forms": [
+        "sequence positions"
+      ],
+      "meaning": "an exclusive saved-message sequence cursor",
+      "source": "session views"
+    },
+    {
+      "term": "tool owner",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tool owners"
+      ],
+      "meaning": "the assistant message that contains the matching tool call",
+      "source": "session views"
+    },
+    {
+      "term": "body window",
+      "category": "technical_noun",
+      "approved_forms": [
+        "body windows"
+      ],
+      "meaning": "the saved message bodies held by one client view",
+      "source": "session views"
+    },
+    {
+      "term": "retention limit",
+      "category": "technical_noun",
+      "approved_forms": [
+        "retention limits"
+      ],
+      "meaning": "the maximum message, byte, or metadata amount held in a view",
+      "source": "session views"
+    },
+    {
+      "term": "model-selection revision",
+      "category": "technical_noun",
+      "approved_forms": [
+        "model-selection revisions"
+      ],
+      "meaning": "a monotonic version of a session's model and reasoning selection",
+      "source": "session views"
+    },
+    {
       "term": "idle workspace",
       "category": "technical_noun",
       "approved_forms": [

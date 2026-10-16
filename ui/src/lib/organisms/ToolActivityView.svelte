@@ -35,5 +35,10 @@
   renderOutput={record && processes.api ? terminal : undefined}
 />
 {#snippet terminal()}
-  {#if record && processes.api}<LiveProcessOutput api={processes.api} {record} {activity} />{/if}
+  {#if record && processes.api}<LiveProcessOutput
+      api={processes.api}
+      {record}
+      {activity}
+      onRecord={(updated) => processes.applyRecords([updated])}
+    />{/if}
 {/snippet}

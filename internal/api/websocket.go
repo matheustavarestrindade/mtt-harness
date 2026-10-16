@@ -13,6 +13,10 @@ import (
 )
 
 func (server *Server) sessionEvents(responseWriter http.ResponseWriter, request *http.Request) {
+	if request.URL.Query().Get("view") == "true" {
+		server.sessionViewEvents(responseWriter, request)
+		return
+	}
 	sessionID := atom.SessionID(request.PathValue("id"))
 	_, operationError := server.store.Sessions().Get(request.Context(), sessionID)
 	if respondToError(responseWriter, http.StatusNotFound, operationError) {
@@ -65,40 +69,6 @@ func (server *Server) sessionEvents(responseWriter http.ResponseWriter, request 
 		case <-operationContext.Done():
 			return
 		case <-changed:
-		}
-	}
-}
-
-func (server *Server) processOutput(responseWriter http.ResponseWriter, request *http.Request) {
-	identifier := request.PathValue("id")
-	if _, found := server.processes.Get(identifier); !found {
-		writeError(responseWriter, http.StatusNotFound, "process output is not retained")
-		return
-	}
-	connection, operationError := websocket.Accept(responseWriter, request, &websocket.AcceptOptions{OriginPatterns: []string{"*"}})
-	if operationError != nil {
-		return
-	}
-	defer connection.Close(websocket.StatusNormalClosure, "")
-	operationContext := connection.CloseRead(request.Context())
-	events, found := server.processes.SubscribeContext(operationContext, identifier)
-	if !found {
-		return
-	}
-	for {
-		select {
-		case <-operationContext.Done():
-			return
-		case event, open := <-events:
-			if !open {
-				return
-			}
-			if operationError := sendJSON(operationContext, connection, map[string]any{"process_id": event.ProcessID, "stream": event.Stream, "data": string(event.Data), "data_base64": event.Data, "offset": event.Offset, "snapshot": event.Snapshot, "at": event.At, "error": event.Error, "exit": event.Exit}); operationError != nil {
-				return
-			}
-			if event.Stream == atom.StreamExit {
-				return
-			}
 		}
 	}
 }

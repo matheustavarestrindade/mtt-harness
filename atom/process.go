@@ -23,6 +23,11 @@ type ProcessSpec struct {
 	Env     []string
 	Notify  NotifyPolicy
 	Timeout time.Duration
+	// Terminal attaches stdin/stdout/stderr to one PTY. Its bytes are reported on
+	// stdout; pipe mode retains separate stdout/stderr streams.
+	Terminal bool `json:",omitempty"`
+	Columns  int  `json:",omitempty"`
+	Rows     int  `json:",omitempty"`
 	// IdleTimeout bounds a foreground quiet wait or one background inactivity
 	// notice. Zero disables inactivity handling; it never stops the command.
 	IdleTimeout time.Duration

@@ -352,6 +352,7 @@
       const panelID = await workbench.selectAgent(session);
       if (!panelID) return;
       await tick();
+      if (menuOpen) return;
       const panel = document.getElementById(`agent-panel-${panelID}`);
       panel?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       panel

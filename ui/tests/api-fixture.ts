@@ -3,6 +3,7 @@ import type { ProcessRecord } from '../src/lib/atoms/processes';
 import type { MemoryMetrics, MemoryPluginState } from '../src/lib/atoms/memory';
 import type { RepetitionConfiguration, WorkspacePluginState } from '../src/lib/atoms/plugins';
 import type { PluginActivityPage } from '../src/lib/atoms/plugin-activity';
+import type { HistoryPage, SessionViewState } from '../src/lib/atoms/session-view';
 import type {
   HarnessEvent,
   Instance,
@@ -24,6 +25,7 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
   const processes = new Map<string, ProcessRecord>();
   const processSockets = new Map<WebSocketRoute, string>();
   const processConnections: string[] = [];
+  const processControls: { id: string; control: Record<string, unknown> }[] = [];
   const processOutput = new Map<
     string,
     { stdout: Buffer; stderr: Buffer; stdoutBytes: number; stderrBytes: number }
@@ -87,6 +89,8 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
   const eventHistory: HarnessEvent[] = [];
   let identifier = 0;
   let sequence = 0;
+  let messageSequence = 0;
+  const messageSequences = new Map<string, number>();
   const model: Model = {
     ID: 'test/test-model',
     Level: 0,
@@ -97,6 +101,234 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
     Prices: null,
   };
   const models: Model[] = [model];
+  function historyPage(
+    session: Session,
+    query: URLSearchParams = new URLSearchParams(),
+  ): HistoryPage {
+    const all = (histories.get(session.ID) ?? []).map((message) => {
+      if (!messageSequences.has(message.ID)) {
+        messageSequence = Math.max(messageSequence + 1, message.Seq || 0);
+        messageSequences.set(message.ID, messageSequence);
+      }
+      return { ...message, Seq: messageSequences.get(message.ID)! };
+    });
+    const modelMap: Record<string, string> = {};
+    for (const event of eventHistory) {
+      const payload = event.Payload as Record<string, unknown> | null;
+      if (
+        event.SessionID === session.ID &&
+        event.Name === 'model.call' &&
+        typeof payload?.message_id === 'string' &&
+        typeof payload.model === 'string'
+      )
+        modelMap[payload.message_id] = payload.model;
+    }
+    const before = Number(query.get('before') ?? 0),
+      after = Number(query.get('after') ?? 0),
+      limit = Number(query.get('limit') ?? 50);
+    const filtered = all.filter(
+      (message) => (!before || message.Seq < before) && (!after || message.Seq > after),
+    );
+    const messages =
+      query.get('metadata') === 'true'
+        ? []
+        : after
+          ? filtered.slice(0, limit)
+          : filtered.slice(-limit);
+    const context: Message[] = [];
+    if (messages[0]?.Role === 'tool') {
+      const owner = [...all]
+        .reverse()
+        .find(
+          (message) =>
+            message.Seq < messages[0].Seq &&
+            message.Role === 'assistant' &&
+            message.ToolCalls?.some((call) => call.ID === messages[0].ToolCallID),
+        );
+      if (owner)
+        context.push({
+          ...owner,
+          Content: [],
+          Reasoning: '',
+          Usage: null,
+          ToolCalls:
+            owner.ToolCalls?.filter((call) =>
+              messages.some((message) => message.ToolCallID === call.ID),
+            ) ?? [],
+        });
+    }
+    const latest = [...all].reverse().find((message) => message.Role === 'assistant');
+    const ids = new Set([...messages, ...context].map((message) => message.ID));
+    return {
+      SessionID: session.ID,
+      Revision: session.HistoryRevision ?? 0,
+      Messages: messages,
+      Context: context,
+      Models: modelMap,
+      Sizes: Object.fromEntries(
+        messages.map((message) => [message.ID, JSON.stringify(message).length]),
+      ),
+      FirstSeq: messages[0]?.Seq ?? 0,
+      LastSeq: messages.at(-1)?.Seq ?? 0,
+      HeadSeq: all.at(-1)?.Seq ?? 0,
+      HasOlder: !!messages.length && all[0].Seq < messages[0].Seq,
+      HasNewer: !!messages.length && all.at(-1)!.Seq > messages.at(-1)!.Seq,
+      LatestResponse: latest
+        ? {
+            MessageID: latest.ID,
+            Seq: latest.Seq,
+            Model: modelMap[latest.ID] ?? '',
+            Usage: latest.Usage,
+            CreatedAt: latest.CreatedAt,
+          }
+        : null,
+      Processes: [...processes.values()].filter(
+        (process) => process.SessionID === session.ID && ids.has(process.Spec.ToolMessageID ?? ''),
+      ),
+      Task: session.Parent
+        ? all
+            .find((message) => message.Role === 'user')
+            ?.Content?.filter((content) => content.Type === 'text')
+            .map((content) => content.Text)
+            .join('\n')
+        : '',
+    };
+  }
+  function viewState(session: Session, details = true): SessionViewState {
+    const history = historyPage(session, new URLSearchParams('metadata=true'));
+    const events = eventHistory.filter((event) => event.SessionID === session.ID);
+    const permissions = new Map<string, import('../src/lib/atoms/types').PermissionRequest>();
+    let live: SessionViewState['Live'] = null;
+    let outcome = '';
+    for (const event of events) {
+      const payload = event.Payload as Record<string, unknown> | null;
+      if (event.Name === 'permission.request' && typeof payload?.ID === 'string')
+        permissions.set(
+          payload.ID,
+          payload as unknown as import('../src/lib/atoms/types').PermissionRequest,
+        );
+      if (event.Name === 'permission.decision' && typeof payload?.RequestID === 'string')
+        permissions.delete(payload.RequestID);
+      if (event.Name === 'model.call' && typeof payload?.message_id === 'string')
+        live = {
+          Message: {
+            ID: payload.message_id,
+            SessionID: session.ID,
+            Seq: 0,
+            Role: 'assistant',
+            Content: [],
+            ToolCalls: [],
+            ToolCallID: '',
+            Usage: null,
+            CreatedAt: event.Time,
+          },
+          Model: String(payload.model ?? ''),
+          Revision: 0,
+          Truncated: false,
+        };
+      if (event.Name === 'model.chunk' && live && payload?.message_id === live.Message.ID) {
+        if (typeof payload.text === 'string') {
+          const text = (live.Message.Content?.[0]?.Text ?? '') + payload.text;
+          live.Message.Content = [
+            { Type: 'text', Text: text, Data: null, MIME: '', URL: '', Filename: '', AudioID: '' },
+          ];
+        }
+        if (typeof payload.reasoning === 'string')
+          live.Message.Reasoning = (live.Message.Reasoning ?? '') + payload.reasoning;
+        live.Revision = Number(payload.chunk_index ?? live.Revision + 1);
+      }
+      if (event.Name === 'action.received' && live) {
+        const call = (payload?.Call ??
+          payload) as unknown as import('../src/lib/atoms/types').ToolCall;
+        if (call?.ID) live.Message.ToolCalls = [...(live.Message.ToolCalls ?? []), call];
+      }
+      if (['turn.end', 'run.error', 'run.cancelled'].includes(event.Name)) {
+        live = null;
+        permissions.clear();
+        outcome =
+          typeof payload?.status === 'string'
+            ? payload.status
+            : event.Name === 'run.error'
+              ? 'error'
+              : event.Name === 'run.cancelled'
+                ? 'cancelled'
+                : 'completed';
+      }
+    }
+    if (live && histories.get(session.ID)?.some((message) => message.ID === live?.Message.ID))
+      live = null;
+    const instance = instances.find((instance) => instance.ID === session.InstanceID);
+    return {
+      Session: session,
+      Outcome: outcome,
+      Status: {
+        running: running.has(session.ID),
+        queued: queued.get(session.ID)?.length ?? 0,
+        messages: queued.get(session.ID)?.map((message) => message.ID) ?? [],
+        error: '',
+      },
+      Statistics: sessionUsage,
+      TaskState: taskStates.get(session.ID) ?? {
+        SessionID: session.ID,
+        Todo: [],
+        Doing: null,
+        Revision: 0,
+        UpdatedAt: session.CreatedAt,
+      },
+      Permissions: [...permissions.values()],
+      History: history,
+      Live: details ? live : null,
+      Processes: details
+        ? [...processes.values()].filter((process) => process.SessionID === session.ID).slice(-128)
+        : [],
+      WorkspaceLinked: !!instance,
+      WorkspaceStopped: instance?.Stopped ?? true,
+      ActiveSessions: [...running].filter((identifier) =>
+        sessions.some(
+          (entry) => entry.ID === identifier && entry.InstanceID === session.InstanceID,
+        ),
+      ),
+    };
+  }
+  function sendState(
+    socket: WebSocketRoute,
+    initial = false,
+    patch: Partial<SessionViewState> = {},
+  ) {
+    const url = new URL(socket.url());
+    const session = sessions.find((session) => url.pathname.includes(`/sessions/${session.ID}/`));
+    if (!session) return;
+    socket.send(
+      JSON.stringify({
+        type: 'state',
+        session_id: session.ID,
+        cursor: sequence,
+        covered_cursor: sequence,
+        state: { ...viewState(session, url.searchParams.get('details') !== 'false'), ...patch },
+        initial,
+        recent: initial
+          ? eventHistory
+              .filter(
+                (event) =>
+                  event.SessionID === session.ID &&
+                  event.Name !== 'model.chunk' &&
+                  event.Name !== 'process.output',
+              )
+              .slice(-80)
+          : undefined,
+      }),
+    );
+  }
+  function state(session: Session, patch: Partial<SessionViewState> = {}) {
+    for (const socket of openSockets) {
+      const url = new URL(socket.url());
+      if (
+        url.searchParams.get('view') === 'true' &&
+        url.pathname.includes(`/sessions/${session.ID}/`)
+      )
+        sendState(socket, false, patch);
+    }
+  }
   function outputFrame(
     identifier: string,
     stream: string,
@@ -114,6 +346,12 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
       at: new Date().toISOString(),
       error: '',
       exit: stream === 'exit' ? processes.get(identifier)?.Exit : null,
+      terminal: stream === 'start' ? processes.get(identifier)?.Spec.Terminal : undefined,
+      input:
+        stream === 'start'
+          ? processes.get(identifier)?.Spec.Terminal === true &&
+            processes.get(identifier)?.Status === 'running'
+          : undefined,
     });
   }
   await page.routeWebSocket(/\/api\/processes\/.*\/output/, (socket) => {
@@ -123,6 +361,18 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
     socket.onClose((code, reason) => {
       processSockets.delete(socket);
       void socket.close({ code, reason });
+    });
+    socket.onMessage((message) => {
+      const control = JSON.parse(String(message));
+      processControls.push({ id: identifier, control });
+      if (control.type === 'input') {
+        const bytes = control.data_base64
+          ? Buffer.from(control.data_base64, 'base64')
+          : Buffer.from(control.data ?? '');
+        if (bytes.equals(Buffer.from([3]))) processExit(identifier, 130);
+        else processChunk(identifier, 'stdout', bytes);
+      }
+      if (control.type === 'signal' && control.signal === 'interrupt') processExit(identifier, 130);
     });
     socket.send(outputFrame(identifier, 'start'));
     const output = processOutput.get(identifier);
@@ -186,6 +436,10 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
   await page.routeWebSocket(/\/api\/sessions\/.*\/events/, (socket) => {
     openSockets.add(socket);
     socket.onClose(() => openSockets.delete(socket));
+    if (new URL(socket.url()).searchParams.get('view') === 'true') {
+      sendState(socket, true);
+      return;
+    }
     if (options.replayEvents) {
       const url = new URL(socket.url());
       const since = Number(url.searchParams.get('since') ?? '0');
@@ -196,6 +450,40 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
     }
   });
   function event(session: Session, name: string, payload: unknown) {
+    const data = payload as Record<string, unknown> | null;
+    if (name === 'agent.start' && typeof data?.session === 'string') {
+      const child = sessions.find((entry) => entry.ID === data.session);
+      if (child && !child.Completed) {
+        running.add(child.ID);
+        const call = [...eventHistory]
+          .reverse()
+          .find((event) => event.SessionID === session.ID && event.Name === 'model.call');
+        child.ParentMessageID = String(
+          data.message_id ?? (call?.Payload as Record<string, unknown>)?.message_id ?? '',
+        );
+      }
+    }
+    if (name === 'agent.end' && typeof data?.session === 'string') running.delete(data.session);
+    if (
+      name === 'turn.start' ||
+      (name === 'model.call' &&
+        typeof data?.message_id === 'string' &&
+        !histories.get(session.ID)?.some((message) => message.ID === data.message_id))
+    )
+      running.add(session.ID);
+    if (['turn.end', 'run.cancelled', 'run.error', 'run.interrupted'].includes(name))
+      running.delete(session.ID);
+    if (name === 'model.chunk' && data && typeof data.chunk_index !== 'number')
+      payload = {
+        ...data,
+        chunk_index:
+          eventHistory.filter(
+            (event) =>
+              event.SessionID === session.ID &&
+              event.Name === 'model.chunk' &&
+              (event.Payload as Record<string, unknown>)?.message_id === data.message_id,
+          ).length + 1,
+      };
     const value: HarnessEvent = {
       Seq: ++sequence,
       Name: name,
@@ -206,8 +494,16 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
     };
     eventHistory.push(value);
     for (const socket of openSockets) {
-      if (socket.url().includes(`/sessions/${session.ID}/`)) socket.send(JSON.stringify(value));
+      if (socket.url().includes(`/sessions/${session.ID}/`)) {
+        const modern = new URL(socket.url()).searchParams.get('view') === 'true';
+        socket.send(JSON.stringify(modern ? { type: 'event', event: value } : value));
+      }
     }
+    if (name !== 'model.chunk' && name !== 'process.output')
+      setTimeout(() => {
+        for (const entry of sessions.filter((entry) => entry.InstanceID === session.InstanceID))
+          state(entry);
+      }, 75);
   }
   await page.route(
     (url) => url.pathname.startsWith('/api/'),
@@ -479,6 +775,19 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
           return reply({ status: 'deleted', session_ids: [...removed] });
         }
         if (parts.length === 2 && method === 'GET') return reply(session);
+        if (parts[2] === 'state')
+          return reply(
+            viewState(session, new URL(request.url()).searchParams.get('details') !== 'false'),
+          );
+        if (parts[2] === 'history') {
+          const query = new URL(request.url()).searchParams;
+          if (
+            query.has('revision') &&
+            Number(query.get('revision')) !== (session.HistoryRevision ?? 0)
+          )
+            return reply({ error: 'session history changed' }, 409);
+          return reply(historyPage(session, query));
+        }
         if (parts[2] === 'model' && method === 'PUT') {
           const input = request.postDataJSON();
           const target = models.find((entry) => entry.ID === input.model);
@@ -497,11 +806,13 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
               409,
             );
           session.Model = target.ID;
+          session.SelectionRevision = (session.SelectionRevision ?? 0) + 1;
           if (
             !target.Reasoning ||
             !target.ReasoningEfforts?.includes(session.ReasoningEffort ?? '')
           )
             session.ReasoningEffort = '';
+          setTimeout(() => state(session), 75);
           return reply(session);
         }
         if (parts[2] === 'reasoning' && method === 'PUT') {
@@ -513,6 +824,8 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
           )
             return reply({ error: 'Unsupported reasoning effort' }, 400);
           session.ReasoningEffort = effort;
+          session.SelectionRevision = (session.SelectionRevision ?? 0) + 1;
+          setTimeout(() => state(session), 75);
           return reply(session);
         }
         if (parts[2] === 'messages' && method === 'GET') return reply(histories.get(session.ID));
@@ -576,6 +889,7 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
           };
           if (running.has(session.ID)) {
             queued.get(session.ID)?.push(message);
+            setTimeout(() => state(session), 75);
             return reply(
               { status: 'queued', position: queued.get(session.ID)?.length, message },
               202,
@@ -618,6 +932,7 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
             session.ID,
             queued.get(session.ID)?.filter((message) => message.ID !== parts[3]) ?? [],
           );
+          setTimeout(() => state(session), 75);
           return reply({ status: 'removed' });
         }
         if (parts[2] === 'cancel') {
@@ -627,7 +942,10 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
         }
       }
       if (parts[0] === 'permissions') {
-        if (session) event(session, 'permission.decision', { RequestID: parts[1] });
+        const owner = sessions.find((candidate) =>
+          viewState(candidate).Permissions.some((permission) => permission.ID === parts[1]),
+        );
+        if (owner) event(owner, 'permission.decision', { RequestID: parts[1] });
         return reply({ status: 'resolved' });
       }
       return reply({ error: `Fixture has no route for ${method} ${path}` }, 404);
@@ -641,6 +959,7 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
     processes,
     processSockets,
     processConnections,
+    processControls,
     processChunk,
     processExit,
     disconnectProcess,
@@ -648,8 +967,12 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
     model,
     models,
     sessionUsage,
+    queued,
     running,
     event,
+    state,
+    historyPage,
+    viewState,
     taskStates,
     memoryStates,
     memoryMetrics,

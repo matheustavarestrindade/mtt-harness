@@ -3,6 +3,8 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
@@ -64,6 +66,10 @@ func (processStore *processes) List(operationContext context.Context, session at
 	if operationError != nil {
 		return nil, operationError
 	}
+	return scanProcesses(rows)
+}
+
+func scanProcesses(rows pgx.Rows) ([]atom.ProcessRecord, error) {
 	defer rows.Close()
 	var list []atom.ProcessRecord
 	for rows.Next() {
@@ -79,4 +85,29 @@ func (processStore *processes) List(operationContext context.Context, session at
 		list = append(list, record)
 	}
 	return list, rows.Err()
+}
+
+func (processStore *processes) Recent(operationContext context.Context, session atom.SessionID, limit int) ([]atom.ProcessRecord, error) {
+	if limit < 1 || limit > 256 {
+		return nil, fmt.Errorf("process metadata limit must be between 1 and 256")
+	}
+	rows, operationError := processStore.store.pool.Query(operationContext, `SELECT id,instance_id,session_id,spec-'Args'-'Env',pid,status,exit,started_at,ended_at FROM processes WHERE session_id=$1 ORDER BY started_at DESC,id DESC LIMIT $2`, string(session), limit)
+	if operationError != nil {
+		return nil, operationError
+	}
+	return scanProcesses(rows)
+}
+
+func (processStore *processes) ForMessages(operationContext context.Context, session atom.SessionID, messageIDs []string) ([]atom.ProcessRecord, error) {
+	if len(messageIDs) > 101 {
+		return nil, fmt.Errorf("process message limit is 101")
+	}
+	if len(messageIDs) == 0 {
+		return []atom.ProcessRecord{}, nil
+	}
+	rows, operationError := processStore.store.pool.Query(operationContext, `SELECT id,instance_id,session_id,spec-'Args'-'Env',pid,status,exit,started_at,ended_at FROM processes WHERE session_id=$1 AND spec->>'ToolMessageID'=ANY($2::text[]) ORDER BY started_at DESC,id DESC LIMIT 1000`, string(session), messageIDs)
+	if operationError != nil {
+		return nil, operationError
+	}
+	return scanProcesses(rows)
 }

@@ -63,6 +63,8 @@ func (queue *queueStore) Start(operationContext context.Context, messageID strin
 	entry.Running = true
 	queue.store.queued[messageID] = entry
 	queue.store.messages[entry.Message.SessionID] = append(queue.store.messages[entry.Message.SessionID], entry.Message)
+	queue.store.messageSequence++
+	queue.store.messageSequences[entry.Message.ID] = queue.store.messageSequence
 	return nil
 }
 
