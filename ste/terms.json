@@ -2,6 +2,84 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "settings page",
+      "category": "technical_noun",
+      "approved_forms": [
+        "settings pages"
+      ],
+      "meaning": "one selected page in the Settings dialog",
+      "source": "ui"
+    },
+    {
+      "term": "page title",
+      "category": "technical_noun",
+      "approved_forms": [
+        "page titles"
+      ],
+      "meaning": "shared heading, icon and description for a settings page",
+      "source": "ui"
+    },
+    {
+      "term": "tab track",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tab tracks"
+      ],
+      "meaning": "container that holds tab buttons and their selection highlight",
+      "source": "ui"
+    },
+    {
+      "term": "tab highlight",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tab highlights"
+      ],
+      "meaning": "visual selection state of a tab button",
+      "source": "ui"
+    },
+    {
+      "term": "tab button",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tab buttons"
+      ],
+      "meaning": "keyboard-operable selection trigger in a tab list",
+      "source": "ui"
+    },
+    {
+      "term": "control audit",
+      "category": "technical_noun",
+      "approved_forms": [
+        "control audits"
+      ],
+      "meaning": "inspection of UI control usage against the shared component system",
+      "source": "ui"
+    },
+    {
+      "term": "child component",
+      "category": "technical_noun",
+      "approved_forms": [
+        "child components"
+      ],
+      "meaning": "component rendered inside another UI component",
+      "source": "ui"
+    },
+    {
+      "term": "file input",
+      "category": "technical_noun",
+      "approved_forms": [
+        "file inputs"
+      ],
+      "meaning": "browser control that opens the file picker",
+      "source": "ui"
+    },
+    {
+      "term": "keyboard access",
+      "category": "technical_noun",
+      "meaning": "operation of the UI using keyboard input",
+      "source": "ui"
+    },
+    {
       "term": "context window",
       "category": "technical_noun",
       "approved_forms": [

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Check, ChevronDown, Circle, CircleDot, ListTodo, X } from 'lucide-svelte';
   import type { TaskState } from '$lib/atoms/types';
+  import * as Collapsible from '../atoms/ui/collapsible';
 
   let { state: taskState, error = '' }: { state: TaskState | null; error?: string } = $props();
   let expanded = $state(true);
@@ -21,56 +22,55 @@
 {#if active || error}
   <section aria-label="Task progress" class="min-w-0 text-xs">
     {#if active}
-      <button
-        type="button"
-        class="flex min-h-11 w-full items-center gap-2 px-4 py-3 text-left hover:bg-accent/30 focus-visible:outline-2 focus-visible:outline-ring"
-        aria-label="Toggle task progress"
-        aria-expanded={expanded}
-        onclick={() => (expanded = !expanded)}
-      >
-        <ListTodo class="size-3.5 shrink-0 text-muted-foreground" />
-        <span class="min-w-0 flex-1 break-words font-medium"
-          >{taskState?.Doing?.Title ?? 'Tasks'}</span
+      <Collapsible.Root bind:open={expanded}>
+        <Collapsible.Trigger
+          class="flex min-h-11 w-full items-center gap-2 px-4 py-3 text-left hover:bg-accent/30 focus-visible:outline-2 focus-visible:outline-ring"
+          aria-label="Toggle task progress"
         >
-        {#if items.length}<span role="status" class="shrink-0 text-[10px] text-muted-foreground"
-            >{done}/{items.length} done</span
-          >{/if}
-        <ChevronDown
-          class={`size-3.5 shrink-0 text-muted-foreground transition-transform ${expanded ? '' : '-rotate-90'}`}
-        />
-      </button>
-      {#if expanded}
-        <div class="border-t border-border px-4 py-3">
-          {#if taskState?.Doing}
-            <p class="mb-2 whitespace-pre-wrap break-words leading-5 text-muted-foreground">
-              {taskState.Doing.Description}
-            </p>
+          <ListTodo class="size-3.5 shrink-0 text-muted-foreground" />
+          <span class="min-w-0 flex-1 break-words font-medium"
+            >{taskState?.Doing?.Title ?? 'Tasks'}</span
+          >
+          {#if items.length}<span role="status" class="shrink-0 text-[10px] text-muted-foreground"
+              >{done}/{items.length} done</span
+            >{/if}
+          <ChevronDown
+            class={`size-3.5 shrink-0 text-muted-foreground transition-transform ${expanded ? '' : '-rotate-90'}`}
+          />
+        </Collapsible.Trigger>
+        <Collapsible.Content class="border-t border-border px-4 py-3">
+          {#if expanded}
+            {#if taskState?.Doing}
+              <p class="mb-2 whitespace-pre-wrap break-words leading-5 text-muted-foreground">
+                {taskState.Doing.Description}
+              </p>
+            {/if}
+            {#if items.length}
+              <ul class="space-y-1" aria-label="TODO items">
+                {#each items as item (item.ID)}
+                  <li class="flex min-h-7 items-start gap-2 py-1" data-status={item.Status}>
+                    {#if item.Status === 'done'}<Check class="mt-0.5 size-3.5 shrink-0" />
+                    {:else if item.Status === 'cancelled'}<X
+                        class="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                      />
+                    {:else if item.Status === 'in_progress'}<CircleDot
+                        class="mt-0.5 size-3.5 shrink-0"
+                      />
+                    {:else}<Circle class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />{/if}
+                    <span
+                      class={`min-w-0 flex-1 break-words ${item.Status === 'done' || item.Status === 'cancelled' ? 'text-muted-foreground line-through' : ''}`}
+                      >{item.Title}</span
+                    >
+                    <span class="shrink-0 text-[10px] text-muted-foreground"
+                      >{statusLabels[item.Status]}</span
+                    >
+                  </li>
+                {/each}
+              </ul>
+            {/if}
           {/if}
-          {#if items.length}
-            <ul class="space-y-1" aria-label="TODO items">
-              {#each items as item (item.ID)}
-                <li class="flex min-h-7 items-start gap-2 py-1" data-status={item.Status}>
-                  {#if item.Status === 'done'}<Check class="mt-0.5 size-3.5 shrink-0" />
-                  {:else if item.Status === 'cancelled'}<X
-                      class="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
-                    />
-                  {:else if item.Status === 'in_progress'}<CircleDot
-                      class="mt-0.5 size-3.5 shrink-0"
-                    />
-                  {:else}<Circle class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />{/if}
-                  <span
-                    class={`min-w-0 flex-1 break-words ${item.Status === 'done' || item.Status === 'cancelled' ? 'text-muted-foreground line-through' : ''}`}
-                    >{item.Title}</span
-                  >
-                  <span class="shrink-0 text-[10px] text-muted-foreground"
-                    >{statusLabels[item.Status]}</span
-                  >
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        </div>
-      {/if}
+        </Collapsible.Content>
+      </Collapsible.Root>
     {/if}
     {#if error}<p role="status" class="break-words px-4 py-3 text-muted-foreground">
         Task progress unavailable: {error}

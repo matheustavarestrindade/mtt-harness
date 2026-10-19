@@ -6,7 +6,7 @@ async function openSidekick(page: Page) {
   await openWorkbenchAction(page, 'Settings');
   await page
     .getByRole('navigation', { name: 'Settings sections' })
-    .getByRole('button', { name: 'Sidekick', exact: true })
+    .getByRole('tab', { name: 'Sidekick', exact: true })
     .click();
   const panel = page.getByRole('region', { name: 'Sidekick settings', exact: true });
   await expect(panel.getByRole('button', { name: 'Enable Sidekick', exact: true })).toBeVisible();
@@ -88,7 +88,7 @@ test('validate retrieval sources and display observed activity', async ({ page }
   await expect(panel.getByText('Worker tokens', { exact: true }).locator('..')).toContainText(
     '180',
   );
-  await panel.locator('summary').filter({ hasText: 'Sidekick' }).click();
+  await panel.locator('[data-slot="collapsible-trigger"]').filter({ hasText: 'Sidekick' }).click();
   await expect(panel.getByText('Input tokens', { exact: true }).locator('..')).toContainText('120');
   await expect(panel.getByText('Cache read', { exact: true }).locator('..')).toContainText('300');
   await expect(panel.getByText('Cache write', { exact: true }).locator('..')).toContainText('30');

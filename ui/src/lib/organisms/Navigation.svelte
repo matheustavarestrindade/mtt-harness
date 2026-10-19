@@ -13,6 +13,7 @@
     ChevronRight,
   } from 'lucide-svelte';
   import { Button } from '$lib/atoms/ui/button';
+  import * as Collapsible from '$lib/atoms/ui/collapsible';
   import ActivityIndicator from '../atoms/ActivityIndicator.svelte';
   import AgentStatusDot from '../atoms/AgentStatusDot.svelte';
   import { sessionChildren, sessionRoot } from '../atoms/session-tree';
@@ -76,77 +77,82 @@
     ? workbench.agents.focusedID === session.ID
     : workbench.session?.ID === session.ID}
   <li data-session-node={session.ID} data-parent-id={session.Parent} class="min-w-0">
-    <div
-      class="group/session relative flex min-h-8 min-w-0 items-center rounded-md pr-0.5 pointer-coarse:min-h-11 {selected
-        ? isAgent && !active
-          ? 'bg-accent text-muted-foreground'
-          : 'bg-accent text-accent-foreground'
-        : isAgent && active
-          ? 'text-foreground hover:bg-muted'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
-      data-agent-row={isAgent || undefined}
-      data-active={active}
+    <Collapsible.Root
+      bind:open={() => expanded[session.ID] !== false, (value) => (expanded[session.ID] = value)}
     >
-      {#if isAgent}<span
-          class="absolute -left-3 top-1/2 w-3 border-t border-border"
-          aria-hidden="true"
-        ></span>{/if}
-      {#if children.length}
-        <button
-          class="grid size-7 shrink-0 place-items-center rounded-md hover:bg-muted pointer-coarse:h-11 pointer-coarse:w-8"
-          aria-label={`${expanded[session.ID] === false ? 'Expand' : 'Collapse'} agents for ${isAgent ? 'agent' : 'session'} ${shortID(session.ID)}`}
-          aria-expanded={expanded[session.ID] !== false}
-          onclick={() => (expanded[session.ID] = expanded[session.ID] === false)}
-        >
-          <ChevronRight
-            class="size-3.5 transition-transform {expanded[session.ID] === false
-              ? ''
-              : 'rotate-90'}"
-          />
-        </button>
-      {/if}
-      <button
-        class="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-xs pointer-coarse:h-11"
-        aria-current={selected ? (isAgent ? 'location' : 'page') : undefined}
-        aria-label={`${isAgent ? 'Agent' : 'Session'} ${shortID(session.ID)}`}
-        title={`${workbench.agents.task(session.ID) || session.ID}\n${session.Model}${isAgent ? '\n' + (feed?.label ?? (session.Completed ? 'Inactive' : 'Status unavailable')) : ''}`}
-        onclick={() => (isAgent ? onSelectAgent(session) : onSelectSession(session))}
+      <div
+        class="group/session relative flex min-h-8 min-w-0 items-center rounded-md pr-0.5 pointer-coarse:min-h-11 {selected
+          ? isAgent && !active
+            ? 'bg-accent text-muted-foreground'
+            : 'bg-accent text-accent-foreground'
+          : isAgent && active
+            ? 'text-foreground hover:bg-muted'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+        data-agent-row={isAgent || undefined}
+        data-active={active}
       >
-        {#if isAgent}<AgentStatusDot
-            {active}
-            label={feed?.label ?? (session.Completed ? 'Inactive' : 'Status unavailable')}
-          />
-        {:else if session.ID === processingSessionID}<span
-            role="status"
-            aria-label="Processing"
-            data-slot="session-activity"
-            class="inline-flex shrink-0"><ActivityIndicator class="size-3.5" /></span
+        {#if isAgent}<span
+            class="absolute -left-3 top-1/2 w-3 border-t border-border"
+            aria-hidden="true"
+          ></span>{/if}
+        {#if children.length}
+          <Collapsible.Trigger
+            class="grid size-7 shrink-0 place-items-center rounded-md hover:bg-muted pointer-coarse:h-11 pointer-coarse:w-8"
+            aria-label={`${expanded[session.ID] === false ? 'Expand' : 'Collapse'} agents for ${isAgent ? 'agent' : 'session'} ${shortID(session.ID)}`}
           >
-        {:else}<MessageSquare class="size-3.5 shrink-0" strokeWidth={1.7} />{/if}
-        <span class="min-w-0 flex-1 truncate"
-          >{isAgent ? 'Agent' : 'Session'} {shortID(session.ID)}</span
-        >
-      </button>
-      {#if !isAgent}<Button
+            <ChevronRight
+              class="size-3.5 transition-transform {expanded[session.ID] === false
+                ? ''
+                : 'rotate-90'}"
+            />
+          </Collapsible.Trigger>
+        {/if}
+        <Button
           variant="ghost"
-          size="icon"
-          class="size-7 min-h-7 min-w-7 shrink-0 rounded-md p-0 text-muted-foreground hover:text-destructive pointer-coarse:size-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-fine:opacity-0 pointer-fine:group-hover/session:opacity-100 pointer-fine:group-focus-within/session:opacity-100"
-          aria-label={`Delete session ${shortID(session.ID)}`}
-          title="Delete session"
-          onclick={() => onDeleteSession(session)}><Trash2 class="size-3.5" /></Button
-        >{/if}
-    </div>
-    {#if children.length && expanded[session.ID] !== false}
-      <ul
-        aria-label={`Agents of ${isAgent ? 'agent' : 'session'} ${shortID(session.ID)}`}
-        class="ml-3 space-y-0.5 border-l border-border pl-3"
-      >
-        {#each children as child (child.ID)}{@render branch(child, [
-            ...ancestors,
-            session.ID,
-          ])}{/each}
-      </ul>
-    {/if}
+          class="h-8 min-w-0 flex-1 justify-start gap-2 rounded-md border-0 px-2 text-left text-xs font-normal hover:bg-transparent pointer-coarse:h-11"
+          aria-current={selected ? (isAgent ? 'location' : 'page') : undefined}
+          aria-label={`${isAgent ? 'Agent' : 'Session'} ${shortID(session.ID)}`}
+          title={`${workbench.agents.task(session.ID) || session.ID}\n${session.Model}${isAgent ? '\n' + (feed?.label ?? (session.Completed ? 'Inactive' : 'Status unavailable')) : ''}`}
+          onclick={() => (isAgent ? onSelectAgent(session) : onSelectSession(session))}
+        >
+          {#if isAgent}<AgentStatusDot
+              {active}
+              label={feed?.label ?? (session.Completed ? 'Inactive' : 'Status unavailable')}
+            />
+          {:else if session.ID === processingSessionID}<span
+              role="status"
+              aria-label="Processing"
+              data-slot="session-activity"
+              class="inline-flex shrink-0"><ActivityIndicator class="size-3.5" /></span
+            >
+          {:else}<MessageSquare class="size-3.5 shrink-0" strokeWidth={1.7} />{/if}
+          <span class="min-w-0 flex-1 truncate"
+            >{isAgent ? 'Agent' : 'Session'} {shortID(session.ID)}</span
+          >
+        </Button>
+        {#if !isAgent}<Button
+            variant="ghost"
+            size="icon"
+            class="size-7 min-h-7 min-w-7 shrink-0 rounded-md p-0 text-muted-foreground hover:text-destructive pointer-coarse:size-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-fine:opacity-0 pointer-fine:group-hover/session:opacity-100 pointer-fine:group-focus-within/session:opacity-100"
+            aria-label={`Delete session ${shortID(session.ID)}`}
+            title="Delete session"
+            onclick={() => onDeleteSession(session)}><Trash2 class="size-3.5" /></Button
+          >{/if}
+      </div>
+      {#if children.length}<Collapsible.Content>
+          {#if expanded[session.ID] !== false}
+            <ul
+              aria-label={`Agents of ${isAgent ? 'agent' : 'session'} ${shortID(session.ID)}`}
+              class="ml-3 space-y-0.5 border-l border-border pl-3"
+            >
+              {#each children as child (child.ID)}{@render branch(child, [
+                  ...ancestors,
+                  session.ID,
+                ])}{/each}
+            </ul>
+          {/if}
+        </Collapsible.Content>{/if}
+    </Collapsible.Root>
   </li>
 {/snippet}
 
@@ -259,8 +265,9 @@
         <Settings2 class="size-4" />Settings
       </Button>
     </div>
-  {:else}<button
-      class="flex min-h-16 items-center gap-3 border-t border-border px-5 text-left hover:bg-muted"
+  {:else}<Button
+      variant="ghost"
+      class="h-auto min-h-16 justify-start gap-3 rounded-none border-0 border-t border-border px-5 text-left"
       onclick={onSettings}
     >
       <span class="relative grid size-8 place-items-center rounded-full bg-secondary"
@@ -279,5 +286,5 @@
             : 'API connection required'}</span
         ></span
       ><Circle class="size-3 text-muted-foreground/50" />
-    </button>{/if}
+    </Button>{/if}
 </nav>

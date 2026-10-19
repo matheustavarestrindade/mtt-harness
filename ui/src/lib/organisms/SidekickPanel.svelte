@@ -12,6 +12,8 @@
   import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
   import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
+  import * as ToggleGroup from '../atoms/ui/toggle-group';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
 
   let { api, instance }: { api: HarnessApi; instance: Instance | null } = $props();
@@ -133,24 +135,23 @@
 </script>
 
 <section aria-label="Sidekick settings" class="min-w-0 space-y-5">
-  <div class="flex items-start gap-3">
-    <Bot class="mt-1 size-5 shrink-0 text-muted-foreground" />
-    <div class="min-w-0 flex-1">
-      <h2 class="text-lg font-medium">Sidekick</h2>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Useful workspace context for the agent’s current DOING activity.
-      </p>
-    </div>
-    {#if panel.state}<span role="status" class="text-xs text-muted-foreground"
-        >{panel.state.Pending
-          ? 'Updating…'
-          : !panel.state.Available
-            ? 'Unavailable'
-            : panel.state.Enabled
-              ? 'On'
-              : 'Off'}</span
-      >{/if}
-  </div>
+  <SettingsPageTitle
+    icon={Bot}
+    title="Sidekick"
+    description="Useful workspace context for the agent’s current DOING activity."
+  >
+    {#snippet actions()}
+      {#if panel.state}<span role="status" class="text-xs text-muted-foreground"
+          >{panel.state.Pending
+            ? 'Updating…'
+            : !panel.state.Available
+              ? 'Unavailable'
+              : panel.state.Enabled
+                ? 'On'
+                : 'Off'}</span
+        >{/if}
+    {/snippet}
+  </SettingsPageTitle>
   {#if !instance}<p class="text-sm text-muted-foreground">
       Select a workspace to configure Sidekick.
     </p>
@@ -211,21 +212,24 @@
         />
         <div class="space-y-2">
           <p class="text-xs font-medium">Retrieval sources</p>
-          <div class="flex flex-wrap gap-2">
-            <Button
-              variant={memoryEnabled ? 'secondary' : 'outline'}
-              class="h-11"
-              aria-pressed={memoryEnabled}
-              {disabled}
-              onclick={() => (memoryEnabled = !memoryEnabled)}>Workspace memory</Button
-            ><Button
-              variant={filesEnabled ? 'secondary' : 'outline'}
-              class="h-11"
-              aria-pressed={filesEnabled}
-              {disabled}
-              onclick={() => (filesEnabled = !filesEnabled)}>Project files</Button
-            >
-          </div>
+          <ToggleGroup.Root
+            type="multiple"
+            variant="outline"
+            spacing={2}
+            class="flex-wrap gap-2"
+            aria-label="Retrieval sources"
+            {disabled}
+            bind:value={
+              () => [...(memoryEnabled ? ['memory'] : []), ...(filesEnabled ? ['files'] : [])],
+              (value) => {
+                memoryEnabled = value.includes('memory');
+                filesEnabled = value.includes('files');
+              }
+            }
+          >
+            <ToggleGroup.Item value="memory" class="h-11">Workspace memory</ToggleGroup.Item>
+            <ToggleGroup.Item value="files" class="h-11">Project files</ToggleGroup.Item>
+          </ToggleGroup.Root>
           <p class="text-xs text-muted-foreground">
             Medium-compression memory and bounded, read-only file excerpts. No shell commands or
             file changes.

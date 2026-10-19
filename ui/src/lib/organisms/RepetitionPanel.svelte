@@ -14,6 +14,7 @@
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
   import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
   import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
+  import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
 
   let { api, instance }: { api: HarnessApi; instance: Instance | null } = $props();
@@ -138,19 +139,12 @@
   }
 </script>
 
-<section aria-label="Spaced repetition" class="mx-auto min-w-0 max-w-2xl space-y-6">
-  <header class="flex min-w-0 flex-wrap items-start justify-between gap-3">
-    <div class="min-w-0">
-      <h2 class="flex items-center gap-2 text-xl font-medium">
-        <Repeat2 class="size-5 shrink-0" />Spaced repetition
-      </h2>
-      <p class="mt-2 text-sm text-muted-foreground">
-        Instruction reminders and recovery for {instance
-          ? workspaceName(instance.Workspace)
-          : 'the selected workspace'}.
-      </p>
-    </div>
-  </header>
+<section aria-label="Spaced repetition" class="min-w-0 w-full space-y-5">
+  <SettingsPageTitle
+    icon={Repeat2}
+    title="Instructions"
+    description={`Instruction reminders and recovery for ${instance ? workspaceName(instance.Workspace) : 'the selected workspace'}.`}
+  />
   {#if !instance}
     <p class="text-sm text-muted-foreground">
       Select a workspace to configure instruction reminders.

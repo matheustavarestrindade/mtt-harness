@@ -20,6 +20,8 @@
   import type { HarnessApi } from '../molecules/api/client';
   import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
   import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
+  import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
+  import Disclosure from '../molecules/Disclosure.svelte';
   import WatcherEditor from './WatcherEditor.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
   let {
@@ -199,26 +201,23 @@
 </script>
 
 <section aria-label="Watcher settings" class="min-w-0 space-y-5">
-  <header class="flex items-start gap-3">
-    <Eye class="mt-1 size-5 shrink-0 text-muted-foreground" />
-    <div class="min-w-0 flex-1">
-      <h2 class="text-lg font-medium">Watchers</h2>
-      <p class="mt-1 text-sm text-muted-foreground">Automatic workspace reviews.</p>
-    </div>
-    {#if panel.state}<div class="flex min-h-11 shrink-0 items-center gap-3">
-        <span role="status" class="text-xs text-muted-foreground"
-          >{panel.state.Pending ? 'Updating…' : panel.state.Enabled ? 'On' : 'Off'}</span
-        >
-        <Switch
-          aria-label="Watchers enabled"
-          {disabled}
-          bind:checked={
-            () => panel.state?.RequestedEnabled ?? false,
-            (checked) => void panel.configure({ enabled: checked })
-          }
-        />
-      </div>{/if}
-  </header>
+  <SettingsPageTitle icon={Eye} title="Watchers" description="Automatic workspace reviews.">
+    {#snippet actions()}
+      {#if panel.state}<div class="flex min-h-11 shrink-0 items-center gap-3">
+          <span role="status" class="text-xs text-muted-foreground"
+            >{panel.state.Pending ? 'Updating…' : panel.state.Enabled ? 'On' : 'Off'}</span
+          >
+          <Switch
+            aria-label="Watchers enabled"
+            {disabled}
+            bind:checked={
+              () => panel.state?.RequestedEnabled ?? false,
+              (checked) => void panel.configure({ enabled: checked })
+            }
+          />
+        </div>{/if}
+    {/snippet}
+  </SettingsPageTitle>
   {#if !instance}<p class="text-sm text-muted-foreground">
       Select a workspace to configure watchers.
     </p>{:else}
@@ -235,7 +234,10 @@
         {panel.actionError}
       </p>{/if}
     <Tabs.Root bind:value={() => tab, selectTab} class="min-w-0 gap-0">
-      <Tabs.List aria-label="Watcher sections" class="grid h-auto min-h-11 w-full grid-cols-3">
+      <Tabs.List
+        aria-label="Watcher sections"
+        class="grid h-[50px] min-h-[50px] w-full grid-cols-3"
+      >
         <Tabs.Trigger value="definitions" class="min-h-11">Watchers</Tabs.Trigger>
         <Tabs.Trigger value="usage" class="min-h-11">Usage</Tabs.Trigger>
         <Tabs.Trigger value="activity" class="min-h-11">Activity</Tabs.Trigger>
@@ -393,16 +395,15 @@
               {activityError}
             </p>{/if}
           <div class="space-y-2">
-            {#each runs as run (run.id)}<details
+            {#each runs as run (run.id)}<Disclosure
                 class="min-w-0 rounded-md border border-border p-3"
+                triggerClass="min-h-8 py-1 text-sm pointer-coarse:min-h-11"
               >
-                <summary class="cursor-pointer text-sm"
-                  ><span class="break-words">{run.name}</span><span
+                {#snippet heading()}<span class="min-w-0 break-words">{run.name}</span><span
                     class="ml-2 text-xs text-muted-foreground"
                     >{run.status} · {watcherTriggers.find((value) => value.value === run.trigger)
                       ?.label ?? run.trigger}</span
-                  ></summary
-                >
+                  >{/snippet}
                 <div class="mt-3 min-w-0 space-y-3 text-xs">
                   <p class="text-muted-foreground">
                     {new Date(run.created_at).toLocaleString()} · {run.duration_ms} ms{run.decision
@@ -420,17 +421,14 @@
                       onclick={() => void cancelRun(run.id)}
                       ><X class="size-4" />Cancel review</Button
                     >{/if}
-                  <details>
-                    <summary class="cursor-pointer py-2 text-muted-foreground"
-                      >Input · {run.estimated ? '≈ ' : ''}{run.input_tokens.toLocaleString()} tokens{run.input_truncated
-                        ? ' · excerpt'
-                        : ''}</summary
-                    >
+                  <Disclosure
+                    title={`Input · ${run.estimated ? '≈ ' : ''}${run.input_tokens.toLocaleString()} tokens${run.input_truncated ? ' · excerpt' : ''}`}
+                  >
                     <pre
                       class="max-h-72 overflow-auto whitespace-pre-wrap break-words">{run.input_preview}</pre>
-                  </details>
+                  </Disclosure>
                 </div>
-              </details>{/each}
+              </Disclosure>{/each}
           </div>
           {#if !runs.length && !reading}<p class="text-sm text-muted-foreground">
               No watcher runs yet.

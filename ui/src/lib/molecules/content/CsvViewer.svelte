@@ -1,7 +1,10 @@
 <script lang="ts">
   import Papa from 'papaparse';
+  import { Checkbox } from '../../atoms/ui/checkbox';
+  import { Label } from '../../atoms/ui/label';
   let { text, delimiter = ',' }: { text: string; delimiter?: string } = $props();
   let header = $state(true);
+  const headerID = $props.id();
   const preview = $derived(text.slice(0, 1_000_000));
   const result = $derived(
     Papa.parse<string[]>(preview, {
@@ -27,9 +30,8 @@
 </script>
 
 <div class="px-3 py-2 text-xs text-muted-foreground">
-  <label class="inline-flex min-h-11 cursor-pointer items-center gap-2"
-    ><input type="checkbox" bind:checked={header} class="size-4 accent-primary" />First row is a
-    header</label
+  <Label for={headerID} class="inline-flex min-h-11 cursor-pointer items-center gap-2"
+    ><Checkbox id={headerID} bind:checked={header} />First row is a header</Label
   >
   <span class="ml-3">{rows.length} rows · {width} columns{limited ? ' · Preview limited' : ''}</span
   >

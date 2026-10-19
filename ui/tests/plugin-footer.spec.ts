@@ -58,7 +58,7 @@ test('preserve ordinary label spacing in the Sidekick reference', async ({ page 
   await openWorkbenchAction(page, 'Settings');
   await page
     .getByRole('navigation', { name: 'Settings sections' })
-    .getByRole('button', { name: 'Sidekick', exact: true })
+    .getByRole('tab', { name: 'Sidekick', exact: true })
     .click();
   const button = page.getByRole('button', { name: 'Refresh Sidekick', exact: true });
   await expect(button).toBeVisible();
@@ -83,19 +83,19 @@ test('match Instructions and Watchers to the original Sidekick footer', async ({
   await connectAndCreate(page);
   await openWorkbenchAction(page, 'Settings');
   const navigation = page.getByRole('navigation', { name: 'Settings sections' });
-  await navigation.getByRole('button', { name: 'Sidekick', exact: true }).click();
+  await navigation.getByRole('tab', { name: 'Sidekick', exact: true }).click();
   const sidekick = page.getByRole('button', { name: 'Refresh Sidekick', exact: true });
   await expect(sidekick).toBeVisible();
   const baseline = await footerMeasurements(sidekick, 'Sidekick');
   expect(
     await navigation
-      .getByRole('button', { name: 'Sidekick', exact: true })
+      .getByRole('tab', { name: 'Sidekick', exact: true })
       .evaluate((element) => getComputedStyle(element).fontSize),
   ).toBe('12px');
   await sidekick.scrollIntoViewIfNeeded();
   await sidekick.locator('..').screenshot({ path: testInfo.outputPath('sidekick-reference.png') });
   for (const name of ['Instructions', 'Watchers']) {
-    await navigation.getByRole('button', { name, exact: true }).click();
+    await navigation.getByRole('tab', { name, exact: true }).click();
     const button = page.getByRole('button', { name: `Refresh ${name}`, exact: true });
     await expect(button).toBeVisible();
     await button.scrollIntoViewIfNeeded();

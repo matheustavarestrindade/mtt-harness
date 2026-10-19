@@ -17,7 +17,7 @@ async function openWatchers(page: import('@playwright/test').Page) {
   await openWorkbenchAction(page, 'Settings');
   await page
     .getByRole('navigation', { name: 'Settings sections' })
-    .getByRole('button', { name: 'Watchers', exact: true })
+    .getByRole('tab', { name: 'Watchers', exact: true })
     .click();
   await expect(page.getByRole('region', { name: 'Watcher settings' })).toBeVisible();
 }
@@ -222,22 +222,22 @@ test('align Watcher tabs and footer buttons with the Sidekick reference', async 
   await connectAndCreate(page);
   await openWorkbenchAction(page, 'Settings');
   const navigation = page.getByRole('navigation', { name: 'Settings sections' });
-  await navigation.getByRole('button', { name: 'Sidekick', exact: true }).click();
+  await navigation.getByRole('tab', { name: 'Sidekick', exact: true }).click();
   const reference = page.getByRole('button', { name: 'Refresh Sidekick', exact: true });
   await expect(reference).toBeVisible();
   const referenceFont = await reference.evaluate((element) => getComputedStyle(element).fontSize);
   const navigationFont = await navigation
-    .getByRole('button', { name: 'Sidekick', exact: true })
+    .getByRole('tab', { name: 'Sidekick', exact: true })
     .evaluate((element) => getComputedStyle(element).fontSize);
   expect(navigationFont).toBe('12px');
   for (const label of ['Instructions', 'Watchers']) {
     expect(
       await navigation
-        .getByRole('button', { name: label, exact: true })
+        .getByRole('tab', { name: label, exact: true })
         .evaluate((element) => getComputedStyle(element).fontSize),
     ).toBe(navigationFont);
   }
-  await navigation.getByRole('button', { name: 'Watchers', exact: true }).click();
+  await navigation.getByRole('tab', { name: 'Watchers', exact: true }).click();
   const tabs = page.getByRole('tablist', { name: 'Watcher sections' });
   await expect(tabs.getByRole('tab')).toHaveText(['Watchers', 'Usage', 'Activity']);
   const rows = [

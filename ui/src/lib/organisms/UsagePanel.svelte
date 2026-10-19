@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { LoaderCircle, RefreshCw } from 'lucide-svelte';
+  import { LoaderCircle, RefreshCw, ChartNoAxesCombined } from 'lucide-svelte';
   import { Button } from '../atoms/ui/button';
   import { Label } from '../atoms/ui/label';
   import type { Instance, Session, Statistics } from '../atoms/types';
   import { costLabel, workspaceName } from '../atoms/format';
   import type { HarnessApi } from '../molecules/api/client';
   import SelectField from '../molecules/SelectField.svelte';
+  import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
 
   let {
     api,
@@ -72,24 +73,24 @@
   });
 </script>
 
-<section aria-label="Usage overview" class="mx-auto w-full max-w-2xl">
-  <div class="mb-6 flex items-start justify-between gap-3">
-    <div>
-      <h2 class="text-xl font-medium tracking-tight">Usage</h2>
-      <p class="mt-2 text-sm leading-6 text-muted-foreground">
-        Cumulative model usage, including child agents. Cache read and write are shown separately.
-      </p>
-    </div>
-    <Button
-      variant="ghost"
-      size="icon"
-      class="icon-button shrink-0"
-      aria-label="Refresh usage"
-      disabled={loading}
-      onclick={() => revision++}><RefreshCw class="size-4" /></Button
-    >
-  </div>
-  <div class="mb-6 space-y-2">
+<section aria-label="Usage overview" class="min-w-0 w-full space-y-5">
+  <SettingsPageTitle
+    icon={ChartNoAxesCombined}
+    title="Usage"
+    description="Cumulative model usage, including child agents. Cache read and write are shown separately."
+  >
+    {#snippet actions()}
+      <Button
+        variant="ghost"
+        size="icon"
+        class="icon-button shrink-0"
+        aria-label="Refresh usage"
+        disabled={loading}
+        onclick={() => revision++}><RefreshCw class="size-4" /></Button
+      >
+    {/snippet}
+  </SettingsPageTitle>
+  <div class="space-y-2">
     <Label for="usage-scope">Usage scope</Label>
     <SelectField
       id="usage-scope"
@@ -119,7 +120,7 @@
         </div>
       {/each}
     </dl>
-    <dl class="mt-6 space-y-3 border-t border-border pt-5 text-sm">
+    <dl class="space-y-3 border-t border-border pt-5 text-sm">
       <div class="flex justify-between gap-3">
         <dt class="text-muted-foreground">Cache read</dt>
         <dd>{integer(statistics.CacheRead)}</dd>
@@ -129,7 +130,7 @@
         <dd>{integer(statistics.CacheWrite)}</dd>
       </div>
     </dl>
-    <p class="mt-5 text-xs leading-5 text-muted-foreground">
+    <p class="text-xs leading-5 text-muted-foreground">
       Input excludes cache. Output includes reasoning. Costs include only calls with available
       pricing. Catalog estimates can differ from provider bills, including discounts and time-based
       rates. Subscription usage has no per-token charge estimate.

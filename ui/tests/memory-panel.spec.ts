@@ -78,7 +78,7 @@ test('show uncached worker input and output with cache separate and reasoning in
   await expect(panel.getByText('Reported worker tokens', { exact: true })).toBeVisible();
   await expect(panel.locator('[title="650,723"]')).toBeVisible();
   await expect(panel.getByText('97 calls · Workspace total', { exact: true })).toBeVisible();
-  await panel.locator('summary').filter({ hasText: 'Compactor' }).click();
+  await panel.locator('[data-slot="collapsible-trigger"]').filter({ hasText: 'Compactor' }).click();
   const details = panel.getByRole('region', { name: 'Memory agent usage' });
   await expect(details.getByText('596,336', { exact: true })).toBeVisible();
   await expect(details.getByText('54,387', { exact: true })).toBeVisible();
@@ -122,7 +122,7 @@ test('show real memory counters and agent usage without double-counting versions
   await expect(summary).toContainText('1,500');
   await expect(summary).toContainText('$0.0125');
   await expect(panel.getByRole('region', { name: 'Memory jobs' })).toContainText('Prepared');
-  await panel.locator('summary').filter({ hasText: 'Compactor' }).click();
+  await panel.locator('[data-slot="collapsible-trigger"]').filter({ hasText: 'Compactor' }).click();
   const agentUsage = panel.getByRole('region', { name: 'Memory agent usage' });
   await expect(agentUsage.getByText('Input tokens', { exact: true }).locator('..')).toContainText(
     '1,000',

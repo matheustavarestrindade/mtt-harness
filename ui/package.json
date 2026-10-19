@@ -8,8 +8,9 @@
   },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc --project tsconfig.node.json && npm run check:layers",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc --project tsconfig.node.json && npm run check:layers && npm run check:components",
     "check:layers": "node scripts/check-layers.mjs",
+    "check:components": "node scripts/check-components.mjs",
     "format": "prettier --write src tests scripts *.ts *.js *.json",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",

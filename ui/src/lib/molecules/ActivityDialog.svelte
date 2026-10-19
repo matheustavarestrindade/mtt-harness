@@ -3,6 +3,7 @@
   import * as Dialog from '$lib/atoms/ui/dialog';
   import type { HarnessEvent } from '$lib/atoms/types';
   import { formatTimestamp } from '$lib/atoms/format';
+  import Disclosure from './Disclosure.svelte';
   let { open = $bindable(false), events = [] }: { open?: boolean; events?: HarnessEvent[] } =
     $props();
 </script>
@@ -18,21 +19,21 @@
       {#if !events.length}<div class="grid place-items-center gap-3 py-12 text-muted-foreground">
           <Radio class="size-6" />
           <p class="text-sm">No events yet.</p>
-        </div>{/if}{#each [...events].reverse() as event (event.Seq)}<details
+        </div>{/if}{#each [...events].reverse() as event (event.Seq)}<Disclosure
           class="rounded-lg border border-border"
+          triggerClass="min-h-11 px-3 text-xs"
         >
-          <summary class="flex min-h-11 cursor-pointer items-center gap-2 px-3 text-xs"
-            ><Terminal class="size-3 text-primary" /><span class="font-mono">{event.Name}</span
+          {#snippet heading()}<Terminal class="size-3 text-primary" /><span class="font-mono"
+              >{event.Name}</span
             ><span class="ml-auto text-[10px] text-muted-foreground"
               >{formatTimestamp(event.Time)}</span
-            ></summary
-          >
+            >{/snippet}
           <pre class="tool-output m-2 whitespace-pre-wrap break-all">{JSON.stringify(
               event.Payload,
               null,
               2,
             ) ?? 'No payload'}</pre>
-        </details>{/each}
+        </Disclosure>{/each}
     </div></Dialog.Content
   ></Dialog.Root
 >

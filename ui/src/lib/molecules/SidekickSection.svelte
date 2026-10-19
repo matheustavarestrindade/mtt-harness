@@ -5,9 +5,9 @@
   import ContentActions from './ContentActions.svelte';
   import { copyToClipboard } from './clipboard';
   import { toast } from 'svelte-sonner';
+  import * as Collapsible from '../atoms/ui/collapsible';
   let { entry, earlier = false }: { entry: PluginActivityEntry; earlier?: boolean } = $props();
   let open = $state(false);
-  const identifier = $props.id();
   async function copyContext() {
     try {
       await copyToClipboard(
@@ -21,29 +21,24 @@
   }
 </script>
 
-<section
+<Collapsible.Root
+  bind:open
+  role="region"
   class="assistant-section min-w-0"
   data-sidekick-id={entry.ID}
   aria-label="Sidekick context"
 >
-  <button
-    type="button"
-    class="activity-toggle w-full"
-    aria-expanded={open}
-    aria-controls={identifier}
-    onclick={() => (open = !open)}
-  >
+  <Collapsible.Trigger class="activity-toggle w-full">
     <ChevronRight class={`size-3 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
     <Bot class="size-3.5 shrink-0" />
     <span class="shrink-0 font-medium text-foreground">Sidekick</span>
     <span class="min-w-0 truncate" title={entry.Title}>{entry.Title}</span>
     {#if earlier}<span class="ml-auto shrink-0 text-[10px]">Earlier context</span>{/if}
-  </button>
-  {#if open}
-    <div
-      id={identifier}
-      class="tool-details mt-1 min-w-0 border border-border bg-card/70 p-2 text-xs"
-    >
+  </Collapsible.Trigger>
+  <Collapsible.Content
+    class="tool-details mt-1 min-w-0 border border-border bg-card/70 p-2 text-xs"
+  >
+    {#if open}
       <div class="max-h-96 min-w-0 space-y-3 overflow-auto overscroll-contain">
         {#each entry.Notes as note}
           <div class="min-w-0">
@@ -80,6 +75,6 @@
           />
         </div>
       </div>
-    </div>
-  {/if}
-</section>
+    {/if}
+  </Collapsible.Content>
+</Collapsible.Root>

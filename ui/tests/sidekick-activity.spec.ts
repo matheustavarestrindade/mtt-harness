@@ -162,7 +162,7 @@ test('keep earlier hints in a collapsed group, paginate, and remove reverted del
   fixture.event(session, 'model.call', { message_id: 'live', model: session.Model });
   await expect(page.locator('[data-sidekick-id="recent-hint"]')).toBeVisible();
   const earlier = page.getByRole('group', { name: 'Earlier Sidekick context', exact: true });
-  await earlier.locator('summary').click();
+  await earlier.getByRole('button').first().click();
   await earlier.getByRole('button', { name: 'Older Sidekick entries', exact: true }).click();
   await expect(page.locator('[data-sidekick-id="older-hint"]')).toBeVisible();
   reverted = true;

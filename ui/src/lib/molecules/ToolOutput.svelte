@@ -7,6 +7,7 @@
   import StructuredData from './content/StructuredData.svelte';
   import MessageContent from './content/MessageContent.svelte';
   import TerminalOutput from './content/TerminalOutput.svelte';
+  import Disclosure from './Disclosure.svelte';
   let { activity }: { activity: ToolActivity } = $props();
   const path = $derived(plainFileReadPath(activity.call));
   const language = $derived(path ? fileLanguage(path) : 'text');
@@ -38,14 +39,12 @@
   />
   <MessageContent content={content.filter((part) => part.Type !== 'text')} embedded />
   {#if outputKind === 'inactivity' && activity.processNotice}
-    <details class="mt-1 min-w-0 text-xs text-muted-foreground">
-      <summary class="min-h-7 cursor-pointer py-1 pointer-coarse:min-h-11"
-        >{activity.processNotice.kind === 'exit'
-          ? 'Completion output'
-          : 'Background output'}</summary
-      >
+    <Disclosure
+      class="mt-1 text-xs text-muted-foreground"
+      title={activity.processNotice.kind === 'exit' ? 'Completion output' : 'Background output'}
+    >
       <TerminalOutput text={activity.processNotice.output} label="Background process output" />
-    </details>
+    </Disclosure>
   {/if}
 {:else}
   {#each content as part}

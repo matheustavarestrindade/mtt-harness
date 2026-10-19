@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { LoaderCircle } from 'lucide-svelte';
+  import { LoaderCircle, SlidersHorizontal } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
   import { Button } from '../atoms/ui/button';
   import { Input } from '../atoms/ui/input';
@@ -14,6 +14,7 @@
   } from '../atoms/settings';
   import type { HarnessApi } from '../molecules/api/client';
   import SelectField from '../molecules/SelectField.svelte';
+  import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
 
   let { api, instance }: { api: HarnessApi; instance: Instance | null } = $props();
   let scope = $state('harness');
@@ -96,12 +97,13 @@
   onDestroy(() => lifetime.abort());
 </script>
 
-<section aria-label="Runtime settings" class="mx-auto w-full max-w-2xl">
-  <h2 class="text-xl font-medium tracking-tight">General</h2>
-  <p class="mt-2 text-sm leading-6 text-muted-foreground">
-    Set limits for the harness or the selected workspace. Workspace settings take priority.
-  </p>
-  <div class="my-6 space-y-2">
+<section aria-label="Runtime settings" class="min-w-0 w-full space-y-5">
+  <SettingsPageTitle
+    icon={SlidersHorizontal}
+    title="General"
+    description="Set limits for the harness or the selected workspace. Workspace settings take priority."
+  />
+  <div class="space-y-2">
     <Label for="settings-scope">Settings scope</Label>
     <SelectField
       id="settings-scope"

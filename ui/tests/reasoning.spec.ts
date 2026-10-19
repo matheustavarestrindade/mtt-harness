@@ -188,7 +188,7 @@ test('show subscription access without API rates and label estimated usage', asy
   await openWorkbenchAction(page, 'Settings');
   await page
     .getByRole('navigation', { name: 'Settings sections' })
-    .getByRole('button', { name: 'Usage', exact: true })
+    .getByRole('tab', { name: 'Usage', exact: true })
     .click();
   await expect(page.getByRole('dialog')).toContainText('Estimated cost');
 });

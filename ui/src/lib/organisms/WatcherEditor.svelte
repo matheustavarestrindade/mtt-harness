@@ -13,6 +13,7 @@
   import WatcherToolSelector from '../molecules/WatcherToolSelector.svelte';
   import MultiSelectField from '../molecules/MultiSelectField.svelte';
   import FieldHelp from '../molecules/FieldHelp.svelte';
+  import Disclosure from '../molecules/Disclosure.svelte';
   let {
     value,
     models,
@@ -295,15 +296,14 @@
     </div>
   </fieldset>
   {#if error}<p role="alert" class="break-words text-sm text-destructive">{error}</p>{/if}
-  {#if preview}<details open class="min-w-0 rounded border border-border p-3">
-      <summary class="cursor-pointer text-xs"
-        >Input preview · {preview.estimated ? '≈ ' : ''}{preview.input_tokens.toLocaleString()} tokens{preview.truncated
-          ? ' · excerpt'
-          : ''}</summary
-      >
+  {#if preview}<Disclosure
+      open
+      class="rounded border border-border p-3"
+      title={`Input preview · ${preview.estimated ? '≈ ' : ''}${preview.input_tokens.toLocaleString()} tokens${preview.truncated ? ' · excerpt' : ''}`}
+    >
       <pre
         class="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs">{preview.prompt}</pre>
-    </details>{/if}
+    </Disclosure>{/if}
   <div class="flex flex-wrap gap-2 border-t border-border pt-4">
     <Button type="submit" class="h-11" disabled={saving}
       >{saving ? 'Saving…' : 'Save watcher settings'}</Button

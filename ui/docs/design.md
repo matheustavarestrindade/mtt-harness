@@ -163,7 +163,9 @@ The editor has `General`, `When to run`, `Review input`, `Tool access`, and `Exe
 
 The `Conversation to review` field gives the token limit for `{last_context}`. The `Tooltip` gives information about context variables. The `interval_tokens` value is used for `context_growth` events.
 
-The watcher panels use `Tabs`. The panels have the same left edge. The Sidekick view stays the same. `Instructions` and Watchers use `PluginPanelFooter`. The refresh action is at the bottom. The button text is the same as the text in the Sidekick view.
+The Settings pages use `SettingsPageTitle` and `Tabs`. The watcher panels also use `Tabs`. The panels have the same left edge. `Instructions` and Watchers use `PluginPanelFooter`. The refresh action is at the bottom. The button text is the same as the text in the Sidekick view.
+
+See `ui/docs/component-audit.md` for the control audit.
 
 `Settings → Watchers` gives workspace watcher definitions. The editor uses `Schema.JSON` for the tool catalog and default watcher definition. A model is necessary. The user can select file operations for `file_actions`. Tool grants do not use the permission pipeline.
 
@@ -218,6 +220,12 @@ Content views in the panel do not have a card container.
 See `messages.md` for the libraries, content limits, and source buttons.
 
 ## Settings
+
+The settings pages use `SettingsPageTitle`. The settings pages have the same page title dimensions. `SettingsDialog` gives the same left edge to the settings pages.
+
+The `Tabs` component controls the settings pages and Watcher sections. The tab highlight stays in the tab track. The UI shows the selected settings page.
+
+See `ui/docs/component-audit.md` for the control audit.
 
 The `UsageBar` molecule uses `LatestResponse.Usage` from the history metadata. It does not use token values from `Statistics` or from the history page. `Last context` is the sum of `Input`, `CacheRead`, `CacheWrite`, and `Output`. Output includes reasoning tokens. `Out` and `Cache` use the same request.
 

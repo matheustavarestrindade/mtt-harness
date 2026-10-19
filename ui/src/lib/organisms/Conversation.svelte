@@ -22,6 +22,7 @@
   import AgentGroup from './AgentGroup.svelte';
   import MessageCard from '../molecules/MessageCard.svelte';
   import QueuedMessage from '../molecules/QueuedMessage.svelte';
+  import Disclosure from '../molecules/Disclosure.svelte';
   import WatcherSection from '../molecules/WatcherSection.svelte';
   import { watcherRuntimeIDs } from '../atoms/watcher';
   import PermissionCard from '../molecules/PermissionCard.svelte';
@@ -175,13 +176,14 @@
                 ><MessageSquarePlus class="size-4" />New session</Button
               >
             {:else}<div class="grid w-full max-w-xl gap-3 text-left sm:grid-cols-2">
-                {#each [{ title: 'Explore the project', text: 'Read the project instructions and summarize the code structure.' }, { title: 'Find a starting point', text: 'Inspect the project and suggest one small, testable improvement. Explain it before making changes.' }] as suggestion}<button
+                {#each [{ title: 'Explore the project', text: 'Read the project instructions and summarize the code structure.' }, { title: 'Find a starting point', text: 'Inspect the project and suggest one small, testable improvement. Explain it before making changes.' }] as suggestion}<Button
+                    variant="outline"
                     onclick={() => onPrompt(suggestion.text)}
-                    class="group rounded-xl border border-border bg-card/50 p-4 text-left transition-colors hover:border-primary/30 hover:bg-accent/40"
+                    class="group block h-auto whitespace-normal rounded-xl border border-border bg-card/50 p-4 text-left transition-colors hover:border-primary/30 hover:bg-accent/40"
                     ><span class="mb-2 flex items-center gap-2 text-xs font-medium"
                       ><Sparkles class="size-3.5 text-primary/70" />{suggestion.title}</span
                     ><span class="text-xs leading-5 text-muted-foreground">{suggestion.text}</span
-                    ></button
+                    ></Button
                   >{/each}
               </div>{/if}
           </div>
@@ -255,17 +257,18 @@
             >
               {workbench.watchers.error}
             </p>{/if}
-          {#if watcherActivity.unplaced.length}<details class="section-content">
-              <summary class="cursor-pointer py-3 text-xs text-muted-foreground"
-                >Watcher reviews · {watcherActivity.unplaced.length}</summary
-              >{#each watcherActivity.unplaced as review (review.ID)}<WatcherSection
+          {#if watcherActivity.unplaced.length}<Disclosure
+              class="section-content"
+              title={`Watcher reviews · ${watcherActivity.unplaced.length}`}
+            >
+              {#each watcherActivity.unplaced as review (review.ID)}<WatcherSection
                   entry={review}
                 />{/each}{#if workbench.watchers.nextCursor}<Button
                   variant="ghost"
                   class="h-11 text-xs"
                   onclick={() => void workbench.watchers.more()}>Load earlier reviews</Button
                 >{/if}
-            </details>{/if}
+            </Disclosure>{/if}
           {#if workbench.history.hasNewer}<Button
               variant="ghost"
               class="h-11 self-center text-xs"
