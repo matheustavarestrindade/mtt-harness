@@ -72,16 +72,18 @@
     <div class="flex min-h-0 min-w-0 flex-1 flex-col sm:flex-row">
       <nav
         aria-label="Settings sections"
-        class="grid shrink-0 grid-cols-3 gap-1 border-b border-border bg-muted/20 p-2 sm:flex sm:w-44 sm:flex-col sm:border-r sm:border-b-0 sm:p-3"
+        class="grid shrink-0 grid-cols-2 gap-1 border-b border-border bg-muted/20 p-2 min-[380px]:grid-cols-3 sm:flex sm:w-44 sm:flex-col sm:border-r sm:border-b-0 sm:p-3"
       >
         {#each sections as item (item.id)}
           <Button
             variant={section === item.id ? 'secondary' : 'ghost'}
-            class="h-11 min-w-0 shrink-0 gap-2 px-2 text-xs sm:justify-start sm:px-3"
+            class="h-11 min-w-0 shrink-0 gap-2 px-2 text-sm sm:justify-start sm:px-3"
             aria-current={section === item.id ? 'page' : undefined}
             onclick={() => (section = item.id)}
           >
-            <item.icon class="hidden size-4 shrink-0 sm:block" /><span>{item.label}</span>
+            <item.icon class="hidden size-4 shrink-0 sm:block" /><span class="min-w-0 truncate"
+              >{item.label}</span
+            >
           </Button>
         {/each}
       </nav>

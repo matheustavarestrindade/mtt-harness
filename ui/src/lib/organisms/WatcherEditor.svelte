@@ -3,12 +3,16 @@
   import { Button } from '../atoms/ui/button';
   import { Input } from '../atoms/ui/input';
   import { Label } from '../atoms/ui/label';
+  import { Switch } from '../atoms/ui/switch';
+  import { Textarea } from '../atoms/ui/textarea';
   import type { Model } from '../atoms/types';
   import type { WatcherDefinition, WatcherTool, WatcherPreview } from '../atoms/watcher';
   import { watcherTriggers } from '../atoms/watcher';
   import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
   import WatcherToolSelector from '../molecules/WatcherToolSelector.svelte';
+  import MultiSelectField from '../molecules/MultiSelectField.svelte';
+  import FieldHelp from '../molecules/FieldHelp.svelte';
   let {
     value,
     models,
@@ -66,70 +70,82 @@
 </script>
 
 <form
-  class="min-w-0 space-y-5 rounded-md border border-border p-4"
+  class="min-w-0 space-y-6 border-y border-border py-5"
   aria-label="Watcher editor"
   onsubmit={(event) => {
     event.preventDefault();
     void save();
   }}
 >
-  <div class="flex items-center justify-between gap-3">
-    <h3 class="font-medium">Watcher configuration</h3>
-    <label class="flex min-h-11 items-center gap-2 text-xs"
-      ><input
-        type="checkbox"
-        class="size-4 accent-foreground"
+  <fieldset class="min-w-0 space-y-4" disabled={saving}>
+    <legend class="mb-3 text-sm font-medium">General</legend>
+    <div class="flex min-h-11 items-center justify-between gap-3">
+      <Label for={`${identifier}-enabled`}>Enabled</Label>
+      <Switch
+        id={`${identifier}-enabled`}
+        aria-label="Watcher enabled"
         bind:checked={draft.enabled}
         disabled={saving}
-      />Enabled</label
-    >
-  </div>
-  <div class="space-y-2">
-    <Label for={`${identifier}-name`}>Name</Label><Input
-      id={`${identifier}-name`}
-      bind:value={draft.name}
-      maxlength={200}
+      />
+    </div>
+    <div class="space-y-2">
+      <Label for={`${identifier}-name`}>Name</Label><Input
+        id={`${identifier}-name`}
+        bind:value={draft.name}
+        maxlength={200}
+        disabled={saving}
+        required
+      />
+    </div>
+    <div class="space-y-2">
+      <Label for={`${identifier}-model`}>Watcher model</Label><ModelCombobox
+        id={`${identifier}-model`}
+        {models}
+        value={draft.model}
+        onValueChange={(value) => {
+          if (draft.model !== value) draft.reasoning_effort = '';
+          draft.model = value;
+        }}
+        disabled={saving}
+        placeholder="Choose a model"
+      />
+    </div>
+    <ReasoningSelect
+      {model}
+      value={draft.reasoning_effort}
+      onChange={(value) => (draft.reasoning_effort = value)}
+      stacked
       disabled={saving}
-      required
     />
-  </div>
-  <div class="space-y-2">
-    <Label for={`${identifier}-model`}>Watcher model</Label><ModelCombobox
-      id={`${identifier}-model`}
-      {models}
-      value={draft.model}
-      onValueChange={(value) => {
-        if (draft.model !== value) draft.reasoning_effort = '';
-        draft.model = value;
-      }}
-      disabled={saving}
-      placeholder="Choose a model"
-    />
-  </div>
-  <ReasoningSelect
-    {model}
-    value={draft.reasoning_effort}
-    onChange={(value) => (draft.reasoning_effort = value)}
-    stacked
-    disabled={saving}
-  />
-  <fieldset class="space-y-1" disabled={saving}>
-    <legend class="mb-2 text-sm font-medium">Run on</legend>{#each watcherTriggers as trigger}<label
-        class="flex min-h-11 items-center gap-3 text-sm"
-        ><input
-          type="checkbox"
-          class="size-4 accent-foreground"
-          checked={draft.triggers.includes(trigger.value)}
-          onchange={(event) =>
-            (draft.triggers = event.currentTarget.checked
-              ? [...draft.triggers, trigger.value]
-              : draft.triggers.filter((value) => value !== trigger.value))}
-        />{trigger.label}</label
-      >{/each}
   </fieldset>
-  <div class="grid min-w-0 gap-4 sm:grid-cols-2">
-    {#if draft.triggers.includes('context_growth')}<div class="space-y-2">
-        <Label for={`${identifier}-interval`}>Context interval (tokens)</Label><Input
+  <fieldset class="min-w-0 space-y-4 border-t border-border pt-5" disabled={saving}>
+    <legend class="pr-2 text-sm font-medium">When to run</legend>
+    <div class="space-y-2">
+      <Label for={`${identifier}-triggers`}>Run on</Label>
+      <MultiSelectField
+        id={`${identifier}-triggers`}
+        value={draft.triggers}
+        options={watcherTriggers}
+        onValueChange={(selected) =>
+          (draft.triggers = watcherTriggers
+            .filter((trigger) => selected.includes(trigger.value))
+            .map((trigger) => trigger.value))}
+        placeholder="Select events"
+        required
+        disabled={saving}
+      />
+      <p class="text-xs text-muted-foreground">Select one or more events.</p>
+    </div>
+    {#if draft.triggers.includes('context_growth')}
+      <div class="space-y-2">
+        <div class="flex items-center gap-1">
+          <Label for={`${identifier}-interval`}>Context interval (tokens)</Label>
+          <FieldHelp
+            label="About context interval"
+            text="How often this watcher runs as the main conversation grows. For example, 32,768 means one check after each additional 32k tokens of context. The review context setting controls how much conversation it receives."
+          />
+        </div>
+        <Input
           id={`${identifier}-interval`}
           type="number"
           min={256}
@@ -139,38 +155,19 @@
           disabled={saving}
           required
         />
-      </div>{/if}
-    <div class="space-y-2">
-      <Label for={`${identifier}-context`}>Default context window (tokens)</Label><Input
-        id={`${identifier}-context`}
-        type="number"
-        min={256}
-        max={1048576}
-        step={1}
-        bind:value={draft.context_tokens}
-        disabled={saving}
-        required
-      />
-    </div>
-  </div>
-  <label class="flex min-h-11 items-center gap-3 text-xs"
-    ><input
-      type="checkbox"
-      class="size-4 accent-foreground"
-      bind:checked={draft.include_reasoning}
-      disabled={saving}
-    />Include provider-exposed thinking</label
-  >
-  {#if draft.triggers.includes('permission_request')}
-    <fieldset class="space-y-3 rounded border border-border p-3" disabled={saving}>
-      <legend class="px-1 text-xs">Permission filter</legend>
-      <label class="flex min-h-11 items-center gap-3 text-xs"
-        ><input
-          type="checkbox"
-          class="size-4 accent-foreground"
+      </div>
+    {/if}
+    {#if draft.triggers.includes('permission_request')}
+      <div class="flex min-h-11 items-center justify-between gap-4">
+        <Label for={`${identifier}-outside`} class="leading-relaxed"
+          >Only paths outside the workspace</Label
+        >
+        <Switch
+          id={`${identifier}-outside`}
           bind:checked={draft.outside_workspace_only}
-        />Only paths outside the workspace</label
-      >
+          disabled={saving}
+        />
+      </div>
       <div class="space-y-2">
         <Label for={`${identifier}-permission-tools`}>Tool names (optional, comma-separated)</Label
         ><Input
@@ -184,29 +181,65 @@
           placeholder="file_actions"
         />
       </div>
-    </fieldset>
-  {/if}
-  <div class="space-y-2">
-    <Label for={`${identifier}-prompt`}>Prompt</Label><textarea
-      id={`${identifier}-prompt`}
-      class="min-h-64 w-full rounded-md border border-input bg-transparent p-3 font-mono text-xs leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      bind:value={draft.prompt}
-      maxlength={65536}
+    {/if}
+  </fieldset>
+  <fieldset class="min-w-0 space-y-4 border-t border-border pt-5" disabled={saving}>
+    <legend class="pr-2 text-sm font-medium">Review input</legend>
+    <div class="space-y-2">
+      <div class="flex items-center gap-1">
+        <Label for={`${identifier}-context`}>Conversation to review (tokens)</Label>
+        <FieldHelp
+          label="About conversation to review"
+          text={'The maximum amount of recent conversation supplied through {last_context}. 32,768 tokens means up to 32k of conversation. An explicit variable such as {last_8k_context} uses its own window. This setting controls review input; Context interval controls how often a review runs.'}
+        />
+      </div>
+      <Input
+        id={`${identifier}-context`}
+        type="number"
+        min={256}
+        max={1048576}
+        step={1}
+        bind:value={draft.context_tokens}
+        disabled={saving}
+        required
+      />
+    </div>
+    <div class="flex min-h-11 items-center justify-between gap-4">
+      <Label for={`${identifier}-thinking`} class="leading-relaxed"
+        >Include provider-exposed thinking</Label
+      >
+      <Switch
+        id={`${identifier}-thinking`}
+        bind:checked={draft.include_reasoning}
+        disabled={saving}
+      />
+    </div>
+    <div class="space-y-2">
+      <Label for={`${identifier}-prompt`}>Prompt</Label><Textarea
+        id={`${identifier}-prompt`}
+        class="min-h-64 font-mono text-xs leading-5"
+        bind:value={draft.prompt}
+        maxlength={65536}
+        disabled={saving}
+        required
+      />
+      <p class="break-words text-xs text-muted-foreground">
+        {'Variables: {todo}, {doing}, {event}, {workspace}, {permission_request}, {tool_call}, {last_context}, {last_32k_context}. k = 1024 tokens.'}
+      </p>
+    </div>
+  </fieldset>
+  <fieldset class="min-w-0 space-y-4 border-t border-border pt-5" disabled={saving}>
+    <legend class="pr-2 text-sm font-medium">Tool access</legend>
+    <WatcherToolSelector
+      {tools}
+      grants={draft.tools}
+      onChange={(value) => (draft.tools = value)}
       disabled={saving}
-      required></textarea>
-    <p class="break-words text-xs text-muted-foreground">
-      {'Variables: {todo}, {doing}, {event}, {workspace}, {permission_request}, {tool_call}, {last_context}, {last_32k_context}. k = 1024 tokens.'}
-    </p>
-  </div>
-  <WatcherToolSelector
-    {tools}
-    grants={draft.tools}
-    onChange={(value) => (draft.tools = value)}
-    disabled={saving}
-  />
-  <details class="rounded border border-border px-3">
-    <summary class="cursor-pointer py-3 text-xs">Execution limits</summary>
-    <div class="grid gap-4 pb-4 sm:grid-cols-2">
+    />
+  </fieldset>
+  <fieldset class="min-w-0 space-y-4 border-t border-border pt-5" disabled={saving}>
+    <legend class="pr-2 text-sm font-medium">Execution limits</legend>
+    <div class="grid gap-4 sm:grid-cols-2">
       <div class="space-y-2">
         <Label for={`${identifier}-timeout`}>Review timeout (ms)</Label><Input
           id={`${identifier}-timeout`}
@@ -228,7 +261,13 @@
         />
       </div>
       <div class="space-y-2">
-        <Label for={`${identifier}-output`}>Output reservation (tokens)</Label><Input
+        <div class="flex items-center gap-1">
+          <Label for={`${identifier}-output`}>Output budget (tokens)</Label><FieldHelp
+            label="About output budget"
+            text="Tokens reserved for each watcher response within its model's context limit."
+          />
+        </div>
+        <Input
           id={`${identifier}-output`}
           type="number"
           min={128}
@@ -238,7 +277,13 @@
         />
       </div>
       <div class="space-y-2">
-        <Label for={`${identifier}-continuations`}>Maximum automatic continuations</Label><Input
+        <div class="flex items-center gap-1">
+          <Label for={`${identifier}-continuations`}>Maximum automatic follow-ups</Label><FieldHelp
+            label="About automatic follow-ups"
+            text="How many times this watcher can ask the main session to continue for the same user instruction. New user input resets the count."
+          />
+        </div>
+        <Input
           id={`${identifier}-continuations`}
           type="number"
           min={1}
@@ -248,7 +293,7 @@
         />
       </div>
     </div>
-  </details>
+  </fieldset>
   {#if error}<p role="alert" class="break-words text-sm text-destructive">{error}</p>{/if}
   {#if preview}<details open class="min-w-0 rounded border border-border p-3">
       <summary class="cursor-pointer text-xs"
@@ -259,8 +304,10 @@
       <pre
         class="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs">{preview.prompt}</pre>
     </details>{/if}
-  <div class="flex flex-wrap gap-2">
-    <Button type="submit" class="h-11" disabled={saving}>Save watcher</Button><Button
+  <div class="flex flex-wrap gap-2 border-t border-border pt-4">
+    <Button type="submit" class="h-11" disabled={saving}
+      >{saving ? 'Saving…' : 'Save watcher settings'}</Button
+    ><Button
       type="button"
       variant="outline"
       class="h-11"

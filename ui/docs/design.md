@@ -159,6 +159,12 @@ The client gets activity data after model requests, session events, and new WebS
 
 ## Watchers
 
+The editor has `General`, `When to run`, `Review input`, `Tool access`, and `Execution limits` sections. `Run on` uses `Select` with `type="multiple"`. `DropdownMenu` contains file operations. The `enabled` value uses a `Switch`.
+
+The `Conversation to review` field gives the token limit for `{last_context}`. The `Tooltip` gives information about context variables. The `interval_tokens` value is used for `context_growth` events.
+
+The watcher panels use `Tabs`. The panels have the same left edge. Sidekick and Watchers use `PluginPanelFooter`. The refresh action is at the bottom. The button text is the same as the text in the Sidekick view.
+
 `Settings → Watchers` gives workspace watcher definitions. The editor uses `Schema.JSON` for the tool catalog and default watcher definition. A model is necessary. The user can select file operations for `file_actions`. Tool grants do not use the permission pipeline.
 
 Use `New watcher`, `Edit`, `Duplicate`, or `Remove`. An input preview uses the selected primary session and does not start a model. Watcher usage is workspace usage. The `CacheRead` and `CacheWrite` values are different from `Input`.

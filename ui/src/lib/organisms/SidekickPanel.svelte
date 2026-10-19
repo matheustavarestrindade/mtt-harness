@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { Bot, Power, RefreshCw, Settings2 } from 'lucide-svelte';
+  import { Bot, Power, Settings2 } from 'lucide-svelte';
   import type { Instance, Model } from '../atoms/types';
   import type { SidekickConfiguration } from '../atoms/plugins';
   import { Button } from '../atoms/ui/button';
@@ -12,6 +12,7 @@
   import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
   import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
 
   let { api, instance }: { api: HarnessApi; instance: Instance | null } = $props();
@@ -356,18 +357,12 @@
     {:else if panel.loading}<p role="status" class="text-sm text-muted-foreground">
         Loading Sidekick…
       </p>{/if}
-    <div class="flex items-center justify-between gap-3 border-t border-border pt-3">
-      <span class="text-xs text-muted-foreground"
-        >{panel.updatedAt
-          ? `Updated ${panel.updatedAt.toLocaleTimeString()}`
-          : 'Workspace activity'}</span
-      ><Button
-        variant="ghost"
-        class="h-11"
-        disabled={panel.loading || panel.saving}
-        onclick={() => void panel.refresh()}
-        ><RefreshCw class={`size-4 ${panel.loading ? 'animate-spin' : ''}`} />Refresh Sidekick</Button
-      >
-    </div>
+    <PluginPanelFooter
+      name="Sidekick"
+      updatedAt={panel.updatedAt}
+      refreshing={panel.loading}
+      disabled={panel.saving}
+      onRefresh={() => void panel.refresh()}
+    />
   {/if}
 </section>

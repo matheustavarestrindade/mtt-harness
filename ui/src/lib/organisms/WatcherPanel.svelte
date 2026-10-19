@@ -1,8 +1,10 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { Eye, Plus, Copy, Pencil, Trash2, Power, RefreshCw, X } from 'lucide-svelte';
+  import { Eye, Plus, Copy, Pencil, Trash2, X } from 'lucide-svelte';
   import { Button } from '../atoms/ui/button';
   import { Input } from '../atoms/ui/input';
+  import { Switch } from '../atoms/ui/switch';
+  import * as Tabs from '../atoms/ui/tabs';
   import { workspaceName } from '../atoms/format';
   import { createClientID } from '../atoms/identifiers';
   import type { Instance, Session, Model } from '../atoms/types';
@@ -17,6 +19,7 @@
   import { watcherTriggers } from '../atoms/watcher';
   import type { HarnessApi } from '../molecules/api/client';
   import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
   import WatcherEditor from './WatcherEditor.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
   let {
@@ -36,6 +39,7 @@
     reading = $state(false),
     activityError = $state(''),
     removeID = $state('');
+  let activityUpdatedAt = $state<Date | null>(null);
   let lifetime = new AbortController();
   let scope = 0;
   const tools = $derived((panel.state?.Schema?.JSON?.['x-tools'] ?? []) as WatcherTool[]);
@@ -60,6 +64,7 @@
     cursor = '';
     reading = false;
     activityError = '';
+    activityUpdatedAt = null;
     removeID = '';
     page = 0;
     untrack(() => panel.connect(client, identifier));
@@ -149,6 +154,7 @@
       runs = (more ? [...runs, ...result.runs] : result.runs).slice(0, 500);
       cursor = runs.length < 500 ? (result.next_cursor ?? '') : '';
       activityError = '';
+      activityUpdatedAt = new Date();
     } catch (failure) {
       if (!signal.aborted && version === scope)
         activityError =
@@ -179,6 +185,17 @@
       lifetime.signal,
     );
   }
+  function selectTab(value: string) {
+    if (!['definitions', 'usage', 'activity'].includes(value) || value === tab) return;
+    tab = value as typeof tab;
+    editing = null;
+    if (tab === 'activity') void loadRuns();
+  }
+  async function refreshWatchers() {
+    await panel.refresh();
+    if (tab === 'activity') await loadRuns();
+  }
+  const updatedAt = $derived(tab === 'activity' ? activityUpdatedAt : panel.updatedAt);
 </script>
 
 <section aria-label="Watcher settings" class="min-w-0 space-y-5">
@@ -186,13 +203,21 @@
     <Eye class="mt-1 size-5 shrink-0 text-muted-foreground" />
     <div class="min-w-0 flex-1">
       <h2 class="text-lg font-medium">Watchers</h2>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Workspace reviews for progress, permission requests, and completion.
-      </p>
+      <p class="mt-1 text-sm text-muted-foreground">Automatic workspace reviews.</p>
     </div>
-    {#if panel.state}<span role="status" class="text-xs text-muted-foreground"
-        >{panel.state.Pending ? 'Updating…' : panel.state.Enabled ? 'On' : 'Off'}</span
-      >{/if}
+    {#if panel.state}<div class="flex min-h-11 shrink-0 items-center gap-3">
+        <span role="status" class="text-xs text-muted-foreground"
+          >{panel.state.Pending ? 'Updating…' : panel.state.Enabled ? 'On' : 'Off'}</span
+        >
+        <Switch
+          aria-label="Watchers enabled"
+          {disabled}
+          bind:checked={
+            () => panel.state?.RequestedEnabled ?? false,
+            (checked) => void panel.configure({ enabled: checked })
+          }
+        />
+      </div>{/if}
   </header>
   {#if !instance}<p class="text-sm text-muted-foreground">
       Select a workspace to configure watchers.
@@ -206,199 +231,225 @@
     {#if panel.state?.Error}<p role="status" class="break-words text-xs text-muted-foreground">
         {panel.state.Error}
       </p>{/if}
-    {#if panel.state}<div class="flex flex-wrap gap-2">
-        <Button
-          class="h-11"
-          variant={panel.state.RequestedEnabled ? 'secondary' : 'default'}
-          {disabled}
-          onclick={() => void panel.configure({ enabled: !panel.state!.RequestedEnabled })}
-          ><Power class="size-4" />{panel.state.RequestedEnabled
-            ? 'Disable Watchers'
-            : 'Enable Watchers'}</Button
-        ><Button variant="outline" class="h-11" {disabled} onclick={() => createWatcher()}
-          ><Plus class="size-4" />New watcher</Button
-        >
-      </div>{/if}
     {#if panel.actionError}<p role="alert" class="break-words text-sm text-destructive">
         {panel.actionError}
       </p>{/if}
-    <nav aria-label="Watcher sections" class="flex flex-wrap gap-1 border-b border-border pb-2">
-      {#each [['definitions', 'Watchers'], ['activity', 'Activity'], ['usage', 'Usage']] as [value, label]}<Button
-          variant={tab === value ? 'secondary' : 'ghost'}
-          class="h-11 text-xs"
-          aria-pressed={tab === value}
-          onclick={() => {
-            tab = value as typeof tab;
-            editing = null;
-            if (tab === 'activity') void loadRuns();
-          }}>{label}</Button
-        >{/each}
-    </nav>
-    {#if tab === 'definitions'}
-      {#if editing}{#key editing.id}<WatcherEditor
-            value={editing}
-            {models}
-            {tools}
-            saving={panel.saving}
-            canPreview={!!session && session.InstanceID === workspaceID}
-            onSave={saveWatcher}
-            onCancel={() => (editing = null)}
-            onPreview={preview}
-          />{/key}
-      {:else}
-        {#if definitions.length > 10 || query}<Input
-            aria-label="Search watchers"
-            placeholder="Search watchers…"
-            bind:value={query}
-          />{/if}
-        <div class="space-y-2">
-          {#each visible as value (value.id)}<article
-              class="rounded-md border border-border p-3"
-              aria-label={`Watcher ${value.name}`}
-            >
-              <div class="flex min-w-0 items-start gap-3">
-                <div class="min-w-0 flex-1">
-                  <h3 class="break-words text-sm font-medium">{value.name}</h3>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    {value.triggers
-                      .map(
-                        (trigger) =>
-                          watcherTriggers.find((item) => item.value === trigger)?.label ?? trigger,
-                      )
-                      .join(' · ')}
-                  </p>
-                </div>
-                <Button
-                  variant={value.enabled ? 'secondary' : 'ghost'}
-                  size="icon"
-                  class="size-11 shrink-0"
-                  aria-label={`${value.enabled ? 'Disable' : 'Enable'} watcher ${value.name}`}
-                  aria-pressed={value.enabled}
-                  {disabled}
-                  onclick={() =>
-                    void configure(
-                      panel.state!.Configuration.watchers.map((item) =>
-                        item.id === value.id ? { ...item, enabled: !item.enabled } : item,
-                      ),
-                    )}><Power class="size-4" /></Button
+    <Tabs.Root bind:value={() => tab, selectTab} class="min-w-0 gap-0">
+      <Tabs.List aria-label="Watcher sections" class="grid h-auto min-h-11 w-full grid-cols-3">
+        <Tabs.Trigger value="definitions" class="min-h-11">Watchers</Tabs.Trigger>
+        <Tabs.Trigger value="usage" class="min-h-11">Usage</Tabs.Trigger>
+        <Tabs.Trigger value="activity" class="min-h-11">Activity</Tabs.Trigger>
+      </Tabs.List>
+      <div class="min-w-0 pt-4">
+        <Tabs.Content value="definitions" class="m-0 min-h-52 min-w-0 space-y-4">
+          <div class="flex min-h-11 items-center justify-between gap-3">
+            <h3 class="text-sm font-medium">
+              {editing ? 'Watcher configuration' : 'Definitions'}
+            </h3>
+            {#if !editing}<Button
+                variant="outline"
+                class="h-11"
+                {disabled}
+                onclick={() => createWatcher()}><Plus class="size-4" />New watcher</Button
+              >{/if}
+          </div>
+          {#if editing}{#key editing.id}<WatcherEditor
+                value={editing}
+                {models}
+                {tools}
+                saving={panel.saving}
+                canPreview={!!session && session.InstanceID === workspaceID}
+                onSave={saveWatcher}
+                onCancel={() => (editing = null)}
+                onPreview={preview}
+              />{/key}
+          {:else}
+            {#if definitions.length > 10 || query}<Input
+                aria-label="Search watchers"
+                placeholder="Search watchers…"
+                bind:value={query}
+              />{/if}
+            <div class="space-y-2">
+              {#each visible as value (value.id)}<article
+                  class="rounded-md border border-border p-3"
+                  aria-label={`Watcher ${value.name}`}
                 >
-              </div>
-              <div class="mt-2 flex flex-wrap gap-1">
-                <Button
-                  variant="ghost"
-                  class="h-11 text-xs"
-                  {disabled}
-                  onclick={() => (editing = structuredClone($state.snapshot(value)))}
-                  ><Pencil class="size-3.5" />Edit</Button
+                  <div class="flex min-w-0 items-start gap-3">
+                    <div class="min-w-0 flex-1">
+                      <h3 class="break-words text-sm font-medium">{value.name}</h3>
+                      <p class="mt-1 text-xs text-muted-foreground">
+                        {value.triggers
+                          .map(
+                            (trigger) =>
+                              watcherTriggers.find((item) => item.value === trigger)?.label ??
+                              trigger,
+                          )
+                          .join(' · ')}
+                      </p>
+                    </div>
+                    <div class="flex min-h-11 shrink-0 items-center">
+                      <Switch
+                        aria-label={`Enable watcher ${value.name}`}
+                        {disabled}
+                        bind:checked={
+                          () => value.enabled,
+                          (checked) =>
+                            void configure(
+                              panel.state!.Configuration.watchers.map((item) =>
+                                item.id === value.id ? { ...item, enabled: checked } : item,
+                              ),
+                            )
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    <Button
+                      variant="ghost"
+                      class="h-11"
+                      {disabled}
+                      onclick={() => (editing = structuredClone($state.snapshot(value)))}
+                      ><Pencil class="size-3.5" />Edit</Button
+                    ><Button
+                      variant="ghost"
+                      class="h-11"
+                      {disabled}
+                      onclick={() => createWatcher(value)}
+                      ><Copy class="size-3.5" />Duplicate</Button
+                    ><Button
+                      variant="ghost"
+                      class="h-11"
+                      {disabled}
+                      onclick={() => (removeID = value.id)}
+                      ><Trash2 class="size-3.5" />Remove</Button
+                    >
+                  </div>
+                  {#if removeID === value.id}<div
+                      class="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-3"
+                    >
+                      <span class="text-xs"
+                        >Remove this watcher definition? Run history is kept.</span
+                      ><Button
+                        variant="destructive"
+                        class="h-11"
+                        disabled={panel.saving}
+                        onclick={async () => {
+                          if (
+                            await configure(
+                              panel.state!.Configuration.watchers.filter(
+                                (item) => item.id !== value.id,
+                              ),
+                            )
+                          )
+                            removeID = '';
+                        }}>Remove watcher</Button
+                      ><Button variant="ghost" class="h-11" onclick={() => (removeID = '')}
+                        >Keep</Button
+                      >
+                    </div>{/if}
+                </article>{/each}
+            </div>
+            {#if !definitions.length}<p class="text-sm text-muted-foreground">
+                No watchers configured.
+              </p>{/if}
+            {#if definitions.length > 20}<div class="flex items-center justify-between gap-3">
+                <Button variant="outline" class="h-11" disabled={page === 0} onclick={() => page--}
+                  >Previous</Button
+                ><span class="text-xs">{page + 1} / {Math.ceil(definitions.length / 20)}</span
                 ><Button
-                  variant="ghost"
-                  class="h-11 text-xs"
-                  {disabled}
-                  onclick={() => createWatcher(value)}><Copy class="size-3.5" />Duplicate</Button
-                ><Button
-                  variant="ghost"
-                  class="h-11 text-xs"
-                  {disabled}
-                  onclick={() => (removeID = value.id)}><Trash2 class="size-3.5" />Remove</Button
-                >
-              </div>
-              {#if removeID === value.id}<div
-                  class="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-3"
-                >
-                  <span class="text-xs">Remove this watcher definition? Run history is kept.</span
-                  ><Button
-                    variant="destructive"
-                    class="h-11 text-xs"
-                    disabled={panel.saving}
-                    onclick={async () => {
-                      if (
-                        await configure(
-                          panel.state!.Configuration.watchers.filter(
-                            (item) => item.id !== value.id,
-                          ),
-                        )
-                      )
-                        removeID = '';
-                    }}>Remove watcher</Button
-                  ><Button variant="ghost" class="h-11 text-xs" onclick={() => (removeID = '')}
-                    >Keep</Button
-                  >
-                </div>{/if}
-            </article>{/each}
-        </div>
-        {#if !definitions.length}<p class="py-5 text-sm text-muted-foreground">
-            No watchers configured.
-          </p>{/if}
-        {#if definitions.length > 20}<div class="flex items-center justify-between gap-3">
-            <Button variant="outline" class="h-11" disabled={page === 0} onclick={() => page--}
-              >Previous</Button
-            ><span class="text-xs">{page + 1} / {Math.ceil(definitions.length / 20)}</span><Button
-              variant="outline"
-              class="h-11"
-              disabled={(page + 1) * 20 >= definitions.length}
-              onclick={() => page++}>Next</Button
-            >
-          </div>{/if}
-      {/if}
-    {:else if tab === 'usage'}{#each panel.metrics?.Agents ?? [] as agent (`${agent.Agent}:${agent.ModelID}`)}<MemoryAgentUsage
-          {agent}
-          label={panel.state?.Configuration.watchers.find(
-            (value) => `watcher.${value.id}` === agent.Agent,
-          )?.name ?? agent.Agent}
-        />{/each}{#if !panel.metrics?.Agents?.length}<p class="text-sm text-muted-foreground">
-          No watcher usage recorded.
-        </p>{/if}
-    {:else}
-      <Button variant="outline" class="h-11" disabled={reading} onclick={() => void loadRuns()}
-        ><RefreshCw class="size-4" />Refresh activity</Button
-      >
-      {#if activityError}<p role="alert" class="break-words text-sm text-destructive">
-          {activityError}
-        </p>{/if}
-      <div class="space-y-2">
-        {#each runs as run (run.id)}<details class="min-w-0 rounded-md border border-border p-3">
-            <summary class="cursor-pointer text-sm"
-              ><span class="break-words">{run.name}</span><span
-                class="ml-2 text-xs text-muted-foreground"
-                >{run.status} · {watcherTriggers.find((value) => value.value === run.trigger)
-                  ?.label ?? run.trigger}</span
-              ></summary
-            >
-            <div class="mt-3 min-w-0 space-y-3 text-xs">
-              <p class="text-muted-foreground">
-                {new Date(run.created_at).toLocaleString()} · {run.duration_ms} ms{run.decision
-                  ? ` · ${run.decision}`
-                  : ''}
-              </p>
-              {#if run.message || run.reason}<p class="whitespace-pre-wrap break-words">
-                  {run.message || run.reason}
-                </p>{/if}{#if run.error}<p class="break-words text-destructive">{run.error}</p>{/if}
-              {#if run.status === 'running'}<Button
                   variant="outline"
                   class="h-11"
-                  onclick={() => void cancelRun(run.id)}><X class="size-4" />Cancel review</Button
-                >{/if}
-              <details>
-                <summary class="cursor-pointer py-2 text-muted-foreground"
-                  >Input · {run.estimated ? '≈ ' : ''}{run.input_tokens.toLocaleString()} tokens{run.input_truncated
-                    ? ' · excerpt'
-                    : ''}</summary
+                  disabled={(page + 1) * 20 >= definitions.length}
+                  onclick={() => page++}>Next</Button
                 >
-                <pre
-                  class="max-h-72 overflow-auto whitespace-pre-wrap break-words">{run.input_preview}</pre>
-              </details>
-            </div>
-          </details>{/each}
+              </div>{/if}
+          {/if}
+        </Tabs.Content>
+        <Tabs.Content value="usage" class="m-0 min-h-52 min-w-0 space-y-4">
+          <div class="flex min-h-11 items-center justify-between gap-3">
+            <h3 class="text-sm font-medium">Worker usage</h3>
+          </div>
+          <div class="space-y-2">
+            {#each panel.metrics?.Agents ?? [] as agent (`${agent.Agent}:${agent.ModelID}`)}<div
+                class="rounded-md border border-border px-3"
+              >
+                <MemoryAgentUsage
+                  {agent}
+                  label={panel.state?.Configuration.watchers.find(
+                    (value) => `watcher.${value.id}` === agent.Agent,
+                  )?.name ?? agent.Agent}
+                />
+              </div>{/each}
+          </div>
+          {#if !panel.metrics?.Agents?.length}<p class="text-sm text-muted-foreground">
+              No watcher usage recorded.
+            </p>{/if}
+        </Tabs.Content>
+        <Tabs.Content value="activity" class="m-0 min-h-52 min-w-0 space-y-4">
+          <div class="flex min-h-11 items-center justify-between gap-3">
+            <h3 class="text-sm font-medium">Recent reviews</h3>
+          </div>
+          {#if activityError}<p role="alert" class="break-words text-sm text-destructive">
+              {activityError}
+            </p>{/if}
+          <div class="space-y-2">
+            {#each runs as run (run.id)}<details
+                class="min-w-0 rounded-md border border-border p-3"
+              >
+                <summary class="cursor-pointer text-sm"
+                  ><span class="break-words">{run.name}</span><span
+                    class="ml-2 text-xs text-muted-foreground"
+                    >{run.status} · {watcherTriggers.find((value) => value.value === run.trigger)
+                      ?.label ?? run.trigger}</span
+                  ></summary
+                >
+                <div class="mt-3 min-w-0 space-y-3 text-xs">
+                  <p class="text-muted-foreground">
+                    {new Date(run.created_at).toLocaleString()} · {run.duration_ms} ms{run.decision
+                      ? ` · ${run.decision}`
+                      : ''}
+                  </p>
+                  {#if run.message || run.reason}<p class="whitespace-pre-wrap break-words">
+                      {run.message || run.reason}
+                    </p>{/if}{#if run.error}<p class="break-words text-destructive">
+                      {run.error}
+                    </p>{/if}
+                  {#if run.status === 'running'}<Button
+                      variant="outline"
+                      class="h-11"
+                      onclick={() => void cancelRun(run.id)}
+                      ><X class="size-4" />Cancel review</Button
+                    >{/if}
+                  <details>
+                    <summary class="cursor-pointer py-2 text-muted-foreground"
+                      >Input · {run.estimated ? '≈ ' : ''}{run.input_tokens.toLocaleString()} tokens{run.input_truncated
+                        ? ' · excerpt'
+                        : ''}</summary
+                    >
+                    <pre
+                      class="max-h-72 overflow-auto whitespace-pre-wrap break-words">{run.input_preview}</pre>
+                  </details>
+                </div>
+              </details>{/each}
+          </div>
+          {#if !runs.length && !reading}<p class="text-sm text-muted-foreground">
+              No watcher runs yet.
+            </p>{/if}
+          {#if cursor}<Button
+              variant="outline"
+              class="h-11"
+              disabled={reading}
+              onclick={() => void loadRuns(true)}>Load earlier runs</Button
+            >{/if}
+        </Tabs.Content>
       </div>
-      {#if !runs.length && !reading}<p class="text-sm text-muted-foreground">
-          No watcher runs yet.
-        </p>{/if}
-      {#if cursor}<Button
-          variant="outline"
-          class="h-11"
-          disabled={reading}
-          onclick={() => void loadRuns(true)}>Load earlier runs</Button
-        >{/if}
-    {/if}
+    </Tabs.Root>
+    <PluginPanelFooter
+      name="Watchers"
+      {updatedAt}
+      refreshing={panel.loading || reading}
+      disabled={panel.saving}
+      onRefresh={() => void refreshWatchers()}
+    />
   {/if}
 </section>
