@@ -2,12 +2,53 @@ package memory
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"slices"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
+func (eventStore *events) RecentSession(operationContext context.Context, sessionID atom.SessionID, limit int) ([]atom.Event, error) {
+	if limit < 1 || limit > 1000 {
+		return nil, fmt.Errorf("event limit must be between 1 and 1000")
+	}
+	if operationError := operationContext.Err(); operationError != nil {
+		return nil, operationError
+	}
+	eventStore.store.mutex.RLock()
+	defer eventStore.store.mutex.RUnlock()
+	var result []atom.Event
+	for index := len(eventStore.store.events) - 1; index >= 0 && len(result) < limit; index-- {
+		event := eventStore.store.events[index]
+		if event.SessionID == sessionID {
+			if len(event.Payload) > 65536 {
+				event.Payload, _ = json.Marshal(map[string]int{"omitted_bytes": len(event.Payload)})
+			}
+			result = append(result, event)
+		}
+	}
+	slices.Reverse(result)
+	return result, nil
+}
+
 type events struct{ store *Store }
+
+func (eventStore *events) LatestSessionEvent(operationContext context.Context, sessionID atom.SessionID, name atom.EventName) (*atom.Event, error) {
+	if operationError := operationContext.Err(); operationError != nil {
+		return nil, operationError
+	}
+	eventStore.store.mutex.RLock()
+	defer eventStore.store.mutex.RUnlock()
+	for index := len(eventStore.store.events) - 1; index >= 0; index-- {
+		event := eventStore.store.events[index]
+		if event.SessionID == sessionID && event.Name == name {
+			return &event, nil
+		}
+	}
+	return nil, nil
+}
 
 func (eventStore *events) Append(operationContext context.Context, event atom.Event) error {
 	_, operationError := eventStore.Record(operationContext, event)

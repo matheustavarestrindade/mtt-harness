@@ -30,6 +30,7 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 	session = modelCall.session
 	operationContext = harness.WithSession(operationContext, session)
 	messageID := newID()
+	agentLoop.beginLiveResponse(session, messageID, modelCall.modelID)
 	if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelCall, map[string]any{"model": modelCall.modelID, "message_id": messageID, "reasoning_effort": modelCall.request.ReasoningEffort}); operationError != nil {
 		return atom.Message{}, nil, operationError
 	}
@@ -55,17 +56,20 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 		}
 		if part.Text != "" {
 			text.WriteString(part.Text)
-			if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelChunk, map[string]any{"text": part.Text, "message_id": messageID}); operationError != nil {
+			chunkIndex := agentLoop.appendLiveText(session.ID, part.Text, false)
+			if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelChunk, map[string]any{"text": part.Text, "message_id": messageID, "chunk_index": chunkIndex}); operationError != nil {
 				return atom.Message{}, tasks, operationError
 			}
 		}
 		if part.Reasoning != "" {
 			reasoning.WriteString(part.Reasoning)
-			if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelChunk, map[string]any{"reasoning": part.Reasoning, "message_id": messageID}); operationError != nil {
+			chunkIndex := agentLoop.appendLiveText(session.ID, part.Reasoning, true)
+			if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelChunk, map[string]any{"reasoning": part.Reasoning, "message_id": messageID, "chunk_index": chunkIndex}); operationError != nil {
 				return atom.Message{}, tasks, operationError
 			}
 		}
 		if part.ToolCall != nil {
+			agentLoop.appendLiveTool(session.ID, *part.ToolCall)
 			if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventActionReceived, part.ToolCall); operationError != nil {
 				return atom.Message{}, tasks, operationError
 			}

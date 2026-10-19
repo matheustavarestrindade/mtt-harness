@@ -31,6 +31,10 @@ ALTER TABLE instances ADD COLUMN IF NOT EXISTS stopped boolean NOT NULL DEFAULT 
 ALTER TABLE instances ADD COLUMN IF NOT EXISTS unlinked boolean NOT NULL DEFAULT false;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS completed boolean NOT NULL DEFAULT false;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS reasoning_effort text NOT NULL DEFAULT '';
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS history_revision bigint NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS selection_revision bigint NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS parent_message_id text NOT NULL DEFAULT '';
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS parent_tool_call_id text NOT NULL DEFAULT '';
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS session_task_state (
 	session_id text PRIMARY KEY REFERENCES sessions(id),
@@ -61,6 +65,8 @@ CREATE TABLE IF NOT EXISTS message_queue (
 CREATE INDEX IF NOT EXISTS message_queue_session ON message_queue (session_id, seq);
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS provider_state jsonb;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS reasoning text NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS messages_session_sequence ON messages(session_id,seq);
+CREATE INDEX IF NOT EXISTS messages_session_assistant ON messages(session_id,seq DESC) WHERE role='assistant';
 CREATE TABLE IF NOT EXISTS events (
 	seq bigserial PRIMARY KEY,
 	instance_id text NOT NULL,
@@ -70,6 +76,8 @@ CREATE TABLE IF NOT EXISTS events (
 	created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS events_session_sequence ON events (session_id, seq);
+CREATE INDEX IF NOT EXISTS events_session_kind_sequence ON events(session_id,name,seq DESC);
+CREATE INDEX IF NOT EXISTS events_agent_child ON events(instance_id,(payload->>'session'),seq DESC) WHERE name='agent.start';
 CREATE TABLE IF NOT EXISTS processes (
 	id text PRIMARY KEY,
 	instance_id text NOT NULL,
@@ -87,6 +95,8 @@ CREATE TABLE IF NOT EXISTS permissions (
 	scope text NOT NULL,
 	created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS process_message_origins ON processes(session_id,(spec->>'ToolMessageID'));
+CREATE INDEX IF NOT EXISTS process_session_recent ON processes(session_id,started_at DESC,id DESC);
 CREATE TABLE IF NOT EXISTS usage_records (
 	id bigserial PRIMARY KEY,
 	instance_id text NOT NULL,
@@ -114,6 +124,7 @@ ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS source_session_id text NOT NU
 ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS duration_ms bigint NOT NULL DEFAULT 0;
 ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT '';
 CREATE UNIQUE INDEX IF NOT EXISTS usage_request_once ON usage_records (instance_id, request_id) WHERE request_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS usage_session_request ON usage_records(session_id,request_id) WHERE request_id IS NOT NULL;
 ALTER TABLE permissions ADD COLUMN IF NOT EXISTS session_id text NOT NULL DEFAULT '';
 ALTER TABLE permissions ADD COLUMN IF NOT EXISTS target text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS providers (

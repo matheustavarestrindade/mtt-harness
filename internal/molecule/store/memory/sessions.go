@@ -41,6 +41,9 @@ func (sessionStore *sessions) Save(operationContext context.Context, session ato
 	if stored, found := sessionStore.store.sessions[session.ID]; found {
 		session.Model = stored.Model
 		session.ReasoningEffort = stored.ReasoningEffort
+		session.HistoryRevision = stored.HistoryRevision
+		session.SelectionRevision = stored.SelectionRevision
+		session.ParentMessageID, session.ParentToolCallID = stored.ParentMessageID, stored.ParentToolCallID
 	}
 	sessionStore.store.sessions[session.ID] = session
 	return nil
@@ -57,6 +60,7 @@ func (sessionStore *sessions) SetModelSelection(operationContext context.Context
 		return store.ErrSessionSelectionChanged
 	}
 	session.Model, session.ReasoningEffort = next.Model, next.ReasoningEffort
+	session.SelectionRevision++
 	sessionStore.store.sessions[sessionID] = session
 	return nil
 }
@@ -99,6 +103,8 @@ func (sessionStore *sessions) Append(operationContext context.Context, message a
 		return store.ErrSessionDeleted
 	}
 	sessionStore.store.messages[message.SessionID] = append(sessionStore.store.messages[message.SessionID], message)
+	sessionStore.store.messageSequence++
+	sessionStore.store.messageSequences[message.ID] = sessionStore.store.messageSequence
 	return nil
 }
 
@@ -138,7 +144,13 @@ func (sessionStore *sessions) DeleteAfter(operationContext context.Context, sess
 		return 0, errors.New("memory: the message is not in the store")
 	}
 	removed := len(list) - index - 1
+	for _, message := range list[index+1:] {
+		delete(sessionStore.store.messageSequences, message.ID)
+	}
 	sessionStore.store.messages[sessionID] = list[:index+1]
+	session := sessionStore.store.sessions[sessionID]
+	session.HistoryRevision++
+	sessionStore.store.sessions[sessionID] = session
 	if state, found := sessionStore.store.taskStates[sessionID]; found {
 		sessionStore.store.taskStates[sessionID] = taskstate.Clear(state, time.Now())
 	}

@@ -85,15 +85,23 @@ Message history does not include tool status fields. The UI shows the label `Res
 
 A `bash` section can show new output before the tool result is available. The fields `ProcessSpec.ToolCallID` and `ProcessSpec.ToolMessageID` connect the process to the tool call. Child agent panels also use the terminal view.
 
-The user can read terminal output and use the copy button. The terminal view does not send input to the process. The UI gets xterm.js when the terminal view opens. ANSI sequences control text color and cursor position. The cursor can replace a line with new output.
+The user can read terminal output and send input. Terminal resize and `Ctrl-C` are available. The UI gets xterm.js when the terminal view opens. ANSI sequences control text color and cursor position. The cursor can replace a line with new output.
 
-The process output WebSocket is active while the terminal view is open. A new connection gives a new output snapshot. Byte offsets show output gaps. The UTF-8 decoders keep data for standard output and standard error. The output events do not start message history reads.
+The `Screen reader mode` control is in `Terminal actions`.
+
+The process output WebSocket is active while the terminal view is open. A new connection gives a new output snapshot. Byte offsets show output gaps.
+
+The UI sends PTY bytes to xterm.js. Pipe output uses different UTF-8 decoders. Output events do not start full history reads.
 
 The terminal height is 288 pixels. The view uses the available width. The user can move through output with the scrollbar.
 
-The client keeps a maximum of 524288 characters. The limit for output chunks is 512. The terminal keeps 2000 lines. The UI removes previous output when the buffer is full.
+The client keeps a maximum of 524288 output bytes. The limit for output chunks is 512. The terminal keeps 2000 lines. The UI removes previous output when the buffer is full.
 
-The copy button uses terminal text. The source download keeps output text with ANSI sequences. When a tool section closes, the output connection stops. A session change also stops the connection. The connection stops when an agent panel closes. It also stops when the UI connection closes.
+The copy button uses terminal text. The source download keeps output bytes with ANSI sequences. When the terminal view closes, the UI stops the socket and terminal. The process continues.
+
+Process exit sends the last output and exit frame, then closes the socket. The input stops. The UI can show the output after the process stops.
+
+The initial terminal dimensions are 120 columns and 30 rows. The terminal view sends `resize` frames. Input is not a conversation message. See `../../docs/interactive-terminals.md` for the input limits and API format.
 
 The process exit status is different from the tool result. A process can continue after an inactivity return. If the process buffer is not available, the UI uses the tool result. The terminal view also shows previous `bash` output.
 

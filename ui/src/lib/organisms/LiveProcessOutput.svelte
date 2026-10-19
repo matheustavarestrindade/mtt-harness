@@ -12,7 +12,13 @@
     api,
     record,
     activity,
-  }: { api: HarnessApi; record: ProcessRecord; activity: ToolActivity } = $props();
+    onRecord,
+  }: {
+    api: HarnessApi;
+    record: ProcessRecord;
+    activity: ToolActivity;
+    onRecord?: (record: ProcessRecord) => void;
+  } = $props();
   let feed = $state<ProcessFeed>();
   const processID = $derived(record.ID);
   const showConnectionStatus = $derived(
@@ -22,7 +28,7 @@
   $effect(() => {
     const client = api;
     processID;
-    const current = untrack(() => new ProcessFeed(client, record));
+    const current = untrack(() => new ProcessFeed(client, record, onRecord));
     feed = current;
     return () => current.close();
   });
@@ -56,10 +62,20 @@
         onclick={() => feed?.reconnect()}><RefreshCw class="size-3" />Reconnect terminal</Button
       >{/if}
   </div>
-  {#if !feed.snapshot.chunks.length && (activity.processNotice || activity.result?.Content?.length)}<ToolOutput
+  {#if !feed.canInput && !feed.snapshot.chunks.length && (activity.processNotice || activity.result?.Content?.length)}<ToolOutput
       {activity}
     />
-  {:else}<TerminalOutput snapshot={feed.snapshot} />{/if}
+  {:else}<TerminalOutput
+      snapshot={feed.snapshot}
+      interactive={feed.canInput}
+      raw={feed.terminal}
+      onInput={(data) => feed?.sendInput(data)}
+      onResize={(columns, rows) => feed?.resize(columns, rows)}
+      onInterrupt={() => feed?.interrupt()}
+    />{/if}
+  {#if feed.inputError}<p role="alert" class="text-xs text-muted-foreground">
+      {feed.inputError}
+    </p>{/if}
   {#if feed.error && showConnectionStatus}<p
       class="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground"
     >

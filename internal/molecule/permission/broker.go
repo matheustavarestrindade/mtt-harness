@@ -10,11 +10,12 @@ import (
 type Broker struct {
 	mutex     sync.Mutex
 	pending   map[string]chan atom.PermissionDecision
+	requests  map[string]atom.PermissionRequest
 	onRequest func(request atom.PermissionRequest)
 }
 
 func NewBroker() *Broker {
-	return &Broker{pending: map[string]chan atom.PermissionDecision{}}
+	return &Broker{pending: map[string]chan atom.PermissionDecision{}, requests: map[string]atom.PermissionRequest{}}
 }
 
 func (permissionBroker *Broker) SetRequestHandler(handler func(request atom.PermissionRequest)) {
@@ -27,12 +28,14 @@ func (permissionBroker *Broker) Request(operationContext context.Context, reques
 	channel := make(chan atom.PermissionDecision, 1)
 	permissionBroker.mutex.Lock()
 	permissionBroker.pending[request.ID] = channel
+	permissionBroker.requests[request.ID] = request
 	handler := permissionBroker.onRequest
 	permissionBroker.mutex.Unlock()
 	defer func() {
 		permissionBroker.mutex.Lock()
 		defer permissionBroker.mutex.Unlock()
 		delete(permissionBroker.pending, request.ID)
+		delete(permissionBroker.requests, request.ID)
 	}()
 	for _, notify := range onReady {
 		if operationError := notify(); operationError != nil {
@@ -61,6 +64,7 @@ func (permissionBroker *Broker) Resolve(identifier string, decision atom.Permiss
 	channel, found := permissionBroker.pending[identifier]
 	if found {
 		delete(permissionBroker.pending, identifier)
+		delete(permissionBroker.requests, identifier)
 	}
 	permissionBroker.mutex.Unlock()
 	if !found {
@@ -75,4 +79,16 @@ func (permissionBroker *Broker) Pending() int {
 	permissionBroker.mutex.Lock()
 	defer permissionBroker.mutex.Unlock()
 	return len(permissionBroker.pending)
+}
+
+func (permissionBroker *Broker) SessionRequests(sessionID atom.SessionID) []atom.PermissionRequest {
+	permissionBroker.mutex.Lock()
+	defer permissionBroker.mutex.Unlock()
+	requests := []atom.PermissionRequest{}
+	for _, request := range permissionBroker.requests {
+		if request.SessionID == sessionID {
+			requests = append(requests, request)
+		}
+	}
+	return requests
 }

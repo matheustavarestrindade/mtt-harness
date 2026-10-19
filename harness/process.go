@@ -16,6 +16,16 @@ type Process interface {
 	Events() <-chan atom.ProcessEvent
 }
 
+// InteractiveProcess accepts bounded input without extending the command's
+// lifetime. Closing a viewer does not close the process input or stop the command.
+type InteractiveProcess interface {
+	Process
+	WriteContext(context.Context, []byte) error
+	ResizeTerminal(columns, rows int) error
+	HasTerminal() bool
+	Running() bool
+}
+
 type ProcessWatcher interface {
 	Match(event atom.ProcessEvent) bool
 	OnMatch(operationContext context.Context, event atom.ProcessEvent)

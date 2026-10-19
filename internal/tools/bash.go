@@ -26,7 +26,7 @@ func (bashTool *Bash) Name() string {
 }
 
 func (bashTool *Bash) Description() string {
-	return "Execute a shell command or script with sh -c in the instance workspace. By default, wait for exit or 10000 milliseconds without output. Exit returns retained stdout and stderr (last 256 KiB per stream) without a duplicate notification. Inactivity returns a running process ID and recent output (last 20 lines / 4096 bytes per stream), leaving the command alive and enabling its background notify policy. Silence does not prove completion or failure. Use process_output to inspect it or process_kill to stop it. Set idle_timeout=0 to wait until exit without inactivity handling. Set wait=false to return the process ID immediately. Background processes can send one inactivity notice, plus the selected notification policy; notify=none suppresses background updates. timeout, idle_timeout and interval are milliseconds."
+	return "Execute a shell command or script with sh -c in the instance workspace. By default, use an interactive pseudo-terminal (PTY) and wait for exit or 10000 milliseconds without output. The UI renders raw ANSI output and accepts terminal input, resize and Ctrl-C while running. PTY stdout/stderr are merged in stdout with terminal line endings; terminal=false uses separate pipes. Retain the last 256 KiB per output stream. Exit returns output without a duplicate notification. Inactivity returns a running process ID and recent output (last 20 lines / 4096 bytes per stream), leaving the command alive and enabling its background notify policy. Silence does not prove completion or failure. Use process_output to inspect it or process_kill to stop it. Set idle_timeout=0 to wait until exit without inactivity handling. Set wait=false to return the process ID immediately. Background processes can send one inactivity notice, plus the selected notification policy; notify=none suppresses background updates. timeout, idle_timeout and interval are milliseconds. Closing a UI viewer closes its socket, not the command."
 }
 
 func (bashTool *Bash) Categories() []string {
@@ -45,6 +45,11 @@ func (bashTool *Bash) InputSchema() atom.Schema {
 				"type": "boolean",
 				"default": true,
 				"description": "Wait for exit or the idle_timeout quiet period. An inactivity return leaves the command running and activates notify; it is not a completed command. Exit returns output only through this tool result. False starts in the background immediately. Cancelling a foreground wait does not stop the command and does not enable background notifications; use process_kill to stop it."
+			},
+			"terminal": {
+				"type": "boolean",
+				"default": true,
+				"description": "Use a real pseudo-terminal (PTY), initially 120 columns by 30 rows. Default true. The UI renders raw ANSI output and can send input, Ctrl-C and terminal resize events while the command is running. PTY stdout and stderr are merged into stdout, and terminal line endings are preserved. Closing the UI viewer does not stop the command. False uses separate stdout/stderr pipes for programs that require pipe behavior. Commands that explicitly disable color or use quiet output still control what they emit."
 			},
 			"notify": {
 				"type": "string",
@@ -85,6 +90,7 @@ type bashInput struct {
 	Interval    int    `json:"interval"`
 	Timeout     int    `json:"timeout"`
 	IdleTimeout *int64 `json:"idle_timeout"`
+	Terminal    *bool  `json:"terminal"`
 }
 
 func (bashTool *Bash) Run(operationContext context.Context, call atom.ToolCall) (atom.ToolResult, error) {
@@ -116,6 +122,7 @@ func (bashTool *Bash) Run(operationContext context.Context, call atom.ToolCall) 
 		Args:        []string{"-c", input.Command},
 		Notify:      policy,
 		IdleTimeout: time.Duration(idleMilliseconds) * time.Millisecond,
+		Terminal:    input.Terminal == nil || *input.Terminal,
 	}
 	// The tool owns foreground output. Set delivery before Start so even an
 	// immediately exiting command cannot queue a duplicate notification.

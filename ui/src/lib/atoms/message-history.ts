@@ -38,3 +38,22 @@ export function reconcileMessageHistory(previous: Message[], incoming: Message[]
     ? previous
     : reconciled;
 }
+
+// Accepted queue messages already live on the server. Keep only a small preview
+// window; the queue's IDs remain available for cancelling older pending entries.
+export function boundedReceipts(messages: Message[]): Message[] {
+  const retained = messages.slice(-16);
+  const size = (message: Message) =>
+    256 +
+    (message.Content ?? []).reduce(
+      (sum, content) =>
+        sum +
+        (content.Text?.length ?? 0) * 2 +
+        (content.Data?.length ?? 0) +
+        (content.URL?.length ?? 0),
+      0,
+    );
+  let bytes = retained.reduce((sum, message) => sum + size(message), 0);
+  while (retained.length > 1 && bytes > 8 * 1024 * 1024) bytes -= size(retained.shift()!);
+  return retained;
+}

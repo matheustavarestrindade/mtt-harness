@@ -71,7 +71,7 @@ func TestSavedEffortChangesAtRequestBoundariesAndPublicThinkingPersists(test *te
 		if event.Name != atom.EventModelChunk {
 			continue
 		}
-		var payload map[string]string
+		var payload map[string]any
 		testutil.RequireNoError(test, json.Unmarshal(event.Payload, &payload))
 		if payload["reasoning"] == "Initial plan" && payload["message_id"] != "" {
 			seenThinking = true

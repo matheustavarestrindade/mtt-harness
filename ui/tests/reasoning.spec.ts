@@ -143,33 +143,18 @@ test('use model-specific effort choices and show model prices before creating a 
   await expect.poll(() => fixture.sessions[1]?.ReasoningEffort).toBe('');
 });
 
-test('keep an effort selection after an older poll returns and recover from a save error', async ({
+test('keep an effort selection after an older snapshot arrives and recover from a save error', async ({
   page,
 }) => {
   const fixture = await mockHarness(page);
   fixture.model.Reasoning = true;
   fixture.model.ReasoningEfforts = ['low', 'high'];
   await connectAndCreate(page);
-  let releasePoll: (() => void) | undefined;
-  let captured = false;
-  await page.route(/\/api\/sessions\/[^/]+$/, async (route) => {
-    if (captured)
-      return route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify(fixture.sessions[0]),
-      });
-    const snapshot = JSON.stringify(fixture.sessions[0]);
-    captured = true;
-    await new Promise<void>((resolve) => {
-      releasePoll = resolve;
-    });
-    await route.fulfill({ contentType: 'application/json', body: snapshot });
-  });
-  await expect.poll(() => captured).toBe(true);
+  const previous = { ...fixture.sessions[0] };
   await page.getByRole('button', { name: 'Session settings', exact: true }).click();
   await chooseSelectOption(page.getByLabel('Thinking effort', { exact: true }), 'high');
   await expect.poll(() => fixture.sessions[0].ReasoningEffort).toBe('high');
-  releasePoll!();
+  fixture.state(fixture.sessions[0], { Session: previous });
   await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveAttribute(
     'data-value',
     'high',

@@ -19,6 +19,7 @@ import type { MemoryMetrics, MemoryConfiguration } from '../../atoms/memory';
 import type { WorkspacePluginState } from '../../atoms/plugins';
 import type { ProcessRecord } from '../../atoms/processes';
 import type { PluginActivityPage } from '../../atoms/plugin-activity';
+import type { HistoryPage, HistoryQuery, SessionViewState } from '../../atoms/session-view';
 
 export class ApiError extends Error {
   constructor(
@@ -130,10 +131,10 @@ export class HarnessApi {
       signal,
     );
   }
-  async processes(sessionID: string, signal?: AbortSignal) {
+  async processes(sessionID: string, signal?: AbortSignal, limit?: number) {
     return (
       (await this.request<ProcessRecord[] | null>(
-        `sessions/${encodeURIComponent(sessionID)}/processes`,
+        `sessions/${encodeURIComponent(sessionID)}/processes${limit ? `?limit=${limit}` : ''}`,
         'GET',
         undefined,
         signal,
@@ -292,6 +293,39 @@ export class HarnessApi {
       )) ?? []
     );
   }
+  async history(
+    sessionID: string,
+    query: HistoryQuery = {},
+    signal?: AbortSignal,
+  ): Promise<HistoryPage> {
+    const parameters = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined) parameters.set(key, String(value));
+    }
+    const page = await this.request<HistoryPage>(
+      `sessions/${encodeURIComponent(sessionID)}/history?${parameters}`,
+      'GET',
+      undefined,
+      signal,
+    );
+    return {
+      ...page,
+      Messages: page.Messages ?? [],
+      Context: page.Context ?? [],
+      Processes: page.Processes ?? [],
+      Models: page.Models ?? {},
+      Sizes: page.Sizes ?? {},
+      LatestResponse: page.LatestResponse ?? null,
+    };
+  }
+  sessionView(sessionID: string, details = true, signal?: AbortSignal) {
+    return this.request<SessionViewState>(
+      `sessions/${encodeURIComponent(sessionID)}/state?details=${details}`,
+      'GET',
+      undefined,
+      signal,
+    );
+  }
   status(sessionID: string, signal?: AbortSignal) {
     return this.request<QueueStatus>(
       `sessions/${encodeURIComponent(sessionID)}/status`,
@@ -412,10 +446,14 @@ export class HarnessApi {
     return this.request<Instance>(`instances/${encodeURIComponent(instanceID)}/start`, 'POST');
   }
 
-  eventsURL(sessionID: string, since: number): URL {
+  eventsURL(sessionID: string, since: number, view = false, details = true): URL {
     const url = this.url(`sessions/${encodeURIComponent(sessionID)}/events`);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     url.searchParams.set('since', String(since));
+    if (view) {
+      url.searchParams.set('view', 'true');
+      url.searchParams.set('details', String(details));
+    }
     if (this.token) url.searchParams.set('token', this.token);
     return url;
   }

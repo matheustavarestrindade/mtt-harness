@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import { ArrowDown, ArrowLeft, ChevronDown, GitBranch, LoaderCircle } from 'lucide-svelte';
   import { Button } from '../atoms/ui/button';
   import AgentStatusDot from '../atoms/AgentStatusDot.svelte';
@@ -18,13 +18,15 @@
   import { placePluginActivity } from '../atoms/plugin-activity';
   import PermissionCard from '../molecules/PermissionCard.svelte';
   import type { AgentMonitor } from './agent-monitor.svelte';
+  import { HistoryScroll } from './history-scroll.svelte';
 
   let { session, monitor, models }: { session: Session; monitor: AgentMonitor; models: Model[] } =
     $props();
-  let open = $state(untrack(() => !session.Completed));
+  let open = $state(untrack(() => monitor.feeds.get(session.ID)?.active ?? false));
+  let disclosureChanged = false;
   let selectedID = $state(untrack(() => session.ID));
   let showTask = $state(false);
-  let following = $state(true);
+  let scroll = $state<HistoryScroll>();
   let output = $state<HTMLDivElement>();
   let previousAgent = '';
   let previousFocusRevision = -1;
@@ -36,11 +38,18 @@
   const model = $derived(models.find((model) => model.ID === selected.Model));
   const entries = $derived(
     buildConversationEntries(
-      feed ? (feed.liveMessage ? [...feed.messages, feed.liveMessage] : feed.messages) : [],
+      feed
+        ? feed.liveMessage && feed.history.tailAttached
+          ? [...feed.messages, feed.liveMessage]
+          : feed.messages
+        : [],
       feed?.processes.records.values() ?? [],
     ),
   );
   const sidekick = $derived(placePluginActivity(entries, feed?.sidekick.entries ?? []));
+  $effect(() => {
+    if (!disclosureChanged && feed?.active) open = true;
+  });
 
   $effect(() => {
     if (monitor.focusRevision === previousFocusRevision) return;
@@ -55,6 +64,12 @@
     if (open && feed) return untrack(() => feed.enablePreview());
   });
   $effect(() => {
+    if (!feed) return;
+    const current = new HistoryScroll(feed.history);
+    scroll = current;
+    return () => current.dispose();
+  });
+  $effect(() => {
     const changes =
       (feed?.messages.length ?? 0) +
       (feed?.sidekick.entries.length ?? 0) +
@@ -63,13 +78,14 @@
       (feed?.liveMessage?.ToolCalls?.length ?? 0);
     if (previousAgent !== selectedID) {
       previousAgent = selectedID;
-      following = true;
       showTask = false;
     }
-    if (open && following && changes >= 0)
-      void tick().then(() => {
-        if (output) output.scrollTop = output.scrollHeight;
-      });
+    feed?.history.version;
+    feed?.history.loading;
+    if (scroll) {
+      scroll.element = output;
+      if (open) scroll.track(selectedID, changes);
+    }
   });
 
   async function decide(requestID: string, kind: 'allow' | 'deny') {
@@ -111,6 +127,7 @@
       aria-label={`${open ? 'Collapse' : 'Expand'} agent ${shortID(session.ID)}`}
       aria-expanded={open}
       onclick={() => {
+        disclosureChanged = true;
         open = !open;
         if (
           !open &&
@@ -149,7 +166,7 @@
       >
     </div>
     <div class="relative min-h-0 flex-1">
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex (This bounded output region supports keyboard scrolling.) -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (Observe navigation input without replacing native keyboard or touch scrolling.) -->
       <div
         bind:this={output}
         role="region"
@@ -157,7 +174,14 @@
         tabindex="0"
         class="h-full min-w-0 overflow-y-auto overscroll-contain p-2 text-xs"
         onscroll={() => {
-          if (output) following = output.scrollHeight - output.scrollTop - output.clientHeight < 48;
+          if (!showTask) scroll?.onScroll();
+        }}
+        onwheel={(event) => {
+          if (event.deltaY < 0) scroll?.interact();
+        }}
+        ontouchstart={() => scroll?.interact()}
+        onkeydown={(event) => {
+          if (['PageUp', 'ArrowUp', 'Home'].includes(event.key)) scroll?.interact();
         }}
       >
         {#if showTask}
@@ -165,13 +189,19 @@
             {task || 'Task details are not available.'}
           </p>
         {:else}
-          {#if feed?.loading && !entries.length}<p
+          {#if (feed?.loading || feed?.history.loading) && !entries.length}<p
               class="flex items-center gap-2 py-2 text-muted-foreground"
             >
               <LoaderCircle class="size-3.5 animate-spin" />Loading agent output…
             </p>{/if}
-          {#if feed?.omittedMessages}<p class="pb-2 text-[10px] text-muted-foreground">
-              Latest 80 output messages shown.
+          {#if feed?.history.hasOlder}<Button
+              variant="ghost"
+              class="h-11 text-xs"
+              disabled={feed.history.loading}
+              onclick={() => void scroll?.older()}>Load earlier agent messages</Button
+            >{/if}
+          {#if feed?.history.error}<p role="alert" class="text-xs text-muted-foreground">
+              {feed.history.error}
             </p>{/if}
           {#if feed}<SidekickHistory
               entries={sidekick.unplaced}
@@ -182,66 +212,74 @@
               onRefresh={() => void feed?.sidekick.refresh()}
             />{/if}
           {#each entries as entry (entry.message.ID)}
-            {#snippet tools(activity: ToolActivity)}
-              {@const result = agentResult(activity.call)}
-              {#if result !== null}
-                <section class="assistant-section" aria-label="Agent result">
-                  <RichText text={result} embedded />
-                </section>
-              {:else if activity.call.Name === 'agent'}
-                {#if activity === entry.tools.find((tool) => tool.call.Name === 'agent')}
-                  {@const children = monitor.children(selectedID, entry.message.ID)}
-                  {#each children as child (child.ID)}
-                    {@const childFeed = monitor.feeds.get(child.ID)}
-                    <button
-                      class="flex min-h-10 w-full min-w-0 items-center gap-2 border-l border-border pl-3 text-left text-xs hover:bg-muted pointer-coarse:min-h-11"
-                      onclick={() => monitor.focus(child.ID)}
-                      aria-label={`View agent ${shortID(child.ID)}`}
-                    >
-                      <GitBranch class="size-3.5 shrink-0" /><span class="min-w-0 flex-1 truncate"
-                        >Agent {shortID(child.ID)}</span
+            <div data-history-id={entry.message.ID}>
+              {#snippet tools(activity: ToolActivity)}
+                {@const result = agentResult(activity.call)}
+                {#if result !== null}
+                  <section class="assistant-section" aria-label="Agent result">
+                    <RichText text={result} embedded />
+                  </section>
+                {:else if activity.call.Name === 'agent'}
+                  {#if activity === entry.tools.find((tool) => tool.call.Name === 'agent')}
+                    {@const children = monitor.children(selectedID, entry.message.ID)}
+                    {#each children as child (child.ID)}
+                      {@const childFeed = monitor.feeds.get(child.ID)}
+                      <button
+                        class="flex min-h-10 w-full min-w-0 items-center gap-2 border-l border-border pl-3 text-left text-xs hover:bg-muted pointer-coarse:min-h-11"
+                        onclick={() => monitor.focus(child.ID)}
+                        aria-label={`View agent ${shortID(child.ID)}`}
                       >
-                      <AgentStatusDot
-                        active={childFeed?.active ?? false}
-                        label={childFeed?.label ?? 'Inactive'}
-                      />
-                    </button>
-                  {:else}
-                    {#each entry.tools.filter((tool) => tool.call.Name === 'agent') as delegation (delegation.call.ID)}
-                      {#if delegation.result}<MessageContent
-                          content={delegation.result.Content}
-                          mode="plain"
-                          embedded
+                        <GitBranch class="size-3.5 shrink-0" /><span class="min-w-0 flex-1 truncate"
+                          >Agent {shortID(child.ID)}</span
+                        >
+                        <AgentStatusDot
+                          active={childFeed?.active ?? false}
+                          label={childFeed?.label ?? 'Inactive'}
                         />
-                      {:else}<p class="py-1 text-xs text-muted-foreground">
-                          {feed?.active
-                            ? 'Delegating a task…'
-                            : 'No child agent is linked to this call.'}
-                        </p>{/if}
+                      </button>
+                    {:else}
+                      {#each entry.tools.filter((tool) => tool.call.Name === 'agent') as delegation (delegation.call.ID)}
+                        {#if delegation.result}<MessageContent
+                            content={delegation.result.Content}
+                            mode="plain"
+                            embedded
+                          />
+                        {:else}<p class="py-1 text-xs text-muted-foreground">
+                            {feed?.active
+                              ? 'Delegating a task…'
+                              : 'No child agent is linked to this call.'}
+                          </p>{/if}
+                      {/each}
                     {/each}
-                  {/each}
-                {/if}
-              {:else if feed}<ToolActivityView
-                  {activity}
-                  messageID={entry.message.ID}
-                  processes={feed.processes}
-                  running={feed.active}
+                  {/if}
+                {:else if feed}<ToolActivityView
+                    {activity}
+                    messageID={entry.message.ID}
+                    processes={feed.processes}
+                    running={feed.active}
+                  />{/if}
+              {/snippet}
+              {#if entry.processNotice}<ProcessNoticeSection
+                  notice={entry.processNotice}
+                  record={entry.processRecord}
+                />{:else}<MessageCard
+                  message={entry.message}
+                  tools={entry.tools}
+                  renderTool={tools}
+                  running={feed?.active ?? false}
+                  streaming={entry.message.ID === feed?.liveMessage?.ID}
                 />{/if}
-            {/snippet}
-            {#if entry.processNotice}<ProcessNoticeSection
-                notice={entry.processNotice}
-                record={entry.processRecord}
-              />{:else}<MessageCard
-                message={entry.message}
-                tools={entry.tools}
-                renderTool={tools}
-                running={feed?.active ?? false}
-                streaming={entry.message.ID === feed?.liveMessage?.ID}
-              />{/if}
-            {#each sidekick.anchored.get(entry.message.ID) ?? [] as hint (hint.ID)}<SidekickSection
-                entry={hint}
-              />{/each}
+              {#each sidekick.anchored.get(entry.message.ID) ?? [] as hint (hint.ID)}<SidekickSection
+                  entry={hint}
+                />{/each}
+            </div>
           {/each}
+          {#if feed?.history.hasNewer}<Button
+              variant="ghost"
+              class="h-11 text-xs"
+              disabled={feed.history.loading}
+              onclick={() => void scroll?.newer()}>Load newer agent messages</Button
+            >{/if}
           {#if !feed?.loading && !entries.length}<p class="py-2 text-xs text-muted-foreground">
               No agent output yet.
             </p>{/if}
@@ -267,15 +305,12 @@
             />{/each}
         {/if}
       </div>
-      {#if !following && !showTask}<Button
+      {#if ((scroll && !scroll.following) || feed?.history.hasNewer) && !showTask}<Button
           variant="secondary"
           size="icon"
           class="absolute right-2 bottom-2 size-9 pointer-coarse:size-11"
           aria-label="Scroll to latest agent output"
-          onclick={() => {
-            following = true;
-            if (output) output.scrollTop = output.scrollHeight;
-          }}><ArrowDown class="size-4" /></Button
+          onclick={() => void scroll?.latest()}><ArrowDown class="size-4" /></Button
         >{/if}
     </div>
   {/if}

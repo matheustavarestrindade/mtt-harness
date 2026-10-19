@@ -26,7 +26,7 @@ func (sessionStore *sessions) GetModelSelection(operationContext context.Context
 }
 
 func (sessionStore *sessions) List(operationContext context.Context, instanceID string) ([]atom.Session, error) {
-	rows, operationError := sessionStore.store.pool.Query(operationContext, `SELECT id,instance_id,parent_id,depth,model,created_at,completed,reasoning_effort FROM sessions WHERE instance_id=$1 AND NOT deleted ORDER BY id`, instanceID)
+	rows, operationError := sessionStore.store.pool.Query(operationContext, `SELECT id,instance_id,parent_id,depth,model,created_at,completed,reasoning_effort,history_revision,selection_revision,parent_message_id,parent_tool_call_id FROM sessions WHERE instance_id=$1 AND NOT deleted ORDER BY id`, instanceID)
 	if operationError != nil {
 		return nil, operationError
 	}
@@ -34,7 +34,7 @@ func (sessionStore *sessions) List(operationContext context.Context, instanceID 
 	var sessions []atom.Session
 	for rows.Next() {
 		var session atom.Session
-		if operationError := rows.Scan(&session.ID, &session.InstanceID, &session.Parent, &session.Depth, &session.Model, &session.CreatedAt, &session.Completed, &session.ReasoningEffort); operationError != nil {
+		if operationError := rows.Scan(&session.ID, &session.InstanceID, &session.Parent, &session.Depth, &session.Model, &session.CreatedAt, &session.Completed, &session.ReasoningEffort, &session.HistoryRevision, &session.SelectionRevision, &session.ParentMessageID, &session.ParentToolCallID); operationError != nil {
 			return nil, operationError
 		}
 		sessions = append(sessions, session)
@@ -46,13 +46,13 @@ func (sessionStore *sessions) Save(operationContext context.Context, session ato
 	result, operationError := sessionStore.store.pool.Exec(operationContext, `
 		WITH instance_state AS MATERIALIZED (SELECT unlinked FROM instances WHERE id=$2 FOR SHARE),
 		parent_state AS MATERIALIZED (SELECT deleted FROM sessions WHERE id=$3 AND NOT EXISTS(SELECT 1 FROM instance_state WHERE unlinked) FOR SHARE)
-		INSERT INTO sessions (id, instance_id, parent_id, depth, model, created_at, completed, reasoning_effort)
-		SELECT $1, $2, $3, $4, $5, $6, $7, $8 WHERE NOT EXISTS (SELECT 1 FROM parent_state WHERE deleted) AND NOT EXISTS(SELECT 1 FROM instance_state WHERE unlinked)
+		INSERT INTO sessions (id, instance_id, parent_id, depth, model, created_at, completed, reasoning_effort,parent_message_id,parent_tool_call_id)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8,$9,$10 WHERE NOT EXISTS (SELECT 1 FROM parent_state WHERE deleted) AND NOT EXISTS(SELECT 1 FROM instance_state WHERE unlinked)
 		ON CONFLICT (id) DO UPDATE SET
 			parent_id = EXCLUDED.parent_id,
 			depth = EXCLUDED.depth,
 			completed = EXCLUDED.completed WHERE NOT sessions.deleted`,
-		string(session.ID), session.InstanceID, string(session.Parent), session.Depth, session.Model, session.CreatedAt, session.Completed, session.ReasoningEffort)
+		string(session.ID), session.InstanceID, string(session.Parent), session.Depth, session.Model, session.CreatedAt, session.Completed, session.ReasoningEffort, session.ParentMessageID, session.ParentToolCallID)
 	if operationError == nil && result.RowsAffected() == 0 {
 		var unlinked bool
 		lookupError := sessionStore.store.pool.QueryRow(operationContext, `SELECT unlinked FROM instances WHERE id=$1`, session.InstanceID).Scan(&unlinked)
@@ -70,9 +70,9 @@ func (sessionStore *sessions) Save(operationContext context.Context, session ato
 func (sessionStore *sessions) Get(operationContext context.Context, sessionID atom.SessionID) (atom.Session, error) {
 	var session atom.Session
 	operationError := sessionStore.store.pool.QueryRow(operationContext, `
-		SELECT id, instance_id, parent_id, depth, model, created_at, completed, reasoning_effort
+		SELECT id, instance_id, parent_id, depth, model, created_at, completed, reasoning_effort,history_revision,selection_revision,parent_message_id,parent_tool_call_id
 		FROM sessions WHERE id = $1 AND NOT deleted`, string(sessionID)).
-		Scan(&session.ID, &session.InstanceID, &session.Parent, &session.Depth, &session.Model, &session.CreatedAt, &session.Completed, &session.ReasoningEffort)
+		Scan(&session.ID, &session.InstanceID, &session.Parent, &session.Depth, &session.Model, &session.CreatedAt, &session.Completed, &session.ReasoningEffort, &session.HistoryRevision, &session.SelectionRevision, &session.ParentMessageID, &session.ParentToolCallID)
 	if errors.Is(operationError, pgx.ErrNoRows) {
 		return atom.Session{}, store.ErrSessionNotFound
 	}
@@ -80,7 +80,7 @@ func (sessionStore *sessions) Get(operationContext context.Context, sessionID at
 }
 
 func (sessionStore *sessions) SetModelSelection(operationContext context.Context, sessionID atom.SessionID, previous, next atom.SessionModelSelection) error {
-	result, operationError := sessionStore.store.pool.Exec(operationContext, `UPDATE sessions SET model=$2, reasoning_effort=$3
+	result, operationError := sessionStore.store.pool.Exec(operationContext, `UPDATE sessions SET model=$2, reasoning_effort=$3,selection_revision=selection_revision+1
 		WHERE id=$1 AND model=$4 AND reasoning_effort=$5 AND NOT completed AND NOT deleted`, string(sessionID), next.Model, next.ReasoningEffort, previous.Model, previous.ReasoningEffort)
 	if operationError != nil {
 		return operationError
@@ -156,6 +156,9 @@ func (sessionStore *sessions) DeleteAfter(operationContext context.Context, sess
 	}
 	tag, operationError := transaction.Exec(operationContext, `DELETE FROM messages WHERE session_id=$1 AND seq>$2`, string(sessionID), sequence)
 	if operationError != nil {
+		return 0, operationError
+	}
+	if _, operationError = transaction.Exec(operationContext, `UPDATE sessions SET history_revision=history_revision+1 WHERE id=$1`, string(sessionID)); operationError != nil {
 		return 0, operationError
 	}
 	if _, operationError := transaction.Exec(operationContext, `UPDATE session_task_state SET todo='[]',doing=NULL,revision=revision+1,responses_since_update=0,updated_at=now() WHERE session_id=$1`, string(sessionID)); operationError != nil {

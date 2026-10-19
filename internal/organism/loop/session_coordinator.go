@@ -22,21 +22,23 @@ const (
 // run exclusively owns the mutable state below. I/O workers receive value
 // copies and report completion; they never mutate the coordinator's fields.
 type sessionCoordinator struct {
-	loop           *Loop
-	session        atom.Session
-	commands       chan sessionCommand
-	completed      chan operationCompletion
-	runFinished    chan runCompletion
-	done           chan struct{}
-	mode           sessionMode
-	beforeDeletion sessionMode
-	pending        []atom.Message
-	mutations      []sessionCommand
-	working        *sessionOperation
-	active         *runningTurn
-	revert         *sessionCommand
-	waiters        []sessionCommand
-	lastError      string
+	loop            *Loop
+	session         atom.Session
+	commands        chan sessionCommand
+	completed       chan operationCompletion
+	runFinished     chan runCompletion
+	done            chan struct{}
+	mode            sessionMode
+	beforeDeletion  sessionMode
+	pending         []atom.Message
+	mutations       []sessionCommand
+	working         *sessionOperation
+	active          *runningTurn
+	revert          *sessionCommand
+	waiters         []sessionCommand
+	lastError       string
+	publishedStatus QueueStatus
+	publishedMode   sessionMode
 }
 
 func newSessionCoordinator(agentLoop *Loop, session atom.Session, pending []atom.Message, stopped bool) *sessionCoordinator {
@@ -50,10 +52,12 @@ func newSessionCoordinator(agentLoop *Loop, session atom.Session, pending []atom
 
 func (coordinator *sessionCoordinator) runCommandLoop() {
 	defer close(coordinator.done)
+	defer coordinator.loop.NotifySessionState(coordinator.session.ID)
 	for {
 		if !coordinator.advancePendingWork() {
 			return
 		}
+		coordinator.notifyStatusChange()
 		select {
 		case command := <-coordinator.commands:
 			coordinator.handleSessionCommand(command)
@@ -63,6 +67,28 @@ func (coordinator *sessionCoordinator) runCommandLoop() {
 			coordinator.handleRunFinished(completed)
 		}
 	}
+}
+
+func (coordinator *sessionCoordinator) notifyStatusChange() {
+	status := QueueStatus{Running: coordinator.active != nil, Error: coordinator.lastError}
+	for _, message := range coordinator.pending {
+		status.Messages = append(status.Messages, message.ID)
+	}
+	changed := status.Running != coordinator.publishedStatus.Running || status.Error != coordinator.publishedStatus.Error || coordinator.mode != coordinator.publishedMode || len(status.Messages) != len(coordinator.publishedStatus.Messages)
+	if !changed {
+		for index, identifier := range status.Messages {
+			if identifier != coordinator.publishedStatus.Messages[index] {
+				changed = true
+				break
+			}
+		}
+	}
+	if !changed {
+		return
+	}
+	coordinator.publishedStatus = status
+	coordinator.publishedMode = coordinator.mode
+	coordinator.loop.NotifySessionState(coordinator.session.ID)
 }
 
 func (coordinator *sessionCoordinator) handleSessionCommand(command sessionCommand) {
