@@ -60,7 +60,9 @@ The dependency direction is `atoms <- molecules <- organisms`. An atom import mu
 
 The shadcn-svelte registry gives the buttons, fields, dialogs, sheet, badges, and notifications. The console components add navigation, connection forms, message history, usage, and the composer.
 
-The `SelectField` molecule uses the shadcn-svelte `Select` components. Model lists and settings use the molecule. Long model text uses line breaks. A long model list uses a scrollbar.
+The `ModelCombobox` molecule uses the shadcn-svelte `Command` and `Popover` components. Model lists have provider sections in name sequence. A text field finds models or providers. A model has a display label without the model ID. The API receives the full model ID.
+
+The `SelectField` molecule uses the shadcn-svelte `Select` components for reasoning effort and other settings. Long model text uses line breaks. A long model list uses a scrollbar. The model control keeps keyboard focus after a selection or API error. The `Escape` key closes the model list before the dialog.
 
 The model ID and reasoning effort values do not change. The model default uses an empty reasoning effort. A model change stays at the previous selection until the API accepts the change.
 

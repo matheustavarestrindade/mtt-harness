@@ -6,10 +6,11 @@
   import { Button } from '../atoms/ui/button';
   import { Input } from '../atoms/ui/input';
   import { Label } from '../atoms/ui/label';
-  import { costLabel, formatTokenCount, modelLabel, workspaceName } from '../atoms/format';
+  import { costLabel, formatTokenCount, workspaceName } from '../atoms/format';
   import { totalAgentUsage, agentTokenCount, durationLabel } from '../atoms/memory';
   import type { HarnessApi } from '../molecules/api/client';
   import SelectField from '../molecules/SelectField.svelte';
+  import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
   import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
@@ -260,17 +261,12 @@
             </p>
           </div>
           <div class="space-y-2">
-            <Label for={`${identifier}-model`}>Recovery worker model</Label><SelectField
+            <Label for={`${identifier}-model`}>Recovery worker model</Label><ModelCombobox
               id={`${identifier}-model`}
               bind:value={workerModel}
               {disabled}
-              options={[
-                { value: '', label: 'Automatic reminders only' },
-                ...models.map((model) => ({ value: model.ID, label: modelLabel(model) })),
-                ...(workerModel && !models.some((model) => model.ID === workerModel)
-                  ? [{ value: workerModel, label: `Unavailable: ${workerModel}`, disabled: true }]
-                  : []),
-              ]}
+              {models}
+              emptyLabel="Automatic reminders only"
               onValueChange={(value) => {
                 workerModel = value;
                 workerEffort = '';
