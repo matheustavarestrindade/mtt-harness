@@ -116,7 +116,10 @@ func (plugin *Plugin) PrepareContext(operationContext context.Context, input har
 				}
 				candidate.InputTokens, candidate.InputLimit = budget.InputTokens, budget.InputLimit
 			}
-			if !forced || budget.InputTokens*100 < budget.InputLimit*configuration.TargetPercent {
+			// Review/urgent notices and the reduction target are advisory. Once
+			// validated preparation is below the hard ceiling, do not wait for
+			// unrelated pending/failed jobs merely to reach the preferred target.
+			if budget.InputTokens*100 < budget.InputLimit*configuration.HardPercent {
 				if operationError := plugin.commitReduction(operationContext, input.Session.InstanceID, view, prepared, candidate); operationError != nil {
 					return selection, operationError
 				}
@@ -128,7 +131,7 @@ func (plugin *Plugin) PrepareContext(operationContext context.Context, input har
 				return selection, queueError
 			}
 			if !queued && !prepared.Pending {
-				return selection, fmt.Errorf("context uses %d of %d input tokens; no further prepared removable groups; worker error: %s", budget.InputTokens, budget.InputLimit, prepared.Failure)
+				return selection, fmt.Errorf("forced context compaction: input uses %d tokens; mandatory ceiling is below %d%% of %d input tokens; no further prepared removable groups; worker error: %s", budget.InputTokens, configuration.HardPercent, budget.InputLimit, prepared.Failure)
 			}
 			plugin.signalWork()
 			pause := time.NewTimer(100 * time.Millisecond)
@@ -166,7 +169,7 @@ func (plugin *Plugin) PrepareContext(operationContext context.Context, input har
 		if level == 2 {
 			kind = "urgent"
 		}
-		data, _ := json.Marshal(map[string]any{"notice": kind, "input_tokens": budget.InputTokens, "input_budget": budget.InputLimit, "estimated": budget.Estimated})
+		data, _ := json.Marshal(map[string]any{"notice": kind, "input_tokens": budget.InputTokens, "input_budget": budget.InputLimit, "estimated": budget.Estimated, "target_percent": configuration.TargetPercent, "hard_percent": configuration.HardPercent})
 		projected.Messages = append(projected.Messages, atom.Message{SessionID: input.Session.ID, Role: atom.RoleRuntime, Ephemeral: true, Content: []atom.Content{{Type: atom.Text, Text: "Context budget: " + string(data)}}})
 		withNotice, operationError := input.Measure(operationContext, projected)
 		if operationError != nil {

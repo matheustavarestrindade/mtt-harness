@@ -40,6 +40,7 @@ type codexModelEntry struct {
 	ServiceTiers             []catalogServiceTier `json:"service_tiers"`
 	DisplayName              *string              `json:"display_name"`
 	ContextWindow            *int                 `json:"context_window"`
+	MaxContextWindow         *int                 `json:"max_context_window"`
 	InputModalities          []atom.MediaType     `json:"input_modalities"`
 	DefaultReasoningEffort   *string              `json:"default_reasoning_level"`
 	SupportedReasoningLevels *[]struct {
@@ -97,7 +98,18 @@ func decodeModelCatalog(responseBody io.Reader, format string) ([]catalogModel, 
 			if entry.Visibility != nil && *entry.Visibility != "list" {
 				continue
 			}
-			metadata := ModelMetadata{Name: entry.DisplayName, ContextMax: entry.ContextWindow, Input: entry.InputModalities, DefaultReasoningEffort: entry.DefaultReasoningEffort}
+			// context_window is the Codex client's default, not necessarily the
+			// backend's supported maximum. This harness owns its context policy.
+			contextWindow := entry.ContextWindow
+			if entry.MaxContextWindow != nil {
+				if *entry.MaxContextWindow < 0 {
+					return nil, fmt.Errorf("catalog model %q max_context_window cannot be negative", entry.Slug)
+				}
+				if *entry.MaxContextWindow > 0 {
+					contextWindow = entry.MaxContextWindow
+				}
+			}
+			metadata := ModelMetadata{Name: entry.DisplayName, ContextMax: contextWindow, Input: entry.InputModalities, DefaultReasoningEffort: entry.DefaultReasoningEffort}
 			if entry.SupportedReasoningLevels != nil {
 				metadata.ReasoningEfforts = []string{}
 				for _, level := range *entry.SupportedReasoningLevels {

@@ -222,7 +222,7 @@ func configurationSchema() atom.Schema {
 "review_percent":{"type":["integer","null"],"description":"Input-budget percentage for the first context notice. Default 50; target < review < urgent < hard."},
 "urgent_percent":{"type":["integer","null"],"description":"Input-budget percentage for an urgent wrap-up notice. Default 65."},
 "hard_percent":{"type":["integer","null"],"description":"Input-budget percentage at which the next request waits for forced compaction. Default 80; maximum 90."},
-"target_percent":{"type":["integer","null"],"description":"Post-compaction input-budget target percentage. Default 45; 10..49, below review_percent."},
+ "target_percent":{"type":["integer","null"],"description":"Advisory input-budget target percentage supplied in context notices. Default 45; 10..49, below review_percent. This is a reduction goal, not a request-admission limit; only hard_percent requires forced compaction."},
 "snapshot_tokens":{"type":["integer","null"],"description":"Estimated token limit for the memory snapshot. Default 1000; 128..8192. The final model input budget still applies."},
 "worker_count":{"type":["integer","null"],"description":"Maximum simultaneous memory jobs per workspace. Default 2; 1..8."},
 "retry_limit":{"type":["integer","null"],"description":"Retries after a failed memory job attempt. Default 2; 0..5. Each model attempt is billed separately."},

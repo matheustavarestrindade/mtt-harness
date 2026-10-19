@@ -38,7 +38,8 @@ The code and test suite are available. The UI control is subsequent work. Use `[
 
 - [x] Add context notices at 50% and 65% after the prompt prefix.
 - [x] Add `ctx_wrapup`. Use one transaction for the context view and memory records.
-- [x] Hold the next model request at 80%. Apply context compaction without model approval. Decrease the input budget below 50%.
+- [x] Hold the next model request at 80%. Apply context compaction without model approval. Continue when context is below the 80% limit.
+- [x] The context notices do not stop requests. Only the 80% limit stops a model request. The default `target_percent` is not a request limit.
 - [x] Keep system instructions, the last user request, active work, task state, tool groups, and necessary provider data.
 - [x] Keep source messages when a memory job gives an error. Give an error if the plugin cannot keep necessary content in the input budget.
 - [x] Give new sessions the initial workspace memory snapshot.
