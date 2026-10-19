@@ -13,6 +13,7 @@ The connection starts with a state frame. The connection then gives events and n
 ```text
 State frame data
 - Session and queue status
+- Bounded QueuedMessages previews with original roles and text
 - Usage, task state, and open permissions
 - History metadata and active session IDs
 - Process metadata and a limited live response
@@ -31,7 +32,7 @@ Live tool-input limit        256 KiB
 Truncated                   true when the preview omits data
 ```
 
-The `details=false` mode does not send live text or tool data. When an agent panel closes, an active agent uses `details=false`. If the agent is not active, the UI closes the session socket.
+The `details=false` mode does not send live text, tool data, or queue previews. When an agent panel closes, an active agent uses `details=false`. If the agent is not active, the UI closes the session socket.
 
 The connection does not send the full output history. New agents keep parent message and tool call IDs in the session. The API uses the sequence of events for previous agent origins. Task text and timestamps do not identify an agent origin.
 

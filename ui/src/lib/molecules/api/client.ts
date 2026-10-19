@@ -259,6 +259,14 @@ export class HarnessApi {
       signal,
     );
   }
+  queuedMessage(sessionID: string, messageID: string, signal?: AbortSignal) {
+    return this.request<Message>(
+      `sessions/${encodeURIComponent(sessionID)}/queue/${encodeURIComponent(messageID)}`,
+      'GET',
+      undefined,
+      signal,
+    );
+  }
   deleteSession(sessionID: string, signal?: AbortSignal) {
     return this.request<SessionDeletion>(
       `sessions/${encodeURIComponent(sessionID)}`,

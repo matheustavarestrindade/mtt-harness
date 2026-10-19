@@ -129,6 +129,8 @@ The messages of a session wait in a queue. Before the next model request, the ha
 
 The active model response and the tool result group finish before the next message batch starts. The user can remove a message before the message batch starts. A message that the API receives after the message batch starts is input for the next model request. See `docs/message-queue.md`.
 
+The view snapshot can include a queue preview. The session coordinator gives the message IDs and queue previews in one response. The queue preview keeps the message role. A full message read does not start the message or add history.
+
 The database keeps a message in the queue before the API gives status `202`. The queue has the limits:
 
 ```
@@ -1261,6 +1263,7 @@ The initial API paths are:
 - `GET /sessions/{id}/state`: read a session view snapshot.
 - `POST /sessions/{id}/cancel`: stop the current run.
 - `DELETE /sessions/{id}/queue/{message_id}`: remove a message from the queue.
+- `GET /sessions/{id}/queue/{message_id}`: read a message that waits in the queue.
 - `GET /sessions/{id}/status`: read the status of the current run and the messages in the queue.
 - `POST /sessions/{id}/revert`: remove the messages after a message.
 - `POST /sessions/{id}/messages`: send a user message.
@@ -1716,6 +1719,7 @@ type ProviderStore interface {
 
 type QueueStore interface {
     Enqueue(operationContext context.Context, message atom.Message, limit int) error
+    PendingMessage(operationContext context.Context, sessionID atom.SessionID, messageID string) (atom.Message, error)
     All(operationContext context.Context) ([]atom.QueuedMessage, error)
     Start(operationContext context.Context, messageID string) error
     StartBatch(operationContext context.Context, sessionID atom.SessionID, messageIDs []string) error

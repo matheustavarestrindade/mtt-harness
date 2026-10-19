@@ -101,6 +101,7 @@ An active conversation, child agent, message in the queue, or active process giv
 | GET | `/sessions/{id}/task-state` | none | `200`, `TaskState` | `404`, `500` |
 | POST | `/sessions/{id}/cancel` | none | `200`, `{"status":"cancelled"}` | `409`, `500` |
 | DELETE | `/sessions/{id}/queue/{message_id}` | none | `200`, `{"status":"removed"}` | `404`, `500` |
+| GET | `/sessions/{id}/queue/{message_id}` | none | `200`, complete pending `Message` | `404`, `500` |
 | POST | `/sessions/{id}/revert` | `{"message_id":"ID"}` | `200`, `RevertResult` | `404`, `400`, `500` |
 | GET | `/sessions/{id}/agents` | none | `200`, session ID array | `500` |
 | GET | `/sessions/{id}/statistics` | none | `200`, `Statistics` | `500` |
@@ -111,6 +112,16 @@ An active conversation, child agent, message in the queue, or active process giv
 The database keeps a message in the queue before the API gives `202`. Before the next model request, the harness puts the messages that wait into history as a message batch. The request contains the message batch in queue sequence. A session can have 128 messages that wait. The harness limit is 4096 messages that wait or run.
 
 The active response and the tool result group finish before the next message batch starts. The message IDs, content, and roles stay the same. After the message batch starts, the message IDs are not in the status list of messages that wait. See `docs/message-queue.md`.
+
+The session view includes `QueuedMessages` when `details=true`.
+
+```text
+Queue preview limits
+Text and metadata       4096 UTF-8 bytes per message
+Content parts           32 per message
+```
+
+The message role stays the same. The `Truncated` field identifies content that is not in the queue preview. A full message read uses `GET /sessions/{id}/queue/{message_id}` and does not start the message. An ID from a different session or a message that does not wait gives `404`.
 
 The session input accepts an optional `reasoning_effort` string with `model`. An empty string uses the model default. The model gives the available values in `ReasoningEfforts`. A session change applies to the next model request. It does not stop an active request. The database keeps the selection.
 
@@ -459,6 +470,11 @@ type SessionViewState = {
   Permissions: PermissionRequest[]; History: HistoryPage; Processes: ProcessRecord[];
   Live?: { Message: Message; Model: string; Revision: number; Truncated: boolean };
   WorkspaceLinked: boolean; WorkspaceStopped: boolean; ActiveSessions: string[];
+  QueuedMessages?: QueuedMessagePreview[];
+};
+type QueuedMessagePreview = {
+  ID: string; SessionID: string; Role: Message['Role']; Content: Content[];
+  CreatedAt: string; Truncated: boolean;
 };
 type QueueStatus = { running: boolean; queued: number; messages: string[]; error: string };
 type HistoryPage = {

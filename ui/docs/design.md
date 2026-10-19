@@ -161,9 +161,13 @@ The client gets activity data after model requests, session events, and new WebS
 
 Response keys agree with the Go types. For example, an instance has `Workspace` and `DefaultModel`. Request keys use the handler format, such as `workspace` and `default_model`. A `null` collection becomes an empty array in the client.
 
-A `202` response shows that the queue accepted a message. It is not a model response. The UI keeps a message receipt until history or queue status gives the result. A queue message from a different client can have an ID without text in the UI.
+A `202` response shows that the queue accepted a message. It is not a model response. The UI keeps a message receipt until history or queue status gives the result. The view snapshot gives queue previews after a page refresh or a new connection.
 
 The `QueuedMessage` molecule shows `Queued` and an `X` control on the message. The UI does not show a queue panel or a `Message accepted` label. A cancellation error keeps the message. A previous state frame must not put the message back after cancellation.
+
+The queue preview keeps the user role and user message bar. The UI shows `Preview limited` if content is not in the queue preview. The `Show full message` control reads the full content from the queue route. The client compares the session ID and queue IDs before it accepts the result.
+
+The UI accepts the `GET` response only while the ID is in the queue. A previous response must not put a message back after cancellation. The UI does not keep message content in browser storage.
 
 A session change cancels previous data requests and event connections. A previous response must not change the new selected view. The UI does not automatically send a message again after a request error. The API can accept the message before the client receives the error.
 
