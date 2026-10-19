@@ -132,7 +132,11 @@ func (plugin *Plugin) PrepareContext(operationContext context.Context, input har
 				return selection, queueError
 			}
 			if !queued && !prepared.Pending {
-				return selection, fmt.Errorf("forced context compaction: input uses %d tokens; mandatory ceiling is below %d%% of %d input tokens; no further prepared removable groups; worker error: %s", budget.InputTokens, configuration.HardPercent, budget.InputLimit, prepared.Failure)
+				measurement := "input uses"
+				if budget.Estimated {
+					measurement = "input estimate is"
+				}
+				return selection, fmt.Errorf("forced context compaction: %s %d tokens; mandatory ceiling is below %d%% of %d input tokens; no further prepared removable groups; worker error: %s", measurement, budget.InputTokens, configuration.HardPercent, budget.InputLimit, prepared.Failure)
 			}
 			plugin.signalWork()
 			pause := time.NewTimer(100 * time.Millisecond)

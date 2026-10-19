@@ -115,6 +115,9 @@ func MeasureRequest(operationContext context.Context, request atom.Request, mode
 	if operationError != nil {
 		return measurement, operationError
 	}
+	if count < 0 {
+		return measurement, fmt.Errorf("provider token count is negative")
+	}
 	measurement.InputTokens = count
 	if model.ContextMax <= 0 {
 		return measurement, nil
@@ -145,6 +148,16 @@ func countTokens(operationContext context.Context, request atom.Request, provide
 	if counter, supported := provider.(harness.TokenCounter); supported {
 		return counter.CountTokens(operationContext, request)
 	}
+	if estimator, supported := provider.(harness.TokenEstimator); supported {
+		estimate, operationError := estimator.EstimateTokens(operationContext, request)
+		if operationError != nil {
+			return 0, operationError
+		}
+		if observed, found, operationError := estimateFromReportedUsage(operationContext, request, provider.Name(), estimator, estimate.Identity); found || operationError != nil {
+			return observed, operationError
+		}
+		return estimate.InputTokens, nil
+	}
 	// Count prompt data, not storage IDs, timestamps, or historical usage. A
 	// text-byte estimate is deliberately conservative. Media has a separate
 	// allowance; adapters with model-specific tokenizers implement TokenCounter.
@@ -155,7 +168,7 @@ func countTokens(operationContext context.Context, request atom.Request, provide
 	count := 16 + len(tools)
 	for _, message := range request.Messages {
 		count += 8
-		if message.ProviderState != nil {
+		if message.ProviderState != nil && message.ProviderState.Provider == provider.Name() {
 			count += len(message.ProviderState.ChatReasoning)
 			for _, reasoning := range message.ProviderState.Reasoning {
 				count += len(reasoning)

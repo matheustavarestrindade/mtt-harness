@@ -171,4 +171,21 @@ type ProviderState struct {
 	Reasoning []json.RawMessage
 	// ChatReasoning is replayed only to the originating chat-completions provider.
 	ChatReasoning string `json:",omitempty"`
+	// ContextUsage anchors a provider report to its exact retained input. This
+	// private accounting metadata is persisted but never sent to a provider.
+	ContextUsage *ContextUsage `json:",omitempty"`
+}
+
+// ContextUsage is a request-local accounting checkpoint, not cumulative usage.
+// Hashes exclude prior accounting checkpoints and saved display/usage metadata.
+type ContextUsage struct {
+	Model                 string
+	Estimator             string
+	InputTokens           int
+	OutputTokens          int
+	PrefixFingerprint     string
+	ResponseFingerprint   string
+	ToolsFingerprint      string
+	ParametersFingerprint string
+	OverlayFingerprints   []string
 }

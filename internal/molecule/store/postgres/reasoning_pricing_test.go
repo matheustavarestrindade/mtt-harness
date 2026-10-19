@@ -27,6 +27,7 @@ func TestReasoningAndPricingSurvivePostgresRoundTrip(test *testing.T) {
 		test.Fatalf("session setting was lost: %+v", loaded)
 	}
 	message := atom.Message{ID: identifier, SessionID: session.ID, Role: atom.RoleAssistant, Reasoning: "Visible thinking", Content: []atom.Content{{Type: atom.Text, Text: "Answer"}}, ProviderState: &atom.ProviderState{Provider: "fixture", ChatReasoning: "private continuation"}, CreatedAt: time.Now()}
+	message.ProviderState.ContextUsage = &atom.ContextUsage{Model: "model", Estimator: "fixture-estimator", InputTokens: 115000, OutputTokens: 500, PrefixFingerprint: "private-prefix", ResponseFingerprint: "private-response", OverlayFingerprints: []string{"private-overlay"}}
 	testutil.RequireNoError(test, database.Sessions().Append(operationContext, message))
 	messages, operationError := database.Sessions().Messages(operationContext, session.ID)
 	testutil.RequireNoError(test, operationError)
@@ -34,6 +35,9 @@ func TestReasoningAndPricingSurvivePostgresRoundTrip(test *testing.T) {
 	testutil.RequireNoError(test, operationError)
 	if len(messages) != 1 || messages[0].Reasoning != message.Reasoning || messages[0].ProviderState.ChatReasoning != "private continuation" || strings.Contains(string(public), "private continuation") {
 		test.Fatal("reasoning persistence or public/private separation failed")
+	}
+	if messages[0].ProviderState.ContextUsage == nil || messages[0].ProviderState.ContextUsage.InputTokens != 115000 || strings.Contains(string(public), "private-prefix") {
+		test.Fatal("context usage anchor was lost or exposed publicly")
 	}
 	specification := atom.ProviderSpec{Name: identifier, MetadataURL: "https://example.test/catalog.json", MetadataFormat: "models_dev", MetadataProvider: "fixture", Billing: "tokens"}
 	testutil.RequireNoError(test, database.Providers().Save(operationContext, specification))
