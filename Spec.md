@@ -1085,23 +1085,31 @@ The tool call gives the notification policy for a background process. The policy
 
 The interval is a number of milliseconds. The default mode is `exit`. A notification is a message in the session. Thus, the model reads the notification on the next turn.
 
-The default value of `wait` for `bash` is `true`. The output goes into the tool result group. The process uses mode `none` before it starts. It does not send a notification for the output. The notification parameters apply only when `wait` is `false`.
+The default value of `wait` for `bash` is `true`. The process uses mode `none` before it starts. A process exit puts the output in the tool result group. It does not send the same output as a notification.
 
-A runtime notification has the message role `runtime`. It is process data, not a user request or a system instruction. The queue keeps the message role. The UI shows the message as `Runtime`.
+The default value of `idle_timeout` is 10000 milliseconds. If output stops for 10000 milliseconds, the tool gives the process ID and available output. The process continues with the selected notification policy. An inactivity return is not a process exit status.
+
+The inactivity return contains the last 20 lines or 4096 bytes for standard output and standard error. The status, time, and output are from one output snapshot. With `idle_timeout: 0`, the harness does not use inactivity returns or inactivity notifications.
+
+With `wait: false`, a process can send one inactivity notification. The `idle_timeout` must be above 0. The notification mode must not be `none`. With `wait: true`, the inactivity return is the only inactivity notification. The process does not send it again.
+
+A runtime notification has the message role `runtime`. It is process data, not a user request or a system instruction. The queue keeps the message role. The UI shows process output in tool sections.
 
 The provider request uses the role `user` for the runtime notification. The notification is context data. It is not a system instruction or a tool result. The content gives the message source.
 
-The unit for the `timeout` and `interval` input of `bash` is milliseconds. For example, `timeout: 60000` gives a limit of 60 seconds.
+The unit for the `timeout`, `idle_timeout`, and `interval` input of `bash` is milliseconds. For example, `timeout: 60000` gives a limit of 60 seconds.
 
 The default timeout is `0`. With `timeout: 0`, the harness does not stop the process automatically. The timeout applies when `wait` is `true` or `false`.
 
 The default value of `wait` is `true`. A value of `false` gives the process ID immediately. When the user cancels a tool call, the process continues. Use `process_kill` to stop the process.
 
-The `interval` parameter must be a minimum of 1 millisecond when `wait` is `false` and `notify` is `interval`. The values `none`, `exit`, and `error` do not use the interval. The mode `interval` also sends a notification when the process stops.
+The `interval` parameter must be a minimum of 1 millisecond when `notify` is `interval`. This applies after an inactivity return. The values `none`, `exit`, and `error` do not use the interval. The mode `interval` also sends a notification when the process stops.
 
 The process manager keeps the process after the initial turn stops. The process manager writes the exit status with an active database context. Output goes through `process.output` before the output buffer, watchers, and notifications.
 
 The output buffer has a limit of 256 KiB for standard output and 256 KiB for standard error. The process supervisor keeps the last 128 completed processes. A client can read the output after a process stops. On Unix, a stop signal applies to the process group.
+
+The process specification keeps the tool call ID and model response ID. The IDs connect a terminal view to one tool call. A new connection gets output snapshots before new output. Byte offsets show output gaps. The WebSocket supplies output bytes in base64 and the process exit status.
 
 Requirements:
 

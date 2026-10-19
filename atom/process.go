@@ -23,6 +23,12 @@ type ProcessSpec struct {
 	Env     []string
 	Notify  NotifyPolicy
 	Timeout time.Duration
+	// IdleTimeout bounds a foreground quiet wait or one background inactivity
+	// notice. Zero disables inactivity handling; it never stops the command.
+	IdleTimeout time.Duration
+	// Tool references are assigned by the runtime, never by shell arguments.
+	ToolCallID    string `json:",omitempty"`
+	ToolMessageID string `json:",omitempty"`
 }
 
 type StreamName string
@@ -40,6 +46,11 @@ type ProcessEvent struct {
 	Data      []byte
 	Error     string
 	At        time.Time
+	// Offset is a zero-based byte position in this stream after output middleware.
+	// Snapshot marks retained output supplied when a subscriber joins.
+	Offset   int64
+	Snapshot bool
+	Exit     *ExitStatus `json:",omitempty"`
 }
 
 type Signal string

@@ -36,7 +36,7 @@ func (processOutputTool *ProcessOutput) InputSchema() atom.Schema {
 		"properties": {
 			"id": {
 				"type": "string",
-				"description": "Harness process ID returned by bash with wait=false, not the operating-system PID. The process must belong to this instance and its output must still be retained."
+				"description": "Harness process ID returned by bash with wait=false or after an inactivity return, not the operating-system PID. The process must belong to this instance and its output must still be retained."
 			}
 		},
 		"required": ["id"]
@@ -98,7 +98,7 @@ func (processKillTool *ProcessKill) InputSchema() atom.Schema {
 		"properties": {
 			"id": {
 				"type": "string",
-				"description": "Harness process ID returned by bash with wait=false, not the operating-system PID. The process must belong to this instance."
+				"description": "Harness process ID returned by bash with wait=false or after an inactivity return, not the operating-system PID. The process must belong to this instance."
 			},
 			"signal": {
 				"type": "string",

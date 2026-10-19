@@ -11,7 +11,8 @@
   import MessageCard from '../molecules/MessageCard.svelte';
   import RichText from '../molecules/content/RichText.svelte';
   import MessageContent from '../molecules/content/MessageContent.svelte';
-  import ToolActivitySection from '../molecules/ToolActivitySection.svelte';
+  import ToolActivityView from './ToolActivityView.svelte';
+  import ProcessNoticeSection from '../molecules/ProcessNoticeSection.svelte';
   import PermissionCard from '../molecules/PermissionCard.svelte';
   import type { AgentMonitor } from './agent-monitor.svelte';
 
@@ -33,6 +34,7 @@
   const entries = $derived(
     buildConversationEntries(
       feed ? (feed.liveMessage ? [...feed.messages, feed.liveMessage] : feed.messages) : [],
+      feed?.processes.records.values() ?? [],
     ),
   );
 
@@ -198,15 +200,23 @@
                     {/each}
                   {/each}
                 {/if}
-              {:else}<ToolActivitySection {activity} running={feed?.active ?? false} />{/if}
+              {:else if feed}<ToolActivityView
+                  {activity}
+                  messageID={entry.message.ID}
+                  processes={feed.processes}
+                  running={feed.active}
+                />{/if}
             {/snippet}
-            <MessageCard
-              message={entry.message}
-              tools={entry.tools}
-              renderTool={tools}
-              running={feed?.active ?? false}
-              streaming={entry.message.ID === feed?.liveMessage?.ID}
-            />
+            {#if entry.processNotice}<ProcessNoticeSection
+                notice={entry.processNotice}
+                record={entry.processRecord}
+              />{:else}<MessageCard
+                message={entry.message}
+                tools={entry.tools}
+                renderTool={tools}
+                running={feed?.active ?? false}
+                streaming={entry.message.ID === feed?.liveMessage?.ID}
+              />{/if}
           {/each}
           {#if !feed?.loading && !entries.length}<p class="py-2 text-xs text-muted-foreground">
               No agent output yet.

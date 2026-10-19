@@ -1,4 +1,5 @@
 import { ApiError, HarnessApi } from '../molecules/api/client';
+import { SessionProcesses } from './session-processes.svelte';
 import { subscribeEvents, type StreamState } from '../molecules/api/events';
 import {
   eventPayload,
@@ -15,6 +16,7 @@ const liveTextLimit = 100_000;
 // A read-only child feed owns its socket, reads, and bounded live preview. Child
 // agents run directly in the loop; their queue status is not an activity signal.
 export class AgentFeed {
+  readonly processes = new SessionProcesses();
   session = $state<Session>();
   messages = $state<Message[]>([]);
   liveMessage = $state<Message | null>(null);
@@ -90,6 +92,7 @@ export class AgentFeed {
     this.previewReaders++;
     if (!this.previewEnabled) {
       this.previewEnabled = true;
+      if (this.session) this.processes.open(this.api, this.session.ID);
       this.loading = !this.messages.length;
       void this.refresh();
       this.observe();
@@ -101,6 +104,7 @@ export class AgentFeed {
       this.previewReaders--;
       if (this.previewReaders > 0) return;
       this.previewEnabled = false;
+      this.processes.close();
       clearTimeout(this.refreshTimer);
       this.refreshTimer = undefined;
     };
@@ -115,7 +119,10 @@ export class AgentFeed {
       (state) => {
         if (this.lifetime.signal.aborted) return;
         this.streamState = state;
-        if (state === 'live' && this.previewEnabled) this.scheduleRefresh();
+        if (state === 'live' && this.previewEnabled) {
+          this.scheduleRefresh();
+          this.processes.scheduleRefresh();
+        }
       },
     );
     this.schedulePoll();
@@ -148,6 +155,8 @@ export class AgentFeed {
   private receiveEvent(event: HarnessEvent) {
     if (this.lifetime.signal.aborted || event.SessionID !== this.session?.ID) return;
     this.onEvent(event);
+    this.processes.observe(event);
+    if (['process.start', 'process.output', 'process.exit'].includes(event.Name)) return;
     const payload = eventPayload(event);
     if (event.Name === 'turn.start' || event.Name === 'model.call') {
       this.phase = 'working';
@@ -350,6 +359,7 @@ export class AgentFeed {
   }
 
   close() {
+    this.processes.close();
     this.lifetime.abort();
     this.stopObserving();
     clearTimeout(this.refreshTimer);

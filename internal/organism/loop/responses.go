@@ -75,7 +75,8 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 			}
 			tasks = append(tasks, task)
 			go func() {
-				task.result <- agentLoop.executeToolCall(operationContext, session, task.call)
+				toolContext := harness.WithToolOrigin(operationContext, harness.ToolOrigin{MessageID: messageID, CallID: task.call.ID})
+				task.result <- agentLoop.executeToolCall(toolContext, session, task.call)
 			}()
 		}
 		content = append(content, part.Content...)

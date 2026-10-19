@@ -15,7 +15,8 @@
   import type { HarnessConsole } from '$lib/organisms/console.svelte';
   import { shortID } from '$lib/atoms/format';
   import { buildConversationEntries, type ToolActivity } from '$lib/atoms/transcript';
-  import ToolActivitySection from '../molecules/ToolActivitySection.svelte';
+  import ToolActivityView from './ToolActivityView.svelte';
+  import ProcessNoticeSection from '../molecules/ProcessNoticeSection.svelte';
   import AgentGroup from './AgentGroup.svelte';
   import MessageCard from '../molecules/MessageCard.svelte';
   import MessageContent from '../molecules/content/MessageContent.svelte';
@@ -47,6 +48,7 @@
   const entries = $derived(
     buildConversationEntries(
       workbench.liveMessage ? [...workbench.messages, workbench.liveMessage] : workbench.messages,
+      workbench.processes.records.values(),
     ),
   );
   const unplacedAgents = $derived(
@@ -168,15 +170,23 @@
                     running={workbench.status.running}
                   />
                 {/if}
-              {:else}<ToolActivitySection {activity} running={workbench.status.running} />{/if}
+              {:else}<ToolActivityView
+                  {activity}
+                  messageID={entry.message.ID}
+                  processes={workbench.processes}
+                  running={workbench.status.running}
+                />{/if}
             {/snippet}
-            <MessageCard
-              message={entry.message}
-              tools={entry.tools}
-              renderTool={tools}
-              running={workbench.status.running}
-              streaming={entry.message.ID === workbench.liveMessage?.ID}
-            />{/each}
+            {#if entry.processNotice}<ProcessNoticeSection
+                notice={entry.processNotice}
+                record={entry.processRecord}
+              />{:else}<MessageCard
+                message={entry.message}
+                tools={entry.tools}
+                renderTool={tools}
+                running={workbench.status.running}
+                streaming={entry.message.ID === workbench.liveMessage?.ID}
+              />{/if}{/each}
           {#if unplacedAgents.length}<AgentGroup
               monitor={workbench.agents}
               sessions={unplacedAgents}

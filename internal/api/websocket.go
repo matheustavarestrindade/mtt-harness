@@ -93,7 +93,7 @@ func (server *Server) processOutput(responseWriter http.ResponseWriter, request 
 			if !open {
 				return
 			}
-			if operationError := sendJSON(operationContext, connection, map[string]any{"stream": event.Stream, "data": string(event.Data), "error": event.Error}); operationError != nil {
+			if operationError := sendJSON(operationContext, connection, map[string]any{"process_id": event.ProcessID, "stream": event.Stream, "data": string(event.Data), "data_base64": event.Data, "offset": event.Offset, "snapshot": event.Snapshot, "at": event.At, "error": event.Error, "exit": event.Exit}); operationError != nil {
 				return
 			}
 			if event.Stream == atom.StreamExit {

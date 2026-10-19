@@ -126,7 +126,7 @@ func TestDiscoveredToolContractsReachProviderRequests(test *testing.T) {
 	if bashProperties["timeout"].Default != float64(0) || bashProperties["wait"].Default != true || bashProperties["notify"].Default != "exit" {
 		test.Fatalf("bash defaults disappeared: %+v", bashProperties)
 	}
-	if !strings.Contains(bashProperties["wait"].Description, "no separate session notifications") || !strings.Contains(bashProperties["notify"].Description, "wait=false") || !strings.Contains(bashProperties["notify"].Description, "Ignored when wait=true") {
+	if !strings.Contains(bashProperties["wait"].Description, "leaves the command running") || !strings.Contains(bashProperties["notify"].Description, "wait=false") || !strings.Contains(bashProperties["notify"].Description, "not queued again") || bashProperties["idle_timeout"].Default != float64(10000) || !strings.Contains(bashProperties["idle_timeout"].Description, "zero disables") || !strings.Contains(bashProperties["idle_timeout"].Description, "milliseconds") {
 		test.Fatalf("foreground/background delivery instructions disappeared: %+v", bashProperties)
 	}
 	if !strings.Contains(strings.Join(bashProperties["notify"].Enum, ","), "none") {
