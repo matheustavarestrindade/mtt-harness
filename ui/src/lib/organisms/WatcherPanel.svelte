@@ -4,6 +4,7 @@
   import { Button } from '../atoms/ui/button';
   import { Input } from '../atoms/ui/input';
   import { workspaceName } from '../atoms/format';
+  import { createClientID } from '../atoms/identifiers';
   import type { Instance, Session, Model } from '../atoms/types';
   import type {
     WatcherConfiguration,
@@ -93,7 +94,7 @@
       WatcherDefinition | undefined;
     if (!defaults) return;
     const value = structuredClone($state.snapshot(copy ?? defaults));
-    value.id = crypto.randomUUID();
+    value.id = createClientID();
     value.name = copy ? `${copy.name} copy` : '';
     value.enabled = true;
     value.permission_tools ??= [];
