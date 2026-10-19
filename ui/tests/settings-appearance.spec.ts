@@ -74,7 +74,10 @@ test('all seven Settings pages use one aligned title including Connection', asyn
     expect(geometry.iconWidth).toBe(20);
     expect(geometry.iconHeight).toBe(20);
     expect(geometry.titleLeft).toBe(32);
-    expect(geometry.descriptionLeft).toBe(32);
+    expect(
+      geometry.descriptionLeft,
+      `${name}: description must start at the page content edge`,
+    ).toBe(0);
     expect(geometry.descriptionGap).toBe(4);
     expect(geometry.descriptionFont).toBe('14px');
     expect(geometry.descriptionLine).toBe('20px');

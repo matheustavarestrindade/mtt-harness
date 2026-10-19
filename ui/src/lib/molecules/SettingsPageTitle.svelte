@@ -15,11 +15,14 @@
   } = $props();
 </script>
 
-<header data-settings-page-title class="flex min-w-0 items-start gap-3">
-  <Icon aria-hidden="true" class="mt-1 size-5 shrink-0 text-muted-foreground" />
-  <div class="min-w-0 flex-1">
-    <h2 class="text-lg font-medium">{title}</h2>
-    <p class="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>
-  </div>
-  {#if actions}<div class="shrink-0">{@render actions()}</div>{/if}
+<header
+  data-settings-page-title
+  class={`grid min-w-0 items-start gap-x-3 gap-y-1 ${actions ? 'grid-cols-[20px_minmax(0,1fr)_auto]' : 'grid-cols-[20px_minmax(0,1fr)]'}`}
+>
+  <Icon aria-hidden="true" class="col-start-1 row-start-1 mt-1 size-5 text-muted-foreground" />
+  <h2 class="col-start-2 row-start-1 min-w-0 text-lg font-medium">{title}</h2>
+  <p class="col-span-2 row-start-2 min-w-0 text-sm leading-5 text-muted-foreground">
+    {description}
+  </p>
+  {#if actions}<div class="col-start-3 row-span-2 row-start-1">{@render actions()}</div>{/if}
 </header>

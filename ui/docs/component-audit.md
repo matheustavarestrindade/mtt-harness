@@ -9,6 +9,7 @@ Pages: General, Instructions, Sidekick, Watchers, Usage, Providers, Connection
 Title: 18px, weight 500, line height 28px
 Icon: 20px; 12px gap before the title
 Description: 14px, line height 20px; 4px below the title
+Description left edge: page content edge, 0px icon indent
 Page inset: owned by SettingsDialog
 ```
 
