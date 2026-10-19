@@ -16,6 +16,9 @@ const (
 	closeQueue
 	deleteConversation
 	fenceConversationDeletion
+	stopStoredInstance
+	resumeStoredInstance
+	unlinkInstance
 )
 
 type queueCommand struct {
@@ -29,6 +32,7 @@ type queueCommand struct {
 }
 
 type queueReply struct {
+	instance       atom.InstanceSpec
 	coordinator    *sessionCoordinator
 	coordinators   []*sessionCoordinator
 	deleted        []atom.SessionID
@@ -41,11 +45,14 @@ type restoredSession struct {
 }
 
 type directoryCompletion struct {
-	command        queueCommand
-	restored       []restoredSession
-	deleted        []atom.SessionID
-	protected      map[atom.SessionID]bool
-	operationError error
+	instance        atom.InstanceSpec
+	unlinked        bool
+	instanceStopped bool
+	command         queueCommand
+	restored        []restoredSession
+	deleted         []atom.SessionID
+	protected       map[atom.SessionID]bool
+	operationError  error
 }
 
 func (messageQueue *Queue) coordinator(operationContext context.Context, session atom.Session, create bool) (*sessionCoordinator, error) {

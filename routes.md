@@ -53,8 +53,9 @@ A list can be `null`. The message, agent, process, and provider handlers give em
 | GET | `/instances` | none | `200`, `Instance[]` or null | `500` |
 | POST | `/instances` | `InstanceInput` | `201`, `Instance` | `400`, `500` |
 | GET | `/instances/{id}` | none | `200`, `Instance` | `404` |
-| DELETE | `/instances/{id}` | none | `200`, `{"status":"stopped"}` | `404`, `500` |
-| POST | `/instances/{id}/start` | none | `200`, `Instance` | `404`, `400`, `409`, `500` |
+| DELETE | `/instances/{id}` | none | `200`, `{"status":"stopped"}` | `404`, `409`, `500`, `503` |
+| POST | `/instances/{id}/start` | none | `200`, `Instance` | `404`, `400`, `409`, `500`, `503` |
+| POST | `/instances/{id}/unlink` | none | `200`, `{"id":"ID","status":"unlinked"}` | `404`, `409`, `500`, `503` |
 | GET | `/instances/{id}/models` | none | `200`, `Model[]` or null | `404` |
 | GET | `/instances/{id}/sessions` | none | `200`, `Session[]` | `404`, `500` |
 | POST | `/instances/{id}/sessions` | optional `{"model":"provider/model","reasoning_effort":"high"}` | `201`, `Session` | `404`, `400`, `500` |
@@ -78,6 +79,10 @@ The workspace must be a directory on the server. A relative path starts at the p
 The fields `process_limit` and `agent_depth_limit` set an instance configuration value when the input is above 0. A value of 0 does not set a limit in the instance request. To set a value of 0, send a request to a settings route. The instance response fields can be 0 after the configuration data goes to settings.
 
 When an instance stops, the database keeps the configuration and sessions. The active turns and processes stop. Messages in the queue can continue when the instance starts again. The instance must be active to give a model list or make a session. The API can read the configuration of a stopped instance.
+
+The unlink operation removes a workspace reference from the workspace list. Files, directories, and symbolic links do not change. The database keeps sessions, messages, plugin data, settings, keys, and usage.
+
+An active conversation, child agent, message in the queue, or active process gives `409`. The previous instance ID cannot start after the unlink operation. The next harness start does not start the unlinked workspace. A new workspace request for the same directory makes a new ID. See `docs/workspace-unlink.md`.
 
 ## Session and Queue Routes
 

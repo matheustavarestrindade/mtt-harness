@@ -263,6 +263,10 @@ An instance can stop and start again with the same data.
 
 The database keeps a stopped instance and the sessions of the instance. The API can start the same instance again. A stopped instance must not start a model call or a process. File tools and shell commands must use the workspace of the instance.
 
+The user can unlink a workspace reference for an idle workspace. The unlink operation does not change files, directories, or symbolic links. The database keeps sessions, messages, plugin data, settings, keys, and usage. The workspace list and the next harness start do not use the unlinked workspace.
+
+An active conversation, child agent, message in the queue, or active process prevents the unlink operation. The instance lifecycle gate controls `unlink`, `stop`, and `resume`. The database field `unlinked` prevents a new workspace reference with the previous instance ID. A new workspace request for the same directory makes a new instance ID. See `docs/workspace-unlink.md`.
+
 Requirements:
 
 - R12: The harness must give one API for many instances.
@@ -1234,6 +1238,7 @@ The initial API paths are:
 - `GET /instances/{id}`: read an instance.
 - `DELETE /instances/{id}`: stop an instance.
 - `POST /instances/{id}/start`: start a stopped instance.
+- `POST /instances/{id}/unlink`: unlink an idle workspace. Files and directories stay the same.
 - `POST /instances/{id}/sessions`: start a session.
 - `GET /instances/{id}/sessions`: read the sessions of an instance.
 - `GET /instances/{id}/models`: read the model list of an instance.

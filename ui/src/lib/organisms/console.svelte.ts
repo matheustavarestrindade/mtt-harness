@@ -80,6 +80,8 @@ export class HarnessConsole {
   private savedMessageIDs = new Set<string>();
   private requestModels = new SvelteMap<string, string>();
   private removedSessionIDs = new Set<string>();
+  private unlinkedInstanceIDs = new Set<string>();
+  private instanceListRevision = 0;
   private selectionRevision = 0;
   private streamFlushTimer: ReturnType<typeof setTimeout> | undefined;
   private pendingText: string[] = [];
@@ -219,6 +221,8 @@ export class HarnessConsole {
     this.catalogError = '';
     this.instances = [];
     this.removedSessionIDs.clear();
+    this.unlinkedInstanceIDs.clear();
+    this.instanceListRevision++;
     this.catalog = [];
     this.models = [];
     this.sessions = [];
@@ -296,8 +300,12 @@ export class HarnessConsole {
   async refreshInstances() {
     const api = this.requireAPIClient();
     const signal = this.lifetime.signal;
+    const revision = ++this.instanceListRevision;
     const instances = await api.instances(signal);
-    if (!signal.aborted) this.instances = instances;
+    if (signal.aborted || revision !== this.instanceListRevision) return;
+    this.instances = instances.filter((instance) => !this.unlinkedInstanceIDs.has(instance.ID));
+    if (this.instance && !this.instances.some((instance) => instance.ID === this.instance?.ID))
+      await this.leaveUnlinkedInstance(this.instance.ID);
   }
 
   connectedAPIClient(): HarnessApi {
@@ -316,6 +324,7 @@ export class HarnessConsole {
   }
 
   async selectInstance(instance: Instance, navigation: WorkspaceNavigation = {}) {
+    if (this.unlinkedInstanceIDs.has(instance.ID)) return;
     const revision = ++this.navigationRevision;
     const history = navigation.history === undefined ? 'push' : navigation.history;
     const api = this.requireAPIClient();
@@ -729,6 +738,32 @@ export class HarnessConsole {
     if (signal.aborted) return;
     await this.refreshInstances();
     if (!signal.aborted) await this.selectInstance(instance);
+  }
+
+  async unlinkInstance(instance: Instance): Promise<boolean> {
+    const api = this.requireAPIClient();
+    const signal = this.lifetime.signal;
+    await api.unlinkInstance(instance.ID, signal);
+    if (signal.aborted || this.api !== api) return false;
+    this.unlinkedInstanceIDs.add(instance.ID);
+    this.instanceListRevision++;
+    this.instances = this.instances.filter((entry) => entry.ID !== instance.ID);
+    await this.leaveUnlinkedInstance(instance.ID);
+    return true;
+  }
+
+  private async leaveUnlinkedInstance(instanceID: string) {
+    if (this.instance?.ID !== instanceID) return;
+    this.navigationRevision++;
+    this.selection.abort();
+    this.stopSessionObservers();
+    this.instance = null;
+    this.sessions = [];
+    this.models = [];
+    this.error = '';
+    writeNavigationRoute({ workspace: '', session: '', agent: '' }, 'replace');
+    const next = this.instances.find((entry) => !entry.Stopped) ?? this.instances[0];
+    if (next) await this.selectInstance(next, { history: 'replace' });
   }
 
   async createSession(model: string, reasoningEffort = '') {
