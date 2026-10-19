@@ -90,6 +90,12 @@ The plugin can apply context compaction while a different memory job has an erro
 
 The plugin gives an error when it cannot keep necessary content below the 80% limit. The context fitter must use plugin policy when the plugin state is `ON`.
 
+The `job_timeout_ms` setting applies to one worker attempt. The default is 120000 milliseconds. At 80%, a context checkpoint must wait while memory jobs run. It does not use the worker timeout to stop a turn.
+
+The database keeps worker progress after a timeout. A new worker attempt uses the worker progress. The retry limit applies when worker progress does not change.
+
+The context checkpoint stops when the user cancels the request or the harness stops. The plugin must examine memory data before it removes context.
+
 ## Memory Snapshots and Cache
 
 After the initial session snapshot, change the memory snapshot only when context compaction removes content. The text, sequence, and position must not change between context refreshes. A memory worker can change the database, but the memory snapshot must wait. A memory search can give new information through tool results.

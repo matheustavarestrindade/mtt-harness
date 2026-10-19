@@ -2,6 +2,21 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "worker attempt",
+      "category": "technical_noun",
+      "approved_forms": [
+        "worker attempts"
+      ],
+      "meaning": "one leased execution of a background job within its configured timeout",
+      "source": "context job lifecycle"
+    },
+    {
+      "term": "worker progress",
+      "category": "technical_noun",
+      "meaning": "durable completed source chunks and extraction pages used to resume a background job",
+      "source": "context job lifecycle"
+    },
+    {
       "term": "playback",
       "category": "technical_noun",
       "meaning": "presentation of saved audio or video through a media player",

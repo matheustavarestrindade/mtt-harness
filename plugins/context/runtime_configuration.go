@@ -226,7 +226,7 @@ func configurationSchema() atom.Schema {
 "snapshot_tokens":{"type":["integer","null"],"description":"Estimated token limit for the memory snapshot. Default 1000; 128..8192. The final model input budget still applies."},
 "worker_count":{"type":["integer","null"],"description":"Maximum simultaneous memory jobs per workspace. Default 2; 1..8."},
 "retry_limit":{"type":["integer","null"],"description":"Retries after a failed memory job attempt. Default 2; 0..5. Each model attempt is billed separately."},
-"job_timeout_ms":{"type":["integer","null"],"description":"Memory job attempt timeout in milliseconds. Default 120000; 1000..600000. Cancellation stops subsequent model and embedding work."},
+"job_timeout_ms":{"type":["integer","null"],"description":"Timeout for one memory worker attempt, in milliseconds. Default 120000; 1000..600000. An attempt that saves progress can resume from its durable checkpoint. Forced context preparation waits across attempts and queued jobs until sufficient work is ready, workers fail, or the request is cancelled. Cancellation stops subsequent model and embedding work."},
 "worker_output_tokens":{"type":["integer","null"],"description":"Maximum worker response tokens. Default 4096; 512..16384, subject to its model context."},
 "source_batch_bytes":{"type":["integer","null"],"description":"Maximum UTF-8 source bytes per worker chunk before model-budget fitting. Default 16000; 1024..64000. Every chunk is retained."},
 "historian_idle_hours":{"type":["integer","null"],"description":"Hours without main-agent retrieval before consolidation is eligible. Default 72; 1..8760. Worker reads do not reset this clock."},
