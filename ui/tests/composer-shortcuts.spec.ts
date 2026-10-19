@@ -54,6 +54,8 @@ test('Enter queues a new message while the current turn is running', async ({ pa
   await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
   await input.fill('Next request');
   await input.press('Enter');
-  await expect(page.getByRole('region', { name: 'Queued messages' })).toContainText('1 queued');
+  await expect(
+    page.locator('[data-queued-message]').filter({ hasText: 'Next request' }),
+  ).toContainText('Queued');
   await expect(input).toHaveValue('');
 });

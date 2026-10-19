@@ -5,8 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/provider"
 	"github.com/matheustavarestrindade/mtt-harness/internal/testutil"
+	"sync"
 )
 
 func TestQueueRunsMessagesInSequence(test *testing.T) {
@@ -17,6 +20,7 @@ func TestQueueRunsMessagesInSequence(test *testing.T) {
 	if _, position, operationError := queue.Submit(operationContext, session, "one"); operationError != nil || position != 1 {
 		test.Fatalf("submit one = %d %v", position, operationError)
 	}
+	awaitQueuedIdle(test, queue, session.ID)
 	if _, position, operationError := queue.Submit(operationContext, session, "two"); operationError != nil || position < 1 || position > 2 {
 		test.Fatalf("submit two = %d %v", position, operationError)
 	}
@@ -83,11 +87,26 @@ func TestQueueCancelsAQueuedMessage(test *testing.T) {
 	testStack := newStack(test, provider.Text("first"), provider.Text("third"))
 	testStack.provider.SetDelay(200 * time.Millisecond)
 	session := testStack.instance(test, 2)
+	firstResponse, releaseResponse := make(chan struct{}), make(chan struct{})
+	release := sync.OnceFunc(func() { close(releaseResponse) })
+	defer release()
+	var first sync.Once
+	harness.Pipe(testStack.harnessRuntime, atom.StageModelResponse, func(operationContext context.Context, message atom.Message) (atom.Message, error) {
+		first.Do(func() {
+			close(firstResponse)
+			select {
+			case <-releaseResponse:
+			case <-operationContext.Done():
+			}
+		})
+		return message, operationContext.Err()
+	})
 	queue := newTestQueue(test, testStack.loop)
 	operationContext := context.Background()
 	if _, _, operationError := queue.Submit(operationContext, session, "one"); operationError != nil {
 		test.Fatal(operationError)
 	}
+	awaitSignal(test, firstResponse)
 	second, _, operationError := queue.Submit(operationContext, session, "two")
 	testutil.RequireNoError(test, operationError)
 
@@ -104,6 +123,7 @@ func TestQueueCancelsAQueuedMessage(test *testing.T) {
 	if removed {
 		test.Fatal("a message which is not in the queue is removed")
 	}
+	release()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		messages, _ := testStack.database.Sessions().Messages(operationContext, session.ID)

@@ -108,7 +108,9 @@ An active conversation, child agent, message in the queue, or active process giv
 | GET | `/sessions/{id}/events` | WebSocket upgrade; optional `since` | event frames | `404`, `400`, upgrade error |
 ```
 
-The database keeps a message in the queue before the API gives `202`. The message goes into history when the turn starts. A session can have 128 messages that wait. The harness limit is 4096 messages that wait or run.
+The database keeps a message in the queue before the API gives `202`. Before the next model request, the harness puts the messages that wait into history as a message batch. The request contains the message batch in queue sequence. A session can have 128 messages that wait. The harness limit is 4096 messages that wait or run.
+
+The active response and the tool result group finish before the next message batch starts. The message IDs, content, and roles stay the same. After the message batch starts, the message IDs are not in the status list of messages that wait. See `docs/message-queue.md`.
 
 The session input accepts an optional `reasoning_effort` string with `model`. An empty string uses the model default. The model gives the available values in `ReasoningEfforts`. A session change applies to the next model request. It does not stop an active request. The database keeps the selection.
 
