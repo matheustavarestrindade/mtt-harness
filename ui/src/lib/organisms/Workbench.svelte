@@ -20,6 +20,7 @@
   import { toast } from 'svelte-sonner';
   import { Toaster } from '$lib/atoms/ui/sonner';
   import { Button } from '$lib/atoms/ui/button';
+  import ActivityIndicator from '../atoms/ActivityIndicator.svelte';
   import * as Sheet from '$lib/atoms/ui/sheet';
   import Navigation from '$lib/organisms/Navigation.svelte';
   import SettingsDialog from '$lib/organisms/SettingsDialog.svelte';
@@ -95,6 +96,12 @@
   const attachmentDrafts = new AttachmentDrafts();
   let providerProtocols = $state<Record<string, string>>({});
   const sessionID = $derived(workbench.session?.ID ?? '');
+  const headerProcessing = $derived(
+    !!sessionID &&
+      workbench.status.running &&
+      !workbench.permissions.length &&
+      (desktopNavigation.current ? navigationCollapsed : !menuOpen),
+  );
   const sessionModel = $derived(findSessionModel(workbench.models, workbench.session?.Model ?? ''));
   const attachmentProtocol = $derived(
     providerProtocols[(sessionModel?.ID || workbench.session?.Model || '').split('/')[0]],
@@ -481,9 +488,15 @@
         >{/if}
       <div class="min-w-0 flex-1">
         <div class="flex min-w-0 items-center gap-2 text-sm">
-          <FolderOpen class="hidden size-4 shrink-0 text-muted-foreground lg:block" /><span
-            class="truncate font-medium"
-            title={workbench.instance?.Workspace}
+          {#if headerProcessing}<span
+              role="status"
+              aria-label="Processing"
+              data-slot="session-activity"
+              class="inline-flex shrink-0 text-muted-foreground"><ActivityIndicator /></span
+            >
+          {:else}<FolderOpen
+              class="hidden size-4 shrink-0 text-muted-foreground lg:block"
+            />{/if}<span class="truncate font-medium" title={workbench.instance?.Workspace}
             >{workbench.instance ? workspaceName(workbench.instance.Workspace) : 'Workspace'}</span
           >{#if desktopNavigation.current}<ChevronRight
               class="size-3 shrink-0 text-muted-foreground/50"

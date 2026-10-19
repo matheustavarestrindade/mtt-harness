@@ -31,9 +31,17 @@ test('stream thinking collapsed and retain one expandable section after persiste
   });
   const thinking = page.getByRole('region', { name: 'Thinking', exact: true });
   await expect(thinking.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+  await expect(thinking.getByRole('button')).toContainText('Plan');
+  await expect(thinking.locator('[data-slot="activity-indicator"]')).toBeVisible();
   await expect(thinking.getByText('Compare the inputs.', { exact: true })).toHaveCount(0);
   await thinking.getByRole('button').click();
   await expect(thinking.getByText('Compare the inputs.', { exact: true })).toBeVisible();
+  fixture.event(session, 'model.chunk', {
+    message_id: 'thinking-message',
+    reasoning: '\n\n**Checking sources**\n\nRead the project files.',
+  });
+  await expect(thinking.getByRole('button')).toContainText('Checking sources');
+  await expect(thinking.getByRole('button')).toHaveAttribute('aria-expanded', 'true');
   fixture.event(session, 'model.chunk', {
     message_id: 'thinking-message',
     text: 'The answer is ready.',
@@ -41,6 +49,8 @@ test('stream thinking collapsed and retain one expandable section after persiste
   await expect(page.getByRole('article', { name: 'assistant message' })).toContainText(
     'The answer is ready.',
   );
+  await expect(thinking.locator('[data-slot="activity-indicator"]')).toHaveCount(0);
+  await expect(thinking.locator('[data-slot="thinking-status"]')).toHaveCount(0);
   const completed: Message = {
     ID: 'thinking-message',
     SessionID: session.ID,
@@ -57,7 +67,7 @@ test('stream thinking collapsed and retain one expandable section after persiste
         AudioID: '',
       },
     ],
-    Reasoning: '**Plan**\n\nCompare the inputs.',
+    Reasoning: '**Plan**\n\nCompare the inputs.\n\n**Checking sources**\n\nRead the project files.',
     ToolCalls: null,
     ToolCallID: '',
     Usage: null,
