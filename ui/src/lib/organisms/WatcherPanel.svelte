@@ -445,7 +445,7 @@
       </div>
     </Tabs.Root>
     <PluginPanelFooter
-      name="Watchers"
+      refreshLabel="Refresh Watchers"
       {updatedAt}
       refreshing={panel.loading || reading}
       disabled={panel.saving}

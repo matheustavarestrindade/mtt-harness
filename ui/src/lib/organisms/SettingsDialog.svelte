@@ -77,7 +77,7 @@
         {#each sections as item (item.id)}
           <Button
             variant={section === item.id ? 'secondary' : 'ghost'}
-            class="h-11 min-w-0 shrink-0 gap-2 px-2 text-sm sm:justify-start sm:px-3"
+            class="h-11 min-w-0 shrink-0 gap-2 px-2 text-xs sm:justify-start sm:px-3"
             aria-current={section === item.id ? 'page' : undefined}
             onclick={() => (section = item.id)}
           >

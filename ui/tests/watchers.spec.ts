@@ -226,12 +226,16 @@ test('align Watcher tabs and footer buttons with the Sidekick reference', async 
   const reference = page.getByRole('button', { name: 'Refresh Sidekick', exact: true });
   await expect(reference).toBeVisible();
   const referenceFont = await reference.evaluate((element) => getComputedStyle(element).fontSize);
-  for (const label of ['Sidekick', 'Watchers']) {
+  const navigationFont = await navigation
+    .getByRole('button', { name: 'Sidekick', exact: true })
+    .evaluate((element) => getComputedStyle(element).fontSize);
+  expect(navigationFont).toBe('12px');
+  for (const label of ['Instructions', 'Watchers']) {
     expect(
       await navigation
         .getByRole('button', { name: label, exact: true })
         .evaluate((element) => getComputedStyle(element).fontSize),
-    ).toBe(referenceFont);
+    ).toBe(navigationFont);
   }
   await navigation.getByRole('button', { name: 'Watchers', exact: true }).click();
   const tabs = page.getByRole('tablist', { name: 'Watcher sections' });

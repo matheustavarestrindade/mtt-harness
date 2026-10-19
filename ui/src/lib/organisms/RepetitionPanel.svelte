@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { LoaderCircle, RefreshCw, Repeat2, Power, Settings2 } from 'lucide-svelte';
+  import { LoaderCircle, Repeat2, Power, Settings2 } from 'lucide-svelte';
   import type { Instance, Model } from '../atoms/types';
   import type { RepetitionConfiguration } from '../atoms/plugins';
   import { Button } from '../atoms/ui/button';
@@ -13,6 +13,7 @@
   import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
   import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
 
   let { api, instance }: { api: HarnessApi; instance: Instance | null } = $props();
@@ -149,15 +150,6 @@
           : 'the selected workspace'}.
       </p>
     </div>
-    {#if workspaceID}<Button
-        variant="ghost"
-        size="icon"
-        class="icon-button"
-        aria-label="Refresh instruction usage"
-        disabled={panel.loading || panel.saving}
-        onclick={() => panel.refresh()}
-        ><RefreshCw class={panel.loading ? 'size-4 animate-spin' : 'size-4'} /></Button
-      >{/if}
   </header>
   {#if !instance}
     <p class="text-sm text-muted-foreground">
@@ -394,8 +386,12 @@
             />{/each}
         </div>{/if}
     {/if}
-    {#if panel.updatedAt}<p class="text-xs text-muted-foreground">
-        Last update {panel.updatedAt.toLocaleTimeString()}. Workspace totals across sessions.
-      </p>{/if}
+    <PluginPanelFooter
+      refreshLabel="Refresh Instructions"
+      updatedAt={panel.updatedAt}
+      refreshing={panel.loading}
+      disabled={panel.saving}
+      onRefresh={() => void panel.refresh()}
+    />
   {/if}
 </section>

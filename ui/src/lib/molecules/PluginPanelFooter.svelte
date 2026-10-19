@@ -3,13 +3,13 @@
   import { Button } from '../atoms/ui/button';
 
   let {
-    name,
+    refreshLabel,
     updatedAt = null,
     refreshing = false,
     disabled = false,
     onRefresh,
   }: {
-    name: string;
+    refreshLabel: string;
     updatedAt?: Date | null;
     refreshing?: boolean;
     disabled?: boolean;
@@ -22,8 +22,6 @@
     >{updatedAt ? `Updated ${updatedAt.toLocaleTimeString()}` : 'Workspace activity'}</span
   >
   <Button variant="ghost" class="h-11" disabled={disabled || refreshing} onclick={onRefresh}>
-    <RefreshCw
-      class={`size-4 ${refreshing ? 'animate-spin motion-reduce:animate-none' : ''}`}
-    />Refresh {name}
+    <RefreshCw class={`size-4 ${refreshing ? 'animate-spin' : ''}`} />{refreshLabel}
   </Button>
 </div>
