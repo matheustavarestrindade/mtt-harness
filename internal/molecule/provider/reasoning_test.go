@@ -68,7 +68,7 @@ func TestResponsesReasoningIsPublicTextOnlyAndNotDuplicated(test *testing.T) {
 		"data: {\"type\":\"response.reasoning_summary_text.done\",\"output_index\":0,\"summary_index\":0,\"text\":\"First step\"}\n\n" +
 		"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":" + item + "}\n\n" +
 		"data: {\"type\":\"response.completed\",\"response\":{\"output\":[" + item + "],\"usage\":{\"input_tokens\":20,\"output_tokens\":10,\"output_tokens_details\":{\"reasoning_tokens\":8}}}}\n\n"
-	stream := &httpStream{parts: make(chan atom.ResponsePart, 16)}
+	stream := &providerStream{parts: make(chan atom.ResponsePart, 16)}
 	go parseResponsesAPIEvents(context.Background(), io.NopCloser(strings.NewReader(body)), stream, "fixture")
 	var reasoning strings.Builder
 	var state *atom.ProviderState
@@ -99,7 +99,7 @@ func TestResponsesReasoningIsPublicTextOnlyAndNotDuplicated(test *testing.T) {
 func TestNativeReasoningTextSurvivesBothProtocols(test *testing.T) {
 	for _, protocol := range []string{"responses", "chat_completions"} {
 		test.Run(protocol, func(test *testing.T) {
-			stream := &httpStream{parts: make(chan atom.ResponsePart, 16)}
+			stream := &providerStream{parts: make(chan atom.ResponsePart, 16)}
 			body := "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"Visible thinking\"}}]}\n\ndata: [DONE]\n\n"
 			if protocol == "responses" {
 				body = "data: {\"type\":\"response.reasoning_text.delta\",\"delta\":\"Visible thinking\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"output\":[{\"type\":\"reasoning\",\"content\":[{\"type\":\"reasoning_text\",\"text\":\"Visible thinking\"}]}]}}\n\n"

@@ -67,6 +67,8 @@ type ProviderSpec struct {
 	Protocol         string
 	Authentication   string
 	APIURL           string
+	Transport        string `json:",omitempty"`
+	WebSocketURL     string `json:",omitempty"`
 	ModelListURL     string
 	ModelListFormat  string `json:",omitempty"`
 	PriceTableURL    string

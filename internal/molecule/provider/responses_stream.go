@@ -11,17 +11,27 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
 
+const maximumResponsesEventBytes = 8 * 1024 * 1024
+
 type responseEvent struct {
-	Type         string          `json:"type"`
-	Delta        string          `json:"delta"`
-	Text         string          `json:"text"`
-	OutputIndex  int             `json:"output_index"`
-	SummaryIndex int             `json:"summary_index"`
-	ContentIndex int             `json:"content_index"`
-	Item         json.RawMessage `json:"item"`
+	Type         string                `json:"type"`
+	Delta        string                `json:"delta"`
+	Text         string                `json:"text"`
+	ResponseID   string                `json:"response_id"`
+	OutputIndex  int                   `json:"output_index"`
+	SummaryIndex int                   `json:"summary_index"`
+	ContentIndex int                   `json:"content_index"`
+	Item         json.RawMessage       `json:"item"`
+	Status       int                   `json:"status"`
+	Error        *responsesErrorDetail `json:"error"`
 	Response     struct {
-		Output []json.RawMessage `json:"output"`
-		Usage  *responsesUsage   `json:"usage"`
+		ID                string                `json:"id"`
+		Output            []json.RawMessage     `json:"output"`
+		Usage             *responsesUsage       `json:"usage"`
+		Error             *responsesErrorDetail `json:"error"`
+		IncompleteDetails struct {
+			Reason string `json:"reason"`
+		} `json:"incomplete_details"`
 	} `json:"response"`
 }
 
@@ -41,15 +51,22 @@ type responseItem struct {
 	} `json:"content"`
 }
 
-func parseResponsesAPIEvents(operationContext context.Context, body io.ReadCloser, stream *httpStream, providerName string) {
-	defer body.Close()
-	defer close(stream.parts)
-	scanner := bufio.NewScanner(body)
-	scanner.Buffer(make([]byte, 64*1024), 8*1024*1024)
-	emittedCalls := map[string]bool{}
-	streamedText := false
-	state := &atom.ProviderState{Provider: providerName}
-	send := func(part atom.ResponsePart) bool {
+// responsesDecoder is shared by HTTP/SSE and WebSocket framing. Only a
+// response.completed event publishes a reusable continuation baseline.
+type responsesDecoder struct {
+	providerName string
+	send         func(atom.ResponsePart) bool
+	reasoning    reasoningStream
+	emittedCalls map[string]bool
+	streamedText bool
+	state        *atom.ProviderState
+	completed    *responseEvent
+	responseID   string
+}
+
+func newResponsesDecoder(operationContext context.Context, stream *providerStream, providerName string) *responsesDecoder {
+	decoder := &responsesDecoder{providerName: providerName, emittedCalls: map[string]bool{}, state: &atom.ProviderState{Provider: providerName}}
+	decoder.send = func(part atom.ResponsePart) bool {
 		select {
 		case stream.parts <- part:
 			return true
@@ -58,117 +75,156 @@ func parseResponsesAPIEvents(operationContext context.Context, body io.ReadClose
 			return false
 		}
 	}
-	reasoning := reasoningStream{send: send}
-	consumeItem := func(raw json.RawMessage, index int, rememberReasoning bool) bool {
-		var item responseItem
-		if operationError := json.Unmarshal(raw, &item); operationError != nil {
-			stream.operationError = fmt.Errorf("invalid Responses output item: %w", operationError)
-			return false
-		}
-		switch item.Type {
-		case "function_call":
-			if emittedCalls[item.CallID] {
-				return true
-			}
-			if item.CallID == "" || item.Name == "" || !json.Valid([]byte(item.Arguments)) {
-				stream.operationError = fmt.Errorf("incomplete Responses function call")
-				return false
-			}
-			emittedCalls[item.CallID] = true
-			return send(atom.ResponsePart{ToolIndex: &index, ToolCall: &atom.ToolCall{ID: item.CallID, Name: item.Name, Input: json.RawMessage(item.Arguments)}})
-		case "reasoning":
-			for partIndex, part := range item.Summary {
-				if part.Type == "summary_text" && !reasoning.completePart(reasoningPartKey(index, "summary", partIndex), part.Text) {
-					return false
-				}
-			}
-			for partIndex, part := range item.Content {
-				if part.Type == "reasoning_text" && !reasoning.completePart(reasoningPartKey(index, "content", partIndex), part.Text) {
-					return false
-				}
-			}
-			if rememberReasoning {
-				state.Reasoning = append(state.Reasoning, append(json.RawMessage(nil), raw...))
-			}
-		}
-		return true
+	decoder.reasoning = reasoningStream{send: decoder.send}
+	return decoder
+}
+
+func (decoder *responsesDecoder) consumeOutputItem(raw json.RawMessage, index int, rememberReasoning bool) (bool, error) {
+	var item responseItem
+	if operationError := json.Unmarshal(raw, &item); operationError != nil {
+		return false, fmt.Errorf("invalid Responses output item: %w", operationError)
 	}
+	switch item.Type {
+	case "function_call":
+		if decoder.emittedCalls[item.CallID] {
+			return true, nil
+		}
+		if item.CallID == "" || item.Name == "" || !json.Valid([]byte(item.Arguments)) {
+			return false, fmt.Errorf("incomplete Responses function call")
+		}
+		decoder.emittedCalls[item.CallID] = true
+		return decoder.send(atom.ResponsePart{ToolIndex: &index, ToolCall: &atom.ToolCall{ID: item.CallID, Name: item.Name, Input: json.RawMessage(item.Arguments)}}), nil
+	case "reasoning":
+		for partIndex, part := range item.Summary {
+			if part.Type == "summary_text" && !decoder.reasoning.completePart(reasoningPartKey(index, "summary", partIndex), part.Text) {
+				return false, nil
+			}
+		}
+		for partIndex, part := range item.Content {
+			if part.Type == "reasoning_text" && !decoder.reasoning.completePart(reasoningPartKey(index, "content", partIndex), part.Text) {
+				return false, nil
+			}
+		}
+		if rememberReasoning {
+			decoder.state.Reasoning = append(decoder.state.Reasoning, append(json.RawMessage(nil), raw...))
+		}
+	}
+	return true, nil
+}
+
+func (decoder *responsesDecoder) consumeEvent(encoded []byte) (bool, error) {
+	var event responseEvent
+	if operationError := json.Unmarshal(encoded, &event); operationError != nil {
+		return false, fmt.Errorf("invalid Responses stream JSON: %w", operationError)
+	}
+	if event.Type == "response.created" {
+		decoder.responseID = event.Response.ID
+	}
+	if event.ResponseID != "" && decoder.responseID != "" && event.ResponseID != decoder.responseID {
+		return false, fmt.Errorf("Responses event belongs to a different response")
+	}
+	switch event.Type {
+	case "response.completed", "response.failed", "response.incomplete":
+		if decoder.responseID != "" && event.Response.ID != "" && decoder.responseID != event.Response.ID {
+			return false, fmt.Errorf("Responses completion belongs to a different response")
+		}
+		if reported := event.Response.Usage; reported != nil {
+			usage, operationError := normalizeProviderUsage(reported.Input, reported.Output, reported.InputDetails, reported.OutputDetails, reported.Cost)
+			if operationError != nil {
+				return false, operationError
+			}
+			if !decoder.send(atom.ResponsePart{Usage: usage}) {
+				return false, nil
+			}
+		}
+	}
+	switch event.Type {
+	case "response.reasoning_summary_text.delta":
+		return decoder.reasoning.appendDelta(reasoningPartKey(event.OutputIndex, "summary", event.SummaryIndex), event.Delta), nil
+	case "response.reasoning_text.delta":
+		return decoder.reasoning.appendDelta(reasoningPartKey(event.OutputIndex, "content", event.ContentIndex), event.Delta), nil
+	case "response.reasoning_summary_text.done":
+		return decoder.reasoning.completePart(reasoningPartKey(event.OutputIndex, "summary", event.SummaryIndex), event.Text), nil
+	case "response.reasoning_text.done":
+		return decoder.reasoning.completePart(reasoningPartKey(event.OutputIndex, "content", event.ContentIndex), event.Text), nil
+	case "response.output_text.delta", "response.refusal.delta":
+		decoder.streamedText = true
+		return decoder.send(atom.ResponsePart{Text: event.Delta}), nil
+	case "response.output_item.done":
+		return decoder.consumeOutputItem(event.Item, event.OutputIndex, false)
+	case "response.completed":
+		for index, raw := range event.Response.Output {
+			keepReading, operationError := decoder.consumeOutputItem(raw, index, true)
+			if operationError != nil || !keepReading {
+				return false, operationError
+			}
+			if !decoder.streamedText {
+				var item responseItem
+				if operationError := json.Unmarshal(raw, &item); operationError != nil {
+					return false, operationError
+				}
+				for _, content := range item.Content {
+					if content.Type == "output_text" && !decoder.send(atom.ResponsePart{Text: content.Text}) {
+						return false, nil
+					}
+					if content.Type == "refusal" && !decoder.send(atom.ResponsePart{Text: content.Refusal}) {
+						return false, nil
+					}
+				}
+			}
+		}
+		if len(decoder.state.Reasoning) > 0 && !decoder.send(atom.ResponsePart{ProviderState: decoder.state}) {
+			return false, nil
+		}
+		decoder.completed = &event
+		return false, nil
+	case "response.failed", "response.incomplete", "error":
+		detail := event.Error
+		if detail == nil {
+			detail = event.Response.Error
+		}
+		message := fmt.Sprintf("%s stream ended with %s", decoder.providerName, event.Type)
+		if event.Status > 0 {
+			message += fmt.Sprintf("; HTTP %d", event.Status)
+		}
+		if detail != nil {
+			if code := boundedProviderDetail(detail.code()); code != "" && code != "null" {
+				message += "; code=" + code
+			}
+			if detail.Message != "" {
+				message += ": " + boundedProviderDetail(detail.Message)
+			}
+		}
+		if reason := event.Response.IncompleteDetails.Reason; reason != "" {
+			message += "; reason=" + boundedProviderDetail(reason)
+		}
+		return false, fmt.Errorf("%s", message)
+	}
+	return true, nil
+}
+
+func parseResponsesAPIEvents(operationContext context.Context, body io.ReadCloser, stream *providerStream, providerName string) {
+	defer body.Close()
+	defer stream.finishResponse()
+	decoder := newResponsesDecoder(operationContext, stream, providerName)
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 64*1024), maximumResponsesEventBytes)
 	var data strings.Builder
-	consumeEvent := func() bool {
+	consume := func() bool {
 		if data.Len() == 0 {
 			return true
 		}
-		encoded := data.String()
+		keepReading, operationError := decoder.consumeEvent([]byte(data.String()))
 		data.Reset()
-		var event responseEvent
-		if operationError := json.Unmarshal([]byte(encoded), &event); operationError != nil {
-			stream.operationError = fmt.Errorf("invalid Responses stream JSON: %w", operationError)
-			return false
+		if operationError != nil {
+			stream.operationError = operationError
 		}
-		// Terminal failures can still carry billable usage. Deliver it before the
-		// error so chat and workspace-worker accounting retain the reported cost.
-		switch event.Type {
-		case "response.completed", "response.failed", "response.incomplete":
-			if reported := event.Response.Usage; reported != nil {
-				usage, usageError := normalizeProviderUsage(reported.Input, reported.Output, reported.InputDetails, reported.OutputDetails, reported.Cost)
-				if usageError != nil {
-					stream.operationError = usageError
-					return false
-				}
-				if !send(atom.ResponsePart{Usage: usage}) {
-					return false
-				}
-			}
-		}
-		switch event.Type {
-		case "response.reasoning_summary_text.delta":
-			return reasoning.appendDelta(reasoningPartKey(event.OutputIndex, "summary", event.SummaryIndex), event.Delta)
-		case "response.reasoning_text.delta":
-			return reasoning.appendDelta(reasoningPartKey(event.OutputIndex, "content", event.ContentIndex), event.Delta)
-		case "response.reasoning_summary_text.done":
-			return reasoning.completePart(reasoningPartKey(event.OutputIndex, "summary", event.SummaryIndex), event.Text)
-		case "response.reasoning_text.done":
-			return reasoning.completePart(reasoningPartKey(event.OutputIndex, "content", event.ContentIndex), event.Text)
-		case "response.output_text.delta", "response.refusal.delta":
-			streamedText = true
-			return send(atom.ResponsePart{Text: event.Delta})
-		case "response.output_item.done":
-			return consumeItem(event.Item, event.OutputIndex, false)
-		case "response.completed":
-			for index, raw := range event.Response.Output {
-				if !consumeItem(raw, index, true) {
-					return false
-				}
-				if !streamedText {
-					var item responseItem
-					if operationError := json.Unmarshal(raw, &item); operationError != nil {
-						stream.operationError = operationError
-						return false
-					}
-					for _, content := range item.Content {
-						if content.Type == "output_text" && !send(atom.ResponsePart{Text: content.Text}) {
-							return false
-						}
-						if content.Type == "refusal" && !send(atom.ResponsePart{Text: content.Refusal}) {
-							return false
-						}
-					}
-				}
-			}
-			if len(state.Reasoning) > 0 && !send(atom.ResponsePart{ProviderState: state}) {
-				return false
-			}
-			return false
-		case "response.failed", "response.incomplete", "error":
-			stream.operationError = fmt.Errorf("%s stream ended with %s", providerName, event.Type)
-			return false
-		}
-		return true
+		return keepReading && operationError == nil
 	}
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.TrimSpace(line) == "" {
-			if !consumeEvent() {
+			if !consume() {
 				return
 			}
 			continue
@@ -178,7 +234,7 @@ func parseResponsesAPIEvents(operationContext context.Context, body io.ReadClose
 				data.WriteByte('\n')
 			}
 			data.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "data:")))
-			if data.Len() > 8*1024*1024 {
+			if data.Len() > maximumResponsesEventBytes {
 				stream.operationError = fmt.Errorf("Responses event exceeds 8 MiB")
 				return
 			}
@@ -188,7 +244,7 @@ func parseResponsesAPIEvents(operationContext context.Context, body io.ReadClose
 		stream.operationError = operationError
 		return
 	}
-	if data.Len() > 0 && !consumeEvent() {
+	if data.Len() > 0 && !consume() {
 		return
 	}
 	stream.operationError = io.ErrUnexpectedEOF

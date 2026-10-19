@@ -25,7 +25,8 @@ func TestConfiguredProvidersCoexistWithTestProvider(test *testing.T) {
 	configurationPath := filepath.Join(test.TempDir(), "providers.json")
 	configurationJSON := `{"providers":[{"name":"custom-provider","api_url":"https://example.invalid","authentication":"none","models":[{"id":"configured-model","tools":true}]}]}`
 	testutil.RequireNoError(test, os.WriteFile(configurationPath, []byte(configurationJSON), 0600))
-	loadProviders(operationContext, configurationPath, modelGateway, database, authentication)
+	closeProviders := loadProviders(operationContext, configurationPath, modelGateway, database, authentication)
+	defer closeProviders()
 	if len(modelGateway.Providers()) != 2 {
 		test.Fatal("provider loading injected providers absent from JSON")
 	}
@@ -41,7 +42,8 @@ func TestConfiguredProvidersCoexistWithTestProvider(test *testing.T) {
 func TestMissingProviderFileDoesNotInjectDefaults(test *testing.T) {
 	database := memory.New()
 	modelGateway := gateway.New(harness.New())
-	loadProviders(context.Background(), filepath.Join(test.TempDir(), "missing.json"), modelGateway, database, nil)
+	closeProviders := loadProviders(context.Background(), filepath.Join(test.TempDir(), "missing.json"), modelGateway, database, nil)
+	defer closeProviders()
 	if len(modelGateway.Providers()) != 0 {
 		test.Fatal("missing JSON file injected hard-coded providers")
 	}

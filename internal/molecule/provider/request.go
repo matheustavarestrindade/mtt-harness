@@ -79,7 +79,7 @@ func (standardProvider *Standard) streamChatCompletions(operationContext context
 		data, _ := io.ReadAll(io.LimitReader(response.Body, 8192))
 		return nil, fmt.Errorf("provider HTTP status %d: %s", response.StatusCode, strings.TrimSpace(string(data)))
 	}
-	stream := &httpStream{parts: make(chan atom.ResponsePart, 64)}
+	stream := &providerStream{parts: make(chan atom.ResponsePart, 64)}
 	go parseChatCompletionEvents(operationContext, response.Body, stream, standardProvider.Name())
 	return stream, nil
 }

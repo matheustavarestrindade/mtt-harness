@@ -17,6 +17,7 @@
     {
       "name": "openai",
       "protocol": "responses",
+      "transport": "auto",
       "authentication": "api_key",
       "api_url": "https://api.openai.com/v1",
       "model_list_url": "https://api.openai.com/v1/models",
@@ -158,6 +159,10 @@
     {
       "name": "openai-codex",
       "protocol": "responses",
+      "transport": "auto",
+      "websocket_headers": {
+        "OpenAI-Beta": "responses_websockets=2026-02-06"
+      },
       "authentication": "chatgpt",
       "api_url": "https://chatgpt.com/backend-api/codex",
       "model_list_url": "https://chatgpt.com/backend-api/codex/models?client_version=0.162.1",

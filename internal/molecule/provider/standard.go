@@ -22,13 +22,30 @@ type Standard struct {
 	inlinePrices     map[string]atom.Prices
 	key              KeyResolver
 	headers          func(context.Context) (http.Header, error)
+	websocketHeaders http.Header
+	websockets       *responsesWebsocketPool
 }
 
 func New(providerSpec atom.ProviderSpec) *Standard {
 	return &Standard{
 		providerSpec: providerSpec,
 		client:       &http.Client{Timeout: 0},
+		websockets:   newResponsesWebsocketPool(),
 	}
+}
+
+// SetWebSocketHeaders supplies non-secret handshake configuration before the
+// provider is published. Authentication still comes from the secret resolver.
+func (standardProvider *Standard) SetWebSocketHeaders(headers http.Header) {
+	standardProvider.websocketHeaders = headers.Clone()
+}
+
+// Close rejects new WebSocket work and joins active requests and socket readers.
+// Callers must stop model workers before closing their providers.
+func (standardProvider *Standard) Close() error {
+	standardProvider.websockets.Close()
+	standardProvider.client.CloseIdleConnections()
+	return nil
 }
 
 func (standardProvider *Standard) Name() string {

@@ -119,7 +119,7 @@ func TestResponsesRejectsTruncatedFailedAndMalformedStreams(test *testing.T) {
 		"data: {\"type\":\"response.incomplete\"}\n\n",
 		"data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"call_id\":\"c\",\"name\":\"read\",\"arguments\":\"{\"}}\n\n",
 	} {
-		stream := &httpStream{parts: make(chan atom.ResponsePart, 64)}
+		stream := &providerStream{parts: make(chan atom.ResponsePart, 64)}
 		parseResponsesAPIEvents(context.Background(), io.NopCloser(strings.NewReader(body)), stream, "openai")
 		for range stream.parts {
 		}
@@ -131,7 +131,7 @@ func TestResponsesRejectsTruncatedFailedAndMalformedStreams(test *testing.T) {
 
 func TestResponsesMultilineEventsAndDeepSeekReasoning(test *testing.T) {
 	body := "event: response.completed\ndata: {\"type\":\"response.completed\",\ndata: \"response\":{\"output\":[{\"type\":\"reasoning\",\"content\":[{\"type\":\"reasoning_text\",\"text\":\"retained reasoning\"}]},{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"answer\"}]}]}}\n\n"
-	stream := &httpStream{parts: make(chan atom.ResponsePart, 64)}
+	stream := &providerStream{parts: make(chan atom.ResponsePart, 64)}
 	parseResponsesAPIEvents(context.Background(), io.NopCloser(strings.NewReader(body)), stream, "deepseek")
 	var state *atom.ProviderState
 	text := ""
