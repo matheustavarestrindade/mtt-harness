@@ -206,6 +206,186 @@ test('stream ANSI colors and progress updates before bash returns, reconnect wit
   expect(failures).toEqual([]);
 });
 
+test('reopen completed background output with both streams and original ANSI colors', async ({
+  page,
+}) => {
+  const fixture = await mockHarness(page);
+  await connectAndCreate(page);
+  const session = fixture.sessions[0];
+  await expect
+    .poll(() =>
+      [...fixture.openSockets].some((socket) => socket.url().includes(`/sessions/${session.ID}/`)),
+    )
+    .toBe(true);
+  const record = processRecord(session);
+  record.Status = 'stopped';
+  record.Exit = { Code: 0, Signal: '', Error: '' };
+  fixture.processes.set(record.ID, record);
+  fixture.processChunk(record.ID, 'stdout', '\x1b[38;2;18;171;99mFULL_COLORED_STDOUT\x1b[0m\n');
+  fixture.processChunk(record.ID, 'stderr', 'Plain warning on stderr\n');
+  fixture.histories.set(session.ID, [
+    message(session, 'shell-plan', '', {
+      ToolCalls: [
+        { ID: 'shell-call', Name: 'bash', Input: { command: 'build project', wait: false } },
+      ],
+    }),
+    message(session, 'receipt', `process ${record.ID} is started`, {
+      Role: 'tool',
+      ToolCallID: 'shell-call',
+    }),
+    message(
+      session,
+      'finished',
+      `[process] Runtime update from a background process, not a new user request.\nprocess ${record.ID} stopped: Plain warning on stderr\n`,
+      { Role: 'runtime' },
+    ),
+  ]);
+  fixture.event(session, 'process.exit', record);
+  const shell = page.locator('[data-call-id="shell-call"]');
+  for (let reopening = 0; reopening < 2; reopening++) {
+    await shell.locator('.activity-toggle').click();
+    await expect(
+      shell.locator('.xterm-screen span').filter({ hasText: /^FULL_COLORED_STDOUT$/ }),
+    ).toHaveCSS('color', 'rgb(18, 171, 99)');
+    await expect(shell).toContainText('Plain warning on stderr');
+    await shell.locator('.activity-toggle').click();
+  }
+  await page.reload();
+  await shell.locator('.activity-toggle').click();
+  await expect(
+    shell.locator('.xterm-screen span').filter({ hasText: /^FULL_COLORED_STDOUT$/ }),
+  ).toHaveCSS('color', 'rgb(18, 171, 99)');
+  await expect(page.getByRole('article', { name: 'runtime message', exact: true })).toHaveCount(0);
+});
+
+test('keep full saved bash output when a plain completion notice is also present', async ({
+  page,
+}) => {
+  const fixture = await mockHarness(page);
+  await connectAndCreate(page);
+  const session = fixture.sessions[0];
+  await expect
+    .poll(() =>
+      [...fixture.openSockets].some((socket) => socket.url().includes(`/sessions/${session.ID}/`)),
+    )
+    .toBe(true);
+  const record = processRecord(session);
+  record.Status = 'stopped';
+  record.Exit = { Code: 0, Signal: '', Error: '' };
+  fixture.processes.set(record.ID, record);
+  fixture.histories.set(session.ID, [
+    message(session, 'shell-plan', '', {
+      ToolCalls: [{ ID: 'shell-call', Name: 'bash', Input: { command: 'run checks' } }],
+    }),
+    message(
+      session,
+      'saved-output',
+      '\x1b[48;2;16;100;180mSAVED_COLORED_OUTPUT\x1b[0m\nFull saved stdout\nPlain warning on stderr',
+      { Role: 'tool', ToolCallID: 'shell-call' },
+    ),
+    message(
+      session,
+      'finished',
+      `[process] Runtime update from a background process, not a new user request.\nprocess ${record.ID} stopped: Plain warning on stderr`,
+      { Role: 'runtime' },
+    ),
+  ]);
+  fixture.event(session, 'process.exit', record);
+  const shell = page.locator('[data-call-id="shell-call"]');
+  await shell.locator('.activity-toggle').click();
+  await expect(
+    shell.locator('.xterm-screen span').filter({ hasText: /^SAVED_COLORED_OUTPUT$/ }),
+  ).toHaveCSS('background-color', 'rgb(16, 100, 180)');
+  await expect(shell).toContainText('Full saved stdout');
+  await expect(shell).toContainText('Plain warning on stderr');
+});
+
+test('retain already-captured colors when the process stream becomes unavailable', async ({
+  page,
+}) => {
+  const fixture = await mockHarness(page);
+  await connectAndCreate(page);
+  const session = fixture.sessions[0];
+  const record = processRecord(session);
+  await expect
+    .poll(() =>
+      [...fixture.openSockets].some((socket) => socket.url().includes(`/sessions/${session.ID}/`)),
+    )
+    .toBe(true);
+  fixture.processes.set(record.ID, record);
+  await page.route(`**/sessions/${session.ID}/processes`, (route) =>
+    route.fulfill({ json: [record] }),
+  );
+  fixture.histories.set(session.ID, [
+    message(session, 'shell-plan', '', {
+      ToolCalls: [
+        { ID: 'shell-call', Name: 'bash', Input: { command: 'watch build', wait: false } },
+      ],
+    }),
+    message(session, 'receipt', `process ${record.ID} is started`, {
+      Role: 'tool',
+      ToolCallID: 'shell-call',
+    }),
+    message(
+      session,
+      'update',
+      `[process] Runtime update from a background process, not a new user request.\nprocess ${record.ID}: Plain status notice`,
+      { Role: 'runtime' },
+    ),
+  ]);
+  fixture.event(session, 'process.start', record);
+  const shell = page.locator('[data-call-id="shell-call"]');
+  await shell.locator('.activity-toggle').click();
+  await expect.poll(() => fixture.processSockets.size).toBe(1);
+  fixture.processChunk(record.ID, 'stdout', '\x1b[38;2;18;171;99mCAPTURED_COLOR\x1b[0m\n');
+  const output = shell.locator('.xterm-screen span').filter({ hasText: /^CAPTURED_COLOR$/ });
+  await expect(output).toHaveCSS('color', 'rgb(18, 171, 99)');
+  await page.routeWebSocket(
+    (url) => url.pathname.endsWith(`/processes/${record.ID}/output`),
+    (socket) => socket.close({ code: 1008, reason: 'Output unavailable' }),
+  );
+  fixture.disconnectProcess(record.ID);
+  await expect(shell.getByRole('status')).toHaveText('Live output unavailable', { timeout: 12000 });
+  await expect(output).toHaveCSS('color', 'rgb(18, 171, 99)');
+});
+
+test('keep colored inactivity output and the later completion details when buffers expire', async ({
+  page,
+}) => {
+  const fixture = await mockHarness(page);
+  await connectAndCreate(page);
+  const session = fixture.sessions[0];
+  const record = processRecord(session);
+  record.Status = 'stopped';
+  record.Exit = { Code: 1, Signal: '', Error: 'exit status 1' };
+  fixture.processes.set(record.ID, record);
+  fixture.histories.set(session.ID, [
+    message(session, 'shell-plan', '', {
+      ToolCalls: [{ ID: 'shell-call', Name: 'bash', Input: { command: 'long build' } }],
+    }),
+    message(
+      session,
+      'idle-result',
+      `process ${record.ID}: state=running; no output for 10000 ms; last activity=2026-01-01T00:00:00.000Z; observed=2026-01-01T00:00:10.000Z\nstdout (last 20 lines / 4096 bytes):\n\x1b[38;2;18;171;99mCOLORED_SAVED_TAIL\x1b[0m\nstderr (last 20 lines / 4096 bytes):\n(no output)`,
+      { Role: 'tool', ToolCallID: 'shell-call' },
+    ),
+    message(
+      session,
+      'finished',
+      `[process] Runtime update from a background process, not a new user request.\nprocess ${record.ID} stopped: Later build failure\nexit status 1`,
+      { Role: 'runtime' },
+    ),
+  ]);
+  fixture.event(session, 'process.exit', record);
+  const shell = page.locator('[data-call-id="shell-call"]');
+  await shell.locator('.activity-toggle').click();
+  await expect(
+    shell.locator('.xterm-screen span').filter({ hasText: /^COLORED_SAVED_TAIL$/ }),
+  ).toHaveCSS('color', 'rgb(18, 171, 99)');
+  await shell.locator('summary').filter({ hasText: 'Completion output' }).click();
+  await expect(shell).toContainText('Later build failure');
+});
+
 test('keep manual terminal scroll and release the stream when the view closes', async ({
   page,
 }) => {

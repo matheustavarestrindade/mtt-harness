@@ -97,6 +97,10 @@ The copy button uses terminal text. The source download keeps output text with A
 
 The process exit status is different from the tool result. A process can continue after an inactivity return. If the process buffer is not available, the UI uses the tool result. The terminal view also shows previous `bash` output.
 
+The UI reads the process output buffer when a completed process view opens. A process notification can contain only standard error. It must not replace the output buffer or the full tool result. A connection error must not remove output from the view.
+
+An inactivity return contains only part of the output. If the buffer is not available, the UI keeps the tool result and gives access to the process exit output. ANSI sequences in the output control text color. Output without ANSI sequences uses the default text color.
+
 ## Process Notifications
 
 The harness keeps process notifications as `runtime` messages for the model. The UI puts process notifications in the applicable `bash` section. The UI does not show the notification text as a conversation message. The API message history stays the same.

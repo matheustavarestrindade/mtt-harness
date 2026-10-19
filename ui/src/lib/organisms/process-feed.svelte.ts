@@ -109,7 +109,10 @@ export class ProcessFeed {
     socket.onerror = () => socket.close();
     socket.onclose = () => {
       if (this.closed || this.socket !== socket || this.state === 'stopped') return;
-      if (++this.retries > 3) {
+      if (
+        (this.record.Status === 'stopped' && !this.snapshot.chunks.length) ||
+        ++this.retries > 3
+      ) {
         this.state = 'unavailable';
         this.error ||= 'Process output is not retained or the connection is unavailable.';
         return;
