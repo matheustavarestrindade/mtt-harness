@@ -18,6 +18,7 @@ import type { RuntimeSettings, RuntimeSettingKey } from '../../atoms/settings';
 import type { MemoryMetrics, MemoryConfiguration } from '../../atoms/memory';
 import type { WorkspacePluginState } from '../../atoms/plugins';
 import type { ProcessRecord } from '../../atoms/processes';
+import type { PluginActivityPage } from '../../atoms/plugin-activity';
 
 export class ApiError extends Error {
   constructor(
@@ -31,6 +32,16 @@ export class ApiError extends Error {
 }
 
 export class HarnessApi {
+  pluginActivity(sessionID: string, plugin: string, cursor = '', signal?: AbortSignal) {
+    const query = new URLSearchParams({ limit: '50' });
+    if (cursor) query.set('cursor', cursor);
+    return this.request<PluginActivityPage>(
+      `sessions/${encodeURIComponent(sessionID)}/plugins/${encodeURIComponent(plugin)}/activity?${query}`,
+      'GET',
+      undefined,
+      signal,
+    );
+  }
   readonly base: URL;
   constructor(
     base: string,

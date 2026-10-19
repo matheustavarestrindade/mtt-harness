@@ -49,7 +49,11 @@ The API does not give a live context percentage or memory text through the route
 
 The API gives usage by workspace agent and model. The panel shows model calls, input tokens, output tokens, cache data, reasoning tokens, and request time. The panel also shows `FailedCalls`. Workspace memory agents do not increase the selected session usage.
 
-The model input total includes `Input`, `CacheRead`, and `CacheWrite`. The output total uses `Output`. The UI does not add `Reasoning` again.
+The model input total uses `Input`. The UI shows `CacheRead` and `CacheWrite` in different fields. The usage total is `Input + Output`. The input value and the usage total do not include cache tokens. The output total includes reasoning tokens. The UI does not add `Reasoning` again.
+
+The label `Reported worker tokens` gives input and output from model calls by workspace memory workers. The total includes requests for memory extraction across the workspace history. It does not give the token count of memory text or the conversation. The total uses provider usage data. A model call without usage data stays in `Calls`. The tokens from the model call are not known.
+
+The value `Estimated tokens removed` gives token estimates across context checkpoints. The value is not provider usage data. The value can include token estimates from previous models and harness versions. The UI uses `≈` for the value.
 
 The UI does not add costs from different currencies. A cost estimate has a label. The value `0` stays `0`. An empty usage record shows `0.0`. Model usage without a price shows `Unavailable`. Subscription models do not receive API token prices.
 

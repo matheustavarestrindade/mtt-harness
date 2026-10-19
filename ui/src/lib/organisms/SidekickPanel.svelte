@@ -301,7 +301,12 @@
           <dd class="mt-1 text-xl tabular-nums">{formatTokenCount(count('jobs/active'))}</dd>
         </div>
         <div>
-          <dt class="text-xs text-muted-foreground">Worker tokens</dt>
+          <dt
+            class="text-xs text-muted-foreground"
+            title="Uncached input + output. Cache is shown separately in worker usage."
+          >
+            Worker tokens
+          </dt>
           <dd class="mt-1 text-lg tabular-nums">
             {formatTokenCount(agentTokenCount(usage.statistics))}
           </dd>

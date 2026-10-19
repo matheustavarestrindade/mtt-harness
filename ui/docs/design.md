@@ -153,6 +153,10 @@ The `SidekickPanel` organism uses the plugin name `sidekick`. The settings dialo
 
 The panel uses `WorkspacePluginPanelState` for data requests and configuration requests. Workspace usage includes worker model calls. The input for a Sidekick note is part of session usage. The harness calculates the text for a Sidekick note.
 
+The `SessionActivity` organism reads Sidekick notes after the request boundary. The `SidekickSection` molecule has disclosure controls for Sidekick notes and source references. A tool result can be a reminder anchor. The UI puts the activity entry after the tool section. The history section contains other activity entries. Child agent previews use the same components.
+
+The client gets activity data after model requests, session events, and new WebSocket connections. Output chunks do not start the API requests. A session change cancels previous requests. The history revision identifies activity entries from previous history. The client keeps a maximum of 1000 activity entries. Activity data does not become a conversation message.
+
 ## API Data
 
 Response keys agree with the Go types. For example, an instance has `Workspace` and `DefaultModel`. Request keys use the handler format, such as `workspace` and `default_model`. A `null` collection becomes an empty array in the client.

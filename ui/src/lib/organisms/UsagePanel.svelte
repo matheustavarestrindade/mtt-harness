@@ -24,12 +24,12 @@
       ? [
           {
             label: 'Total input tokens',
-            value: integer(statistics.Input + statistics.CacheRead + statistics.CacheWrite),
+            value: integer(statistics.Input),
           },
           { label: 'Total output tokens', value: integer(statistics.Output) },
           { label: 'Model calls', value: integer(statistics.Calls) },
           { label: 'Overall cache hit', value: `${statistics.CacheHitPercentage.toFixed(1)}%` },
-          { label: 'Reasoning tokens', value: integer(statistics.Reasoning) },
+          { label: 'Reasoning (in output)', value: integer(statistics.Reasoning) },
           {
             label:
               statistics.Cost?.Estimated || statistics.Costs?.some((cost) => cost.Estimated)
@@ -77,8 +77,7 @@
     <div>
       <h2 class="text-xl font-medium tracking-tight">Usage</h2>
       <p class="mt-2 text-sm leading-6 text-muted-foreground">
-        Cumulative model usage, including child agents. Reused input is counted for every request.
-        Compaction does not subtract historical usage. These totals are not current context usage.
+        Cumulative model usage, including child agents. Cache read and write are shown separately.
       </p>
     </div>
     <Button
@@ -122,10 +121,6 @@
     </dl>
     <dl class="mt-6 space-y-3 border-t border-border pt-5 text-sm">
       <div class="flex justify-between gap-3">
-        <dt class="text-muted-foreground">Uncached input</dt>
-        <dd>{integer(statistics.Input)}</dd>
-      </div>
-      <div class="flex justify-between gap-3">
         <dt class="text-muted-foreground">Cache read</dt>
         <dd>{integer(statistics.CacheRead)}</dd>
       </div>
@@ -135,10 +130,9 @@
       </div>
     </dl>
     <p class="mt-5 text-xs leading-5 text-muted-foreground">
-      Input includes cached tokens. Reasoning tokens are shown separately and are not added to
-      output. Costs include only calls with available pricing. Catalog estimates can differ from
-      provider bills, including discounts and time-based rates. Subscription usage has no per-token
-      charge estimate.
+      Input excludes cache. Output includes reasoning. Costs include only calls with available
+      pricing. Catalog estimates can differ from provider bills, including discounts and time-based
+      rates. Subscription usage has no per-token charge estimate.
     </p>
   {/if}
 </section>

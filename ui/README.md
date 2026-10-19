@@ -168,7 +168,7 @@ Provider keys and OAuth tokens stay in the harness database. The UI does not kee
 
 ## Settings and Usage
 
-The message input area shows `Last context`, `Out`, `Cache`, and `Total`. Token values come from the provider for the last response in the selected session. `Last context` adds input and output tokens. Input includes `CacheRead` and `CacheWrite`. Output includes reasoning tokens. Child agents do not add tokens to the last response.
+The message input area shows `Last context`, `Out`, `Cache`, and `Total`. Token values come from the provider for the last response in the selected session. `Last context` adds `Input`, `CacheRead`, `CacheWrite`, and `Output`. Output includes reasoning tokens. Child agents do not add tokens to the last response.
 
 The model context limit comes from the model for the last response. A model change does not replace the limit for a previous response. The percentage is not available without a model context limit. `Cache` is the percentage of input tokens from `CacheRead`. The UI shows `—` when usage data is not available.
 
@@ -181,6 +181,8 @@ The general section sets the agent depth limit and process limit. Select the har
 A value of 0 prevents new child agents or processes. An empty field removes the selected setting. The harness then uses the default value.
 
 The usage section shows model calls, input tokens, output tokens, reasoning tokens, cache data, and cost data. Select the harness, workspace, or session scope. Session usage data includes child agents. Select the button with the label `Refresh usage` to get new usage data.
+
+The usage section uses `Input`. The UI shows `CacheRead` and `CacheWrite` in different fields. The worker usage value is `Input + Output`.
 
 The API gives usage data for the available history. It does not give subscription limits. The UI shows `0.0` cost for a new conversation without model usage. The UI shows `Unavailable` when usage has occurred but price data is not available.
 
@@ -196,7 +198,9 @@ The panel shows `low`, `medium`, `high`, and `deferred` reminders. It also shows
 
 The `Sidekick` section is in the settings dialog. The task panel also has a `Sidekick settings` button. A worker model is necessary before the plugin state can be `ON`.
 
-The panel shows Sidekick notes and worker usage. Workspace memory and project files are different retrieval sources. The harness gives Sidekick notes to the agent in a model request.
+The panel shows `Notes delivered` and worker usage. Workspace memory and project files are different retrieval sources. The harness gives Sidekick notes to the agent in a model request.
+
+The conversation has disclosure controls for Sidekick notes and source references. Open a Sidekick note to examine the context added to a model request. Child agent previews also show activity entries. The section `Earlier Sidekick context` contains activity entries without a reminder anchor in the view.
 
 ## Workspace Memory
 

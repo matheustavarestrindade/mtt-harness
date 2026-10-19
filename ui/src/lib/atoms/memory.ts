@@ -103,8 +103,8 @@ export function totalAgentUsage(agents: MemoryAgentUsage[]): {
 }
 
 export function agentTokenCount(statistics: Statistics): number {
-  // Provider output already includes reasoning; never add Reasoning again.
-  return statistics.Input + statistics.CacheRead + statistics.CacheWrite + statistics.Output;
+  // Harness Input excludes cache. Cache stays separate; Output includes reasoning.
+  return statistics.Input + statistics.Output;
 }
 
 export function durationLabel(milliseconds: number): string {

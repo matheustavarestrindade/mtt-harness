@@ -66,6 +66,8 @@ test('show recorded repetition metrics and recovery costs at narrow widths', asy
           ...fixture.sessionUsage,
           Calls: 4,
           Input: 400,
+          CacheRead: 200,
+          CacheWrite: 50,
           Output: 100,
           Reasoning: 50,
           Cost: { Currency: 'USD', Value: 0.015, Estimated: true },
@@ -84,6 +86,8 @@ test('show recorded repetition metrics and recovery costs at narrow widths', asy
   await expect(panel.getByText('500', { exact: true })).toBeVisible();
   await panel.getByText('Instruction recovery', { exact: true }).click();
   await expect(panel.getByText('400', { exact: true })).toBeVisible();
+  await expect(panel.getByText('Cache read', { exact: true }).locator('..')).toContainText('200');
+  await expect(panel.getByText('Cache write', { exact: true }).locator('..')).toContainText('50');
   await panel.getByRole('button', { name: 'Configure reminders' }).click();
   await panel.getByLabel('Reminder pattern', { exact: true }).fill('high');
   await panel.getByRole('button', { name: 'Save reminder settings' }).click();

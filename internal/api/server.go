@@ -98,6 +98,7 @@ func (server *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /instances/{id}/plugins/{plugin}/settings", server.pluginSettings)
 	mux.HandleFunc("PATCH /instances/{id}/plugins/{plugin}/settings", server.updatePluginSettings)
 	mux.HandleFunc("GET /instances/{id}/plugins/{plugin}/statistics", server.pluginStatistics)
+	mux.HandleFunc("GET /sessions/{id}/plugins/{plugin}/activity", server.sessionPluginActivity)
 	mux.HandleFunc("GET /instances/{id}/agent-statistics", server.workspaceAgentStatistics)
 	mux.HandleFunc("GET /providers", server.listProviders)
 	mux.HandleFunc("GET /providers/{id}/models", server.providerModels)

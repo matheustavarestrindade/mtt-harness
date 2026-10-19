@@ -61,13 +61,37 @@ test('validate retrieval sources and display observed activity', async ({ page }
       'sources/memories': 8,
       'sources/files': 10,
     },
-    Agents: [],
+    Agents: [
+      {
+        Agent: 'sidekick.context',
+        ModelID: fixture.model.ID,
+        FailedCalls: 0,
+        DurationMilliseconds: 100,
+        Statistics: {
+          ...fixture.sessionUsage,
+          Input: 120,
+          Output: 60,
+          CacheRead: 300,
+          CacheWrite: 30,
+          Reasoning: 35,
+        },
+      },
+    ],
   });
   const panel = await openSidekick(page);
   await expect(panel.getByText('Notes delivered', { exact: true }).locator('..')).toContainText(
     '7',
   );
-  await expect(panel.getByText('Worker cost', { exact: true }).locator('..')).toContainText('0.0');
+  await expect(panel.getByText('Worker cost', { exact: true }).locator('..')).toContainText(
+    'Unavailable',
+  );
+  await expect(panel.getByText('Worker tokens', { exact: true }).locator('..')).toContainText(
+    '180',
+  );
+  await panel.locator('summary').filter({ hasText: 'Sidekick' }).click();
+  await expect(panel.getByText('Input tokens', { exact: true }).locator('..')).toContainText('120');
+  await expect(panel.getByText('Cache read', { exact: true }).locator('..')).toContainText('300');
+  await expect(panel.getByText('Cache write', { exact: true }).locator('..')).toContainText('30');
   await panel.getByRole('button', { name: 'Configure Sidekick', exact: true }).click();
   await chooseSelectOption(panel.getByLabel('Worker model', { exact: true }), fixture.model.ID);
   await panel.getByRole('button', { name: 'Project files', exact: true }).click();

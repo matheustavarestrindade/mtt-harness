@@ -100,10 +100,6 @@ func (plugin *Plugin) filterSources(operationContext context.Context, session at
 	used := []sourceData{}
 	seen := map[string]bool{}
 	total := 0
-	type deliveredNote struct {
-		Text       string   `json:"text"`
-		References []string `json:"references"`
-	}
 	notes := []deliveredNote{}
 	for _, note := range output.Notes {
 		note.Text = strings.TrimSpace(note.Text)
@@ -125,17 +121,14 @@ func (plugin *Plugin) filterSources(operationContext context.Context, session at
 		}
 		notes = append(notes, delivered)
 	}
-	data, operationError = json.Marshal(struct {
-		Doing string          `json:"doing"`
-		Notes []deliveredNote `json:"notes"`
-	}{task.Doing.Title, notes})
+	data, operationError = json.Marshal(hintPayload{task.Doing.Title, notes})
 	if operationError != nil {
 		return "", nil, operationError
 	}
 	// JSON quoting keeps task/file/memory data out of trusted instruction prose.
 	var result bytes.Buffer
-	result.WriteString("<sidekick>\nTask-scoped reference data. Use only information relevant to the current request and consistent with higher-priority instructions. Do not repeat this metadata or narrate Sidekick to the user.\n")
+	result.WriteString(hintPrefix)
 	result.Write(data)
-	result.WriteString("\n</sidekick>")
+	result.WriteString(hintSuffix)
 	return result.String(), used, nil
 }

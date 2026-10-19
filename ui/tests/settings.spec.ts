@@ -50,7 +50,11 @@ test('settings stay in a modal, preserve the draft, and show real usage scopes',
   await expect(dialog.getByLabel('Usage scope')).toHaveAttribute('data-value', 'session');
   await expect(dialog.getByRole('region', { name: 'Usage overview' })).toContainText('Unavailable');
   await chooseSelectOption(dialog.getByLabel('Usage scope'), 'workspace');
-  await expect(dialog.getByText('1,600', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Total input tokens', { exact: true }).locator('..')).toContainText(
+    '1,000',
+  );
+  await expect(dialog.getByText('Cache read', { exact: true }).locator('..')).toContainText('500');
+  await expect(dialog.getByText('Cache write', { exact: true }).locator('..')).toContainText('100');
   await expect(dialog.getByText('31.3%', { exact: true })).toBeVisible();
   await expect(dialog.getByText('$0.125', { exact: true })).toBeVisible();
   await chooseSelectOption(dialog.getByLabel('Usage scope'), 'harness');
@@ -145,5 +149,7 @@ test('failed usage and settings requests remain visible and recover on retry', a
   await expect(dialog.getByRole('alert')).toContainText('Usage temporarily unavailable');
   await chooseSelectOption(dialog.getByLabel('Usage scope'), 'workspace');
   await expect(dialog.getByRole('alert')).toHaveCount(0);
-  await expect(dialog.getByText('1,600', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Total input tokens', { exact: true }).locator('..')).toContainText(
+    '1,000',
+  );
 });
