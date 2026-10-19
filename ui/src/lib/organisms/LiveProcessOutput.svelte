@@ -29,9 +29,11 @@
 </script>
 
 {#if feed}
-  <div class="flex flex-wrap items-center gap-x-2 text-[10px] text-muted-foreground">
-    <span class="break-all font-mono">Process {record.ID}</span>
-    <span role="status"
+  <div
+    class="flex flex-wrap items-center gap-x-2 text-[10px] text-muted-foreground"
+    title={record.ID}
+  >
+    <span role="status" class:sr-only={feed.state === 'live' || feed.state === 'stopped'}
       >{feed.state === 'stopped'
         ? feed.exit
           ? `Exited ${feed.exit.Code}`

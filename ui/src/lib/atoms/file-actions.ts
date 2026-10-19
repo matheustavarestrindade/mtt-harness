@@ -23,7 +23,10 @@ export function toolActivityLabel(call: ToolCall): string {
       : Array.isArray(details.input.paths)
         ? ` · ${details.input.paths.length} paths`
         : '';
-  return `${details.operations.join(' → ')}${path}`;
+  const operations = details.operations.every((operation) => operation === details.operations[0])
+    ? `${details.operations[0]}${details.operations.length > 1 ? ` ×${details.operations.length}` : ''}`
+    : details.operations.join(' → ');
+  return `${operations}${path}`;
 }
 
 // Only a single read without extra output has a plain file body. Mutation

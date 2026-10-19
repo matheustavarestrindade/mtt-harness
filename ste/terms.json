@@ -2,6 +2,39 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "screen reader label",
+      "category": "technical_noun",
+      "approved_forms": [
+        "screen reader labels"
+      ],
+      "meaning": "the accessible name announced for a user-interface control or region",
+      "source": "web UI"
+    },
+    {
+      "term": "actions menu",
+      "category": "technical_noun",
+      "meaning": "the compact menu containing copy and download operations",
+      "source": "web UI"
+    },
+    {
+      "term": "URL fragment",
+      "category": "technical_noun",
+      "approved_forms": [
+        "URL fragments"
+      ],
+      "meaning": "the part of a browser URL after the hash character",
+      "source": "web UI navigation"
+    },
+    {
+      "term": "toolbar",
+      "category": "technical_noun",
+      "approved_forms": [
+        "toolbars"
+      ],
+      "meaning": "a row of interface controls for content operations",
+      "source": "web UI"
+    },
+    {
       "term": "ANSIUp",
       "category": "technical_noun",
       "meaning": "the ANSI text-to-HTML formatter used for structured result previews",
