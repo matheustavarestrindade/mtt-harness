@@ -340,6 +340,19 @@
     menuOpen = false;
     void runWorkbenchAction('select', () => workbench.selectSession(session));
   }
+  async function selectAgent(session: Session) {
+    menuOpen = false;
+    await runWorkbenchAction('agent', async () => {
+      const panelID = await workbench.selectAgent(session);
+      if (!panelID) return;
+      await tick();
+      const panel = document.getElementById(`agent-panel-${panelID}`);
+      panel?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      panel
+        ?.querySelector<HTMLButtonElement>('[data-agent-heading]')
+        ?.focus({ preventScroll: true });
+    });
+  }
   function requestSessionDeletion(session: Session) {
     menuOpen = false;
     deletionError = '';
@@ -426,6 +439,7 @@
     {hasActiveTasks}
     onSelectInstance={selectInstance}
     onSelectSession={selectSession}
+    onSelectAgent={selectAgent}
     onDeleteSession={requestSessionDeletion}
     onRefresh={() => void runWorkbenchAction('refresh', () => workbench.refreshInstances())}
   />

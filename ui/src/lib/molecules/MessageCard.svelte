@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { Copy } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
   import { Button } from '$lib/atoms/ui/button';
@@ -15,11 +16,13 @@
     tools = [],
     running = false,
     streaming = false,
+    renderTool,
   }: {
     message: Message;
     tools?: ToolActivity[];
     running?: boolean;
     streaming?: boolean;
+    renderTool?: Snippet<[ToolActivity]>;
   } = $props();
   const displayMessage = $derived(assistantDisplayMessage(message, streaming));
   const text = $derived(messageText(displayMessage));
@@ -60,18 +63,18 @@
         {message.Role === 'runtime' ? 'Runtime' : 'System'}
       </p>
     {/if}
-    <div class="message-actions">
-      <time class="text-[10px] text-muted-foreground" datetime={message.CreatedAt}
-        >{formatTimestamp(message.CreatedAt)}</time
-      ><Button
-        variant="ghost"
-        size="icon"
-        class="icon-button text-muted-foreground"
-        onclick={copyText}
-        aria-label="Copy message"
-        title="Copy message"><Copy class="size-3.5" /></Button
-      >
-    </div>
+    {#if hasContent}<div class="message-actions">
+        <time class="text-[10px] text-muted-foreground" datetime={message.CreatedAt}
+          >{formatTimestamp(message.CreatedAt)}</time
+        ><Button
+          variant="ghost"
+          size="icon"
+          class="icon-button text-muted-foreground"
+          onclick={copyText}
+          aria-label="Copy message"
+          title="Copy message"><Copy class="size-3.5" /></Button
+        >
+      </div>{/if}
     <div
       class={message.Role === 'assistant' ? 'assistant-sections' : 'flex min-w-0 flex-col gap-1'}
     >
@@ -91,10 +94,12 @@
           />
         {/if}
       {/if}
-      {#each tools as activity (activity.call.ID)}<ToolActivitySection
-          {activity}
-          {running}
-        />{/each}
+      {#each tools as activity (activity.call.ID)}
+        {#if renderTool}{@render renderTool(activity)}{:else}<ToolActivitySection
+            {activity}
+            {running}
+          />{/if}
+      {/each}
     </div>
   </article>
 {/if}
