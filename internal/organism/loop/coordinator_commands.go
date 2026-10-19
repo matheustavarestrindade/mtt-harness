@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
 type sessionCommandKind uint8
@@ -20,6 +21,10 @@ const (
 	prepareSessionDeletion
 	releaseSessionDeletion
 	admitQueuedMessages
+	readControlToken
+	confirmControlToken
+	applyPermissionDecision
+	submitFencedRuntime
 )
 
 // A command gets exactly one reply. The single-slot reply channel lets a
@@ -31,6 +36,8 @@ type sessionCommand struct {
 	messageID            string
 	messageIDs           []string
 	includeQueuedContent bool
+	control              harness.SessionControlToken
+	permission           atom.PermissionDecision
 	reply                chan sessionReply
 }
 
@@ -41,6 +48,8 @@ type sessionReply struct {
 	status         QueueStatus
 	operationError error
 	messageIDs     []string
+	control        harness.SessionControlToken
+	applied        bool
 }
 
 type sessionOperation struct {

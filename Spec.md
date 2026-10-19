@@ -830,6 +830,20 @@ The API can give Sidekick notes to the UI for a session. A Sidekick note is avai
 
 Sidekick keeps Sidekick notes and source references in worker records after request context removal. The `revert` operation removes activity entries without a reminder anchor in the session history. Session deletion removes the activity entries. The API uses activity pages and a history revision.
 
+### 9.4 Watcher Plugin
+
+The Watcher plugin uses the harness loop to examine task state, permission requests, and completed primary turns. The default plugin state is `OFF`. Settings use the database key `plugin.watcher`. A workspace can have many watcher definitions. A watcher definition selects a model, prompt template, watcher triggers, context window, and tool selection.
+
+Worker sessions have an execution profile. The execution profile applies to `search_tool` and tool calls. The user can select file operations for `file_actions`. Tool grants do not use the permission pipeline. The harness examines input and model limits. Watcher sessions and the child sessions of a watcher cannot start watcher runs.
+
+The watcher uses `continue` or `interfere` to give a decision. For a permission request, `continue` gives `allow` with `scope:once`. The tool `interfere` gives a `deny` decision and a correction. A user decision cannot be changed by a subsequent watcher decision.
+
+The `EndTurn` event callback starts the watcher after a completed primary turn. A runtime continuation can start a new primary turn through the session queue. It does not make a user message. Continuation limits apply across primary turns. The harness examines user input, task state, configuration, and history through source fences before a decision is used.
+
+The prompt template uses `{todo}`, `{doing}`, and context window variables such as `{last_32k_context}`. Variable values are not examined for more variables. Conversation data is not system instructions. The source does not include `ProviderState`, `Content.Data`, or `data:` URLs.
+
+The plugin uses the `watcher` Postgres schema for watcher schedules and watcher run records. Workspace usage includes worker model calls. Worker usage does not increase primary conversation cost. See `plugins/watcher/doc.md` for configuration, limits, and API data.
+
 ## 10. Tools
 
 The Go interface of a tool is:

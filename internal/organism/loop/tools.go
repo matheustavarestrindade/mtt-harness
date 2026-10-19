@@ -50,6 +50,11 @@ func removeTool(specifications []atom.ToolSpec, name string) []atom.ToolSpec {
 	return output
 }
 func (agentLoop *Loop) runValidatedToolCall(operationContext context.Context, session atom.Session, call atom.ToolCall) atom.ToolResult {
+	if session.Execution != nil {
+		if _, allowed := session.Execution.Grant(call.Name); !allowed {
+			return failedToolResult(call, fmt.Errorf("tool %q is not enabled for this session", call.Name))
+		}
+	}
 	call, operationError := agentLoop.pipeline.Plan(operationContext, call)
 	if operationError != nil {
 		return failedToolResult(call, operationError)
@@ -69,24 +74,37 @@ func (agentLoop *Loop) runValidatedToolCall(operationContext context.Context, se
 	if !available {
 		return failedToolResult(call, fmt.Errorf("tool %q is not available for this workspace", call.Name))
 	}
-	if operationError := schema.Validate(tool.InputSchema().JSON, call.Input); operationError != nil {
-		return failedToolResult(call, fmt.Errorf("loop: the input of %s is not correct: %w", call.Name, operationError))
-	}
-	check := tool.Check(operationContext, call)
-	verdict, operationError := agentLoop.pipeline.DecideInput(operationContext, call)
+	specification, operationError := harness.ToolSpecification(operationContext, tool)
 	if operationError != nil {
 		return failedToolResult(call, operationError)
 	}
-	if check.Kind == atom.VerdictDeny || verdict.Kind == atom.VerdictDeny {
-		return atom.ToolResult{CallID: call.ID, Status: atom.StatusDenied, Error: "the tool call is denied"}
+	if operationError := schema.Validate(specification.InputSchema.JSON, call.Input); operationError != nil {
+		return failedToolResult(call, fmt.Errorf("loop: the input of %s is not correct: %w", call.Name, operationError))
 	}
-	for _, decision := range []atom.Verdict{check, verdict} {
-		allowed, operationError := agentLoop.resolvePermissionVerdict(operationContext, session, call.Name, decision)
+	if session.Execution != nil {
+		grant, _ := session.Execution.Grant(call.Name)
+		if operationTool, supported := tool.(harness.OperationTool); supported {
+			if operationError := operationTool.ValidateOperations(call, grant.Operations); operationError != nil {
+				return failedToolResult(call, operationError)
+			}
+		}
+	} else {
+		check := tool.Check(operationContext, call)
+		verdict, operationError := agentLoop.pipeline.DecideInput(operationContext, call)
 		if operationError != nil {
 			return failedToolResult(call, operationError)
 		}
-		if !allowed {
+		if check.Kind == atom.VerdictDeny || verdict.Kind == atom.VerdictDeny {
 			return atom.ToolResult{CallID: call.ID, Status: atom.StatusDenied, Error: "the tool call is denied"}
+		}
+		for _, decision := range []atom.Verdict{check, verdict} {
+			allowed, operationError := agentLoop.resolvePermissionCall(operationContext, session, call.Name, decision, &call)
+			if operationError != nil {
+				return failedToolResult(call, operationError)
+			}
+			if !allowed {
+				return atom.ToolResult{CallID: call.ID, Status: atom.StatusDenied, Error: "the tool call is denied"}
+			}
 		}
 	}
 	if operationError := operationContext.Err(); operationError != nil {
@@ -97,6 +115,9 @@ func (agentLoop *Loop) runValidatedToolCall(operationContext context.Context, se
 			return atom.ToolResult{CallID: call.ID, Status: atom.StatusDenied, Error: "finish is only available to child agents"}
 		}
 		return agentLoop.finishChildAgent(session, call)
+	}
+	if session.Execution != nil && session.Execution.DecisionRoot && (call.Name == "continue" || call.Name == "interfere") {
+		return agentLoop.finishReviewSession(session, call)
 	}
 	result, operationError := tool.Run(operationContext, call)
 	if operationError != nil {
@@ -132,7 +153,11 @@ func (agentLoop *Loop) sessionToolDefinitions(operationContext context.Context, 
 			if !available {
 				continue
 			}
-			specifications = append(specifications, describeTool(tool))
+			specification, operationError := harness.ToolSpecification(operationContext, tool)
+			if operationError != nil {
+				return nil, operationError
+			}
+			specifications = append(specifications, specification)
 		}
 	}
 	names := map[string]bool{}
@@ -141,16 +166,24 @@ func (agentLoop *Loop) sessionToolDefinitions(operationContext context.Context, 
 	}
 	// Discovery is the bootstrap capability. Other definitions enter a session
 	// through discovery and always resolve against the current registry.
-	for _, name := range []string{"search_tool"} {
+	bootstrap := []string{"search_tool"}
+	if session.Execution != nil && session.Execution.DecisionRoot {
+		bootstrap = append(bootstrap, "continue", "interfere")
+	}
+	for _, name := range bootstrap {
 		if names[name] {
 			continue
 		}
 		if tool, found := agentLoop.configuration.Registry.Get(name); found {
-			specifications = append(specifications, describeTool(tool))
+			specification, operationError := harness.ToolSpecification(operationContext, tool)
+			if operationError != nil {
+				return nil, operationError
+			}
+			specifications = append(specifications, specification)
 			names[name] = true
 		}
 	}
-	if session.Depth > 0 && !names["finish"] {
+	if session.Depth > 0 && !names["finish"] && (session.Execution == nil || !session.Execution.DecisionRoot) {
 		if tool, found := agentLoop.configuration.Registry.Get("finish"); found {
 			specifications = append(specifications, describeTool(tool))
 		}
@@ -185,7 +218,18 @@ func (agentLoop *Loop) activateDiscoveredTools(operationContext context.Context,
 	var found []atom.ToolSpec
 	for _, reference := range references {
 		if tool, exists := agentLoop.configuration.Registry.Get(reference.Name); exists {
-			found = append(found, describeTool(tool))
+			available, operationError := harness.ToolAvailable(operationContext, tool)
+			if operationError != nil {
+				return operationError
+			}
+			if !available {
+				continue
+			}
+			specification, operationError := harness.ToolSpecification(operationContext, tool)
+			if operationError != nil {
+				return operationError
+			}
+			found = append(found, specification)
 		}
 	}
 	agentLimit := 0

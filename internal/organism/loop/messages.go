@@ -21,13 +21,19 @@ func (agentLoop *Loop) saveModelResponse(operationContext context.Context, sessi
 	if operationError := agentLoop.configuration.Store.Sessions().Append(operationContext, message); operationError != nil {
 		return operationError
 	}
+	// Worker attempts are accounted at the stream boundary, including interrupted
+	// attempts whose session-history writer has already been cancelled.
+	if session.Execution != nil {
+		return nil
+	}
 	if usage == nil {
 		usage = &atom.Usage{}
 	}
-	operationError = agentLoop.configuration.Store.Usage().Save(operationContext, atom.UsageRecord{
+	record := atom.UsageRecord{
 		InstanceID: session.InstanceID, SessionID: session.ID, ModelID: modelID,
 		Usage: *usage, CreatedAt: time.Now(), RequestID: message.ID, Status: status,
-	})
+	}
+	operationError = agentLoop.configuration.Store.Usage().Save(operationContext, record)
 	agentLoop.notifyWorkspaceState(session.InstanceID)
 	return operationError
 }

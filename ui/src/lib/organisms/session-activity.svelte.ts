@@ -46,6 +46,13 @@ export class SessionActivity {
   observe(event: HarnessEvent) {
     if (event.SessionID !== this.sessionID) return;
     if (
+      event.Name === 'plugin.activity' &&
+      (event.Payload as Record<string, unknown>)?.plugin === this.plugin
+    ) {
+      this.scheduleRefresh();
+      return;
+    }
+    if (
       [
         'model.call',
         'run.end',
@@ -91,12 +98,13 @@ export class SessionActivity {
         page.Name !== this.plugin ||
         !Number.isSafeInteger(page.Revision) ||
         !Number.isSafeInteger(page.HistoryRevision) ||
-        page.Revision < this.revision
+        page.Revision < this.revision ||
+        page.HistoryRevision < this.historyRevision
       )
         return;
       const incoming = page.Entries ?? [];
       if (incoming.some((entry) => entry.SessionID !== sessionID))
-        throw new Error('Sidekick activity scope is invalid.');
+        throw new Error(`${this.plugin} activity scope is invalid.`);
       const changedHistory = page.HistoryRevision !== this.historyRevision;
       if (changedHistory) {
         this.entries = [];
@@ -130,7 +138,8 @@ export class SessionActivity {
         if (cursor) this.pending = true;
         return;
       }
-      this.error = failure instanceof Error ? failure.message : 'Cannot load Sidekick activity.';
+      this.error =
+        failure instanceof Error ? failure.message : `Cannot load ${this.plugin} activity.`;
     } finally {
       if (!signal.aborted) {
         this.reading = this.loading = false;

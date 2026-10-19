@@ -7,6 +7,12 @@ import (
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 )
 
+// EventPublisher persists an event before notifying subscribers. Plugins publish
+// from workers; observation callbacks only coalesce metadata and signal work.
+type EventPublisher interface {
+	Send(context.Context, atom.Event) error
+}
+
 func (harnessRuntime *Harness) On(name atom.EventName, handler Handler) Unsubscribe {
 	harnessRuntime.mutex.Lock()
 	identifier := harnessRuntime.nextRegistrationID()

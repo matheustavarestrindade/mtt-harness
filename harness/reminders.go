@@ -16,6 +16,8 @@ type ReminderDelivery struct {
 // ReminderContribution contains only request-local messages. Commit runs in the
 // turn worker immediately before provider dispatch, after all budget checks.
 // A failed dispatch can replay the same durable reminder on the next request.
+// A contribution with no messages can observe dispatch through Commit; it adds
+// no input tokens and must not change the provider-bound request.
 type ReminderContribution struct {
 	Messages []atom.Message
 	Commit   func(context.Context, ReminderDelivery) error

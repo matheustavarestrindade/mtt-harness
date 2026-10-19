@@ -22,10 +22,11 @@ type Session struct {
 	ReasoningEffort   string `json:",omitempty"`
 	CreatedAt         time.Time
 	Completed         bool
-	HistoryRevision   uint64 `json:",omitempty"`
-	SelectionRevision uint64 `json:",omitempty"`
-	ParentMessageID   string `json:",omitempty"`
-	ParentToolCallID  string `json:",omitempty"`
+	HistoryRevision   uint64            `json:",omitempty"`
+	SelectionRevision uint64            `json:",omitempty"`
+	ParentMessageID   string            `json:",omitempty"`
+	ParentToolCallID  string            `json:",omitempty"`
+	Execution         *ExecutionProfile `json:"-"`
 }
 
 type AgentTask struct {

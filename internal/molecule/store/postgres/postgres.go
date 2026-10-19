@@ -35,6 +35,8 @@ ALTER TABLE sessions ADD COLUMN IF NOT EXISTS history_revision bigint NOT NULL D
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS selection_revision bigint NOT NULL DEFAULT 0;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS parent_message_id text NOT NULL DEFAULT '';
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS parent_tool_call_id text NOT NULL DEFAULT '';
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS execution_profile jsonb;
+CREATE INDEX IF NOT EXISTS messages_session_user ON messages(session_id,seq DESC) WHERE role='user';
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS session_task_state (
 	session_id text PRIMARY KEY REFERENCES sessions(id),

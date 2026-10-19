@@ -2,6 +2,7 @@ package harness
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
@@ -30,11 +31,49 @@ type ScopedTool interface {
 	Available(context.Context) (bool, error)
 }
 
+// SessionTool marks lifecycle capabilities that belong only in matching session
+// catalogs. Ordinary plugin tools retain the normal compact registered catalog.
+type SessionTool interface{ SessionOnly() bool }
+
+// OperationTool owns its operation names, restricted schema and runtime check.
+// External tool metadata is not interpreted as an operation-access guarantee.
+type OperationTool interface {
+	Operations() []string
+	WithOperations([]string) (atom.ToolSpec, error)
+	ValidateOperations(atom.ToolCall, []string) error
+}
+
 func ToolAvailable(operationContext context.Context, tool Tool) (bool, error) {
+	if session, found := SessionFrom(operationContext); found && session.Execution != nil {
+		if _, allowed := session.Execution.Grant(tool.Name()); !allowed {
+			return false, nil
+		}
+	}
 	if scoped, supported := tool.(ScopedTool); supported {
 		return scoped.Available(operationContext)
 	}
 	return true, nil
+}
+
+// ToolSpecification resolves the effective definition from the registered tool.
+// Restrictions preserve the tool's validation rules, descriptions and defaults.
+func ToolSpecification(operationContext context.Context, tool Tool) (atom.ToolSpec, error) {
+	specification := atom.ToolSpec{Name: tool.Name(), Description: tool.Description(), Categories: tool.Categories(), InputSchema: tool.InputSchema()}
+	session, found := SessionFrom(operationContext)
+	if !found || session.Execution == nil {
+		return specification, nil
+	}
+	grant, allowed := session.Execution.Grant(tool.Name())
+	if !allowed {
+		return atom.ToolSpec{}, fmt.Errorf("tool %q is not enabled for this session", tool.Name())
+	}
+	if operationTool, supported := tool.(OperationTool); supported {
+		return operationTool.WithOperations(grant.Operations)
+	}
+	if len(grant.Operations) > 0 {
+		return atom.ToolSpec{}, fmt.Errorf("tool %q has no operation-selection contract", tool.Name())
+	}
+	return specification, nil
 }
 
 func (harnessRuntime *Harness) Tool(tool Tool) Unsubscribe {

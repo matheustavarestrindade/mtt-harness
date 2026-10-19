@@ -13,6 +13,24 @@ import (
 
 type sessions struct{ store *Store }
 
+func (sessionStore *sessions) LatestUserMessageID(operationContext context.Context, sessionID atom.SessionID) (string, error) {
+	if operationError := operationContext.Err(); operationError != nil {
+		return "", operationError
+	}
+	sessionStore.store.mutex.RLock()
+	defer sessionStore.store.mutex.RUnlock()
+	if sessionStore.store.deletedSessions[sessionID] {
+		return "", store.ErrSessionDeleted
+	}
+	messages := sessionStore.store.messages[sessionID]
+	for index := len(messages) - 1; index >= 0; index-- {
+		if messages[index].Role == atom.RoleUser {
+			return messages[index].ID, nil
+		}
+	}
+	return "", nil
+}
+
 func (sessionStore *sessions) GetModelSelection(operationContext context.Context, sessionID atom.SessionID) (atom.SessionModelSelection, bool, error) {
 	if operationError := operationContext.Err(); operationError != nil {
 		return atom.SessionModelSelection{}, false, operationError
@@ -44,7 +62,9 @@ func (sessionStore *sessions) Save(operationContext context.Context, session ato
 		session.HistoryRevision = stored.HistoryRevision
 		session.SelectionRevision = stored.SelectionRevision
 		session.ParentMessageID, session.ParentToolCallID = stored.ParentMessageID, stored.ParentToolCallID
+		session.Execution = stored.Execution
 	}
+	session.Execution = session.Execution.Clone()
 	sessionStore.store.sessions[session.ID] = session
 	return nil
 }
@@ -75,6 +95,7 @@ func (sessionStore *sessions) Get(operationContext context.Context, sessionID at
 	if !found {
 		return atom.Session{}, store.ErrSessionNotFound
 	}
+	session.Execution = session.Execution.Clone()
 	return session, nil
 }
 
@@ -114,6 +135,7 @@ func (sessionStore *sessions) List(operationContext context.Context, instanceID 
 	var sessions []atom.Session
 	for _, session := range sessionStore.store.sessions {
 		if session.InstanceID == instanceID && !sessionStore.store.deletedSessions[session.ID] {
+			session.Execution = session.Execution.Clone()
 			sessions = append(sessions, session)
 		}
 	}

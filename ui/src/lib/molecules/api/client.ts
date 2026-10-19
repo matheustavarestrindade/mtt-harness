@@ -33,6 +33,20 @@ export class ApiError extends Error {
 }
 
 export class HarnessApi {
+  async pluginAction<Result = unknown>(
+    workspaceID: string,
+    plugin: string,
+    action: string,
+    input: unknown,
+    signal?: AbortSignal,
+  ): Promise<Result> {
+    return this.request<Result>(
+      `instances/${encodeURIComponent(workspaceID)}/plugins/${encodeURIComponent(plugin)}/actions/${encodeURIComponent(action)}`,
+      'POST',
+      input,
+      signal,
+    );
+  }
   pluginActivity(sessionID: string, plugin: string, cursor = '', signal?: AbortSignal) {
     const query = new URLSearchParams({ limit: '50' });
     if (cursor) query.set('cursor', cursor);

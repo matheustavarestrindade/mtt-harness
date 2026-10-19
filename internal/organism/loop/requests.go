@@ -79,12 +79,33 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 		return nil, operationError
 	}
 	request := atom.Request{Model: modelID, Messages: messages, Tools: tools, ReasoningEffort: session.ReasoningEffort}
+	if session.Execution != nil {
+		request.Params = map[string]any{"max_output_tokens": session.Execution.MaxOutputTokens}
+	}
 	request, operationError = agentLoop.pipeline.Request(operationContext, request)
 	if operationError != nil {
 		return nil, operationError
 	}
 	if request.Model == "" {
 		request.Model = modelID
+	}
+	if session.Execution != nil {
+		if request.Params == nil {
+			request.Params = map[string]any{}
+		}
+		request.Params["max_output_tokens"] = session.Execution.MaxOutputTokens
+		request.Tools = nil
+		for _, selected := range tools {
+			tool, found := agentLoop.configuration.Registry.Get(selected.Name)
+			if !found {
+				continue
+			}
+			specification, definitionError := harness.ToolSpecification(operationContext, tool)
+			if definitionError != nil {
+				return nil, definitionError
+			}
+			request.Tools = append(request.Tools, specification)
+		}
 	}
 	modelInfo, modelProvider, operationError := agentLoop.resolveModel(session.InstanceID, request.Model)
 	if operationError != nil {
@@ -93,13 +114,15 @@ func (agentLoop *Loop) prepareModelCall(operationContext context.Context, sessio
 	if operationError := modelInfo.ValidateReasoningEffort(request.ReasoningEffort); operationError != nil {
 		return nil, operationError
 	}
-	verdict, operationError := agentLoop.pipeline.DecideRequest(operationContext, request)
-	if operationError != nil {
-		return nil, operationError
-	}
-	allowed, operationError := agentLoop.resolvePermissionVerdict(operationContext, session, "model.request", verdict)
-	if operationError != nil || !allowed {
-		return nil, operationError
+	if session.Execution == nil {
+		verdict, operationError := agentLoop.pipeline.DecideRequest(operationContext, request)
+		if operationError != nil {
+			return nil, operationError
+		}
+		allowed, operationError := agentLoop.resolvePermissionVerdict(operationContext, session, "model.request", verdict)
+		if operationError != nil || !allowed {
+			return nil, operationError
+		}
 	}
 	modelID = modelProvider.Name() + "/" + modelInfo.ID
 	request.Model = modelInfo.ID

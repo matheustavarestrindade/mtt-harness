@@ -2,6 +2,168 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "context window",
+      "category": "technical_noun",
+      "approved_forms": [
+        "context windows"
+      ],
+      "meaning": "token-bounded context capacity or selected conversation span for a model request",
+      "source": "model request budgeting"
+    },
+    {
+      "term": "file operation",
+      "category": "technical_noun",
+      "approved_forms": [
+        "file operations"
+      ],
+      "meaning": "named read, discovery or mutation capability of a file tool",
+      "source": "file_actions"
+    },
+    {
+      "term": "watcher trigger",
+      "category": "technical_noun",
+      "approved_forms": [
+        "watcher triggers"
+      ],
+      "meaning": "configured event that can schedule a watcher run",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "watcher schedule",
+      "category": "technical_noun",
+      "approved_forms": [
+        "watcher schedules"
+      ],
+      "meaning": "durable context checkpoint and continuation counters for a watcher definition",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "event callback",
+      "category": "technical_noun",
+      "approved_forms": [
+        "event callbacks"
+      ],
+      "meaning": "registered function invoked for an event after persistence",
+      "source": "harness event bus"
+    },
+    {
+      "term": "configuration change",
+      "category": "technical_noun",
+      "approved_forms": [
+        "configuration changes"
+      ],
+      "meaning": "accepted update to stored runtime configuration",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "input preview",
+      "category": "technical_noun",
+      "approved_forms": [
+        "input previews"
+      ],
+      "meaning": "bounded display of a rendered model input",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "watcher run record",
+      "category": "technical_noun",
+      "approved_forms": [
+        "watcher run records"
+      ],
+      "meaning": "stored public metadata and decision for one watcher run",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "execution profile",
+      "category": "technical_noun",
+      "approved_forms": [
+        "execution profiles"
+      ],
+      "meaning": "server-created session policy with a tool capability set and execution origin",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "tool grant",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tool grants"
+      ],
+      "meaning": "configured authorization for a tool and its selected operations",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "watcher definition",
+      "category": "technical_noun",
+      "approved_forms": [
+        "watcher definitions"
+      ],
+      "meaning": "workspace configuration of one named watcher with its model, prompt, triggers and capabilities",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "watcher run",
+      "category": "technical_noun",
+      "approved_forms": [
+        "watcher runs"
+      ],
+      "meaning": "one recorded execution of a watcher definition",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "review group",
+      "category": "technical_noun",
+      "approved_forms": [
+        "review groups"
+      ],
+      "meaning": "matching watcher runs whose decisions apply to one source event",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "runtime continuation",
+      "category": "technical_noun",
+      "approved_forms": [
+        "runtime continuations"
+      ],
+      "meaning": "identified runtime input that can resume a main session through its queue",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "permission review",
+      "category": "technical_noun",
+      "approved_forms": [
+        "permission reviews"
+      ],
+      "meaning": "watcher evaluation of a pending permission request",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "worker session",
+      "category": "technical_noun",
+      "approved_forms": [
+        "worker sessions"
+      ],
+      "meaning": "isolated harness session used by a workspace automation worker",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "source fence",
+      "category": "technical_noun",
+      "approved_forms": [
+        "source fences"
+      ],
+      "meaning": "revision and identity checks that prevent stale decisions from changing a session",
+      "source": "Watcher plugin"
+    },
+    {
+      "term": "tool selection",
+      "category": "technical_noun",
+      "approved_forms": [
+        "tool selections"
+      ],
+      "meaning": "configured set of available tool capabilities",
+      "source": "Watcher plugin"
+    },
+    {
       "term": "queue preview",
       "category": "technical_noun",
       "approved_forms": [

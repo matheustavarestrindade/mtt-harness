@@ -11,6 +11,10 @@ import (
 )
 
 func (coordinator *sessionCoordinator) startOperation(command sessionCommand) {
+	if command.kind == submitFencedRuntime && !coordinator.matchesControl(command.control) {
+		command.respond(sessionReply{operationError: harness.ErrReviewStale})
+		return
+	}
 	if command.kind == admitQueuedMessages {
 		for _, message := range coordinator.pending {
 			command.messageIDs = append(command.messageIDs, message.ID)
@@ -27,6 +31,23 @@ func (coordinator *sessionCoordinator) startOperation(command sessionCommand) {
 		defer cancel()
 		completed := operationCompletion{command: command}
 		switch command.kind {
+		case submitFencedRuntime:
+			completed.response.operationError = coordinator.loop.configuration.Store.Queue().Enqueue(operationContext, command.message, pendingMessageLimit)
+			if completed.response.operationError == nil && operationContext.Err() == nil {
+				confirmationKind := confirmControlToken
+				if command.permission.RequestID != "" {
+					confirmationKind = applyPermissionDecision
+				}
+				confirmation, confirmationError := coordinator.requestSessionCommand(operationContext, sessionCommand{kind: confirmationKind, control: command.control, permission: command.permission})
+				completed.response.operationError = confirmationError
+				completed.response.applied = confirmation.applied && confirmationError == nil
+			}
+			if !completed.response.applied {
+				cleanupContext, finishCleanup := context.WithTimeout(context.WithoutCancel(operationContext), 5*time.Second)
+				_, cleanupError := coordinator.loop.configuration.Store.Queue().Remove(cleanupContext, coordinator.session.ID, command.message.ID)
+				finishCleanup()
+				completed.response.operationError = errors.Join(completed.response.operationError, operationContext.Err(), cleanupError)
+			}
 		case submitMessage:
 			completed.response.operationError = coordinator.loop.configuration.Store.Queue().Enqueue(operationContext, command.message, pendingMessageLimit)
 		case cancelPending:
@@ -62,8 +83,8 @@ func (coordinator *sessionCoordinator) handleOperation(completed operationComple
 	coordinator.working = nil
 	response := completed.response
 	switch completed.command.kind {
-	case submitMessage:
-		if response.operationError == nil {
+	case submitMessage, submitFencedRuntime:
+		if response.operationError == nil && (completed.command.kind == submitMessage || response.applied) {
 			coordinator.pending = append(coordinator.pending, completed.command.message)
 			response.position = len(coordinator.pending)
 		}

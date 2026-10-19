@@ -22,6 +22,8 @@
   import AgentGroup from './AgentGroup.svelte';
   import MessageCard from '../molecules/MessageCard.svelte';
   import QueuedMessage from '../molecules/QueuedMessage.svelte';
+  import WatcherSection from '../molecules/WatcherSection.svelte';
+  import { watcherRuntimeIDs } from '../atoms/watcher';
   import PermissionCard from '../molecules/PermissionCard.svelte';
   import { HistoryScroll } from './history-scroll.svelte';
   let {
@@ -48,18 +50,26 @@
   let feed: HTMLDivElement;
   const scroll = new HistoryScroll(untrack(() => workbench.history));
   $effect(() => () => scroll.dispose());
+  const knownWatcherRuns = $derived(new Set(workbench.watchers.entries.map((entry) => entry.ID)));
+  const transcriptMessages = $derived(
+    (workbench.liveMessage && workbench.history.tailAttached
+      ? [...workbench.messages, workbench.liveMessage]
+      : workbench.messages
+    ).filter((message) => {
+      const identifiers = watcherRuntimeIDs(message);
+      return (
+        !identifiers.length || !identifiers.every((identifier) => knownWatcherRuns.has(identifier))
+      );
+    }),
+  );
   const entries = $derived(
-    buildConversationEntries(
-      workbench.liveMessage && workbench.history.tailAttached
-        ? [...workbench.messages, workbench.liveMessage]
-        : workbench.messages,
-      workbench.processes.records.values(),
-    ),
+    buildConversationEntries(transcriptMessages, workbench.processes.records.values()),
   );
   const unplacedAgents = $derived(
     workbench.agents.unplaced(new Set(entries.map((entry) => entry.message.ID))),
   );
   const sidekick = $derived(placePluginActivity(entries, workbench.sidekick.entries));
+  const watcherActivity = $derived(placePluginActivity(entries, workbench.watchers.entries));
   const queued = $derived(
     queuedMessageViews(
       workbench.receipts,
@@ -73,6 +83,7 @@
     const changes =
       workbench.messages.length +
       workbench.sidekick.entries.length +
+      workbench.watchers.entries.length +
       workbench.permissions.length +
       queued.length +
       workbench.agents.children(workbench.session?.ID ?? '').length +
@@ -117,7 +128,7 @@
             ><LoaderCircle class="size-4 animate-spin" />Loading conversation…</span
           >
         </div>
-      {:else if !workbench.messages.length && !queued.length && !workbench.liveMessage && !unplacedAgents.length && !workbench.sidekick.entries.length && !workbench.sidekick.error}
+      {:else if !workbench.messages.length && !queued.length && !workbench.liveMessage && !unplacedAgents.length && !workbench.sidekick.entries.length && !workbench.sidekick.error && !workbench.watchers.entries.length && !workbench.watchers.error}
         <section class="flex flex-1 flex-col items-center justify-center py-8 text-center sm:py-12">
           <div
             class="quiet-grid mb-6 grid size-28 place-items-center rounded-3xl border border-border/50 bg-muted/30"
@@ -233,8 +244,28 @@
               {#each sidekick.anchored.get(entry.message.ID) ?? [] as hint (hint.ID)}<SidekickSection
                   entry={hint}
                 />{/each}
+              {#each watcherActivity.anchored.get(entry.message.ID) ?? [] as review (review.ID)}<WatcherSection
+                  entry={review}
+                />{/each}
             </div>
           {/each}
+          {#if workbench.watchers.error}<p
+              role="alert"
+              class="break-words text-xs text-muted-foreground"
+            >
+              {workbench.watchers.error}
+            </p>{/if}
+          {#if watcherActivity.unplaced.length}<details class="section-content">
+              <summary class="cursor-pointer py-3 text-xs text-muted-foreground"
+                >Watcher reviews · {watcherActivity.unplaced.length}</summary
+              >{#each watcherActivity.unplaced as review (review.ID)}<WatcherSection
+                  entry={review}
+                />{/each}{#if workbench.watchers.nextCursor}<Button
+                  variant="ghost"
+                  class="h-11 text-xs"
+                  onclick={() => void workbench.watchers.more()}>Load earlier reviews</Button
+                >{/if}
+            </details>{/if}
           {#if workbench.history.hasNewer}<Button
               variant="ghost"
               class="h-11 self-center text-xs"

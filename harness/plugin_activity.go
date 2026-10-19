@@ -25,19 +25,28 @@ type PluginActivityNote struct {
 	References []string
 }
 
-// PluginActivityEntry records an insertion committed at a model-request boundary.
-// Its anchor belongs to the session's saved history; it is not a chat message or
-// a tool call. InputTokens is optional and already belongs to main-request input.
+// PluginActivityEntry records committed plugin activity or a review outcome.
+// An optional anchor belongs to saved history. Entries are not chat messages or
+// tool calls; workers' private reasoning is never activity data.
 type PluginActivityEntry struct {
-	ID             string
-	SessionID      atom.SessionID
-	AnchorID       string
-	AnchorSequence int64
-	Title          string
-	Notes          []PluginActivityNote
-	CreatedAt      time.Time
-	InputTokens    *int `json:",omitempty"`
-	Estimated      bool
+	ID              string
+	SessionID       atom.SessionID
+	AnchorID        string
+	AnchorSequence  int64
+	Title           string
+	Notes           []PluginActivityNote
+	CreatedAt       time.Time
+	InputTokens     *int `json:",omitempty"`
+	Estimated       bool
+	Outcome         string         `json:",omitempty"`
+	Decision        string         `json:",omitempty"`
+	Trigger         string         `json:",omitempty"`
+	DefinitionID    string         `json:",omitempty"`
+	WorkerSessionID atom.SessionID `json:",omitempty"`
+	DurationMS      int64          `json:",omitempty"`
+	Error           string         `json:",omitempty"`
+	InputPreview    string         `json:",omitempty"`
+	InputTruncated  bool           `json:",omitempty"`
 }
 
 type PluginActivityPage struct {

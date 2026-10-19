@@ -22,6 +22,8 @@ type PermissionRequest struct {
 	SessionID  SessionID
 	Target     string
 	Why        string
+	ToolCall   *ToolCall `json:",omitempty"`
+	MessageID  string    `json:",omitempty"`
 }
 
 type Scope string
@@ -40,4 +42,5 @@ type PermissionDecision struct {
 	Kind       VerdictKind
 	Scope      Scope
 	CreatedAt  time.Time
+	Actor      string `json:",omitempty"`
 }

@@ -12,6 +12,9 @@ import (
 )
 
 func (pluginHost *Host) ProjectReminders(operationContext context.Context, session atom.Session, request atom.Request) (atom.Request, error) {
+	if session.Execution != nil {
+		return request, nil
+	}
 	for _, registered := range pluginHost.All() {
 		plugin, available := registered.(harness.RequestReminderPlugin)
 		if !available {
@@ -45,6 +48,9 @@ func (pluginHost *Host) ProjectReminders(operationContext context.Context, sessi
 }
 
 func (pluginHost *Host) PrepareReminders(operationContext context.Context, input harness.ContextRequest) (harness.ReminderPlan, error) {
+	if input.Session.Execution != nil {
+		return harness.ReminderPlan{Request: input.Request}, nil
+	}
 	projected, operationError := pluginHost.ProjectReminders(operationContext, input.Session, input.Request)
 	if operationError != nil {
 		return harness.ReminderPlan{}, operationError
@@ -80,6 +86,13 @@ func (pluginHost *Host) PrepareReminders(operationContext context.Context, input
 			return plan, fmt.Errorf("plugin %q changed the request while preparing a reminder", registered.Name())
 		}
 		if len(contribution.Messages) == 0 {
+			// Metadata-only observers still commit exactly at dispatch, with no
+			// inserted tokens and no change to cached request bytes.
+			if contribution.Commit != nil {
+				commits = append(commits, func(commitContext context.Context) error {
+					return contribution.Commit(commitContext, harness.ReminderDelivery{Estimated: input.Budget.Estimated})
+				})
+			}
 			continue
 		}
 		before, operationError := input.Measure(operationContext, plan.Request)

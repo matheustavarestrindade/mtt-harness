@@ -43,6 +43,7 @@ import type {
 const idleStatus = (): QueueStatus => ({ running: false, queued: 0, messages: [], error: '' });
 export class HarnessConsole {
   readonly sidekick = new SessionActivity();
+  readonly watchers = new SessionActivity('watcher');
   readonly processes = new SessionProcesses();
   readonly history = new SessionHistory((records, messages) => {
     this.processes.applyHistory(
@@ -266,6 +267,7 @@ export class HarnessConsole {
 
   private stopSessionObservers() {
     this.sidekick.close();
+    this.watchers.close();
     this.processes.close();
     this.history.close();
     this.agents.close();
@@ -434,6 +436,7 @@ export class HarnessConsole {
     );
     this.processes.open(api, session.ID);
     this.sidekick.open(api, session.ID);
+    this.watchers.open(api, session.ID);
     this.agents.open(api, session, this.sessions);
     this.history.open(api, session.ID);
     this.error = '';
@@ -609,6 +612,7 @@ export class HarnessConsole {
       previousLive !== state.Live?.Message.ID
     )
       this.sidekick.scheduleRefresh();
+    this.watchers.scheduleRefresh();
     this.receipts = this.receipts.filter(
       (message) =>
         !this.savedMessageIDs.has(message.ID) &&
@@ -717,11 +721,16 @@ export class HarnessConsole {
 
   private receiveEvent(event: HarnessEvent) {
     if (event.SessionID !== this.session?.ID) return;
+    if (event.Name === 'plugin.activity') {
+      this.sidekick.observe(event);
+      this.watchers.observe(event);
+    }
     if (event.Seq <= this.liveCoverage) {
       if (event.Name === 'agent.start' || event.Name === 'agent.end') this.agents.observe(event);
       return;
     }
     this.sidekick.observe(event);
+    this.watchers.observe(event);
     this.processes.observe(event);
     if (['process.start', 'process.output', 'process.exit'].includes(event.Name)) return;
     this.agents.observe(event);

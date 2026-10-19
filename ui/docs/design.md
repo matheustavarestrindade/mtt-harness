@@ -157,6 +157,16 @@ The `SessionActivity` organism reads Sidekick notes after the request boundary. 
 
 The client gets activity data after model requests, session events, and new WebSocket connections. Output chunks do not start the API requests. A session change cancels previous requests. The history revision identifies activity entries from previous history. The client keeps a maximum of 1000 activity entries. Activity data does not become a conversation message.
 
+## Watchers
+
+`Settings → Watchers` gives workspace watcher definitions. The editor uses `Schema.JSON` for the tool catalog and default watcher definition. A model is necessary. The user can select file operations for `file_actions`. Tool grants do not use the permission pipeline.
+
+Use `New watcher`, `Edit`, `Duplicate`, or `Remove`. An input preview uses the selected primary session and does not start a model. Watcher usage is workspace usage. The `CacheRead` and `CacheWrite` values are different from `Input`.
+
+The `SessionActivity` API and `plugin.activity` events give watcher run records. The view gives `Decision`, `Outcome`, and `InputPreview`. The API does not give `Message.Reasoning` from worker sessions.
+
+The UI uses the watcher run record for a runtime continuation when the `run_ids` values agree. Responses from a previous workspace or session must not replace new data.
+
 ## API Data
 
 Response keys agree with the Go types. For example, an instance has `Workspace` and `DefaultModel`. Request keys use the handler format, such as `workspace` and `default_model`. A `null` collection becomes an empty array in the client.

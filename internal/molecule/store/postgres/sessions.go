@@ -12,6 +12,15 @@ import (
 
 type sessions struct{ store *Store }
 
+func (sessionStore *sessions) LatestUserMessageID(operationContext context.Context, sessionID atom.SessionID) (string, error) {
+	var identifier string
+	operationError := sessionStore.store.pool.QueryRow(operationContext, `SELECT id FROM messages WHERE session_id=$1 AND role='user' ORDER BY seq DESC LIMIT 1`, string(sessionID)).Scan(&identifier)
+	if errors.Is(operationError, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return identifier, operationError
+}
+
 func (sessionStore *sessions) GetModelSelection(operationContext context.Context, sessionID atom.SessionID) (atom.SessionModelSelection, bool, error) {
 	var selection atom.SessionModelSelection
 	var deleted bool
@@ -26,7 +35,7 @@ func (sessionStore *sessions) GetModelSelection(operationContext context.Context
 }
 
 func (sessionStore *sessions) List(operationContext context.Context, instanceID string) ([]atom.Session, error) {
-	rows, operationError := sessionStore.store.pool.Query(operationContext, `SELECT id,instance_id,parent_id,depth,model,created_at,completed,reasoning_effort,history_revision,selection_revision,parent_message_id,parent_tool_call_id FROM sessions WHERE instance_id=$1 AND NOT deleted ORDER BY id`, instanceID)
+	rows, operationError := sessionStore.store.pool.Query(operationContext, `SELECT id,instance_id,parent_id,depth,model,created_at,completed,reasoning_effort,history_revision,selection_revision,parent_message_id,parent_tool_call_id,execution_profile FROM sessions WHERE instance_id=$1 AND NOT deleted ORDER BY id`, instanceID)
 	if operationError != nil {
 		return nil, operationError
 	}
@@ -34,8 +43,14 @@ func (sessionStore *sessions) List(operationContext context.Context, instanceID 
 	var sessions []atom.Session
 	for rows.Next() {
 		var session atom.Session
-		if operationError := rows.Scan(&session.ID, &session.InstanceID, &session.Parent, &session.Depth, &session.Model, &session.CreatedAt, &session.Completed, &session.ReasoningEffort, &session.HistoryRevision, &session.SelectionRevision, &session.ParentMessageID, &session.ParentToolCallID); operationError != nil {
+		var execution []byte
+		if operationError := rows.Scan(&session.ID, &session.InstanceID, &session.Parent, &session.Depth, &session.Model, &session.CreatedAt, &session.Completed, &session.ReasoningEffort, &session.HistoryRevision, &session.SelectionRevision, &session.ParentMessageID, &session.ParentToolCallID, &execution); operationError != nil {
 			return nil, operationError
+		}
+		if len(execution) > 0 {
+			if operationError := json.Unmarshal(execution, &session.Execution); operationError != nil {
+				return nil, operationError
+			}
 		}
 		sessions = append(sessions, session)
 	}
@@ -43,16 +58,20 @@ func (sessionStore *sessions) List(operationContext context.Context, instanceID 
 }
 
 func (sessionStore *sessions) Save(operationContext context.Context, session atom.Session) error {
+	execution, operationError := json.Marshal(session.Execution)
+	if operationError != nil {
+		return operationError
+	}
 	result, operationError := sessionStore.store.pool.Exec(operationContext, `
 		WITH instance_state AS MATERIALIZED (SELECT unlinked FROM instances WHERE id=$2 FOR SHARE),
 		parent_state AS MATERIALIZED (SELECT deleted FROM sessions WHERE id=$3 AND NOT EXISTS(SELECT 1 FROM instance_state WHERE unlinked) FOR SHARE)
-		INSERT INTO sessions (id, instance_id, parent_id, depth, model, created_at, completed, reasoning_effort,parent_message_id,parent_tool_call_id)
-		SELECT $1, $2, $3, $4, $5, $6, $7, $8,$9,$10 WHERE NOT EXISTS (SELECT 1 FROM parent_state WHERE deleted) AND NOT EXISTS(SELECT 1 FROM instance_state WHERE unlinked)
+		INSERT INTO sessions (id, instance_id, parent_id, depth, model, created_at, completed, reasoning_effort,parent_message_id,parent_tool_call_id,execution_profile)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8,$9,$10,$11 WHERE NOT EXISTS (SELECT 1 FROM parent_state WHERE deleted) AND NOT EXISTS(SELECT 1 FROM instance_state WHERE unlinked)
 		ON CONFLICT (id) DO UPDATE SET
 			parent_id = EXCLUDED.parent_id,
 			depth = EXCLUDED.depth,
 			completed = EXCLUDED.completed WHERE NOT sessions.deleted`,
-		string(session.ID), session.InstanceID, string(session.Parent), session.Depth, session.Model, session.CreatedAt, session.Completed, session.ReasoningEffort, session.ParentMessageID, session.ParentToolCallID)
+		string(session.ID), session.InstanceID, string(session.Parent), session.Depth, session.Model, session.CreatedAt, session.Completed, session.ReasoningEffort, session.ParentMessageID, session.ParentToolCallID, execution)
 	if operationError == nil && result.RowsAffected() == 0 {
 		var unlinked bool
 		lookupError := sessionStore.store.pool.QueryRow(operationContext, `SELECT unlinked FROM instances WHERE id=$1`, session.InstanceID).Scan(&unlinked)
@@ -69,12 +88,16 @@ func (sessionStore *sessions) Save(operationContext context.Context, session ato
 
 func (sessionStore *sessions) Get(operationContext context.Context, sessionID atom.SessionID) (atom.Session, error) {
 	var session atom.Session
+	var execution []byte
 	operationError := sessionStore.store.pool.QueryRow(operationContext, `
-		SELECT id, instance_id, parent_id, depth, model, created_at, completed, reasoning_effort,history_revision,selection_revision,parent_message_id,parent_tool_call_id
+		SELECT id, instance_id, parent_id, depth, model, created_at, completed, reasoning_effort,history_revision,selection_revision,parent_message_id,parent_tool_call_id,execution_profile
 		FROM sessions WHERE id = $1 AND NOT deleted`, string(sessionID)).
-		Scan(&session.ID, &session.InstanceID, &session.Parent, &session.Depth, &session.Model, &session.CreatedAt, &session.Completed, &session.ReasoningEffort, &session.HistoryRevision, &session.SelectionRevision, &session.ParentMessageID, &session.ParentToolCallID)
+		Scan(&session.ID, &session.InstanceID, &session.Parent, &session.Depth, &session.Model, &session.CreatedAt, &session.Completed, &session.ReasoningEffort, &session.HistoryRevision, &session.SelectionRevision, &session.ParentMessageID, &session.ParentToolCallID, &execution)
 	if errors.Is(operationError, pgx.ErrNoRows) {
 		return atom.Session{}, store.ErrSessionNotFound
+	}
+	if operationError == nil && len(execution) > 0 {
+		operationError = json.Unmarshal(execution, &session.Execution)
 	}
 	return session, operationError
 }

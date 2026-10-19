@@ -46,6 +46,11 @@ func (agentLoop *Loop) RunAgentTask(operationContext context.Context, task atom.
 		ReasoningEffort: task.ReasoningEffort,
 		CreatedAt:       time.Now(),
 	}
+	if parent.Execution != nil {
+		child.Execution = parent.Execution.Clone()
+		child.Execution.DecisionRoot = false
+		child.Execution.SystemPrompt = workerChildSystemPrompt
+	}
 	if origin, found := harness.ToolOriginFrom(operationContext); found {
 		child.ParentMessageID, child.ParentToolCallID = origin.MessageID, origin.CallID
 	}

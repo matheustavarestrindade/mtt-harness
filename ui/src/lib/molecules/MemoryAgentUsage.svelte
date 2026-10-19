@@ -3,7 +3,7 @@
   import type { MemoryAgentUsage } from '../atoms/memory';
   import { agentTokenCount, durationLabel, memoryAgentLabel } from '../atoms/memory';
   import { costLabel, formatTokenCount } from '../atoms/format';
-  let { agent }: { agent: MemoryAgentUsage } = $props();
+  let { agent, label }: { agent: MemoryAgentUsage; label?: string } = $props();
   const usage = $derived(agent.Statistics);
   const estimated = $derived(usage.Cost?.Estimated || usage.Costs?.some((cost) => cost.Estimated));
 </script>
@@ -16,7 +16,7 @@
       class="size-3 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
     />
     <span class="min-w-0 flex-1">
-      <span class="block font-medium">{memoryAgentLabel(agent.Agent)}</span>
+      <span class="block font-medium">{label ?? memoryAgentLabel(agent.Agent)}</span>
       <span class="mt-1 block break-all font-mono text-[10px] text-muted-foreground"
         >{agent.ModelID}</span
       >
