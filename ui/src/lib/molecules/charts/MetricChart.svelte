@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ChartDatum, ChartSeries, UsageMetric } from '../../atoms/usage';
-  import { formatUsageDay, usageValueLabel } from '../../atoms/usage';
+  import { chartCategorySeries, formatUsageDay, usageValueLabel } from '../../atoms/usage';
   import Disclosure from '../Disclosure.svelte';
   let {
     title,
@@ -13,6 +13,7 @@
     dates = false,
     height = 240,
     legend = true,
+    categoryLabels = 'axis',
   }: {
     title: string;
     data: ChartDatum[];
@@ -24,12 +25,18 @@
     dates?: boolean;
     height?: number;
     legend?: boolean;
+    categoryLabels?: 'axis' | 'below';
   } = $props();
   type ChartComponent = (typeof import('./BarChartView.svelte'))['default'];
   let Renderer = $state<ChartComponent | null>(null),
     error = $state('');
   let containerWidth = $state(0);
   const heading = $props.id();
+  const categories = $derived(
+    horizontal && categoryLabels === 'below' && series.length === 1
+      ? chartCategorySeries(data)
+      : [],
+  );
   const hasValues = $derived(
     data.some((row) => series.some((item) => typeof row[item.key] === 'number')),
   );
@@ -75,13 +82,26 @@
           {dates}
           {height}
           {containerWidth}
+          {categories}
         />{:else if error}<p role="status" class="text-xs text-muted-foreground">
           {error}
         </p>{:else}<p role="status" class="py-8 text-xs text-muted-foreground">
           Loading chart…
         </p>{/if}
     </div>
-    {#if legend && series.length > 1}<ul
+    {#if categories.length}<ul
+        class="flex min-w-0 flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground"
+        aria-label={`${title} categories`}
+      >
+        {#each categories as category (category.key)}<li
+            class="flex min-w-0 max-w-full items-start gap-1.5"
+          >
+            <span class="mt-0.5 size-2.5 shrink-0 rounded-sm" style:background={category.color}
+            ></span>
+            <span class="min-w-0 break-words [overflow-wrap:anywhere]">{category.label}</span>
+          </li>{/each}
+      </ul>{/if}
+    {#if legend && !categories.length && series.length > 1}<ul
         class="flex min-w-0 flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground"
         aria-label={`${title} legend`}
       >

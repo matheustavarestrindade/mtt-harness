@@ -54,6 +54,15 @@ export const usageMetrics: { value: UsageMetric; label: string }[] = [
 ];
 export const chartColors = Array.from({ length: 8 }, (_, index) => `var(--chart-${index + 1})`);
 
+// Share category keys and colors between the bars and their below-chart labels.
+export function chartCategorySeries(data: ChartDatum[]): ChartSeries[] {
+  return data.map((row, index) => ({
+    key: `category${index}`,
+    label: row.label,
+    color: chartColors[index % chartColors.length],
+  }));
+}
+
 export function emptyStatistics(): Statistics {
   return {
     Calls: 0,

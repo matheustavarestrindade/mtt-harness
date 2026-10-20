@@ -313,6 +313,7 @@
               {metric}
               currency={selectedCurrency}
               horizontal
+              categoryLabels="below"
               height={Math.max(130, comparison.length * 36 + 32)}
               legend={false}
             />

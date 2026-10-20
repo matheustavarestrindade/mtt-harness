@@ -329,6 +329,7 @@
               series={[{ key: 'value', label: 'Jobs', color: chartColors[0] }]}
               metric="calls"
               horizontal
+              categoryLabels="below"
               height={164}
               legend={false}
             />

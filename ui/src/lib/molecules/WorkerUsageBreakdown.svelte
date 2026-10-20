@@ -112,6 +112,7 @@
       {metric}
       currency={selectedCurrency}
       horizontal
+      categoryLabels="below"
       legend={false}
       height={Math.max(120, rows.length * 34 + 32)}
       description={metric === 'tokens'

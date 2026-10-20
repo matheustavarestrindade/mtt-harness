@@ -36,6 +36,7 @@ test('keep request counts integral while preserving fractional cost axes', async
   await panel.getByRole('tab', { name: 'Requests', exact: true }).click();
   const requests = panel.getByRole('region', { name: 'Daily requests', exact: true });
   await expect(requests.locator('svg').first()).toBeVisible();
+  await expect.poll(() => requests.locator('.lc-text-tspan').allTextContents()).toContain('1');
   const tickLabels = await requests.locator('.lc-text-tspan').allTextContents();
   expect(tickLabels).toContain('1');
   expect(tickLabels.filter((label) => /^-?\d+\.\d+$/.test(label))).toEqual([]);
@@ -72,6 +73,13 @@ test('render actual daily and model bars with separate cache and filter totals',
     )
     .toBeGreaterThan(0);
   await expect(panel.locator('[title="2,600"]')).toHaveText('2,600');
+  const modelComparison = panel.getByRole('region', { name: 'By model', exact: true });
+  await expect(modelComparison.getByRole('list', { name: 'By model categories' })).toContainText(
+    'provider-a/model-a',
+  );
+  await expect(
+    modelComparison.locator('.lc-axis-tick-label').filter({ hasText: /provider-/ }),
+  ).toHaveCount(0);
   const marks = daily.locator('.lc-bars .lc-bar');
   const tallest = await marks.evaluateAll(
     (elements) =>

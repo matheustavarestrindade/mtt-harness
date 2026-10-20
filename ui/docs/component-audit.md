@@ -38,9 +38,10 @@ The control audit applies to `ui/src`. Only `atoms/ui` has `button`, `input`, `s
 ## Charts
 
 ```text
-Horizontal label space: min(130px, 25% of chart container width)
-Category labels: LayerChart pixel-width truncation
-Category ticks: explicit row keys, including a single category
+Memory jobs and worker/model charts: category labels below the plot
+Bars and category labels: matching colors, no left category-label column
+Other horizontal axis labels: min(130px, 25% of chart container width)
+Axis-label mode: explicit ticks and LayerChart pixel-width truncation
 Full labels and values: Chart.Tooltip and View data
 ```
 

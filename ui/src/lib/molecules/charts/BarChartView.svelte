@@ -14,6 +14,7 @@
     dates = false,
     height = 240,
     containerWidth = 0,
+    categories = [],
   }: {
     data: ChartDatum[];
     series: ChartSeries[];
@@ -23,9 +24,13 @@
     dates?: boolean;
     height?: number;
     containerWidth?: number;
+    categories?: ChartSeries[];
   } = $props();
+  const plotSeries = $derived(categories.length ? categories : series);
   const configuration = $derived(
-    Object.fromEntries(series.map((item) => [item.key, { label: item.label, color: item.color }])),
+    Object.fromEntries(
+      plotSeries.map((item) => [item.key, { label: item.label, color: item.color }]),
+    ),
   );
   const positive = $derived(
     Math.max(
@@ -69,7 +74,11 @@
       : 4,
   );
   const chartData = $derived(
-    data.map((row, index) => ({ ...row, axisKey: dates ? row.label : `row-${index}` })),
+    data.map((row, index) => ({
+      ...row,
+      axisKey: dates ? row.label : `row-${index}`,
+      ...(categories[index] ? { [categories[index].key]: row[series[0].key] } : {}),
+    })),
   );
   const labelsByKey = $derived(new Map(chartData.map((row) => [row.axisKey, row.label])));
   const labels = $derived(chartData.map((row) => row.axisKey));
@@ -103,7 +112,7 @@
 >
   <BarChart
     data={chartData}
-    {series}
+    series={plotSeries}
     orientation={horizontal ? 'horizontal' : 'vertical'}
     x={horizontal ? undefined : 'axisKey'}
     y={horizontal ? 'axisKey' : undefined}
@@ -113,7 +122,18 @@
     yDomain={horizontal ? undefined : [minimum, maximum]}
     seriesLayout="stack"
     motion="none"
-    padding={{ left: horizontal ? categoryPadding : 42, right: 12, top: 12, bottom: 28 }}
+    padding={{
+      left: categories.length
+        ? minimum < 0 && metric === 'cost'
+          ? 26
+          : 8
+        : horizontal
+          ? categoryPadding
+          : 42,
+      right: categories.length ? (metric === 'cost' ? 26 : 16) : 12,
+      top: 12,
+      bottom: 28,
+    }}
     props={{
       xAxis: {
         format: horizontal ? formatAxis : formatCategory,
@@ -121,10 +141,11 @@
       },
       yAxis: {
         format: horizontal ? formatCategory : formatAxis,
-        ticks: horizontal ? labels : valueTicks,
-        tickLabelProps: horizontal
-          ? { truncate: { maxWidth: Math.max(0, categoryPadding - 10), style: labelStyle } }
-          : undefined,
+        ticks: categories.length ? [] : horizontal ? labels : valueTicks,
+        tickLabelProps:
+          horizontal && !categories.length
+            ? { truncate: { maxWidth: Math.max(0, categoryPadding - 10), style: labelStyle } }
+            : undefined,
       },
       tooltip: { context: { touchEvents: 'pan-y' } },
     }}
@@ -132,6 +153,7 @@
     {#snippet tooltip({ context })}
       <Chart.Tooltip
         role="tooltip"
+        hideLabel={categories.length > 0}
         label={dates
           ? formatUsageDay(String(context.tooltip.data?.label ?? data[0]?.label))
           : String(context.tooltip.data?.label ?? '')}

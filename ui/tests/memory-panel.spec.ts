@@ -52,12 +52,19 @@ function metrics(workspaceID: string): MemoryMetrics {
   };
 }
 
-test('use the Memory chart container width instead of a desktop label gutter', async ({
+test('put Memory categories below full-width bars with hover and tap details', async ({
   page,
 }, testInfo) => {
   const fixture = await mockHarness(page);
   await connectAndCreate(page);
-  fixture.memoryMetrics.set(fixture.instances[0].ID, metrics(fixture.instances[0].ID));
+  const usage = metrics(fixture.instances[0].ID);
+  usage.Agents.push({
+    ...usage.Agents[0],
+    Agent: 'context.historian',
+    ModelID: 'test/second-worker-model',
+    Statistics: { ...usage.Agents[0].Statistics, Input: 60, Output: 30 },
+  });
+  fixture.memoryMetrics.set(fixture.instances[0].ID, usage);
   const widths = testInfo.project.name === 'desktop' ? [1280, 1600] : [390, 320];
   for (const [index, width] of widths.entries()) {
     await page.setViewportSize({ width, height: 900 });
@@ -80,20 +87,47 @@ test('use the Memory chart container width instead of a desktop label gutter', a
               return Math.max(0, ...hitAreas) / container.width;
             }),
           {
-            message: `${title}: the bar plot should retain at least 70% of its container at ${width}px`,
+            message: `${title}: category labels must not reserve plot width at ${width}px`,
           },
         )
-        .toBeGreaterThanOrEqual(0.69);
-      if (title === 'Tokens by model') {
-        const label = chart.locator('.lc-axis-tick-label').filter({ hasText: /test/ });
-        await expect(label).toBeVisible();
-        const labelBounds = (await label.boundingBox())!,
-          containerBounds = (await chart.locator('[data-slot="chart"]').boundingBox())!;
-        expect(labelBounds.x).toBeGreaterThanOrEqual(containerBounds.x - 1);
-        expect(labelBounds.x + labelBounds.width).toBeLessThanOrEqual(
-          containerBounds.x + containerBounds.width * 0.25,
+        .toBeGreaterThanOrEqual(0.88);
+      const categories = chart.getByRole('list', { name: `${title} categories` });
+      await expect(categories).toBeVisible();
+      const expected =
+        title === 'Tokens by model'
+          ? usage.Agents.map((agent) => agent.ModelID)
+          : ['Running', 'Queued', 'Prepared', 'Failed'];
+      for (const label of expected) await expect(categories).toContainText(label);
+      await expect(
+        chart
+          .locator('.lc-axis-tick-label')
+          .filter({ hasText: /test\/|Running|Queued|Prepared|Failed/ }),
+      ).toHaveCount(0);
+      const labelBounds = (await categories.boundingBox())!,
+        containerBounds = (await chart.locator('[data-slot="chart"]').boundingBox())!;
+      expect(labelBounds.y).toBeGreaterThanOrEqual(containerBounds.y + containerBounds.height);
+      expect(labelBounds.x).toBeGreaterThanOrEqual(containerBounds.x - 1);
+      expect(labelBounds.x + labelBounds.width).toBeLessThanOrEqual(
+        containerBounds.x + containerBounds.width + 1,
+      );
+      const colors = await categories
+        .locator('li > span:first-child')
+        .evaluateAll((elements) =>
+          elements.map((element) => getComputedStyle(element).backgroundColor),
         );
-      }
+      expect(new Set(colors).size).toBe(expected.length);
+      const barColors = await chart
+        .locator('.lc-bars .lc-bar')
+        .evaluateAll((elements) =>
+          elements
+            .filter(
+              (element) =>
+                element.getBoundingClientRect().width > 0 &&
+                element.getBoundingClientRect().height > 0,
+            )
+            .map((element) => getComputedStyle(element).fill),
+        );
+      expect(barColors.every((color) => colors.includes(color))).toBe(true);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
@@ -117,7 +151,7 @@ test('use the Memory chart container width instead of a desktop label gutter', a
     'test/worker-model-with-a-long-descriptive-identifier',
   );
   await expect(workers.getByRole('table')).toContainText('1,500');
-  await page.screenshot({ path: testInfo.outputPath('memory-chart-width.png') });
+  await page.screenshot({ path: testInfo.outputPath('memory-categories-below.png') });
 });
 
 test('show uncached worker input and output with cache separate and reasoning included once', async ({
