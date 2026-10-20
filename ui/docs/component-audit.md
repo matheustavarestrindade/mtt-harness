@@ -18,6 +18,8 @@ The Connection settings page uses the same component. `Instructions` and Watcher
 ## Component Map
 
 ```text
+Usage graphs                    shadcn Chart + LayerChart
+Date range                      shadcn RangeCalendar + Popover
 Settings pages, Watcher sections -> Tabs
 Thinking, tools, agents, task state, activity, usage -> Collapsible, Disclosure
 Retrieval sources -> ToggleGroup

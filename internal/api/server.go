@@ -96,6 +96,7 @@ func (server *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /processes/{id}/output", server.processOutput)
 	mux.HandleFunc("POST /permissions/{id}", server.resolvePermission)
 	mux.HandleFunc("GET /statistics", server.statistics)
+	mux.HandleFunc("GET /usage", server.usageReport)
 	mux.HandleFunc("GET /plugins", server.listPlugins)
 	mux.HandleFunc("GET /plugins/{plugin}/settings", server.pluginSettings)
 	mux.HandleFunc("PATCH /plugins/{plugin}/settings", server.updatePluginSettings)

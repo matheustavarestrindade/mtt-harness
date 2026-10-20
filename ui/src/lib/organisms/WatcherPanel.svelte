@@ -18,7 +18,7 @@
   } from '../atoms/watcher';
   import { watcherTriggers } from '../atoms/watcher';
   import type { HarnessApi } from '../molecules/api/client';
-  import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import WorkerUsageBreakdown from '../molecules/WorkerUsageBreakdown.svelte';
   import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
   import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
   import Disclosure from '../molecules/Disclosure.svelte';
@@ -371,18 +371,13 @@
           <div class="flex min-h-11 items-center justify-between gap-3">
             <h3 class="text-sm font-medium">Worker usage</h3>
           </div>
-          <div class="space-y-2">
-            {#each panel.metrics?.Agents ?? [] as agent (`${agent.Agent}:${agent.ModelID}`)}<div
-                class="rounded-md border border-border px-3"
-              >
-                <MemoryAgentUsage
-                  {agent}
-                  label={panel.state?.Configuration.watchers.find(
-                    (value) => `watcher.${value.id}` === agent.Agent,
-                  )?.name ?? agent.Agent}
-                />
-              </div>{/each}
-          </div>
+          {#if panel.metrics?.Agents.length}<WorkerUsageBreakdown
+              agents={panel.metrics.Agents}
+              {models}
+              agentLabel={(name) =>
+                panel.state?.Configuration.watchers.find((value) => `watcher.${value.id}` === name)
+                  ?.name ?? name}
+            />{/if}
           {#if !panel.metrics?.Agents?.length}<p class="text-sm text-muted-foreground">
               No watcher usage recorded.
             </p>{/if}

@@ -11,7 +11,10 @@
   import type { HarnessApi } from '../molecules/api/client';
   import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
-  import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import WorkerUsageBreakdown from '../molecules/WorkerUsageBreakdown.svelte';
+  import MetricChart from '../molecules/charts/MetricChart.svelte';
+  import { chartColors } from '../atoms/usage';
+  import Disclosure from '../molecules/Disclosure.svelte';
   import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
   import * as ToggleGroup from '../atoms/ui/toggle-group';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
@@ -322,40 +325,53 @@
           </dd>
         </div>
       </dl>
-      <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-        <dt class="text-muted-foreground">Memory results</dt>
-        <dd class="text-right tabular-nums">{formatTokenCount(count('sources/memories'))}</dd>
-        <dt class="text-muted-foreground">File excerpts</dt>
-        <dd class="text-right tabular-nums">{formatTokenCount(count('sources/files'))}</dd>
-        <dt class="text-muted-foreground">Duplicate sources skipped</dt>
-        <dd class="text-right tabular-nums">{formatTokenCount(count('sources/duplicates'))}</dd>
-        <dt class="text-muted-foreground">Already in context</dt>
-        <dd class="text-right tabular-nums">
-          {formatTokenCount(count('sources/already_present'))}
-        </dd>
-        <dt class="text-muted-foreground">Runs with no useful note</dt>
-        <dd class="text-right tabular-nums">{formatTokenCount(count('jobs/skipped'))}</dd>
-        <dt class="text-muted-foreground">Stale results discarded</dt>
-        <dd class="text-right tabular-nums">
-          {formatTokenCount(count('jobs/stale') + count('hints/stale'))}
-        </dd>
-        <dt class="text-muted-foreground">Cancelled runs</dt>
-        <dd class="text-right tabular-nums">{formatTokenCount(count('jobs/cancelled'))}</dd>
-        <dt class="text-muted-foreground">Added request input</dt>
-        <dd class="text-right tabular-nums">
-          {count('hints/estimated_tokens') ? '≈ ' : ''}{formatTokenCount(
-            count('hints/input_tokens'),
-          )}
-        </dd>
-      </dl>
+      {#if count('sources/memories') || count('sources/files')}<MetricChart
+          title="Retrieved sources"
+          description="All-time workspace retrieval results."
+          data={[
+            { label: 'Workspace memory', value: count('sources/memories') },
+            { label: 'Project files', value: count('sources/files') },
+          ]}
+          series={[{ key: 'value', label: 'Results', color: chartColors[0] }]}
+          metric="calls"
+          horizontal
+          legend={false}
+          height={116}
+        />{:else}<p class="text-sm text-muted-foreground">No retrieved sources yet.</p>{/if}
+      <Disclosure title="Retrieval details"
+        ><dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <dt class="text-muted-foreground">Memory results</dt>
+          <dd class="text-right tabular-nums">{formatTokenCount(count('sources/memories'))}</dd>
+          <dt class="text-muted-foreground">File excerpts</dt>
+          <dd class="text-right tabular-nums">{formatTokenCount(count('sources/files'))}</dd>
+          <dt class="text-muted-foreground">Duplicate sources skipped</dt>
+          <dd class="text-right tabular-nums">{formatTokenCount(count('sources/duplicates'))}</dd>
+          <dt class="text-muted-foreground">Already in context</dt>
+          <dd class="text-right tabular-nums">
+            {formatTokenCount(count('sources/already_present'))}
+          </dd>
+          <dt class="text-muted-foreground">Runs with no useful note</dt>
+          <dd class="text-right tabular-nums">{formatTokenCount(count('jobs/skipped'))}</dd>
+          <dt class="text-muted-foreground">Stale results discarded</dt>
+          <dd class="text-right tabular-nums">
+            {formatTokenCount(count('jobs/stale') + count('hints/stale'))}
+          </dd>
+          <dt class="text-muted-foreground">Cancelled runs</dt>
+          <dd class="text-right tabular-nums">{formatTokenCount(count('jobs/cancelled'))}</dd>
+          <dt class="text-muted-foreground">Added request input</dt>
+          <dd class="text-right tabular-nums">
+            {count('hints/estimated_tokens') ? '≈ ' : ''}{formatTokenCount(
+              count('hints/input_tokens'),
+            )}
+          </dd>
+        </dl>
+      </Disclosure>
       <p class="text-xs text-muted-foreground">
         Worker usage belongs to this workspace. Added hint input is already included in chat usage.
       </p>
       {#if panel.metrics.Agents.length}<div>
           <h3 class="mb-2 text-sm font-medium">Agent usage</h3>
-          {#each panel.metrics.Agents as agent (`${agent.Agent}:${agent.ModelID}`)}<MemoryAgentUsage
-              {agent}
-            />{/each}
+          <WorkerUsageBreakdown agents={panel.metrics.Agents} {models} />
         </div>{/if}
     {:else if panel.loading}<p role="status" class="text-sm text-muted-foreground">
         Loading Sidekick…

@@ -2,6 +2,90 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "usage analytics",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "recorded model usage grouped for reporting",
+      "source": "docs/usage-analytics.md"
+    },
+    {
+      "term": "usage report",
+      "category": "technical_noun",
+      "approved_forms": [
+        "usage reports"
+      ],
+      "meaning": "bounded usage aggregation for a date range and scope",
+      "source": "atom/usage_report.go"
+    },
+    {
+      "term": "usage bucket",
+      "category": "technical_noun",
+      "approved_forms": [
+        "usage buckets"
+      ],
+      "meaning": "one UTC day and model usage aggregate",
+      "source": "atom/usage_report.go"
+    },
+    {
+      "term": "date range",
+      "category": "technical_noun",
+      "approved_forms": [
+        "date ranges"
+      ],
+      "meaning": "inclusive UTC dates used to select usage records",
+      "source": "usage analytics"
+    },
+    {
+      "term": "UTC day",
+      "category": "technical_noun",
+      "approved_forms": [
+        "UTC days"
+      ],
+      "meaning": "calendar day in the UTC time zone",
+      "source": "usage analytics"
+    },
+    {
+      "term": "read snapshot",
+      "category": "technical_noun",
+      "approved_forms": [
+        "read snapshots"
+      ],
+      "meaning": "consistent database state used by one read operation",
+      "source": "Postgres"
+    },
+    {
+      "term": "chart",
+      "category": "technical_noun",
+      "approved_forms": [
+        "charts"
+      ],
+      "meaning": "graphical quantitative data display",
+      "source": "shadcn chart"
+    },
+    {
+      "term": "LayerChart",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "Svelte chart library used by shadcn-svelte",
+      "source": "LayerChart"
+    },
+    {
+      "term": "model series",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "chart data for one provider-qualified model",
+      "source": "usage charts"
+    },
+    {
+      "term": "usage scope",
+      "category": "technical_noun",
+      "approved_forms": [
+        "usage scopes"
+      ],
+      "meaning": "harness, workspace or conversation boundary of a usage report",
+      "source": "usage analytics"
+    },
+    {
       "term": "settings page",
       "category": "technical_noun",
       "approved_forms": [

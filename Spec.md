@@ -474,6 +474,16 @@ Requirements:
 
 The API gives `CacheHitRate` and `CacheHitPercentage`. The percentage is the rate multiplied by 100. The harness must use the prices from the provider configuration before prices from the database.
 
+The `/usage` API gives usage buckets by UTC day and model. The date range includes `from` and `to`. The maximum date range is 366 days. The default is the last 30 UTC days. The usage scope can be workspace, session, or harness. Use `agent_prefix` for workspace agent usage.
+
+```text
+Usage report limit: 10000 day/model/currency groups
+```
+
+The database gives usage buckets in one read snapshot. `Statistics` uses the usage buckets. If cost data is not available, the cost stays unknown. A cost of 0 is known. Cost estimates keep `Estimated: true`. The usage report does not contain API key IDs.
+
+See `docs/usage-analytics.md`.
+
 ### 6.2 Provider Data
 
 The default provider data is in `providers.json`. The file includes OpenAI and DeepSeek. The ChatGPT coding plan also uses data from the file. Source files must not contain a default provider list or model list.
@@ -1306,6 +1316,7 @@ The initial API paths are:
 - `GET /sessions/{id}/statistics`: read the statistics of a session.
 - `GET /instances/{id}/statistics`: read the statistics of an instance.
 - `GET /statistics`: read the full statistics of the harness.
+- `GET /usage`: read usage buckets by date, model, and scope.
 - `GET /health`: give the status of the harness.
 
 The message input can have text or content items:
@@ -1716,6 +1727,7 @@ type PermissionStore interface {
 }
 
 type UsageStore interface {
+    Report(operationContext context.Context, query atom.UsageQuery) (atom.UsageReport, error)
     Save(operationContext context.Context, record atom.UsageRecord) error
     Session(operationContext context.Context, sessionID atom.SessionID) (atom.Statistics, error)
     Instance(operationContext context.Context, instanceID string) (atom.Statistics, error)

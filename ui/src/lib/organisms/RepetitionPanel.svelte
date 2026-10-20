@@ -12,7 +12,9 @@
   import SelectField from '../molecules/SelectField.svelte';
   import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
-  import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import WorkerUsageBreakdown from '../molecules/WorkerUsageBreakdown.svelte';
+  import MetricChart from '../molecules/charts/MetricChart.svelte';
+  import { chartColors } from '../atoms/usage';
   import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
   import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
@@ -307,15 +309,23 @@
         {panel.actionError}
       </p>{/if}
     {#if panel.metrics}
-      <dl class="grid grid-cols-2 gap-5 sm:grid-cols-4">
-        {#each [{ label: 'Low reminders', key: 'reminders/low' }, { label: 'Medium reminders', key: 'reminders/medium' }, { label: 'High recoveries', key: 'reminders/high' }, { label: 'Deferred reminders', key: 'reminders/deferred' }] as item}<div
-          >
-            <dt class="text-xs text-muted-foreground">{item.label}</dt>
-            <dd class="mt-1 text-xl font-medium tabular-nums">
-              {formatTokenCount(count(item.key))}
-            </dd>
-          </div>{/each}
-      </dl>
+      {#if count('reminders/low') || count('reminders/medium') || count('reminders/high')}<MetricChart
+          title="Delivered reminders"
+          description="All-time workspace deliveries by reminder level."
+          data={[
+            ['Low', 'reminders/low'],
+            ['Medium', 'reminders/medium'],
+            ['High', 'reminders/high'],
+          ].map(([label, key]) => ({ label, value: count(key) }))}
+          series={[{ key: 'value', label: 'Reminders', color: chartColors[0] }]}
+          metric="calls"
+          horizontal
+          legend={false}
+          height={144}
+        />{:else}<p class="text-sm text-muted-foreground">No reminders delivered yet.</p>{/if}
+      {#if count('reminders/deferred')}<p class="text-xs text-muted-foreground">
+          {formatTokenCount(count('reminders/deferred'))} deferred reminders
+        </p>{/if}
       <div class="grid grid-cols-1 gap-4 border-y border-border py-4 sm:grid-cols-3">
         <div>
           <p class="text-xs text-muted-foreground">Reminder input added</p>
@@ -375,9 +385,7 @@
       </dl>
       {#if panel.metrics.Agents.length}<div>
           <h3 class="mb-2 text-sm font-medium">Recovery agents</h3>
-          {#each panel.metrics.Agents as agent (`${agent.Agent}/${agent.ModelID}`)}<MemoryAgentUsage
-              {agent}
-            />{/each}
+          <WorkerUsageBreakdown agents={panel.metrics.Agents} {models} />
         </div>{/if}
     {/if}
     <PluginPanelFooter

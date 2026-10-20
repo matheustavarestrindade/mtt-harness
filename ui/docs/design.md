@@ -221,6 +221,18 @@ See `messages.md` for the libraries, content limits, and source buttons.
 
 ## Settings
 
+The Usage section uses `shadcn-svelte` charts with LayerChart. The `/usage` API gives usage buckets by UTC day and model. The date range, provider, model, and usage scope controls select the data.
+
+```text
+Token total: Input + Output
+Reasoning: already included in Output
+CacheRead and CacheWrite: a separate metric
+```
+
+If cost data is not available, the cost stays unknown. A cost of 0 is known. Currencies stay different. The `Other models` model series has the usage for models not in the other model series. A data table gives correct values.
+
+Memory, Sidekick, `Instructions`, and Watchers use `WorkerUsageBreakdown`. The `PluginMetrics` response gives the charts for work status and `low`, `medium`, and `high` reminders. The charts from `PluginMetrics` do not give usage by UTC day. The UI uses `import()` for chart code and removes charts when the view closes. See `docs/usage-analytics.md` for the API contract.
+
 The settings pages use `SettingsPageTitle`. The settings pages have the same page title dimensions. `SettingsDialog` gives the same left edge to the settings pages.
 
 The `Tabs` component controls the settings pages and Watcher sections. The tab highlight stays in the tab track. The UI shows the selected settings page.

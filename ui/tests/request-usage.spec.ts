@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { latestRequestUsage } from '../src/lib/atoms/request-usage';
 import type { Message, Session, Usage } from '../src/lib/atoms/types';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate, openWorkbenchAction } from './helpers';
+import { chooseSelectOption, connectAndCreate, openWorkbenchAction } from './helpers';
 
 const report: Usage = {
   Input: 30000,
@@ -97,14 +97,16 @@ test('show one reported request instead of cumulative input, output, or cache to
   await openWorkbenchAction(page, 'Settings');
   await page.getByRole('dialog').getByRole('tab', { name: 'Usage', exact: true }).click();
   const overview = page.getByRole('region', { name: 'Usage overview' });
-  await expect(overview).toContainText('Total input tokens');
-  await expect(
-    overview.getByText('Total input tokens', { exact: true }).locator('..'),
-  ).toContainText('2,000,000');
-  await expect(overview.getByText('Cache read', { exact: true }).locator('..')).toContainText(
+  await chooseSelectOption(overview.getByLabel('Scope', { exact: true }), 'session');
+  await overview.getByRole('button', { name: 'Usage details', exact: true }).click();
+  const breakdown = overview.getByLabel('Usage breakdown');
+  await expect(breakdown.getByText('Input', { exact: true }).locator('..')).toContainText(
+    '2,000,000',
+  );
+  await expect(breakdown.getByText('Cache read', { exact: true }).locator('..')).toContainText(
     '500,000',
   );
-  await expect(overview).toContainText('Overall cache hit');
+  await expect(breakdown).toContainText('Cache hit');
 });
 
 test('keep the measured model limit through a selection change and accept smaller new reports', async ({

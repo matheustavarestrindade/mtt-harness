@@ -20,6 +20,7 @@ import type { WorkspacePluginState } from '../../atoms/plugins';
 import type { ProcessRecord } from '../../atoms/processes';
 import type { PluginActivityPage } from '../../atoms/plugin-activity';
 import type { HistoryPage, HistoryQuery, SessionViewState } from '../../atoms/session-view';
+import type { UsageQuery, UsageReport } from '../../atoms/usage';
 
 export class ApiError extends Error {
   constructor(
@@ -366,6 +367,11 @@ export class HarnessApi {
   }
   harnessStatistics(signal?: AbortSignal) {
     return this.request<Statistics>('statistics', 'GET', undefined, signal);
+  }
+  usageReport(query: UsageQuery, signal?: AbortSignal) {
+    const parameters = new URLSearchParams();
+    for (const [name, value] of Object.entries(query)) if (value) parameters.set(name, value);
+    return this.request<UsageReport>(`usage?${parameters}`, 'GET', undefined, signal);
   }
   instanceStatistics(instanceID: string, signal?: AbortSignal) {
     return this.request<Statistics>(

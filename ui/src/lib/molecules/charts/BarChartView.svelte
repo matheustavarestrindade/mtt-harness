@@ -1,0 +1,137 @@
+<script lang="ts">
+  import { BarChart } from 'layerchart';
+  import { scaleBand } from 'd3-scale';
+  import * as Chart from '../../atoms/ui/chart';
+  import type { ChartDatum, ChartSeries, UsageMetric } from '../../atoms/usage';
+  import { formatUsageDay, usageValueLabel } from '../../atoms/usage';
+  let {
+    data,
+    series,
+    metric = 'tokens',
+    currency = '',
+    horizontal = false,
+    dates = false,
+    height = 240,
+  }: {
+    data: ChartDatum[];
+    series: ChartSeries[];
+    metric?: UsageMetric;
+    currency?: string;
+    horizontal?: boolean;
+    dates?: boolean;
+    height?: number;
+  } = $props();
+  const configuration = $derived(
+    Object.fromEntries(series.map((item) => [item.key, { label: item.label, color: item.color }])),
+  );
+  const positive = $derived(
+    Math.max(
+      0,
+      ...data.map((row) =>
+        series.reduce(
+          (sum, item) =>
+            sum + Math.max(0, typeof row[item.key] === 'number' ? (row[item.key] as number) : 0),
+          0,
+        ),
+      ),
+    ),
+  );
+  const minimum = $derived(
+    Math.min(
+      0,
+      ...data.map((row) =>
+        series.reduce(
+          (sum, item) =>
+            sum + Math.min(0, typeof row[item.key] === 'number' ? (row[item.key] as number) : 0),
+          0,
+        ),
+      ),
+    ),
+  );
+  const maximum = $derived(positive || (!minimum ? 1 : 0));
+  const valueTicks = $derived(
+    metric !== 'cost' && maximum - minimum < 5
+      ? Array.from(
+          { length: Math.ceil(maximum) - Math.floor(minimum) + 1 },
+          (_, index) => Math.floor(minimum) + index,
+        )
+      : 4,
+  );
+  const chartData = $derived(
+    data.map((row, index) => ({ ...row, axisKey: dates ? row.label : `row-${index}` })),
+  );
+  const labelsByKey = $derived(new Map(chartData.map((row) => [row.axisKey, row.label])));
+  const labels = $derived(chartData.map((row) => row.axisKey));
+  const ticks = $derived(
+    dates
+      ? labels.filter((_, index) => index % Math.max(1, Math.ceil(labels.length / 5)) === 0)
+      : undefined,
+  );
+  const formatAxis = (value: unknown) =>
+    metric === 'cost'
+      ? new Intl.NumberFormat(undefined, {
+          notation: 'compact',
+          maximumFractionDigits: Number(value) !== 0 && Math.abs(Number(value)) < 0.01 ? 6 : 2,
+        }).format(Number(value))
+      : usageValueLabel(Number(value), metric, currency, true);
+  const formatCategory = (value: unknown) => {
+    const label = labelsByKey.get(String(value)) ?? String(value);
+    const characters = Array.from(label);
+    return dates
+      ? formatUsageDay(label, true)
+      : characters.length > 18
+        ? `${characters.slice(0, 17).join('')}…`
+        : label;
+  };
+</script>
+
+<Chart.Container
+  config={configuration}
+  class="min-w-0 w-full aspect-auto"
+  style={`height:${height}px`}
+>
+  <BarChart
+    data={chartData}
+    {series}
+    orientation={horizontal ? 'horizontal' : 'vertical'}
+    x={horizontal ? undefined : 'axisKey'}
+    y={horizontal ? 'axisKey' : undefined}
+    xScale={horizontal ? undefined : scaleBand().padding(0.2)}
+    yScale={horizontal ? scaleBand().padding(0.35) : undefined}
+    xDomain={horizontal ? [minimum, maximum] : undefined}
+    yDomain={horizontal ? undefined : [minimum, maximum]}
+    seriesLayout="stack"
+    motion="none"
+    padding={{ left: horizontal ? 130 : 42, right: 12, top: 12, bottom: 28 }}
+    props={{
+      xAxis: {
+        format: horizontal ? formatAxis : formatCategory,
+        ticks: horizontal ? valueTicks : ticks,
+      },
+      yAxis: {
+        format: horizontal ? formatCategory : formatAxis,
+        ticks: horizontal ? undefined : valueTicks,
+      },
+      tooltip: { context: { touchEvents: 'pan-y' } },
+    }}
+  >
+    {#snippet tooltip({ context })}
+      <Chart.Tooltip
+        role="tooltip"
+        label={dates
+          ? formatUsageDay(String(context.tooltip.data?.label ?? data[0]?.label))
+          : String(context.tooltip.data?.label ?? '')}
+        class="max-w-[min(22rem,calc(100vw-2rem))] [overflow-wrap:anywhere]"
+      >
+        {#snippet formatter({ value, name, item })}
+          <span class="inline-block size-2.5 shrink-0 rounded-sm" style:background={item.color}
+          ></span>
+          <span class="min-w-0 flex-1 break-words text-muted-foreground">{name}</span>
+          <span class="shrink-0 tabular-nums"
+            >{usageValueLabel(typeof value === 'number' ? value : null, metric, currency)}</span
+          >
+        {/snippet}
+      </Chart.Tooltip>
+    {/snippet}
+  </BarChart>
+</Chart.Container>

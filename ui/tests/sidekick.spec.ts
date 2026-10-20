@@ -88,6 +88,7 @@ test('validate retrieval sources and display observed activity', async ({ page }
   await expect(panel.getByText('Worker tokens', { exact: true }).locator('..')).toContainText(
     '180',
   );
+  await panel.getByRole('button', { name: 'Worker details', exact: true }).click();
   await panel.locator('[data-slot="collapsible-trigger"]').filter({ hasText: 'Sidekick' }).click();
   await expect(panel.getByText('Input tokens', { exact: true }).locator('..')).toContainText('120');
   await expect(panel.getByText('Cache read', { exact: true }).locator('..')).toContainText('300');

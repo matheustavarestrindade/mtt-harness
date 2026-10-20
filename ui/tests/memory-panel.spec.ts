@@ -78,6 +78,7 @@ test('show uncached worker input and output with cache separate and reasoning in
   await expect(panel.getByText('Reported worker tokens', { exact: true })).toBeVisible();
   await expect(panel.locator('[title="650,723"]')).toBeVisible();
   await expect(panel.getByText('97 calls · Workspace total', { exact: true })).toBeVisible();
+  await panel.getByRole('button', { name: 'Worker details', exact: true }).click();
   await panel.locator('[data-slot="collapsible-trigger"]').filter({ hasText: 'Compactor' }).click();
   const details = panel.getByRole('region', { name: 'Memory agent usage' });
   await expect(details.getByText('596,336', { exact: true })).toBeVisible();
@@ -87,6 +88,7 @@ test('show uncached worker input and output with cache separate and reasoning in
   );
   await expect(details.getByText('Cache write', { exact: true }).locator('..')).toContainText('0');
   await expect(details.getByText('Reasoning (included)', { exact: true })).toBeVisible();
+  await panel.getByRole('button', { name: 'Activity details', exact: true }).click();
   await expect(panel.getByRole('region', { name: 'Memory activity' })).toContainText('≈ 752,031');
 });
 
@@ -122,6 +124,7 @@ test('show real memory counters and agent usage without double-counting versions
   await expect(summary).toContainText('1,500');
   await expect(summary).toContainText('$0.0125');
   await expect(panel.getByRole('region', { name: 'Memory jobs' })).toContainText('Prepared');
+  await panel.getByRole('button', { name: 'Worker details', exact: true }).click();
   await panel.locator('[data-slot="collapsible-trigger"]').filter({ hasText: 'Compactor' }).click();
   const agentUsage = panel.getByRole('region', { name: 'Memory agent usage' });
   await expect(agentUsage.getByText('Input tokens', { exact: true }).locator('..')).toContainText(
@@ -134,6 +137,7 @@ test('show real memory counters and agent usage without double-counting versions
     '200',
   );
   await expect(panel.getByRole('region', { name: 'Memory agent usage' })).toContainText('2.3 s');
+  await panel.getByRole('button', { name: 'Activity details', exact: true }).click();
   await expect(panel.getByRole('region', { name: 'Memory activity' })).toContainText('24,000');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('memory-panel.png'), fullPage: true });

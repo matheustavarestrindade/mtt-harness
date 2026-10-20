@@ -12,9 +12,9 @@ test('configure workspace repetition with themed selectors and keep the draft', 
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('tab', { name: 'Instructions', exact: true }).click();
   const panel = dialog.getByRole('region', { name: 'Spaced repetition', exact: true });
-  await expect(panel.getByRole('status')).toHaveText('Off');
+  await expect(panel.getByRole('status').filter({ hasText: /^Off$/ })).toBeVisible();
   await panel.getByRole('button', { name: 'Enable instruction reminders' }).click();
-  await expect(panel.getByRole('status')).toHaveText('On');
+  await expect(panel.getByRole('status').filter({ hasText: /^On$/ })).toBeVisible();
   expect(fixture.repetitionUpdates[0].patch).toEqual({ enabled: true });
   await panel.getByRole('button', { name: 'Configure reminders' }).click();
   await chooseSelectOption(panel.getByLabel('Growth interval', { exact: true }), 'tokens');
@@ -84,8 +84,9 @@ test('show recorded repetition metrics and recovery costs at narrow widths', asy
     panel.getByText('Recovery worker cost', { exact: true }).locator('..'),
   ).toContainText('≈ $0.015');
   await expect(panel.getByText('500', { exact: true })).toBeVisible();
+  await panel.getByRole('button', { name: 'Worker details', exact: true }).click();
   await panel.getByText('Instruction recovery', { exact: true }).click();
-  await expect(panel.getByText('400', { exact: true })).toBeVisible();
+  await expect(panel.getByText('Input tokens', { exact: true }).locator('..')).toContainText('400');
   await expect(panel.getByText('Cache read', { exact: true }).locator('..')).toContainText('200');
   await expect(panel.getByText('Cache write', { exact: true }).locator('..')).toContainText('50');
   await panel.getByRole('button', { name: 'Configure reminders' }).click();

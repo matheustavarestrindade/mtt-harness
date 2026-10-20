@@ -20,6 +20,7 @@ test('show zero cost for a new chat while preserving unknown and reported costs'
   await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('tab', { name: 'Usage', exact: true }).click();
+  await chooseSelectOption(dialog.getByLabel('Scope', { exact: true }), 'session');
   await expect(dialog.getByText('0.0', { exact: true })).toBeVisible();
 
   Object.assign(fixture.sessionUsage, { Calls: 1, Input: 20, Output: 12 });
@@ -47,18 +48,26 @@ test('settings stay in a modal, preserve the draft, and show real usage scopes',
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
   await dialog.getByRole('tab', { name: 'Usage', exact: true }).click();
-  await expect(dialog.getByLabel('Usage scope')).toHaveAttribute('data-value', 'session');
-  await expect(dialog.getByRole('region', { name: 'Usage overview' })).toContainText('Unavailable');
-  await chooseSelectOption(dialog.getByLabel('Usage scope'), 'workspace');
-  await expect(dialog.getByText('Total input tokens', { exact: true }).locator('..')).toContainText(
-    '1,000',
+  await expect(dialog.getByLabel('Scope', { exact: true })).toHaveAttribute(
+    'data-value',
+    'workspace',
   );
-  await expect(dialog.getByText('Cache read', { exact: true }).locator('..')).toContainText('500');
-  await expect(dialog.getByText('Cache write', { exact: true }).locator('..')).toContainText('100');
-  await expect(dialog.getByText('31.3%', { exact: true })).toBeVisible();
-  await expect(dialog.getByText('$0.125', { exact: true })).toBeVisible();
-  await chooseSelectOption(dialog.getByLabel('Usage scope'), 'harness');
-  await expect(dialog.getByText('$0.75 + €0.50', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Usage details', exact: true }).click();
+  const breakdown = dialog.getByLabel('Usage breakdown', { exact: true });
+  await expect(breakdown.getByText('Input', { exact: true }).locator('..')).toContainText('1,000');
+  await expect(breakdown.getByText('Cache read', { exact: true }).locator('..')).toContainText(
+    '500',
+  );
+  await expect(breakdown.getByText('Cache write', { exact: true }).locator('..')).toContainText(
+    '100',
+  );
+  await expect(breakdown.getByText('31.3%', { exact: true })).toBeVisible();
+  await expect(
+    dialog.getByLabel('Usage totals').getByText('$0.125', { exact: true }),
+  ).toBeVisible();
+  await chooseSelectOption(dialog.getByLabel('Scope', { exact: true }), 'harness');
+  await expect(dialog.getByLabel('Usage totals')).toContainText('$0.75');
+  await expect(dialog.getByLabel('Usage totals')).toContainText('€0.50');
   if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 700 });
   for (const button of await dialog
     .getByRole('navigation', { name: 'Settings sections' })
@@ -138,18 +147,22 @@ test('failed usage and settings requests remain visible and recover on retry', a
   failed = false;
   await dialog.getByRole('button', { name: 'Retry', exact: true }).click();
   await expect(dialog.getByLabel('Agent depth limit', { exact: true })).toHaveValue('2');
-  await page.route(/\/api\/sessions\/[^/]+\/statistics$/, (route) =>
-    route.fulfill({
-      status: 503,
-      contentType: 'application/json',
-      body: JSON.stringify({ error: 'Usage temporarily unavailable' }),
-    }),
+  await page.route(
+    (url) => url.pathname === '/api/usage' && url.searchParams.has('session_id'),
+    (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Usage temporarily unavailable' }),
+      }),
   );
   await dialog.getByRole('tab', { name: 'Usage', exact: true }).click();
+  await chooseSelectOption(dialog.getByLabel('Scope', { exact: true }), 'session');
   await expect(dialog.getByRole('alert')).toContainText('Usage temporarily unavailable');
-  await chooseSelectOption(dialog.getByLabel('Usage scope'), 'workspace');
+  await chooseSelectOption(dialog.getByLabel('Scope', { exact: true }), 'workspace');
   await expect(dialog.getByRole('alert')).toHaveCount(0);
-  await expect(dialog.getByText('Total input tokens', { exact: true }).locator('..')).toContainText(
-    '1,000',
-  );
+  await dialog.getByRole('button', { name: 'Usage details', exact: true }).click();
+  await expect(
+    dialog.getByLabel('Usage breakdown').getByText('Input', { exact: true }).locator('..'),
+  ).toContainText('1,000');
 });

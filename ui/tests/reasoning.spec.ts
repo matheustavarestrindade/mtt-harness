@@ -190,5 +190,11 @@ test('show subscription access without API rates and label estimated usage', asy
     .getByRole('navigation', { name: 'Settings sections' })
     .getByRole('tab', { name: 'Usage', exact: true })
     .click();
-  await expect(page.getByRole('dialog')).toContainText('Estimated cost');
+  const usage = page.getByRole('region', { name: 'Usage overview' });
+  await chooseSelectOption(usage.getByLabel('Scope', { exact: true }), 'session');
+  await expect(usage.getByLabel('Usage totals')).toContainText('≈ $0.001');
+  await usage.getByRole('tab', { name: 'Cost', exact: true }).click();
+  await expect(usage.getByRole('region', { name: 'Daily cost', exact: true })).toContainText(
+    'includes estimates',
+  );
 });

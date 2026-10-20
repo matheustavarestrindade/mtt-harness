@@ -14,7 +14,7 @@
   import { Button } from '../atoms/ui/button';
   import * as Tabs from '../atoms/ui/tabs';
   import type { SettingsSection } from '../atoms/settings';
-  import type { Instance, Session } from '../atoms/types';
+  import type { Instance, Session, Model } from '../atoms/types';
   import type { HarnessApi } from '../molecules/api/client';
   import ConnectionForm from '../molecules/ConnectionForm.svelte';
   import ProvidersPanel from './ProvidersPanel.svelte';
@@ -31,6 +31,7 @@
     api,
     instance,
     session,
+    models = [],
     initialBase,
     initialToken,
     busy,
@@ -44,6 +45,7 @@
     api: HarnessApi | null;
     instance: Instance | null;
     session: Session | null;
+    models?: Model[];
     initialBase: string;
     initialToken: string;
     busy: boolean;
@@ -168,6 +170,7 @@
                   {api}
                   {instance}
                   {session}
+                  {models}
                 />{:else}{@render connectionRequired()}{/if}{/if}</Tabs.Content
           >
           <Tabs.Content value="providers" class="m-0 min-w-0"

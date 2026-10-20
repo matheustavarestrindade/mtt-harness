@@ -767,6 +767,7 @@
   instance={workbench.instance}
   session={workbench.session}
   initialBase={preferences.base}
+  models={workbench.catalog}
   initialToken={preferences.token}
   busy={busy === 'connect'}
   error={workbench.connection === 'error' ? workbench.error : ''}

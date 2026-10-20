@@ -127,6 +127,9 @@ ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS duration_ms bigint NOT NULL D
 ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT '';
 CREATE UNIQUE INDEX IF NOT EXISTS usage_request_once ON usage_records (instance_id, request_id) WHERE request_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS usage_session_request ON usage_records(session_id,request_id) WHERE request_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS usage_time_model ON usage_records(created_at,model_id);
+CREATE INDEX IF NOT EXISTS usage_instance_time_model ON usage_records(instance_id,created_at,model_id);
+CREATE INDEX IF NOT EXISTS usage_session_time ON usage_records(session_id,created_at);
 ALTER TABLE permissions ADD COLUMN IF NOT EXISTS session_id text NOT NULL DEFAULT '';
 ALTER TABLE permissions ADD COLUMN IF NOT EXISTS target text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS providers (
