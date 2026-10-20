@@ -2,6 +2,7 @@
   import { BarChart } from 'layerchart';
   import { scaleBand } from 'd3-scale';
   import * as Chart from '../../atoms/ui/chart';
+  import type { TooltipPayload } from '../../atoms/ui/chart/chart-utils';
   import type { ChartDatum, ChartSeries, UsageMetric } from '../../atoms/usage';
   import { formatUsageDay, usageValueLabel } from '../../atoms/usage';
   let {
@@ -12,6 +13,7 @@
     horizontal = false,
     dates = false,
     height = 240,
+    containerWidth = 0,
   }: {
     data: ChartDatum[];
     series: ChartSeries[];
@@ -20,6 +22,7 @@
     horizontal?: boolean;
     dates?: boolean;
     height?: number;
+    containerWidth?: number;
   } = $props();
   const configuration = $derived(
     Object.fromEntries(series.map((item) => [item.key, { label: item.label, color: item.color }])),
@@ -49,6 +52,14 @@
     ),
   );
   const maximum = $derived(positive || (!minimum ? 1 : 0));
+  // The same chart renders in wide settings pages and narrow sidebars. Keep
+  // category labels within a quarter of the actual container, not the viewport.
+  const categoryPadding = $derived(containerWidth > 0 ? Math.min(130, containerWidth / 4) : 130);
+  const labelStyle = {
+    fontSize: '12px',
+    fontFamily: 'var(--font-sans)',
+    fontWeight: '400',
+  } as CSSStyleDeclaration;
   const valueTicks = $derived(
     metric !== 'cost' && maximum - minimum < 5
       ? Array.from(
@@ -102,7 +113,7 @@
     yDomain={horizontal ? undefined : [minimum, maximum]}
     seriesLayout="stack"
     motion="none"
-    padding={{ left: horizontal ? 130 : 42, right: 12, top: 12, bottom: 28 }}
+    padding={{ left: horizontal ? categoryPadding : 42, right: 12, top: 12, bottom: 28 }}
     props={{
       xAxis: {
         format: horizontal ? formatAxis : formatCategory,
@@ -110,7 +121,10 @@
       },
       yAxis: {
         format: horizontal ? formatCategory : formatAxis,
-        ticks: horizontal ? undefined : valueTicks,
+        ticks: horizontal ? labels : valueTicks,
+        tickLabelProps: horizontal
+          ? { truncate: { maxWidth: Math.max(0, categoryPadding - 10), style: labelStyle } }
+          : undefined,
       },
       tooltip: { context: { touchEvents: 'pan-y' } },
     }}
@@ -123,7 +137,15 @@
           : String(context.tooltip.data?.label ?? '')}
         class="max-w-[min(22rem,calc(100vw-2rem))] [overflow-wrap:anywhere]"
       >
-        {#snippet formatter({ value, name, item })}
+        {#snippet formatter({
+          value,
+          name,
+          item,
+        }: {
+          value: unknown;
+          name: string;
+          item: TooltipPayload;
+        })}
           <span class="inline-block size-2.5 shrink-0 rounded-sm" style:background={item.color}
           ></span>
           <span class="min-w-0 flex-1 break-words text-muted-foreground">{name}</span>

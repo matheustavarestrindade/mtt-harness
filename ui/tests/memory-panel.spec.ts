@@ -52,6 +52,74 @@ function metrics(workspaceID: string): MemoryMetrics {
   };
 }
 
+test('use the Memory chart container width instead of a desktop label gutter', async ({
+  page,
+}, testInfo) => {
+  const fixture = await mockHarness(page);
+  await connectAndCreate(page);
+  fixture.memoryMetrics.set(fixture.instances[0].ID, metrics(fixture.instances[0].ID));
+  const widths = testInfo.project.name === 'desktop' ? [1280, 1600] : [390, 320];
+  for (const [index, width] of widths.entries()) {
+    await page.setViewportSize({ width, height: 900 });
+    const panel = await openMemory(page);
+    if (index === 0)
+      await panel.getByRole('button', { name: 'Refresh memory', exact: true }).click();
+    for (const title of ['Jobs by status', 'Tokens by model']) {
+      const chart = panel.getByRole('region', { name: title, exact: true });
+      await expect(chart.locator('[data-slot="chart"]')).toBeVisible();
+      await expect
+        .poll(
+          () =>
+            chart.evaluate((element) => {
+              const container = element
+                .querySelector('[data-slot="chart"]')!
+                .getBoundingClientRect();
+              const hitAreas = Array.from(element.querySelectorAll('.lc-tooltip-rect')).map(
+                (mark) => mark.getBoundingClientRect().width,
+              );
+              return Math.max(0, ...hitAreas) / container.width;
+            }),
+          {
+            message: `${title}: the bar plot should retain at least 70% of its container at ${width}px`,
+          },
+        )
+        .toBeGreaterThanOrEqual(0.69);
+      if (title === 'Tokens by model') {
+        const label = chart.locator('.lc-axis-tick-label').filter({ hasText: /test/ });
+        await expect(label).toBeVisible();
+        const labelBounds = (await label.boundingBox())!,
+          containerBounds = (await chart.locator('[data-slot="chart"]').boundingBox())!;
+        expect(labelBounds.x).toBeGreaterThanOrEqual(containerBounds.x - 1);
+        expect(labelBounds.x + labelBounds.width).toBeLessThanOrEqual(
+          containerBounds.x + containerBounds.width * 0.25,
+        );
+      }
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+  const panel = page.getByRole('region', { name: 'Workspace memory', exact: true });
+  const workers = panel.getByRole('region', { name: 'Tokens by model', exact: true });
+  const mark = workers.locator('.lc-bars .lc-bar').first();
+  await mark.scrollIntoViewIfNeeded();
+  const bounds = (await mark.boundingBox())!;
+  if (testInfo.project.name === 'mobile')
+    await page.touchscreen.tap(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  else await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await expect(page.getByRole('tooltip')).toContainText(
+    'test/worker-model-with-a-long-descriptive-identifier',
+  );
+  await expect(page.getByRole('tooltip')).toContainText('1,500');
+  await page.mouse.move(0, 0);
+  await workers.getByRole('button', { name: 'View data', exact: true }).click();
+  await expect(workers.getByRole('table')).toContainText(
+    'test/worker-model-with-a-long-descriptive-identifier',
+  );
+  await expect(workers.getByRole('table')).toContainText('1,500');
+  await page.screenshot({ path: testInfo.outputPath('memory-chart-width.png') });
+});
+
 test('show uncached worker input and output with cache separate and reasoning included once', async ({
   page,
 }) => {

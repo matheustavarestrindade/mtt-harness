@@ -35,6 +35,15 @@ Field help, enabled state -> Tooltip, Switch
 
 The control audit applies to `ui/src`. Only `atoms/ui` has `button`, `input`, `select`, and `textarea`. The UI uses HTML for message content.
 
+## Charts
+
+```text
+Horizontal label space: min(130px, 25% of chart container width)
+Category labels: LayerChart pixel-width truncation
+Category ticks: explicit row keys, including a single category
+Full labels and values: Chart.Tooltip and View data
+```
+
 ## Tab Track
 
 ```text

@@ -28,6 +28,7 @@
   type ChartComponent = (typeof import('./BarChartView.svelte'))['default'];
   let Renderer = $state<ChartComponent | null>(null),
     error = $state('');
+  let containerWidth = $state(0);
   const heading = $props.id();
   const hasValues = $derived(
     data.some((row) => series.some((item) => typeof row[item.key] === 'number')),
@@ -58,6 +59,7 @@
     </p>
   {:else}
     <div
+      bind:clientWidth={containerWidth}
       role="img"
       aria-labelledby={heading}
       aria-label={`${title}. Exact values are available in View data.`}
@@ -72,6 +74,7 @@
           {horizontal}
           {dates}
           {height}
+          {containerWidth}
         />{:else if error}<p role="status" class="text-xs text-muted-foreground">
           {error}
         </p>{:else}<p role="status" class="py-8 text-xs text-muted-foreground">
