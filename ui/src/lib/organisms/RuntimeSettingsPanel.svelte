@@ -6,18 +6,20 @@
   import { Input } from '../atoms/ui/input';
   import { Label } from '../atoms/ui/label';
   import type { Instance } from '../atoms/types';
-  import { workspaceName } from '../atoms/format';
   import {
     runtimeSettingFields,
     type RuntimeSettingKey,
     type RuntimeSettings,
+    type SettingsScope,
   } from '../atoms/settings';
   import type { HarnessApi } from '../molecules/api/client';
-  import SelectField from '../molecules/SelectField.svelte';
   import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
 
-  let { api, instance }: { api: HarnessApi; instance: Instance | null } = $props();
-  let scope = $state('harness');
+  let {
+    api,
+    instance,
+    scope = 'harness',
+  }: { api: HarnessApi; instance: Instance | null; scope?: SettingsScope } = $props();
   let revision = $state(0);
   let values = $state<RuntimeSettings>({});
   let saved = $state<RuntimeSettings>({});
@@ -101,46 +103,36 @@
   <SettingsPageTitle
     icon={SlidersHorizontal}
     title="General"
-    description="Set limits for the harness or the selected workspace. Workspace settings take priority."
+    description={scope === 'workspace'
+      ? 'Set workspace limits. Empty values use the harness defaults.'
+      : 'Set default limits for the harness.'}
   />
-  <div class="space-y-2">
-    <Label for="settings-scope">Settings scope</Label>
-    <SelectField
-      id="settings-scope"
-      bind:value={scope}
-      disabled={!!busy}
-      options={[
-        { value: 'harness', label: 'Entire harness' },
-        ...(instance
-          ? [{ value: 'workspace', label: `Workspace · ${workspaceName(instance.Workspace)}` }]
-          : []),
-      ]}
-    />
-  </div>
   {#if loading}<p role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
       <LoaderCircle class="size-4 animate-spin" />Loading settings…
     </p>
   {:else if error}
     <p role="alert" class="break-words text-sm text-destructive">{error}</p>
-    <Button variant="outline" class="mt-4 h-11" onclick={() => revision++}>Retry</Button>
+    <Button variant="outline" class="h-11" onclick={() => revision++}>Retry</Button>
   {:else}
-    <div class="space-y-6">
+    <div class="divide-y divide-border border-t border-border">
       {#each runtimeSettingFields as field (field.key)}
         <form
-          class="rounded-xl border border-border p-4 sm:p-5"
+          class="min-w-0 space-y-3 py-5 last:pb-0"
+          aria-label={`${field.label} settings`}
           onsubmit={(event) => {
             event.preventDefault();
             void saveRuntimeSetting(field.key);
           }}
         >
-          <Label for={`setting-${field.key}`}>{field.label}</Label>
+          <Label id={`setting-label-${field.key}`} for={`setting-${field.key}`}>{field.label}</Label
+          >
           <p
             id={`setting-description-${field.key}`}
-            class="mt-2 text-xs leading-5 text-muted-foreground"
+            class="text-xs leading-5 text-muted-foreground"
           >
             {field.description}
           </p>
-          <div class="mt-4 flex items-center gap-3">
+          <div class="flex items-center gap-3">
             <Input
               id={`setting-${field.key}`}
               type="number"
@@ -165,13 +157,10 @@
               {#if busy === field.key}<LoaderCircle class="size-4 animate-spin" />{/if}Save
             </Button>
           </div>
-          <p class="mt-3 text-xs leading-5 text-muted-foreground">
+          <p class="text-xs leading-5 text-muted-foreground">
             Leave empty to use the default. {inheritedLabel(field.key)}.
           </p>
-          {#if fieldErrors[field.key]}<p
-              role="alert"
-              class="mt-3 break-words text-sm text-destructive"
-            >
+          {#if fieldErrors[field.key]}<p role="alert" class="break-words text-sm text-destructive">
               {fieldErrors[field.key]}
             </p>{/if}
         </form>

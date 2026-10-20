@@ -5,7 +5,6 @@
   import { Input } from '../atoms/ui/input';
   import { Switch } from '../atoms/ui/switch';
   import * as Tabs from '../atoms/ui/tabs';
-  import { workspaceName } from '../atoms/format';
   import { createClientID } from '../atoms/identifiers';
   import type { Instance, Session, Model } from '../atoms/types';
   import type {
@@ -21,6 +20,7 @@
   import WorkerUsageBreakdown from '../molecules/WorkerUsageBreakdown.svelte';
   import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
   import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
+  import PluginHeaderControls from '../molecules/PluginHeaderControls.svelte';
   import Disclosure from '../molecules/Disclosure.svelte';
   import WatcherEditor from './WatcherEditor.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
@@ -203,27 +203,18 @@
 <section aria-label="Watcher settings" class="min-w-0 space-y-5">
   <SettingsPageTitle icon={Eye} title="Watchers" description="Automatic workspace reviews.">
     {#snippet actions()}
-      {#if panel.state}<div class="flex min-h-11 shrink-0 items-center gap-3">
-          <span role="status" class="text-xs text-muted-foreground"
-            >{panel.state.Pending ? 'Updating…' : panel.state.Enabled ? 'On' : 'Off'}</span
-          >
-          <Switch
-            aria-label="Watchers enabled"
-            {disabled}
-            bind:checked={
-              () => panel.state?.RequestedEnabled ?? false,
-              (checked) => void panel.configure({ enabled: checked })
-            }
-          />
-        </div>{/if}
+      {#if panel.state}<PluginHeaderControls
+          enabled={panel.state.RequestedEnabled}
+          status={panel.state.Pending ? 'Updating…' : panel.state.Enabled ? 'On' : 'Off'}
+          toggleLabel="Watchers enabled"
+          {disabled}
+          onToggle={(enabled) => void panel.configure({ enabled })}
+        />{/if}
     {/snippet}
   </SettingsPageTitle>
   {#if !instance}<p class="text-sm text-muted-foreground">
       Select a workspace to configure watchers.
     </p>{:else}
-    <p class="break-words text-xs text-muted-foreground" title={instance.Workspace}>
-      {workspaceName(instance.Workspace)} · Workspace settings
-    </p>
     {#if panel.error}<p role="alert" class="break-words text-sm text-destructive">
         {panel.error}
       </p>{/if}

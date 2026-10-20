@@ -17,7 +17,7 @@ test('show zero cost for a new chat while preserving unknown and reported costs'
   await expect(usage.getByText('0.0', { exact: true })).toBeVisible();
   await expect(usage).not.toContainText('Unavailable');
 
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('tab', { name: 'Usage', exact: true }).click();
   await chooseSelectOption(dialog.getByLabel('Scope', { exact: true }), 'session');
@@ -44,9 +44,11 @@ test('settings stay in a modal, preserve the draft, and show real usage scopes',
   await mockHarness(page);
   await connectAndCreate(page);
   await page.getByLabel('Message', { exact: true }).fill('Keep this draft');
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(
+    dialog.getByRole('heading', { name: 'Workspace settings', exact: true }),
+  ).toBeVisible();
   await dialog.getByRole('tab', { name: 'Usage', exact: true }).click();
   await expect(dialog.getByLabel('Scope', { exact: true })).toHaveAttribute(
     'data-value',
@@ -65,7 +67,9 @@ test('settings stay in a modal, preserve the draft, and show real usage scopes',
   await expect(
     dialog.getByLabel('Usage totals').getByText('$0.125', { exact: true }),
   ).toBeVisible();
-  await chooseSelectOption(dialog.getByLabel('Scope', { exact: true }), 'harness');
+  await page.keyboard.press('Escape');
+  await openWorkbenchAction(page, 'Settings');
+  await dialog.getByRole('tab', { name: 'Usage', exact: true }).click();
   await expect(dialog.getByLabel('Usage totals')).toContainText('$0.75');
   await expect(dialog.getByLabel('Usage totals')).toContainText('€0.50');
   if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 700 });
@@ -88,20 +92,47 @@ test('settings stay in a modal, preserve the draft, and show real usage scopes',
   expect(failures).toEqual([]);
 });
 
-test('save harness and workspace limits and restore inheritance', async ({ page }) => {
+test('save harness and workspace limits in flat sections and restore inheritance', async ({
+  page,
+}, testInfo) => {
   const fixture = await mockHarness(page);
+  if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 740 });
   await connectAndCreate(page);
   await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
   const depth = dialog.getByLabel('Agent depth limit', { exact: true });
   await expect(depth).toHaveValue('2');
+  const scopeBounds = (await dialog.locator('[data-settings-page-title]').boundingBox())!;
+  for (const label of ['Agent depth limit', 'Process limit']) {
+    const input = dialog.getByLabel(label, { exact: true }),
+      form = dialog.getByRole('form', { name: `${label} settings`, exact: true });
+    const appearance = await form.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        left: style.paddingLeft,
+        right: style.paddingRight,
+        borderLeft: style.borderLeftWidth,
+        borderRight: style.borderRightWidth,
+        radius: style.borderRadius,
+      };
+    });
+    expect(appearance).toEqual({
+      left: '0px',
+      right: '0px',
+      borderLeft: '0px',
+      borderRight: '0px',
+      radius: '0px',
+    });
+    expect(Math.abs((await input.boundingBox())!.x - scopeBounds.x)).toBeLessThanOrEqual(1);
+  }
   await depth.fill('3');
   await depth
     .locator('xpath=ancestor::form')
     .getByRole('button', { name: 'Save', exact: true })
     .click();
   await expect.poll(() => fixture.settings.get('')?.agent_depth_limit).toBe('3');
-  await chooseSelectOption(dialog.getByLabel('Settings scope'), 'workspace');
+  await page.keyboard.press('Escape');
+  await openWorkbenchAction(page, 'Workspace settings');
   await expect(depth).toHaveValue('');
   await expect(dialog).toContainText('Harness setting: 3');
   await depth.fill('0');
@@ -124,6 +155,9 @@ test('save harness and workspace limits and restore inheritance', async ({ page 
   await expect(
     processLimit.locator('xpath=ancestor::form').getByRole('button', { name: 'Save' }),
   ).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await dialog.getByRole('tab', { name: 'General', exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath('general-flat-settings.png') });
 });
 
 test('failed usage and settings requests remain visible and recover on retry', async ({ page }) => {
@@ -156,6 +190,8 @@ test('failed usage and settings requests remain visible and recover on retry', a
         body: JSON.stringify({ error: 'Usage temporarily unavailable' }),
       }),
   );
+  await page.keyboard.press('Escape');
+  await openWorkbenchAction(page, 'Workspace settings');
   await dialog.getByRole('tab', { name: 'Usage', exact: true }).click();
   await chooseSelectOption(dialog.getByLabel('Scope', { exact: true }), 'session');
   await expect(dialog.getByRole('alert')).toContainText('Usage temporarily unavailable');

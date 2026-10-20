@@ -9,11 +9,12 @@
     Repeat2,
     Bot,
     Eye,
+    FolderCog,
   } from 'lucide-svelte';
   import * as Dialog from '../atoms/ui/dialog';
   import { Button } from '../atoms/ui/button';
   import * as Tabs from '../atoms/ui/tabs';
-  import type { SettingsSection } from '../atoms/settings';
+  import { settingsPages, type SettingsScope, type SettingsSection } from '../atoms/settings';
   import type { Instance, Session, Model } from '../atoms/types';
   import type { HarnessApi } from '../molecules/api/client';
   import ConnectionForm from '../molecules/ConnectionForm.svelte';
@@ -24,10 +25,12 @@
   import SidekickPanel from './SidekickPanel.svelte';
   import WatcherPanel from './WatcherPanel.svelte';
   import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
+  import DialogTitleBar from '../molecules/DialogTitleBar.svelte';
 
   let {
     open = $bindable(false),
     section = $bindable<SettingsSection>('general'),
+    scope = $bindable<SettingsScope>('harness'),
     api,
     instance,
     session,
@@ -39,9 +42,11 @@
     onConnect,
     onDisconnect,
     onProvidersChanged,
+    onClose,
   }: {
     open?: boolean;
     section?: SettingsSection;
+    scope?: SettingsScope;
     api: HarnessApi | null;
     instance: Instance | null;
     session: Session | null;
@@ -53,6 +58,7 @@
     onConnect: (base: string, token: string) => Promise<void>;
     onDisconnect: () => void;
     onProvidersChanged: () => Promise<void>;
+    onClose?: () => void;
   } = $props();
   const sections = [
     { id: 'general' as const, label: 'General', icon: SlidersHorizontal },
@@ -64,6 +70,13 @@
     { id: 'connection' as const, label: 'Connection', icon: Cable },
   ];
   const sidebar = new MediaQuery('(min-width: 640px)');
+  const availableSections = $derived(
+    sections.filter((item) => settingsPages[scope].includes(item.id)),
+  );
+  $effect(() => {
+    if (!settingsPages[scope].includes(section))
+      section = scope === 'harness' && !api ? 'connection' : 'general';
+  });
   let content = $state<HTMLDivElement>();
   $effect(() => {
     const selectedSection = section;
@@ -81,18 +94,45 @@
       title="Connect your harness"
       description="Connect to the API to view usage, configure providers, and change runtime settings."
     />
-    <Button class="h-11" onclick={() => (section = 'connection')}>Open connection settings</Button>
+    <Button
+      class="h-11"
+      onclick={() => {
+        scope = 'harness';
+        section = 'connection';
+      }}>Open connection settings</Button
+    >
   </div>
+{/snippet}
+
+{#snippet workspaceRequired()}
+  <SettingsPageTitle
+    icon={FolderCog}
+    title="Workspace settings"
+    description="Select a workspace to configure its limits, plugins, and usage."
+  />
 {/snippet}
 
 <Dialog.Root bind:open>
   <Dialog.Content
+    showCloseButton={false}
+    data-settings-scope={scope}
+    onCloseAutoFocus={(event) => {
+      if (onClose) {
+        event.preventDefault();
+        onClose();
+      }
+    }}
     class="settings-dialog flex h-[min(90dvh,780px)] max-w-[calc(100%_-_1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
   >
-    <Dialog.Header class="shrink-0 border-b border-border px-5 py-4 pr-16 text-left">
-      <Dialog.Title class="text-base">Settings</Dialog.Title>
+    <Dialog.Header class="shrink-0 border-b border-border px-5 py-2 text-left">
+      <DialogTitleBar
+        title={scope === 'workspace' ? 'Workspace settings' : 'Settings'}
+        closeLabel="Close settings"
+      />
       <Dialog.Description class="sr-only"
-        >Manage your connection, providers, usage, and runtime limits.</Dialog.Description
+        >{scope === 'workspace'
+          ? 'Configure workspace limits, plugins, and usage.'
+          : 'Configure harness limits, providers, usage, and connection.'}</Dialog.Description
       >
     </Dialog.Header>
     <Tabs.Root
@@ -108,7 +148,7 @@
           aria-label="Settings pages"
           class="grid h-auto w-full min-w-0 grid-cols-2 gap-1 rounded-none bg-transparent p-2 data-[orientation=horizontal]:h-auto min-[380px]:grid-cols-3 sm:flex sm:flex-col sm:items-stretch sm:justify-start sm:p-3"
         >
-          {#each sections as item (item.id)}
+          {#each availableSections as item (item.id)}
             <Tabs.Trigger
               value={item.id}
               class="h-11 min-h-11 min-w-0 shrink-0 gap-2 px-2 text-xs sm:flex-none sm:justify-start sm:px-3"
@@ -127,7 +167,7 @@
         class="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain p-5 sm:p-7"
       >
         <Tabs.Content value="connection" class="m-0 min-w-0">
-          {#if section === 'connection'}
+          {#if scope === 'harness' && section === 'connection'}
             <ConnectionForm
               {initialBase}
               {initialToken}
@@ -141,40 +181,42 @@
         </Tabs.Content>
         {#key api}
           <Tabs.Content value="general" class="m-0 min-w-0"
-            >{#if section === 'general'}{#if api}<RuntimeSettingsPanel
+            >{#if section === 'general'}{#if scope === 'workspace' && !instance}{@render workspaceRequired()}{:else if api}<RuntimeSettingsPanel
                   {api}
                   {instance}
+                  {scope}
                 />{:else}{@render connectionRequired()}{/if}{/if}</Tabs.Content
           >
           <Tabs.Content value="instructions" class="m-0 min-w-0"
-            >{#if section === 'instructions'}{#if api}<RepetitionPanel
+            >{#if scope === 'workspace' && section === 'instructions'}{#if api}<RepetitionPanel
                   {api}
                   {instance}
                 />{:else}{@render connectionRequired()}{/if}{/if}</Tabs.Content
           >
           <Tabs.Content value="sidekick" class="m-0 min-w-0"
-            >{#if section === 'sidekick'}{#if api}<SidekickPanel
+            >{#if scope === 'workspace' && section === 'sidekick'}{#if api}<SidekickPanel
                   {api}
                   {instance}
                 />{:else}{@render connectionRequired()}{/if}{/if}</Tabs.Content
           >
           <Tabs.Content value="watcher" class="m-0 min-w-0"
-            >{#if section === 'watcher'}{#if api}<WatcherPanel
+            >{#if scope === 'workspace' && section === 'watcher'}{#if api}<WatcherPanel
                   {api}
                   {instance}
                   {session}
                 />{:else}{@render connectionRequired()}{/if}{/if}</Tabs.Content
           >
           <Tabs.Content value="usage" class="m-0 min-w-0"
-            >{#if section === 'usage'}{#if api}<UsagePanel
+            >{#if section === 'usage'}{#if scope === 'workspace' && !instance}{@render workspaceRequired()}{:else if api}<UsagePanel
                   {api}
                   {instance}
                   {session}
                   {models}
+                  settingsScope={scope}
                 />{:else}{@render connectionRequired()}{/if}{/if}</Tabs.Content
           >
           <Tabs.Content value="providers" class="m-0 min-w-0"
-            >{#if section === 'providers'}{#if api}<ProvidersPanel
+            >{#if scope === 'harness' && section === 'providers'}{#if api}<ProvidersPanel
                   {api}
                   onChanged={onProvidersChanged}
                 />{:else}{@render connectionRequired()}{/if}{/if}</Tabs.Content

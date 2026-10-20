@@ -94,7 +94,7 @@ test('show one reported request instead of cumulative input, output, or cache to
     fullPage: true,
   });
 
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   await page.getByRole('dialog').getByRole('tab', { name: 'Usage', exact: true }).click();
   const overview = page.getByRole('region', { name: 'Usage overview' });
   await chooseSelectOption(overview.getByLabel('Scope', { exact: true }), 'session');

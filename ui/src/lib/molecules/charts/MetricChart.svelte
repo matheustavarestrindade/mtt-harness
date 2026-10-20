@@ -14,6 +14,7 @@
     height = 240,
     legend = true,
     categoryLabels = 'axis',
+    emptyMessage,
   }: {
     title: string;
     data: ChartDatum[];
@@ -26,6 +27,7 @@
     height?: number;
     legend?: boolean;
     categoryLabels?: 'axis' | 'below';
+    emptyMessage?: string;
   } = $props();
   type ChartComponent = (typeof import('./BarChartView.svelte'))['default'];
   let Renderer = $state<ChartComponent | null>(null),
@@ -62,7 +64,10 @@
     {#if description}<p class="text-xs leading-5 text-muted-foreground">{description}</p>{/if}
   </div>
   {#if !data.length || !series.length || !hasValues}<p class="py-6 text-sm text-muted-foreground">
-      {metric === 'cost' ? 'No cost reported for this selection.' : 'No usage for this selection.'}
+      {emptyMessage ??
+        (metric === 'cost'
+          ? 'No cost reported for this selection.'
+          : 'No usage for this selection.')}
     </p>
   {:else}
     <div

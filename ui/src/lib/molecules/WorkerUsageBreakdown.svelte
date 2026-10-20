@@ -99,43 +99,45 @@
         options={currencies.map((value) => ({ value, label: value }))}
         onValueChange={(value) => (currency = value)}
       />{/if}
-    <MetricChart
-      title={`${usageMetrics.find((option) => option.value === metric)?.label} by ${group}`}
-      data={rows}
-      series={[
-        {
-          key: 'value',
-          label: usageMetrics.find((option) => option.value === metric)?.label ?? 'Usage',
-          color: chartColors[0],
-        },
-      ]}
-      {metric}
-      currency={selectedCurrency}
-      horizontal
-      categoryLabels="below"
-      legend={false}
-      height={Math.max(120, rows.length * 34 + 32)}
-      description={metric === 'tokens'
-        ? 'All-time workspace usage. Uncached input + output; cache stays separate.'
-        : metric === 'cost'
-          ? `All-time recorded costs${totals.Costs?.some((cost) => cost.Currency === selectedCurrency && cost.Estimated) ? ' · includes estimates' : ''}. Missing prices stay unknown.`
-          : 'All-time workspace usage.'}
-    />
-    <Disclosure title="Worker details"
-      >{#each pageEntries as agent (`${agent.Agent}:${agent.ModelID}`)}<MemoryAgentUsage
-          {agent}
-          label={agentLabel(agent.Agent)}
-        />{/each}
-      {#if agents.length > 25}<div class="mt-3 flex justify-between gap-2">
-          <Button variant="outline" class="h-11" disabled={page === 0} onclick={() => page--}
-            >Previous</Button
-          ><Button
-            variant="outline"
-            class="h-11"
-            disabled={(page + 1) * 25 >= agents.length}
-            onclick={() => page++}>Next</Button
-          >
-        </div>{/if}
-    </Disclosure>
+    <div class="min-w-0">
+      <MetricChart
+        title={`${usageMetrics.find((option) => option.value === metric)?.label} by ${group}`}
+        data={rows}
+        series={[
+          {
+            key: 'value',
+            label: usageMetrics.find((option) => option.value === metric)?.label ?? 'Usage',
+            color: chartColors[0],
+          },
+        ]}
+        {metric}
+        currency={selectedCurrency}
+        horizontal
+        categoryLabels="below"
+        legend={false}
+        height={Math.max(120, rows.length * 34 + 32)}
+        description={metric === 'tokens'
+          ? 'All-time workspace usage. Uncached input + output; cache stays separate.'
+          : metric === 'cost'
+            ? `All-time recorded costs${totals.Costs?.some((cost) => cost.Currency === selectedCurrency && cost.Estimated) ? ' · includes estimates' : ''}. Missing prices stay unknown.`
+            : 'All-time workspace usage.'}
+      />
+      <Disclosure title="Worker details"
+        >{#each pageEntries as agent (`${agent.Agent}:${agent.ModelID}`)}<MemoryAgentUsage
+            {agent}
+            label={agentLabel(agent.Agent)}
+          />{/each}
+        {#if agents.length > 25}<div class="mt-3 flex justify-between gap-2">
+            <Button variant="outline" class="h-11" disabled={page === 0} onclick={() => page--}
+              >Previous</Button
+            ><Button
+              variant="outline"
+              class="h-11"
+              disabled={(page + 1) * 25 >= agents.length}
+              onclick={() => page++}>Next</Button
+            >
+          </div>{/if}
+      </Disclosure>
+    </div>
   {:else}<p class="text-sm text-muted-foreground">No worker calls yet.</p>{/if}
 </section>

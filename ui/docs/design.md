@@ -141,11 +141,11 @@ The UI does not change memory content or model context. See `memory.md` for usag
 
 ## Spaced Repetition
 
-The `Instructions` section in the settings dialog uses the plugin name `spaced_repetition`. A button in the Memory panel opens the section. The UI shows workspace settings for the interval, reminder pattern, worker model, and reasoning effort.
+The `Instructions` section in `Workspace settings` uses the plugin name `spaced_repetition`. A button in the Memory panel opens the section. The UI shows workspace settings for the interval, reminder pattern, worker model, and reasoning effort.
 
 The `WorkspacePluginPanelState` organism controls plugin requests. A response from a previous workspace must not change the selected view. Memory and spaced repetition use the same organism.
 
-The UI does not add the cost of reminder tokens to worker cost. Mobile settings navigation uses 2 rows. The UI controls stay in the viewport.
+The UI does not add the cost of reminder tokens to worker cost. The UI controls stay in the viewport. The `MetricChart` component shows the `running`, `completed`, `failed`, `cancelled`, and `interrupted` values. The `recovery/queries` and `recovery/duration_ms` values are not part of the chart data. The `FieldHelp` component gives usage information.
 
 ## Sidekick
 
@@ -167,7 +167,7 @@ The Settings pages use `SettingsPageTitle` and `Tabs`. The watcher panels also u
 
 See `ui/docs/component-audit.md` for the control audit.
 
-`Settings → Watchers` gives workspace watcher definitions. The editor uses `Schema.JSON` for the tool catalog and default watcher definition. A model is necessary. The user can select file operations for `file_actions`. Tool grants do not use the permission pipeline.
+`Configuration → Workspace settings → Watchers` gives workspace watcher definitions. The editor uses `Schema.JSON` for the tool catalog and default watcher definition. A model is necessary. The user can select file operations for `file_actions`. Tool grants do not use the permission pipeline.
 
 Use `New watcher`, `Edit`, `Duplicate`, or `Remove`. An input preview uses the selected primary session and does not start a model. Watcher usage is workspace usage. The `CacheRead` and `CacheWrite` values are different from `Input`.
 
@@ -247,7 +247,15 @@ The client removes previous model IDs on session selection. The conversation cos
 
 Settings use one dialog above the conversation. Large screens have a sidebar for section selection. Small screens have a horizontal section list. The content section has a scrollbar. The user can close the dialog with the `Escape` key. The dialog keeps keyboard focus while it is open.
 
-The dialog has connection, provider, usage, and general settings sections. The usage section sends requests to the API to get statistics. The general section sends configuration requests to the API. An empty value removes the selected setting.
+`ConfigurationMenu` gives the navigation scope. The harness sections are `General`, `Usage`, `Providers`, and `Connection`. The workspace sections are `General`, `Instructions`, `Sidekick`, `Watchers`, and `Usage`. The `Workspace settings` value identifies the scope. An empty value removes the selected setting.
+
+The UI uses `PluginHeaderControls` and `DialogTitleBar` for settings pages.
+
+```text
+Plugin header: status, Switch, configuration gear button
+Configuration gear: immediately right of the Switch
+Dialog header: title and Close button share one centered row
+```
 
 Section requests stop when the dialog closes. They also stop when the user selects a different section. Previous requests must not change the selected scope. The UI keeps the conversation and message draft.
 

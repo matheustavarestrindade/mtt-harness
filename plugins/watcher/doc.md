@@ -6,7 +6,7 @@ The plugin is on `feat/watcher-plugin`. The harness loop runs watcher sessions.
 
 ## Workspace Settings
 
-The database setting is `plugin.watcher`. The default plugin state is `OFF`. A workspace can have many watcher definitions. The workspace UI is at `Settings → Watchers`.
+The database setting is `plugin.watcher`. The default plugin state is `OFF`. A workspace can have many watcher definitions. The workspace UI is at `Configuration → Workspace settings → Watchers`.
 
 A watcher definition has an ID, name, model, prompt template, watcher triggers, and tool selection. Use `New watcher`, `Edit`, `Duplicate`, or `Remove`. A worker model is necessary for `ON`. The workspace model list applies.
 

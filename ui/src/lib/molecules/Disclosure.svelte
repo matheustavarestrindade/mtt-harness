@@ -10,7 +10,7 @@
     children,
     label,
     class: className = '',
-    triggerClass = 'min-h-8 py-2 text-xs text-muted-foreground pointer-coarse:min-h-11',
+    triggerClass = 'min-h-7 py-1 text-xs text-muted-foreground pointer-coarse:min-h-11',
     contentClass = '',
   }: {
     open?: boolean;

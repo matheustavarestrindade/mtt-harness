@@ -6,10 +6,14 @@ The settings pages use `SettingsPageTitle`. The component gives the same page ti
 
 ```text
 Pages: General, Instructions, Sidekick, Watchers, Usage, Providers, Connection
+Configuration menu: Settings / Workspace settings / Model and thinking
+Settings: harness General, Usage, Providers, Connection
+Workspace settings: workspace General, Instructions, Sidekick, Watchers, Usage
 Title: 18px, weight 500, line height 28px
 Icon: 20px; 12px gap before the title
 Description: 14px, line height 20px; 4px below the title
 Description left edge: page content edge, 0px icon indent
+General limits: flat form rows, horizontal separators, no nested cards
 Page inset: owned by SettingsDialog
 ```
 
@@ -19,6 +23,9 @@ The Connection settings page uses the same component. `Instructions` and Watcher
 
 ```text
 Usage graphs                    shadcn Chart + LayerChart
+Configuration entry points      ConfigurationMenu + DropdownMenu
+Plugin switch/settings gear     PluginHeaderControls + Switch + Button
+Modal title and aligned close   DialogTitleBar + Dialog.Close
 Date range                      shadcn RangeCalendar + Popover
 Settings pages, Watcher sections -> Tabs
 Thinking, tools, agents, task state, activity, usage -> Collapsible, Disclosure
@@ -43,6 +50,9 @@ Bars and category labels: matching colors, no left category-label column
 Other horizontal axis labels: min(130px, 25% of chart container width)
 Axis-label mode: explicit ticks and LayerChart pixel-width truncation
 Full labels and values: Chart.Tooltip and View data
+Instruction recovery: status-count chart; searches/time remain separate context
+Chart detail rows: no outer gap between View data and Usage/Worker details
+Disclosure targets: 28px desktop; 44px touch
 ```
 
 ## Tab Track

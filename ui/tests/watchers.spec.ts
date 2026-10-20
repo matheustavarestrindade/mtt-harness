@@ -14,7 +14,7 @@ const textContent = (text: string) => ({
 });
 
 async function openWatchers(page: import('@playwright/test').Page) {
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   await page
     .getByRole('navigation', { name: 'Settings sections' })
     .getByRole('tab', { name: 'Watchers', exact: true })
@@ -220,7 +220,7 @@ test('align Watcher tabs and footer buttons with the Sidekick reference', async 
   await mockWatchers(page);
   if (page.viewportSize()!.width < 1024) await page.setViewportSize({ width: 320, height: 900 });
   await connectAndCreate(page);
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   const navigation = page.getByRole('navigation', { name: 'Settings sections' });
   await navigation.getByRole('tab', { name: 'Sidekick', exact: true }).click();
   const reference = page.getByRole('button', { name: 'Refresh Sidekick', exact: true });

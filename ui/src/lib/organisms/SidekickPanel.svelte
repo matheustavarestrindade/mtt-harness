@@ -1,12 +1,12 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { Bot, Power, RefreshCw, Settings2 } from 'lucide-svelte';
+  import { Bot, RefreshCw } from 'lucide-svelte';
   import type { Instance, Model } from '../atoms/types';
   import type { SidekickConfiguration } from '../atoms/plugins';
   import { Button } from '../atoms/ui/button';
   import { Input } from '../atoms/ui/input';
   import { Label } from '../atoms/ui/label';
-  import { costLabel, formatTokenCount, workspaceName } from '../atoms/format';
+  import { costLabel, formatTokenCount } from '../atoms/format';
   import { totalAgentUsage, agentTokenCount } from '../atoms/memory';
   import type { HarnessApi } from '../molecules/api/client';
   import ModelCombobox from '../molecules/ModelCombobox.svelte';
@@ -16,6 +16,7 @@
   import { chartColors } from '../atoms/usage';
   import Disclosure from '../molecules/Disclosure.svelte';
   import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
+  import PluginHeaderControls from '../molecules/PluginHeaderControls.svelte';
   import * as ToggleGroup from '../atoms/ui/toggle-group';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
 
@@ -144,46 +145,35 @@
     description="Useful workspace context for the agent’s current DOING activity."
   >
     {#snippet actions()}
-      {#if panel.state}<span role="status" class="text-xs text-muted-foreground"
-          >{panel.state.Pending
+      {#if panel.state}<PluginHeaderControls
+          enabled={panel.state.RequestedEnabled}
+          status={panel.state.Pending
             ? 'Updating…'
             : !panel.state.Available
               ? 'Unavailable'
               : panel.state.Enabled
                 ? 'On'
-                : 'Off'}</span
-        >{/if}
+                : 'Off'}
+          toggleLabel="Sidekick enabled"
+          configureLabel="Configure Sidekick"
+          {disabled}
+          toggleDisabled={!panel.state.Available && !panel.state.RequestedEnabled}
+          expanded={editing}
+          onToggle={() => void toggleSidekick()}
+          onConfigure={() => openConfiguration()}
+        />{/if}
     {/snippet}
   </SettingsPageTitle>
   {#if !instance}<p class="text-sm text-muted-foreground">
       Select a workspace to configure Sidekick.
     </p>
   {:else}
-    <p class="break-words text-xs text-muted-foreground" title={instance.Workspace}>
-      {workspaceName(instance.Workspace)} · Workspace settings
-    </p>
     {#if panel.error}<p role="alert" class="break-words text-sm text-destructive">
         {panel.error}
       </p>{/if}
     {#if panel.state?.Error}<p role="status" class="break-words text-xs text-muted-foreground">
         {panel.state.Error}
       </p>{/if}
-    {#if panel.state}
-      <div class="flex flex-wrap gap-2">
-        <Button
-          variant={panel.state.RequestedEnabled ? 'secondary' : 'default'}
-          class="h-11"
-          disabled={disabled || (!panel.state.Available && !panel.state.RequestedEnabled)}
-          onclick={toggleSidekick}
-          ><Power class="size-4" />{panel.state.RequestedEnabled
-            ? 'Disable Sidekick'
-            : 'Enable Sidekick'}</Button
-        >
-        <Button variant="outline" class="h-11" {disabled} onclick={() => openConfiguration()}
-          ><Settings2 class="size-4" />Configure Sidekick</Button
-        >
-      </div>
-    {/if}
     {#if editing}
       <form
         class="space-y-4 border-y border-border py-5"

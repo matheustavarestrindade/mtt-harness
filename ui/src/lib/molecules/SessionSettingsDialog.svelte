@@ -5,6 +5,7 @@
   import SessionModelSelect from './SessionModelSelect.svelte';
   import ReasoningSelect from './ReasoningSelect.svelte';
   import ModelChangeConfirmation from './ModelChangeConfirmation.svelte';
+  import DialogTitleBar from './DialogTitleBar.svelte';
   let {
     open = $bindable(false),
     models,
@@ -20,6 +21,7 @@
     onEffortChange,
     onConfirm,
     onCancel,
+    onClose,
   }: {
     open?: boolean;
     models: Model[];
@@ -35,16 +37,26 @@
     onEffortChange: (effort: string) => void;
     onConfirm: () => void;
     onCancel: () => void;
+    onClose?: () => void;
   } = $props();
 </script>
 
 <Dialog.Root bind:open>
-  <Dialog.Content class="max-h-[90dvh] overflow-y-auto sm:max-w-md">
+  <Dialog.Content
+    showCloseButton={false}
+    onCloseAutoFocus={(event) => {
+      if (onClose) {
+        event.preventDefault();
+        onClose();
+      }
+    }}
+    class="max-h-[90dvh] overflow-y-auto sm:max-w-md"
+  >
     {#if pendingModel}
       <ModelChangeConfirmation {...pendingModel} {busy} {onConfirm} {onCancel} />
     {:else}
       <Dialog.Header>
-        <Dialog.Title>Session settings</Dialog.Title>
+        <DialogTitleBar title="Session settings" closeLabel="Close session settings" />
         <Dialog.Description
           >Changes apply to the next model request in this conversation.</Dialog.Description
         >

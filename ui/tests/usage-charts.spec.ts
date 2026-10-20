@@ -6,7 +6,7 @@ import type { UsageBucket } from '../src/lib/atoms/usage';
 
 async function openUsage(page: import('@playwright/test').Page) {
   await connectAndCreate(page);
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   await page
     .getByRole('tablist', { name: 'Settings pages' })
     .getByRole('tab', { name: 'Usage', exact: true })
@@ -15,6 +15,33 @@ async function openUsage(page: import('@playwright/test').Page) {
   await expect(panel.getByRole('heading', { name: 'Daily tokens' })).toBeVisible();
   return panel;
 }
+
+test('keep chart and usage detail rows together without stacked section gaps', async ({
+  page,
+}, testInfo) => {
+  await page.clock.setFixedTime(new Date('2026-10-19T12:00:00Z'));
+  await mockHarness(page);
+  await mockUsage(page);
+  if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 760 });
+  const panel = await openUsage(page),
+    chart = panel.getByRole('region', { name: 'By model', exact: true });
+  const viewData = chart.getByRole('button', { name: 'View data', exact: true }),
+    usageDetails = panel.getByRole('button', { name: 'Usage details', exact: true });
+  await usageDetails.scrollIntoViewIfNeeded();
+  const viewBounds = (await viewData.boundingBox())!,
+    detailsBounds = (await usageDetails.boundingBox())!;
+  expect(detailsBounds.y - (viewBounds.y + viewBounds.height)).toBeLessThanOrEqual(4);
+  expect(viewBounds.height).toBeGreaterThanOrEqual(testInfo.project.name === 'mobile' ? 44 : 28);
+  expect(detailsBounds.height).toBeGreaterThanOrEqual(testInfo.project.name === 'mobile' ? 44 : 28);
+  await viewData.focus();
+  await page.keyboard.press('Tab');
+  await expect(usageDetails).toBeFocused();
+  await usageDetails.click();
+  await expect(panel.getByLabel('Usage breakdown')).toBeVisible();
+  await usageDetails.click();
+  await viewData.click();
+  await expect(chart.getByRole('table')).toBeVisible();
+});
 
 test('keep request counts integral while preserving fractional cost axes', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-19T12:00:00Z'));
@@ -211,7 +238,9 @@ test('aggregate extra models without losing tokens and keep delayed responses sc
   );
   await chooseSelectOption(panel.getByLabel('Scope', { exact: true }), 'session');
   await expect.poll(() => requested).toBe(true);
-  await chooseSelectOption(panel.getByLabel('Scope', { exact: true }), 'harness');
+  await page.getByRole('button', { name: 'Close settings', exact: true }).click();
+  await openWorkbenchAction(page, 'Settings');
+  await page.getByRole('dialog').getByRole('tab', { name: 'Usage', exact: true }).click();
   await expect(panel.locator('[title="240"]')).toHaveText('240');
   release();
   await expect(panel.locator('[title="240"]')).toHaveText('240');

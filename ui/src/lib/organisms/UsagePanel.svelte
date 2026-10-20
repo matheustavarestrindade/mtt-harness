@@ -5,7 +5,8 @@
   import { Button } from '../atoms/ui/button';
   import * as Tabs from '../atoms/ui/tabs';
   import type { Instance, Session, Model } from '../atoms/types';
-  import { costLabel, formatTokenCount, workspaceName } from '../atoms/format';
+  import { costLabel, formatTokenCount } from '../atoms/format';
+  import type { SettingsScope } from '../atoms/settings';
   import {
     aggregateUsageModels,
     chartColors,
@@ -34,11 +35,13 @@
     instance,
     session,
     models = [],
+    settingsScope = 'harness',
   }: {
     api: HarnessApi;
     instance: Instance | null;
     session: Session | null;
     models?: Model[];
+    settingsScope?: SettingsScope;
   } = $props();
   let scope = $state(''),
     range = $state<DateRange>(recentUsageRange(30)),
@@ -53,15 +56,20 @@
     updatedAt = $state<Date | null>(null),
     modelPage = $state(0);
   const identifier = $props.id();
-  const scopes = $derived([
-    { value: 'harness', label: 'Entire harness' },
-    ...(instance
-      ? [{ value: 'workspace', label: `Workspace · ${workspaceName(instance.Workspace)}` }]
-      : []),
-    ...(session ? [{ value: 'session', label: 'Current session' }] : []),
-  ]);
+  const scopes = $derived(
+    settingsScope === 'harness'
+      ? [{ value: 'harness', label: 'Entire harness' }]
+      : [
+          { value: 'workspace', label: 'Workspace' },
+          ...(session ? [{ value: 'session', label: 'Current session' }] : []),
+        ],
+  );
   const selection = $derived(
-    scopes.some((option) => option.value === scope) ? scope : instance ? 'workspace' : 'harness',
+    scopes.some((option) => option.value === scope)
+      ? scope
+      : settingsScope === 'workspace'
+        ? 'workspace'
+        : 'harness',
   );
   const scopeKey = $derived(
     `${selection}:${selection === 'workspace' ? instance?.ID : selection === 'session' ? session?.ID : ''}`,
@@ -204,15 +212,17 @@
     description="Daily usage and model breakdowns from recorded requests."
   />
   <div class="grid min-w-0 grid-cols-2 gap-3">
-    <div class="min-w-0 space-y-2">
-      <Label for={`${identifier}-scope`}>Scope</Label><SelectField
-        id={`${identifier}-scope`}
-        value={selection}
-        options={scopes}
-        onValueChange={(value) => (scope = value)}
-      />
+    {#if scopes.length > 1}<div class="min-w-0 space-y-2">
+        <Label for={`${identifier}-scope`}>Scope</Label><SelectField
+          id={`${identifier}-scope`}
+          value={selection}
+          options={scopes}
+          onValueChange={(value) => (scope = value)}
+        />
+      </div>{/if}
+    <div class={scopes.length > 1 ? 'min-w-0' : 'col-span-2 min-w-0'}>
+      <UsageDateRange value={range} onChange={(value) => (range = value)} />
     </div>
-    <UsageDateRange value={range} onChange={(value) => (range = value)} />
     <div class="min-w-0 space-y-2">
       <Label for={`${identifier}-provider`}>Provider</Label><SelectField
         id={`${identifier}-provider`}
@@ -275,113 +285,115 @@
         </dd>
       </div>
     </dl>
-    <Tabs.Root bind:value={metric} class="min-w-0 gap-4">
-      <Tabs.List aria-label="Usage metric" class="grid min-h-[50px] w-full grid-cols-4"
-        ><Tabs.Trigger value="tokens" class="min-h-11">Tokens</Tabs.Trigger><Tabs.Trigger
-          value="cost"
-          class="min-h-11">Cost</Tabs.Trigger
-        ><Tabs.Trigger value="calls" class="min-h-11">Requests</Tabs.Trigger><Tabs.Trigger
-          value="cache"
-          class="min-h-11">Cache</Tabs.Trigger
-        ></Tabs.List
-      >
-      {#each usageMetrics as option (option.value)}<Tabs.Content
-          value={option.value}
-          class="m-0 min-w-0 space-y-6"
-          >{#if metric === option.value}
-            {#if metric === 'cost' && currencies.length > 1}<div class="max-w-56 space-y-2">
-                <Label for={`${identifier}-currency`}>Currency</Label><SelectField
-                  id={`${identifier}-currency`}
-                  value={selectedCurrency}
-                  options={currencies.map((value) => ({ value, label: value }))}
-                  onValueChange={(value) => (currency = value)}
-                />
-              </div>{/if}
-            <MetricChart
-              title={`Daily ${option.label.toLowerCase()}`}
-              data={timeline.data}
-              series={timeline.series}
-              {metric}
-              currency={selectedCurrency}
-              dates
-              description={`${description} Days use UTC.`}
-            />
-            <MetricChart
-              title="By model"
-              data={comparison}
-              series={[{ key: 'value', label: option.label, color: chartColors[0] }]}
-              {metric}
-              currency={selectedCurrency}
-              horizontal
-              categoryLabels="below"
-              height={Math.max(130, comparison.length * 36 + 32)}
-              legend={false}
-            />
-          {/if}</Tabs.Content
-        >{/each}
-    </Tabs.Root>
-    <Disclosure title="Usage details">
-      <dl
-        aria-label="Usage breakdown"
-        class="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs tabular-nums"
-      >
-        {#each [['Input', totals.Input], ['Output', totals.Output], ['Cache read', totals.CacheRead], ['Cache write', totals.CacheWrite], ['Reasoning (in output)', totals.Reasoning], ['Calls with cost', pricedCalls], ['Calls without cost', totals.Calls - pricedCalls], ['Failed calls', failedCalls]] as [label, value]}<div
-          >
-            <dt class="text-muted-foreground">{label}</dt>
-            <dd class="mt-1">{Number(value).toLocaleString()}</dd>
-          </div>{/each}
-        <div>
-          <dt class="text-muted-foreground">Cache hit</dt>
-          <dd class="mt-1">{totals.CacheHitPercentage.toFixed(1)}%</dd>
+    <div class="min-w-0">
+      <Tabs.Root bind:value={metric} class="min-w-0 gap-4">
+        <Tabs.List aria-label="Usage metric" class="grid min-h-[50px] w-full grid-cols-4"
+          ><Tabs.Trigger value="tokens" class="min-h-11">Tokens</Tabs.Trigger><Tabs.Trigger
+            value="cost"
+            class="min-h-11">Cost</Tabs.Trigger
+          ><Tabs.Trigger value="calls" class="min-h-11">Requests</Tabs.Trigger><Tabs.Trigger
+            value="cache"
+            class="min-h-11">Cache</Tabs.Trigger
+          ></Tabs.List
+        >
+        {#each usageMetrics as option (option.value)}<Tabs.Content
+            value={option.value}
+            class="m-0 min-w-0 space-y-6"
+            >{#if metric === option.value}
+              {#if metric === 'cost' && currencies.length > 1}<div class="max-w-56 space-y-2">
+                  <Label for={`${identifier}-currency`}>Currency</Label><SelectField
+                    id={`${identifier}-currency`}
+                    value={selectedCurrency}
+                    options={currencies.map((value) => ({ value, label: value }))}
+                    onValueChange={(value) => (currency = value)}
+                  />
+                </div>{/if}
+              <MetricChart
+                title={`Daily ${option.label.toLowerCase()}`}
+                data={timeline.data}
+                series={timeline.series}
+                {metric}
+                currency={selectedCurrency}
+                dates
+                description={`${description} Days use UTC.`}
+              />
+              <MetricChart
+                title="By model"
+                data={comparison}
+                series={[{ key: 'value', label: option.label, color: chartColors[0] }]}
+                {metric}
+                currency={selectedCurrency}
+                horizontal
+                categoryLabels="below"
+                height={Math.max(130, comparison.length * 36 + 32)}
+                legend={false}
+              />
+            {/if}</Tabs.Content
+          >{/each}
+      </Tabs.Root>
+      <Disclosure title="Usage details">
+        <dl
+          aria-label="Usage breakdown"
+          class="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs tabular-nums"
+        >
+          {#each [['Input', totals.Input], ['Output', totals.Output], ['Cache read', totals.CacheRead], ['Cache write', totals.CacheWrite], ['Reasoning (in output)', totals.Reasoning], ['Calls with cost', pricedCalls], ['Calls without cost', totals.Calls - pricedCalls], ['Failed calls', failedCalls]] as [label, value]}<div
+            >
+              <dt class="text-muted-foreground">{label}</dt>
+              <dd class="mt-1">{Number(value).toLocaleString()}</dd>
+            </div>{/each}
+          <div>
+            <dt class="text-muted-foreground">Cache hit</dt>
+            <dd class="mt-1">{totals.CacheHitPercentage.toFixed(1)}%</dd>
+          </div>
+        </dl>
+        <div class="mt-4 max-h-80 overflow-auto">
+          <table class="w-full text-left text-xs tabular-nums">
+            <caption class="sr-only">Usage by model</caption><thead
+              ><tr
+                >{#each ['Model', 'Input', 'Output', 'Cache read', 'Cache write', 'Requests', 'Cost'] as label}<th
+                    class="sticky top-0 bg-background px-2 py-3">{label}</th
+                  >{/each}</tr
+              ></thead
+            ><tbody
+              >{#each pageModels as row (row.id)}<tr class="border-t border-border"
+                  ><th class="max-w-56 break-words px-2 py-3 font-normal">{row.label}</th><td
+                    class="p-2">{row.statistics.Input.toLocaleString()}</td
+                  ><td class="p-2">{row.statistics.Output.toLocaleString()}</td><td class="p-2"
+                    >{row.statistics.CacheRead.toLocaleString()}</td
+                  ><td class="p-2">{row.statistics.CacheWrite.toLocaleString()}</td><td class="p-2"
+                    >{row.statistics.Calls.toLocaleString()}</td
+                  ><td class="whitespace-nowrap p-2"
+                    >{row.statistics.Costs?.some((cost) => cost.Estimated) ? '≈ ' : ''}{costLabel(
+                      row.statistics,
+                    )}</td
+                  ></tr
+                >{/each}</tbody
+            >
+          </table>
         </div>
-      </dl>
-      <div class="mt-4 max-h-80 overflow-auto">
-        <table class="w-full text-left text-xs tabular-nums">
-          <caption class="sr-only">Usage by model</caption><thead
-            ><tr
-              >{#each ['Model', 'Input', 'Output', 'Cache read', 'Cache write', 'Requests', 'Cost'] as label}<th
-                  class="sticky top-0 bg-background px-2 py-3">{label}</th
-                >{/each}</tr
-            ></thead
-          ><tbody
-            >{#each pageModels as row (row.id)}<tr class="border-t border-border"
-                ><th class="max-w-56 break-words px-2 py-3 font-normal">{row.label}</th><td
-                  class="p-2">{row.statistics.Input.toLocaleString()}</td
-                ><td class="p-2">{row.statistics.Output.toLocaleString()}</td><td class="p-2"
-                  >{row.statistics.CacheRead.toLocaleString()}</td
-                ><td class="p-2">{row.statistics.CacheWrite.toLocaleString()}</td><td class="p-2"
-                  >{row.statistics.Calls.toLocaleString()}</td
-                ><td class="whitespace-nowrap p-2"
-                  >{row.statistics.Costs?.some((cost) => cost.Estimated) ? '≈ ' : ''}{costLabel(
-                    row.statistics,
-                  )}</td
-                ></tr
-              >{/each}</tbody
-          >
-        </table>
-      </div>
-      {#if rankedModels.length > 25}<div class="mt-3 flex items-center justify-between gap-2">
-          <Button
-            variant="outline"
-            class="h-11"
-            disabled={modelPage === 0}
-            onclick={() => modelPage--}>Previous</Button
-          ><span class="text-xs">{modelPage + 1} / {Math.ceil(rankedModels.length / 25)}</span
-          ><Button
-            variant="outline"
-            class="h-11"
-            disabled={(modelPage + 1) * 25 >= rankedModels.length}
-            onclick={() => modelPage++}>Next</Button
-          >
-        </div>{/if}
-      <p class="mt-4 text-xs leading-5 text-muted-foreground">
-        Input excludes cache. Output includes reasoning. Cost shows available prices in their
-        original currencies; missing prices stay unknown, including subscription usage. {selection ===
-        'session'
-          ? 'Session totals include child agents.'
-          : 'Workspace and harness totals include background workers.'}
-      </p>
-    </Disclosure>
+        {#if rankedModels.length > 25}<div class="mt-3 flex items-center justify-between gap-2">
+            <Button
+              variant="outline"
+              class="h-11"
+              disabled={modelPage === 0}
+              onclick={() => modelPage--}>Previous</Button
+            ><span class="text-xs">{modelPage + 1} / {Math.ceil(rankedModels.length / 25)}</span
+            ><Button
+              variant="outline"
+              class="h-11"
+              disabled={(modelPage + 1) * 25 >= rankedModels.length}
+              onclick={() => modelPage++}>Next</Button
+            >
+          </div>{/if}
+        <p class="mt-4 text-xs leading-5 text-muted-foreground">
+          Input excludes cache. Output includes reasoning. Cost shows available prices in their
+          original currencies; missing prices stay unknown, including subscription usage. {selection ===
+          'session'
+            ? 'Session totals include child agents.'
+            : 'Workspace and harness totals include background workers.'}
+        </p>
+      </Disclosure>
+    </div>
   {/if}
   <PluginPanelFooter
     {updatedAt}

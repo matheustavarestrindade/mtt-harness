@@ -3,13 +3,15 @@ import { mockHarness } from './api-fixture';
 import { chooseSelectOption, connectAndCreate, openWorkbenchAction } from './helpers';
 
 async function openSidekick(page: Page) {
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   await page
     .getByRole('navigation', { name: 'Settings sections' })
     .getByRole('tab', { name: 'Sidekick', exact: true })
     .click();
   const panel = page.getByRole('region', { name: 'Sidekick settings', exact: true });
-  await expect(panel.getByRole('button', { name: 'Enable Sidekick', exact: true })).toBeVisible();
+  await expect(
+    panel.getByRole('switch', { name: 'Sidekick enabled', exact: true }),
+  ).not.toBeChecked();
   return panel;
 }
 
@@ -20,13 +22,13 @@ test('configure the real Sidekick fields without changing chat state', async ({
   await connectAndCreate(page);
   await page.getByLabel('Message', { exact: true }).fill('Preserve this draft');
   const panel = await openSidekick(page);
-  await panel.getByRole('button', { name: 'Enable Sidekick', exact: true }).click();
+  await panel.getByRole('switch', { name: 'Sidekick enabled', exact: true }).click();
   await chooseSelectOption(panel.getByLabel('Worker model', { exact: true }), fixture.model.ID);
   await panel.getByLabel('Debounce (ms)', { exact: true }).fill('900');
   await panel.getByLabel('Cooldown (ms)', { exact: true }).fill('20000');
   await panel.getByRole('button', { name: 'Project files', exact: true }).click();
   await panel.getByRole('button', { name: 'Save and enable Sidekick', exact: true }).click();
-  await expect(panel.getByRole('button', { name: 'Disable Sidekick', exact: true })).toBeVisible();
+  await expect(panel.getByRole('switch', { name: 'Sidekick enabled', exact: true })).toBeChecked();
   expect(fixture.sidekickUpdates[0]).toEqual({
     workspaceID: fixture.instances[0].ID,
     patch: {

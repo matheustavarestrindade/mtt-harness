@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate, chooseSelectOption } from './helpers';
+import { chooseSelectOption, connectAndCreate, openSessionSettings } from './helpers';
 
 test('choose thinking effort by keyboard, preserve the default value, and close only the menu with Escape', async ({
   page,
@@ -10,7 +10,7 @@ test('choose thinking effort by keyboard, preserve the default value, and close 
   fixture.model.ReasoningEfforts = ['none', 'low', 'high'];
   fixture.model.DefaultReasoningEffort = 'low';
   await connectAndCreate(page);
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   const thinking = page.getByRole('button', { name: 'Thinking effort', exact: true });
   await expect(thinking).toHaveAttribute('data-slot', 'select-trigger');
   await expect(thinking).toHaveAttribute('aria-haspopup', 'listbox');
@@ -51,7 +51,7 @@ test('scroll a large model catalog without horizontal overflow and retain the di
   }
   await connectAndCreate(page);
   if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 640 });
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   const model = page.getByRole('combobox', { name: 'Session model', exact: true });
   await model.click();
   const list = page.getByRole('listbox');
@@ -81,7 +81,7 @@ test('display an unavailable saved effort as disabled and allow an explicit defa
   await connectAndCreate(page);
   fixture.sessions[0].ReasoningEffort = 'retired-effort';
   await page.reload();
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   const thinking = page.getByRole('button', { name: 'Thinking effort', exact: true });
   await expect(thinking).toContainText('Unavailable: retired-effort');
   await thinking.click();
