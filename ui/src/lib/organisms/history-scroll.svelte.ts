@@ -13,6 +13,7 @@ export class HistoryScroll {
   private paging = false;
   private interaction = 0;
   private lastTop = 0;
+  private seekingLatest = false;
   private pageAnchor: { node: HTMLElement; offset: number } | null = null;
   constructor(readonly history: SessionHistory) {}
   dispose() {
@@ -22,6 +23,7 @@ export class HistoryScroll {
   }
   interact(direction: 'up' | 'down' = 'up') {
     this.interaction++;
+    this.seekingLatest = false;
     this.programmaticTop = null;
     if (direction === 'down') {
       const element = this.element;
@@ -52,6 +54,7 @@ export class HistoryScroll {
       this.programmaticTop = null;
       this.lastTop = this.element?.scrollTop ?? 0;
       this.pageAnchor = null;
+      this.seekingLatest = false;
       this.interaction++;
     }
     this.revision = this.history.revision;
@@ -68,6 +71,7 @@ export class HistoryScroll {
       this.programmaticTop = null;
       if (Math.abs(element.scrollTop - expected) < 1) return;
     }
+    if (this.seekingLatest) return;
     if (this.paging) {
       if (this.pageAnchor?.node.isConnected)
         this.pageAnchor.offset =
@@ -146,10 +150,23 @@ export class HistoryScroll {
       interaction = ++this.interaction;
     this.following = true;
     this.history.following = true;
-    await this.history.loadLatest();
-    await tick();
-    if (generation !== this.generation || interaction !== this.interaction) return;
+    this.seekingLatest = true;
+    // Apply the explicit Latest action before asynchronous paging. Otherwise a
+    // remaining native keyboard-scroll event can turn following off during I/O.
     this.toBottom();
+    try {
+      await this.history.loadLatest();
+      await tick();
+      if (generation !== this.generation || interaction !== this.interaction) return;
+      this.toBottom();
+      // Focus changes and the replacement history can emit a final native
+      // scroll during layout. Real wheel/key/touch input cancels this seek.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      if (generation === this.generation && interaction === this.interaction) this.toBottom();
+    } finally {
+      if (generation === this.generation && interaction === this.interaction)
+        this.seekingLatest = false;
+    }
   }
   private scheduleFollow() {
     const generation = this.generation,

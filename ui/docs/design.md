@@ -141,11 +141,11 @@ The UI does not change memory content or model context. See `memory.md` for usag
 
 ## Spaced Repetition
 
-The `Instructions` section in the settings dialog uses the plugin name `spaced_repetition`. A button in the Memory panel opens the section. The UI shows workspace settings for the interval, reminder pattern, worker model, and reasoning effort.
+The `Instructions` section in `Workspace settings` uses the plugin name `spaced_repetition`. A button in the Memory panel opens the section. The UI shows workspace settings for the interval, reminder pattern, worker model, and reasoning effort.
 
 The `WorkspacePluginPanelState` organism controls plugin requests. A response from a previous workspace must not change the selected view. Memory and spaced repetition use the same organism.
 
-The UI does not add the cost of reminder tokens to worker cost. Mobile settings navigation uses 2 rows. The UI controls stay in the viewport.
+The UI does not add the cost of reminder tokens to worker cost. The UI controls stay in the viewport. The `MetricChart` component shows the `running`, `completed`, `failed`, `cancelled`, and `interrupted` values. The `recovery/queries` and `recovery/duration_ms` values are not part of the chart data. The `FieldHelp` component gives usage information.
 
 ## Sidekick
 
@@ -167,11 +167,17 @@ The Settings pages use `SettingsPageTitle` and `Tabs`. The watcher panels also u
 
 See `ui/docs/component-audit.md` for the control audit.
 
-`Settings → Watchers` gives workspace watcher definitions. The editor uses `Schema.JSON` for the tool catalog and default watcher definition. A model is necessary. The user can select file operations for `file_actions`. Tool grants do not use the permission pipeline.
+`Configuration → Workspace settings → Watchers` gives workspace watcher definitions. The editor uses `Schema.JSON` for the tool catalog and default watcher definition. A model is necessary. The user can select file operations for `file_actions`. Tool grants do not use the permission pipeline.
 
 Use `New watcher`, `Edit`, `Duplicate`, or `Remove`. An input preview uses the selected primary session and does not start a model. Watcher usage is workspace usage. The `CacheRead` and `CacheWrite` values are different from `Input`.
 
 The `SessionActivity` API and `plugin.activity` events give watcher run records. The view gives `Decision`, `Outcome`, and `InputPreview`. The API does not give `Message.Reasoning` from worker sessions.
+
+The view uses `WatcherReviewDetails` and `WatcherReviewInput`. The `watcher_event` data gives `type` and `source_phase`. It is not the watcher result. The view uses `RichText`, `StructuredData`, and `ToolInput`. `ContentActions` gives `Show original preview`, `Copy original preview`, and `Download original preview`.
+
+The UI uses `AnchorID` to put a watcher run with the correct message. `Workspace settings → Watchers → Activity` gives watcher run records. The UI does not show a `Watcher reviews` group. The `InputTruncated` value controls the `Excerpt` label. The UI does not change conversation data.
+
+`WatcherReviewView` and `WatcherLiveOutput` show the reviewer session. They use `AgentFeed`, the session WebSocket, and history pages. The panel shows text, `Message.Reasoning`, and tool output. When the user closes the view, the UI removes view resources. A user question with `ContinueChat: false` has status `Needs your input` in the UI.
 
 The UI uses the watcher run record for a runtime continuation when the `run_ids` values agree. Responses from a previous workspace or session must not replace new data.
 
@@ -221,6 +227,18 @@ See `messages.md` for the libraries, content limits, and source buttons.
 
 ## Settings
 
+The Usage section uses `shadcn-svelte` charts with LayerChart. The `/usage` API gives usage buckets by UTC day and model. The date range, provider, model, and usage scope controls select the data.
+
+```text
+Token total: Input + Output
+Reasoning: already included in Output
+CacheRead and CacheWrite: a separate metric
+```
+
+If cost data is not available, the cost stays unknown. A cost of 0 is known. Currencies stay different. The `Other models` model series has the usage for models not in the other model series. A data table gives correct values.
+
+Memory, Sidekick, `Instructions`, and Watchers use `WorkerUsageBreakdown`. The `PluginMetrics` response gives the charts for work status and `low`, `medium`, and `high` reminders. The charts from `PluginMetrics` do not give usage by UTC day. The UI uses `import()` for chart code and removes charts when the view closes. See `docs/usage-analytics.md` for the API contract.
+
 The settings pages use `SettingsPageTitle`. The settings pages have the same page title dimensions. `SettingsDialog` gives the same left edge to the settings pages.
 
 The `Tabs` component controls the settings pages and Watcher sections. The tab highlight stays in the tab track. The UI shows the selected settings page.
@@ -235,7 +253,15 @@ The client removes previous model IDs on session selection. The conversation cos
 
 Settings use one dialog above the conversation. Large screens have a sidebar for section selection. Small screens have a horizontal section list. The content section has a scrollbar. The user can close the dialog with the `Escape` key. The dialog keeps keyboard focus while it is open.
 
-The dialog has connection, provider, usage, and general settings sections. The usage section sends requests to the API to get statistics. The general section sends configuration requests to the API. An empty value removes the selected setting.
+`ConfigurationMenu` gives the navigation scope. The harness sections are `General`, `Usage`, `Providers`, and `Connection`. The workspace sections are `General`, `Instructions`, `Sidekick`, `Watchers`, and `Usage`. The `Workspace settings` value identifies the scope. An empty value removes the selected setting.
+
+The UI uses `PluginHeaderControls` and `DialogTitleBar` for settings pages.
+
+```text
+Plugin header: status, Switch, configuration gear button
+Configuration gear: immediately right of the Switch
+Dialog header: title and Close button share one centered row
+```
 
 Section requests stop when the dialog closes. They also stop when the user selects a different section. Previous requests must not change the selected scope. The UI keeps the conversation and message draft.
 

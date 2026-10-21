@@ -52,6 +52,108 @@ function metrics(workspaceID: string): MemoryMetrics {
   };
 }
 
+test('put Memory categories below full-width bars with hover and tap details', async ({
+  page,
+}, testInfo) => {
+  const fixture = await mockHarness(page);
+  await connectAndCreate(page);
+  const usage = metrics(fixture.instances[0].ID);
+  usage.Agents.push({
+    ...usage.Agents[0],
+    Agent: 'context.historian',
+    ModelID: 'test/second-worker-model',
+    Statistics: { ...usage.Agents[0].Statistics, Input: 60, Output: 30 },
+  });
+  fixture.memoryMetrics.set(fixture.instances[0].ID, usage);
+  const widths = testInfo.project.name === 'desktop' ? [1280, 1600] : [390, 320];
+  for (const [index, width] of widths.entries()) {
+    await page.setViewportSize({ width, height: 900 });
+    const panel = await openMemory(page);
+    if (index === 0)
+      await panel.getByRole('button', { name: 'Refresh memory', exact: true }).click();
+    for (const title of ['Jobs by status', 'Tokens by model']) {
+      const chart = panel.getByRole('region', { name: title, exact: true });
+      await expect(chart.locator('[data-slot="chart"]')).toBeVisible();
+      await expect
+        .poll(
+          () =>
+            chart.evaluate((element) => {
+              const container = element
+                .querySelector('[data-slot="chart"]')!
+                .getBoundingClientRect();
+              const hitAreas = Array.from(element.querySelectorAll('.lc-tooltip-rect')).map(
+                (mark) => mark.getBoundingClientRect().width,
+              );
+              return Math.max(0, ...hitAreas) / container.width;
+            }),
+          {
+            message: `${title}: category labels must not reserve plot width at ${width}px`,
+          },
+        )
+        .toBeGreaterThanOrEqual(0.88);
+      const categories = chart.getByRole('list', { name: `${title} categories` });
+      await expect(categories).toBeVisible();
+      const expected =
+        title === 'Tokens by model'
+          ? usage.Agents.map((agent) => agent.ModelID)
+          : ['Running', 'Queued', 'Prepared', 'Failed'];
+      for (const label of expected) await expect(categories).toContainText(label);
+      await expect(
+        chart
+          .locator('.lc-axis-tick-label')
+          .filter({ hasText: /test\/|Running|Queued|Prepared|Failed/ }),
+      ).toHaveCount(0);
+      const labelBounds = (await categories.boundingBox())!,
+        containerBounds = (await chart.locator('[data-slot="chart"]').boundingBox())!;
+      expect(labelBounds.y).toBeGreaterThanOrEqual(containerBounds.y + containerBounds.height);
+      expect(labelBounds.x).toBeGreaterThanOrEqual(containerBounds.x - 1);
+      expect(labelBounds.x + labelBounds.width).toBeLessThanOrEqual(
+        containerBounds.x + containerBounds.width + 1,
+      );
+      const colors = await categories
+        .locator('li > span:first-child')
+        .evaluateAll((elements) =>
+          elements.map((element) => getComputedStyle(element).backgroundColor),
+        );
+      expect(new Set(colors).size).toBe(expected.length);
+      const barColors = await chart
+        .locator('.lc-bars .lc-bar')
+        .evaluateAll((elements) =>
+          elements
+            .filter(
+              (element) =>
+                element.getBoundingClientRect().width > 0 &&
+                element.getBoundingClientRect().height > 0,
+            )
+            .map((element) => getComputedStyle(element).fill),
+        );
+      expect(barColors.every((color) => colors.includes(color))).toBe(true);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+  const panel = page.getByRole('region', { name: 'Workspace memory', exact: true });
+  const workers = panel.getByRole('region', { name: 'Tokens by model', exact: true });
+  const mark = workers.locator('.lc-bars .lc-bar').first();
+  await mark.scrollIntoViewIfNeeded();
+  const bounds = (await mark.boundingBox())!;
+  if (testInfo.project.name === 'mobile')
+    await page.touchscreen.tap(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  else await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await expect(page.getByRole('tooltip')).toContainText(
+    'test/worker-model-with-a-long-descriptive-identifier',
+  );
+  await expect(page.getByRole('tooltip')).toContainText('1,500');
+  await page.mouse.move(0, 0);
+  await workers.getByRole('button', { name: 'View data', exact: true }).click();
+  await expect(workers.getByRole('table')).toContainText(
+    'test/worker-model-with-a-long-descriptive-identifier',
+  );
+  await expect(workers.getByRole('table')).toContainText('1,500');
+  await page.screenshot({ path: testInfo.outputPath('memory-categories-below.png') });
+});
+
 test('show uncached worker input and output with cache separate and reasoning included once', async ({
   page,
 }) => {
@@ -78,6 +180,7 @@ test('show uncached worker input and output with cache separate and reasoning in
   await expect(panel.getByText('Reported worker tokens', { exact: true })).toBeVisible();
   await expect(panel.locator('[title="650,723"]')).toBeVisible();
   await expect(panel.getByText('97 calls · Workspace total', { exact: true })).toBeVisible();
+  await panel.getByRole('button', { name: 'Worker details', exact: true }).click();
   await panel.locator('[data-slot="collapsible-trigger"]').filter({ hasText: 'Compactor' }).click();
   const details = panel.getByRole('region', { name: 'Memory agent usage' });
   await expect(details.getByText('596,336', { exact: true })).toBeVisible();
@@ -87,6 +190,7 @@ test('show uncached worker input and output with cache separate and reasoning in
   );
   await expect(details.getByText('Cache write', { exact: true }).locator('..')).toContainText('0');
   await expect(details.getByText('Reasoning (included)', { exact: true })).toBeVisible();
+  await panel.getByRole('button', { name: 'Activity details', exact: true }).click();
   await expect(panel.getByRole('region', { name: 'Memory activity' })).toContainText('≈ 752,031');
 });
 
@@ -122,6 +226,7 @@ test('show real memory counters and agent usage without double-counting versions
   await expect(summary).toContainText('1,500');
   await expect(summary).toContainText('$0.0125');
   await expect(panel.getByRole('region', { name: 'Memory jobs' })).toContainText('Prepared');
+  await panel.getByRole('button', { name: 'Worker details', exact: true }).click();
   await panel.locator('[data-slot="collapsible-trigger"]').filter({ hasText: 'Compactor' }).click();
   const agentUsage = panel.getByRole('region', { name: 'Memory agent usage' });
   await expect(agentUsage.getByText('Input tokens', { exact: true }).locator('..')).toContainText(
@@ -134,6 +239,7 @@ test('show real memory counters and agent usage without double-counting versions
     '200',
   );
   await expect(panel.getByRole('region', { name: 'Memory agent usage' })).toContainText('2.3 s');
+  await panel.getByRole('button', { name: 'Activity details', exact: true }).click();
   await expect(panel.getByRole('region', { name: 'Memory activity' })).toContainText('24,000');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('memory-panel.png'), fullPage: true });

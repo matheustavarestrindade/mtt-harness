@@ -474,6 +474,16 @@ Requirements:
 
 The API gives `CacheHitRate` and `CacheHitPercentage`. The percentage is the rate multiplied by 100. The harness must use the prices from the provider configuration before prices from the database.
 
+The `/usage` API gives usage buckets by UTC day and model. The date range includes `from` and `to`. The maximum date range is 366 days. The default is the last 30 UTC days. The usage scope can be workspace, session, or harness. Use `agent_prefix` for workspace agent usage.
+
+```text
+Usage report limit: 10000 day/model/currency groups
+```
+
+The database gives usage buckets in one read snapshot. `Statistics` uses the usage buckets. If cost data is not available, the cost stays unknown. A cost of 0 is known. Cost estimates keep `Estimated: true`. The usage report does not contain API key IDs.
+
+See `docs/usage-analytics.md`.
+
 ### 6.2 Provider Data
 
 The default provider data is in `providers.json`. The file includes OpenAI and DeepSeek. The ChatGPT coding plan also uses data from the file. Source files must not contain a default provider list or model list.
@@ -836,13 +846,17 @@ The Watcher plugin uses the harness loop to examine task state, permission reque
 
 Worker sessions have an execution profile. The execution profile applies to `search_tool` and tool calls. The user can select file operations for `file_actions`. Tool grants do not use the permission pipeline. The harness examines input and model limits. Watcher sessions and the child sessions of a watcher cannot start watcher runs.
 
-The watcher uses `continue` or `interfere` to give a decision. For a permission request, `continue` gives `allow` with `scope:once`. The tool `interfere` gives a `deny` decision and a correction. A user decision cannot be changed by a subsequent watcher decision.
+The watcher uses `continue` or `interfere` to give a decision. For a permission request, `continue` gives `allow` with `scope:once`. The `continue_chat` input of `interfere` is `true` by default. With `true`, a permission review gives `deny` and a correction. A user decision cannot be changed by a subsequent watcher decision.
+
+With `continue_chat: false`, the UI shows watcher feedback for the user. The plugin does not put a primary turn in the queue. It does not resolve a permission request. Active work stays active. The user question stays at the reminder anchor for the next primary request. If a user question and a correction are in the same review group, the group waits for the user.
 
 The `EndTurn` event callback starts the watcher after a completed primary turn. A runtime continuation can start a new primary turn through the session queue. It does not make a user message. Continuation limits apply across primary turns. The harness examines user input, task state, configuration, and history through source fences before a decision is used.
 
 The prompt template uses `{todo}`, `{doing}`, and context window variables such as `{last_32k_context}`. Variable values are not examined for more variables. Conversation data is not system instructions. The source does not include `ProviderState`, `Content.Data`, or `data:` URLs.
 
 The plugin uses the `watcher` Postgres schema for watcher schedules and watcher run records. Workspace usage includes worker model calls. Worker usage does not increase primary conversation cost. See `plugins/watcher/doc.md` for configuration, limits, and API data.
+
+The conversation transcript contains text, not `Message` JSON. It has speaker labels, tool arguments, and tool output. It does not include message IDs, timestamps, empty fields, or usage values. The `input_tokens` field gives the token estimate. The UI uses the worker session's WebSocket and history APIs for live output.
 
 ## 10. Tools
 
@@ -1306,6 +1320,7 @@ The initial API paths are:
 - `GET /sessions/{id}/statistics`: read the statistics of a session.
 - `GET /instances/{id}/statistics`: read the statistics of an instance.
 - `GET /statistics`: read the full statistics of the harness.
+- `GET /usage`: read usage buckets by date, model, and scope.
 - `GET /health`: give the status of the harness.
 
 The message input can have text or content items:
@@ -1716,6 +1731,7 @@ type PermissionStore interface {
 }
 
 type UsageStore interface {
+    Report(operationContext context.Context, query atom.UsageQuery) (atom.UsageReport, error)
     Save(operationContext context.Context, record atom.UsageRecord) error
     Session(operationContext context.Context, sessionID atom.SessionID) (atom.Statistics, error)
     Instance(operationContext context.Context, instanceID string) (atom.Statistics, error)

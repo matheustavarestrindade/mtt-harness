@@ -55,7 +55,7 @@ test('preserve ordinary label spacing in the Sidekick reference', async ({ page 
   await mockHarness(page);
   await mockWatchers(page);
   await connectAndCreate(page);
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   await page
     .getByRole('navigation', { name: 'Settings sections' })
     .getByRole('tab', { name: 'Sidekick', exact: true })
@@ -81,7 +81,7 @@ test('match Instructions and Watchers to the original Sidekick footer', async ({
   await mockWatchers(page);
   if (page.viewportSize()!.width < 1024) await page.setViewportSize({ width: 320, height: 900 });
   await connectAndCreate(page);
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   const navigation = page.getByRole('navigation', { name: 'Settings sections' });
   await navigation.getByRole('tab', { name: 'Sidekick', exact: true }).click();
   const sidekick = page.getByRole('button', { name: 'Refresh Sidekick', exact: true });

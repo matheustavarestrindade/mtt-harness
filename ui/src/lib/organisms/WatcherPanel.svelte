@@ -5,7 +5,6 @@
   import { Input } from '../atoms/ui/input';
   import { Switch } from '../atoms/ui/switch';
   import * as Tabs from '../atoms/ui/tabs';
-  import { workspaceName } from '../atoms/format';
   import { createClientID } from '../atoms/identifiers';
   import type { Instance, Session, Model } from '../atoms/types';
   import type {
@@ -17,11 +16,14 @@
     WatcherPreview,
   } from '../atoms/watcher';
   import { watcherTriggers } from '../atoms/watcher';
+  import { watcherReviewFromRun, watcherStatusLabel } from '../atoms/watcher-presentation';
   import type { HarnessApi } from '../molecules/api/client';
-  import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import WorkerUsageBreakdown from '../molecules/WorkerUsageBreakdown.svelte';
   import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
   import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
+  import PluginHeaderControls from '../molecules/PluginHeaderControls.svelte';
   import Disclosure from '../molecules/Disclosure.svelte';
+  import WatcherReviewView from './WatcherReviewView.svelte';
   import WatcherEditor from './WatcherEditor.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
   let {
@@ -203,27 +205,18 @@
 <section aria-label="Watcher settings" class="min-w-0 space-y-5">
   <SettingsPageTitle icon={Eye} title="Watchers" description="Automatic workspace reviews.">
     {#snippet actions()}
-      {#if panel.state}<div class="flex min-h-11 shrink-0 items-center gap-3">
-          <span role="status" class="text-xs text-muted-foreground"
-            >{panel.state.Pending ? 'Updating…' : panel.state.Enabled ? 'On' : 'Off'}</span
-          >
-          <Switch
-            aria-label="Watchers enabled"
-            {disabled}
-            bind:checked={
-              () => panel.state?.RequestedEnabled ?? false,
-              (checked) => void panel.configure({ enabled: checked })
-            }
-          />
-        </div>{/if}
+      {#if panel.state}<PluginHeaderControls
+          enabled={panel.state.RequestedEnabled}
+          status={panel.state.Pending ? 'Updating…' : panel.state.Enabled ? 'On' : 'Off'}
+          toggleLabel="Watchers enabled"
+          {disabled}
+          onToggle={(enabled) => void panel.configure({ enabled })}
+        />{/if}
     {/snippet}
   </SettingsPageTitle>
   {#if !instance}<p class="text-sm text-muted-foreground">
       Select a workspace to configure watchers.
     </p>{:else}
-    <p class="break-words text-xs text-muted-foreground" title={instance.Workspace}>
-      {workspaceName(instance.Workspace)} · Workspace settings
-    </p>
     {#if panel.error}<p role="alert" class="break-words text-sm text-destructive">
         {panel.error}
       </p>{/if}
@@ -371,18 +364,13 @@
           <div class="flex min-h-11 items-center justify-between gap-3">
             <h3 class="text-sm font-medium">Worker usage</h3>
           </div>
-          <div class="space-y-2">
-            {#each panel.metrics?.Agents ?? [] as agent (`${agent.Agent}:${agent.ModelID}`)}<div
-                class="rounded-md border border-border px-3"
-              >
-                <MemoryAgentUsage
-                  {agent}
-                  label={panel.state?.Configuration.watchers.find(
-                    (value) => `watcher.${value.id}` === agent.Agent,
-                  )?.name ?? agent.Agent}
-                />
-              </div>{/each}
-          </div>
+          {#if panel.metrics?.Agents.length}<WorkerUsageBreakdown
+              agents={panel.metrics.Agents}
+              {models}
+              agentLabel={(name) =>
+                panel.state?.Configuration.watchers.find((value) => `watcher.${value.id}` === name)
+                  ?.name ?? name}
+            />{/if}
           {#if !panel.metrics?.Agents?.length}<p class="text-sm text-muted-foreground">
               No watcher usage recorded.
             </p>{/if}
@@ -399,34 +387,21 @@
                 class="min-w-0 rounded-md border border-border p-3"
                 triggerClass="min-h-8 py-1 text-sm pointer-coarse:min-h-11"
               >
-                {#snippet heading()}<span class="min-w-0 break-words">{run.name}</span><span
-                    class="ml-2 text-xs text-muted-foreground"
-                    >{run.status} · {watcherTriggers.find((value) => value.value === run.trigger)
-                      ?.label ?? run.trigger}</span
+                {#snippet heading()}<span class="min-w-0 break-words" data-watcher-activity={run.id}
+                    >{run.name}</span
+                  ><span class="ml-2 text-xs text-muted-foreground"
+                    >{watcherStatusLabel(run.status)} · {watcherTriggers.find(
+                      (value) => value.value === run.trigger,
+                    )?.label ?? run.trigger}</span
                   >{/snippet}
                 <div class="mt-3 min-w-0 space-y-3 text-xs">
-                  <p class="text-muted-foreground">
-                    {new Date(run.created_at).toLocaleString()} · {run.duration_ms} ms{run.decision
-                      ? ` · ${run.decision}`
-                      : ''}
-                  </p>
-                  {#if run.message || run.reason}<p class="whitespace-pre-wrap break-words">
-                      {run.message || run.reason}
-                    </p>{/if}{#if run.error}<p class="break-words text-destructive">
-                      {run.error}
-                    </p>{/if}
+                  <WatcherReviewView {api} review={watcherReviewFromRun(run)} />
                   {#if run.status === 'running'}<Button
                       variant="outline"
                       class="h-11"
                       onclick={() => void cancelRun(run.id)}
                       ><X class="size-4" />Cancel review</Button
                     >{/if}
-                  <Disclosure
-                    title={`Input · ${run.estimated ? '≈ ' : ''}${run.input_tokens.toLocaleString()} tokens${run.input_truncated ? ' · excerpt' : ''}`}
-                  >
-                    <pre
-                      class="max-h-72 overflow-auto whitespace-pre-wrap break-words">{run.input_preview}</pre>
-                  </Disclosure>
                 </div>
               </Disclosure>{/each}
           </div>

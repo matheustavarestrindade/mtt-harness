@@ -14,6 +14,18 @@ const settingsPages = new Set([
   'UsagePanel.svelte',
   'ProvidersPanel.svelte',
 ]);
+const pluginPages = new Set([
+  'SidekickPanel.svelte',
+  'RepetitionPanel.svelte',
+  'WatcherPanel.svelte',
+]);
+const sharedPatterns = new Map([
+  ['Workbench.svelte', 'ConfigurationMenu'],
+  ['Navigation.svelte', 'ConfigurationMenu'],
+  ['Composer.svelte', 'ConfigurationMenu'],
+  ['SettingsDialog.svelte', 'DialogTitleBar'],
+  ['SessionSettingsDialog.svelte', 'DialogTitleBar'],
+]);
 
 async function inspect(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -25,6 +37,15 @@ async function inspect(directory) {
     }
     if (!entry.isFile() || !entry.name.endsWith('.svelte')) continue;
     const source = await readFile(filename, 'utf8');
+    const required = pluginPages.has(entry.name)
+      ? 'PluginHeaderControls'
+      : sharedPatterns.get(entry.name);
+    if (required && !source.includes(`<${required}`))
+      failures.push(`${path.relative(root, filename)}: use the shared ${required} component`);
+    if (settingsPages.has(entry.name) && source.includes('· Workspace settings'))
+      failures.push(
+        `${path.relative(root, filename)}: workspace scope belongs to Configuration navigation, not repeated page labels`,
+      );
     if (
       settingsPages.has(entry.name) &&
       (/<h2\b/.test(source) || !source.includes('<SettingsPageTitle'))

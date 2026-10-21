@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { chooseSelectOption } from './helpers';
+import { chooseSelectOption, openWorkbenchAction } from './helpers';
 import { mockHarness } from './api-fixture';
 import type { DeviceLogin, Model, Provider } from '../src/lib/atoms/types';
 
@@ -151,7 +151,10 @@ test('offer every available model and submit model IDs rather than display names
   await expect(page.getByRole('region', { name: 'DeepSeek models', exact: true })).toContainText(
     'DeepSeek-V4.1-Flash',
   );
-  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Close settings', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
   const workspaceModel = page.getByLabel('Default model');
   await workspaceModel.click();
@@ -194,13 +197,7 @@ async function openProviders(page: Page, mobile: boolean) {
   await page.getByLabel('API token', { exact: true }).fill('test-token');
   await page.getByRole('button', { name: 'Connect to API', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  if (mobile) await page.getByRole('button', { name: 'Open navigation' }).click();
-  if (mobile)
-    await page
-      .getByRole('dialog')
-      .getByRole('button', { name: /^Settings/ })
-      .click();
-  else await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await openWorkbenchAction(page, 'Settings');
   await page.getByRole('dialog').getByRole('tab', { name: 'Providers', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Providers', exact: true })).toBeVisible();
 }
@@ -345,7 +342,10 @@ test('configure API providers, refresh catalogs, and remove a key', async ({ pag
   expect(fixture.keys.has('openai')).toBe(false);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('providers.png'), fullPage: true });
-  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Close settings', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
   await expect(page.getByLabel('Default model')).toHaveAttribute(
     'data-value',

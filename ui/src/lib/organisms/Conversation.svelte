@@ -22,8 +22,7 @@
   import AgentGroup from './AgentGroup.svelte';
   import MessageCard from '../molecules/MessageCard.svelte';
   import QueuedMessage from '../molecules/QueuedMessage.svelte';
-  import Disclosure from '../molecules/Disclosure.svelte';
-  import WatcherSection from '../molecules/WatcherSection.svelte';
+  import WatcherSection from './WatcherSection.svelte';
   import { watcherRuntimeIDs } from '../atoms/watcher';
   import PermissionCard from '../molecules/PermissionCard.svelte';
   import { HistoryScroll } from './history-scroll.svelte';
@@ -129,7 +128,7 @@
             ><LoaderCircle class="size-4 animate-spin" />Loading conversation…</span
           >
         </div>
-      {:else if !workbench.messages.length && !queued.length && !workbench.liveMessage && !unplacedAgents.length && !workbench.sidekick.entries.length && !workbench.sidekick.error && !workbench.watchers.entries.length && !workbench.watchers.error}
+      {:else if !workbench.messages.length && !queued.length && !workbench.liveMessage && !unplacedAgents.length && !workbench.sidekick.entries.length && !workbench.sidekick.error && !workbench.watchers.error}
         <section class="flex flex-1 flex-col items-center justify-center py-8 text-center sm:py-12">
           <div
             class="quiet-grid mb-6 grid size-28 place-items-center rounded-3xl border border-border/50 bg-muted/30"
@@ -248,6 +247,7 @@
                 />{/each}
               {#each watcherActivity.anchored.get(entry.message.ID) ?? [] as review (review.ID)}<WatcherSection
                   entry={review}
+                  api={workbench.connection === 'connected' ? workbench.connectedAPIClient() : null}
                 />{/each}
             </div>
           {/each}
@@ -257,18 +257,6 @@
             >
               {workbench.watchers.error}
             </p>{/if}
-          {#if watcherActivity.unplaced.length}<Disclosure
-              class="section-content"
-              title={`Watcher reviews · ${watcherActivity.unplaced.length}`}
-            >
-              {#each watcherActivity.unplaced as review (review.ID)}<WatcherSection
-                  entry={review}
-                />{/each}{#if workbench.watchers.nextCursor}<Button
-                  variant="ghost"
-                  class="h-11 text-xs"
-                  onclick={() => void workbench.watchers.more()}>Load earlier reviews</Button
-                >{/if}
-            </Disclosure>{/if}
           {#if workbench.history.hasNewer}<Button
               variant="ghost"
               class="h-11 self-center text-xs"

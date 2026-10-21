@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { ArrowUp, Square, LoaderCircle, Settings } from 'lucide-svelte';
+  import { ArrowUp, Square, LoaderCircle } from 'lucide-svelte';
   import { Button } from '$lib/atoms/ui/button';
   import { Textarea } from '$lib/atoms/ui/textarea';
   import type { Model } from '../atoms/types';
   import { attachmentIssue, type DraftAttachment } from '../atoms/attachments';
   import AttachmentTray from './AttachmentTray.svelte';
   import AttachmentMenu from './AttachmentMenu.svelte';
+  import ConfigurationMenu from './ConfigurationMenu.svelte';
+  import type { SettingsScope } from '../atoms/settings';
   let {
     value = $bindable(''),
     disabled = false,
@@ -15,7 +17,8 @@
     onSend,
     onCancel,
     onSettings,
-    settingsOpen = false,
+    onConfiguration,
+    workspaceAvailable = false,
     attachments = [],
     attachmentError = '',
     model,
@@ -30,8 +33,9 @@
     cancelling?: boolean;
     onSend: () => void;
     onCancel: () => void;
-    onSettings?: () => void;
-    settingsOpen?: boolean;
+    onSettings?: (trigger: HTMLButtonElement | null) => void;
+    onConfiguration?: (scope: SettingsScope, trigger: HTMLButtonElement | null) => void;
+    workspaceAvailable?: boolean;
     attachments?: DraftAttachment[];
     attachmentError?: string;
     model?: Model;
@@ -98,6 +102,7 @@
 </script>
 
 <form
+  aria-label="Message composer"
   class="flex min-w-0 flex-col gap-1 rounded-xl border border-input bg-card p-1.5 shadow-sm transition-colors focus-within:border-primary/50"
   class:border-primary={dragging}
   ondragover={(event) => {
@@ -165,17 +170,11 @@
         : ''}</span
     >
     <div class="flex shrink-0 items-center gap-0.5">
-      {#if onSettings}<Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          class="icon-button text-muted-foreground hover:text-foreground"
-          aria-label="Session settings"
-          title="Session settings"
-          aria-haspopup="dialog"
-          aria-expanded={settingsOpen}
-          onclick={onSettings}><Settings class="size-4" /></Button
-        >{/if}
+      {#if onConfiguration}<ConfigurationMenu
+          {workspaceAvailable}
+          onSettings={onConfiguration}
+          onSessionSettings={onSettings}
+        />{/if}
       {#if running}<Button
           class="size-11"
           variant="outline"

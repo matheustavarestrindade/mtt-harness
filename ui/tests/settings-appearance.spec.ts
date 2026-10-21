@@ -53,44 +53,52 @@ test('all seven Settings pages use one aligned title including Connection', asyn
   await mockWatchers(page);
   await connectAndCreate(page);
   if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 900 });
-  await openWorkbenchAction(page, 'Settings');
   const settingsTabs = page.getByRole('tablist', { name: 'Settings pages', exact: true });
-  await expect(settingsTabs.getByRole('tab')).toHaveCount(7);
   let baseline: Awaited<ReturnType<typeof titleGeometry>> | undefined;
-  for (const name of ['Sidekick', ...pages.filter((name) => name !== 'Sidekick')]) {
-    const tab = settingsTabs.getByRole('tab', { name, exact: true });
-    await tab.click();
-    await expect(tab).toHaveAttribute('aria-selected', 'true');
-    const title = page.locator('[data-settings-page-title]');
-    await expect(title).toHaveCount(1);
-    await expect(title.getByRole('heading', { level: 2 })).toHaveText(name);
-    await expect
-      .poll(() => page.locator('[data-settings-content]').evaluate((element) => element.scrollTop))
-      .toBe(0);
-    const geometry = await titleGeometry(title);
-    expect(geometry.fontSize).toBe('18px');
-    expect(geometry.fontWeight).toBe('500');
-    expect(geometry.lineHeight).toBe('28px');
-    expect(geometry.iconWidth).toBe(20);
-    expect(geometry.iconHeight).toBe(20);
-    expect(geometry.titleLeft).toBe(32);
-    expect(
-      geometry.descriptionLeft,
-      `${name}: description must start at the page content edge`,
-    ).toBe(0);
-    expect(geometry.descriptionGap).toBe(4);
-    expect(geometry.descriptionFont).toBe('14px');
-    expect(geometry.descriptionLine).toBe('20px');
-    if (baseline)
-      for (const key of Object.keys(baseline) as (keyof typeof geometry)[])
-        expect(geometry[key], `${name}: ${key}`).toBe(baseline[key]);
-    else baseline = geometry;
-    await page.screenshot({
-      path: testInfo.outputPath(`settings-${name.toLowerCase()}-title.png`),
-    });
-    await page
-      .locator('[data-settings-content]')
-      .evaluate((element) => (element.scrollTop = element.scrollHeight));
+  for (const [scope, names] of [
+    ['Workspace settings', ['Sidekick', 'General', 'Instructions', 'Watchers', 'Usage']],
+    ['Settings', ['General', 'Usage', 'Providers', 'Connection']],
+  ] as const) {
+    await openWorkbenchAction(page, scope);
+    await expect(settingsTabs.getByRole('tab')).toHaveCount(names.length);
+    for (const name of names) {
+      const tab = settingsTabs.getByRole('tab', { name, exact: true });
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+      const title = page.locator('[data-settings-page-title]');
+      await expect(title).toHaveCount(1);
+      await expect(title.getByRole('heading', { level: 2 })).toHaveText(name);
+      await expect
+        .poll(() =>
+          page.locator('[data-settings-content]').evaluate((element) => element.scrollTop),
+        )
+        .toBe(0);
+      const geometry = await titleGeometry(title);
+      expect(geometry.fontSize).toBe('18px');
+      expect(geometry.fontWeight).toBe('500');
+      expect(geometry.lineHeight).toBe('28px');
+      expect(geometry.iconWidth).toBe(20);
+      expect(geometry.iconHeight).toBe(20);
+      expect(geometry.titleLeft).toBe(32);
+      expect(
+        geometry.descriptionLeft,
+        `${name}: description must start at the page content edge`,
+      ).toBe(0);
+      expect(geometry.descriptionGap).toBe(4);
+      expect(geometry.descriptionFont).toBe('14px');
+      expect(geometry.descriptionLine).toBe('20px');
+      if (baseline)
+        for (const key of Object.keys(baseline) as (keyof typeof geometry)[])
+          expect(geometry[key], `${name}: ${key}`).toBe(baseline[key]);
+      else baseline = geometry;
+      await page.screenshot({
+        path: testInfo.outputPath(`settings-${name.toLowerCase()}-title.png`),
+      });
+      await page
+        .locator('[data-settings-content]')
+        .evaluate((element) => (element.scrollTop = element.scrollHeight));
+    }
+    await page.getByRole('button', { name: 'Close settings', exact: true }).click();
   }
   const overflow = await page.evaluate(() =>
     Array.from(document.querySelectorAll<HTMLElement>('body *'))
@@ -119,7 +127,7 @@ test('Watcher highlights fit their track and nested tab keyboard navigation is i
   await mockWatchers(page);
   await connectAndCreate(page);
   if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 900 });
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   const outer = page.getByRole('tablist', { name: 'Settings pages', exact: true });
   const parent = outer.getByRole('tab', { name: 'Watchers', exact: true });
   await parent.click();

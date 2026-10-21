@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate, chooseSelectOption } from './helpers';
+import { chooseSelectOption, connectAndCreate, openSessionSettings } from './helpers';
 
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC1kAAAAASUVORK5CYII=',
@@ -250,12 +250,15 @@ test('revalidate drafts after model changes and reject Responses audio', async (
   await page.keyboard.press('Escape');
   await input.setInputFiles({ name: 'image.png', mimeType: 'image/png', buffer: png });
   await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   await chooseSelectOption(
     page.getByRole('combobox', { name: 'Session model', exact: true }),
     'test/text-only',
   );
-  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Close session settings', exact: true })
+    .click();
   await expect(page.getByRole('list', { name: 'Attachments', exact: true })).toContainText(
     'does not accept image',
   );

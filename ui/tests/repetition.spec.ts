@@ -8,13 +8,16 @@ test('configure workspace repetition with themed selectors and keep the draft', 
   const fixture = await mockHarness(page);
   await connectAndCreate(page);
   await page.getByLabel('Message', { exact: true }).fill('Keep this draft');
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('tab', { name: 'Instructions', exact: true }).click();
   const panel = dialog.getByRole('region', { name: 'Spaced repetition', exact: true });
-  await expect(panel.getByRole('status')).toHaveText('Off');
-  await panel.getByRole('button', { name: 'Enable instruction reminders' }).click();
-  await expect(panel.getByRole('status')).toHaveText('On');
+  await expect(panel.getByRole('status').filter({ hasText: /^Off$/ })).toBeVisible();
+  const recovery = panel.getByRole('region', { name: 'Recovery activity', exact: true });
+  await expect(recovery).toContainText('No recovery activity yet.');
+  await expect(recovery.locator('svg')).toHaveCount(0);
+  await panel.getByRole('switch', { name: 'Instruction reminders enabled' }).click();
+  await expect(panel.getByRole('status').filter({ hasText: /^On$/ })).toBeVisible();
   expect(fixture.repetitionUpdates[0].patch).toEqual({ enabled: true });
   await panel.getByRole('button', { name: 'Configure reminders' }).click();
   await chooseSelectOption(panel.getByLabel('Growth interval', { exact: true }), 'tokens');
@@ -54,7 +57,12 @@ test('show recorded repetition metrics and recovery costs at narrow widths', asy
       'reminders/tokens': 1800,
       'reminders/estimated_tokens': 1800,
       'recovery/completed': 2,
+      'recovery/running': 1,
+      'recovery/failed': 3,
+      'recovery/cancelled': 4,
+      'recovery/interrupted': 5,
       'recovery/queries': 4,
+      'recovery/duration_ms': 1234,
     },
     Agents: [
       {
@@ -76,7 +84,7 @@ test('show recorded repetition metrics and recovery costs at narrow widths', asy
       },
     ],
   });
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('tab', { name: 'Instructions', exact: true }).click();
   const panel = dialog.getByRole('region', { name: 'Spaced repetition', exact: true });
@@ -84,8 +92,41 @@ test('show recorded repetition metrics and recovery costs at narrow widths', asy
     panel.getByText('Recovery worker cost', { exact: true }).locator('..'),
   ).toContainText('≈ $0.015');
   await expect(panel.getByText('500', { exact: true })).toBeVisible();
+  const recovery = panel.getByRole('region', { name: 'Recovery activity', exact: true });
+  await expect(recovery.locator('[data-slot="chart"]')).toBeVisible();
+  const categories = recovery.getByRole('list', { name: 'Recovery activity categories' });
+  for (const label of ['Running', 'Completed', 'Failed', 'Cancelled', 'Interrupted'])
+    await expect(categories).toContainText(label);
+  await expect(
+    recovery
+      .locator('.lc-axis-tick-label')
+      .filter({ hasText: /Running|Completed|Failed|Cancelled|Interrupted/ }),
+  ).toHaveCount(0);
+  await recovery.getByRole('button', { name: 'View data', exact: true }).click();
+  for (const [label, value] of [
+    ['Running', '1'],
+    ['Completed', '2'],
+    ['Failed', '3'],
+    ['Cancelled', '4'],
+    ['Interrupted', '5'],
+  ])
+    await expect(recovery.getByRole('row').filter({ hasText: label }).getByRole('cell')).toHaveText(
+      value,
+    );
+  await expect(panel.getByLabel('Recovery context', { exact: true })).toHaveText(
+    '4 memory searches · 1.2 s recovery time',
+  );
+  await expect(panel.getByText('Running recoveries', { exact: true })).toHaveCount(0);
+  await expect(panel.getByText('Completed recoveries', { exact: true })).toHaveCount(0);
+  await panel.getByRole('button', { name: 'About instruction recovery usage' }).click();
+  await expect(page.getByRole('tooltip')).toContainText(
+    'Automatic reminders make no worker-model calls',
+  );
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
+  await panel.getByRole('button', { name: 'Worker details', exact: true }).click();
   await panel.getByText('Instruction recovery', { exact: true }).click();
-  await expect(panel.getByText('400', { exact: true })).toBeVisible();
+  await expect(panel.getByText('Input tokens', { exact: true }).locator('..')).toContainText('400');
   await expect(panel.getByText('Cache read', { exact: true }).locator('..')).toContainText('200');
   await expect(panel.getByText('Cache write', { exact: true }).locator('..')).toContainText('50');
   await panel.getByRole('button', { name: 'Configure reminders' }).click();

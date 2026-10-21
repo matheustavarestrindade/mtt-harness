@@ -98,7 +98,7 @@ test('keep mobile actions in the drawer and hand off one panel at a time', async
 
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
   const navigation = page.getByRole('navigation', { name: 'Workspaces and sessions', exact: true });
-  for (const label of ['New session', 'Tasks', 'Memory', 'Session activity', 'Settings']) {
+  for (const label of ['New session', 'Tasks', 'Memory', 'Session activity', 'Configuration']) {
     await expect(navigation.getByRole('button', { name: label, exact: true })).toBeInViewport();
   }
   await page.screenshot({
@@ -132,12 +132,16 @@ test('keep mobile actions in the drawer and hand off one panel at a time', async
     await expect(workbenchReturnControl(page, '')).toBeFocused();
   }
   await expect(draft).toHaveValue('Keep the mobile draft');
-  await expect(page.getByRole('button', { name: 'Session settings', exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole('form', { name: 'Message composer' })
+      .getByRole('button', { name: 'Configuration', exact: true }),
+  ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('mobile-compact-header.png'), fullPage: true });
 
   await page.setViewportSize({ width: 1440, height: 960 });
-  for (const label of ['Open tasks panel', 'Open settings', 'Session activity', 'New session']) {
+  for (const label of ['Open tasks panel', 'Configuration', 'Session activity', 'New session']) {
     await expect(header.getByRole('button', { name: label, exact: true })).toBeVisible();
   }
 });

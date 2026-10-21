@@ -141,7 +141,10 @@ func (plugin *Plugin) observePermission(operationContext context.Context, event 
 	plugin.enqueue(observation{Session: session, Trigger: "permission_request", Permission: &atom.PermissionRequest{ID: metadata.ID, SessionID: metadata.SessionID, InstanceID: metadata.InstanceID}})
 }
 
-type requestConfiguration struct{ configuration configuration }
+type requestConfiguration struct {
+	configuration configuration
+	state         sessionState
+}
 type requestKey struct{ plugin *Plugin }
 
 func (plugin *Plugin) BeginRequest(operationContext context.Context, session atom.Session) (context.Context, func(), error) {
@@ -153,20 +156,22 @@ func (plugin *Plugin) BeginRequest(operationContext context.Context, session ato
 		plugin.recordError(session.InstanceID, operationError)
 		return operationContext, func() {}, nil
 	}
-	return context.WithValue(operationContext, requestKey{plugin}, requestConfiguration{configuration}), func() {}, nil
-}
-func (*Plugin) ProjectReminders(_ context.Context, _ atom.Session, request atom.Request) (atom.Request, error) {
-	return request, nil
+	state, operationError := plugin.database.Session(operationContext, session.InstanceID, string(session.ID))
+	if operationError != nil {
+		return operationContext, func() {}, operationError
+	}
+	return context.WithValue(operationContext, requestKey{plugin}, requestConfiguration{configuration: configuration, state: state}), func() {}, nil
 }
 func (plugin *Plugin) PrepareReminder(operationContext context.Context, input harness.ContextRequest) (harness.ReminderContribution, error) {
 	if input.Session.Execution != nil || input.Session.Parent != "" {
 		return harness.ReminderContribution{}, nil
 	}
 	frozen, found := operationContext.Value(requestKey{plugin}).(requestConfiguration)
-	if !found || !frozen.configuration.Enabled {
+	if !found {
 		return harness.ReminderContribution{}, nil
 	}
-	if !slices.ContainsFunc(frozen.configuration.Watchers, func(value definition) bool { return value.Enabled && slices.Contains(value.Triggers, "context_growth") }) {
+	observeGrowth := frozen.configuration.Enabled && slices.ContainsFunc(frozen.configuration.Watchers, func(value definition) bool { return value.Enabled && slices.Contains(value.Triggers, "context_growth") })
+	if !observeGrowth && len(frozen.state.Notices) == 0 {
 		return harness.ReminderContribution{}, nil
 	}
 	var visible []string
@@ -176,7 +181,26 @@ func (plugin *Plugin) PrepareReminder(operationContext context.Context, input ha
 		}
 	}
 	value := observation{Session: input.Session, Trigger: "context_growth", Tokens: input.Budget.InputTokens, Model: input.ModelID, Visible: visible}
-	return harness.ReminderContribution{Commit: func(context.Context, harness.ReminderDelivery) error { plugin.enqueue(value); return nil }}, nil
+	retired := map[string]bool{}
+	for _, notice := range frozen.state.Notices {
+		if !slices.Contains(visible, notice.AnchorID) {
+			retired[notice.ID] = true
+		}
+	}
+	return harness.ReminderContribution{Commit: func(commitContext context.Context, _ harness.ReminderDelivery) error {
+		if len(retired) > 0 {
+			if operationError := plugin.database.UpdateSession(commitContext, input.Session.InstanceID, string(input.Session.ID), func(state *sessionState) error {
+				state.Notices = slices.DeleteFunc(state.Notices, func(notice reviewNotice) bool { return retired[notice.ID] })
+				return nil
+			}); operationError != nil {
+				return operationError
+			}
+		}
+		if observeGrowth {
+			plugin.enqueue(value)
+		}
+		return nil
+	}}, nil
 }
 func (plugin *Plugin) EndTurn(operationContext context.Context, session atom.Session, status string) error {
 	if session.Execution != nil || session.Parent != "" || plugin.database == nil {

@@ -16,7 +16,10 @@
   import { costLabel, formatTokenCount, workspaceName } from '../atoms/format';
   import { memoryCounter, totalAgentUsage, agentTokenCount } from '../atoms/memory';
   import type { HarnessApi } from '../molecules/api/client';
-  import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import WorkerUsageBreakdown from '../molecules/WorkerUsageBreakdown.svelte';
+  import MetricChart from '../molecules/charts/MetricChart.svelte';
+  import { chartColors } from '../atoms/usage';
+  import Disclosure from '../molecules/Disclosure.svelte';
   import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import { MemoryPanelState } from './memory-panel.svelte';
 
@@ -310,51 +313,66 @@
               >{count('job/running') ? 'Working' : count('job/pending') ? 'Queued' : 'Idle'}</span
             >
           </div>
-          <dl class="grid grid-cols-3 gap-2 text-center text-xs tabular-nums">
-            {#each [['Running', 'job/running'], ['Queued', 'job/pending'], ['Prepared', 'job/ready']] as [label, key]}<div
-                class="rounded-md bg-muted/40 py-2"
-              >
-                <dd class="font-medium">{count(key).toLocaleString()}</dd>
-                <dt class="mt-1 text-[10px] text-muted-foreground">{label}</dt>
-              </div>{/each}
-          </dl>
-          {#if count('job/failed')}<p class="mt-2 text-[11px] text-destructive">
-              {count('job/failed')} failed jobs
-            </p>{/if}
+          {#if ['job/running', 'job/pending', 'job/ready', 'job/failed'].some((key) => count(key) > 0)}
+            <MetricChart
+              title="Jobs by status"
+              description="Current workspace job states."
+              data={[
+                ['Running', 'job/running'],
+                ['Queued', 'job/pending'],
+                ['Prepared', 'job/ready'],
+                ['Failed', 'job/failed'],
+              ].map(([label, key]) => ({
+                label,
+                value: count(key),
+              }))}
+              series={[{ key: 'value', label: 'Jobs', color: chartColors[0] }]}
+              metric="calls"
+              horizontal
+              categoryLabels="below"
+              height={164}
+              legend={false}
+            />
+            {#if count('job/failed')}<p class="mt-2 text-xs text-destructive">
+                {count('job/failed')} failed jobs
+              </p>{/if}
+          {:else}<p class="text-xs text-muted-foreground">No queued or running jobs.</p>{/if}
         </section>
         <section class="border-b border-border py-4" aria-label="Memory agent usage">
           <h3 class="mb-1 text-xs font-medium">Workers</h3>
-          {#each panel.metrics.Agents as agent (`${agent.Agent}/${agent.ModelID}`)}<MemoryAgentUsage
-              {agent}
+          {#if panel.metrics.Agents.length}<WorkerUsageBreakdown
+              agents={panel.metrics.Agents}
+              {models}
             />{:else}<p class="py-3 text-xs leading-5 text-muted-foreground">
               No worker calls yet. Direct memory saves do not use a language model.
-            </p>{/each}
+            </p>{/if}
           <p class="mt-2 text-[10px] leading-5 text-muted-foreground">
             Worker usage is cumulative across workspace sessions.
           </p>
         </section>
         <section class="py-4" aria-label="Memory activity">
-          <h3 class="mb-3 text-xs font-medium">Activity</h3>
-          <dl class="space-y-2.5 text-[11px] tabular-nums">
-            {#each [['Direct saves', 'context.remember/saved_memories'], ['Memory searches', 'context.main_search/queries'], ['Checkpoints', 'context.compactor/checkpoints'], ['Messages reduced', 'context.compactor/removed_messages'], ['Estimated tokens removed', 'context.compactor/estimated_tokens_removed']] as [label, key]}<div
-                class="flex justify-between gap-3"
-              >
-                <dt class="text-muted-foreground">{label}</dt>
-                <dd
-                  title={key === 'context.compactor/estimated_tokens_removed'
-                    ? 'Cumulative checkpoint estimates; not provider-reported token savings or current memory size.'
-                    : undefined}
+          <Disclosure title="Activity details">
+            <dl class="space-y-2.5 text-[11px] tabular-nums">
+              {#each [['Direct saves', 'context.remember/saved_memories'], ['Memory searches', 'context.main_search/queries'], ['Checkpoints', 'context.compactor/checkpoints'], ['Messages reduced', 'context.compactor/removed_messages'], ['Estimated tokens removed', 'context.compactor/estimated_tokens_removed']] as [label, key]}<div
+                  class="flex justify-between gap-3"
                 >
-                  {key === 'context.compactor/estimated_tokens_removed' ? '≈ ' : ''}{count(
-                    key,
-                  ).toLocaleString()}
-                </dd>
-              </div>{/each}
-            <div class="flex justify-between gap-3">
-              <dt class="text-muted-foreground">Embedding chunks</dt>
-              <dd>{embeddingChunks.toLocaleString()}</dd>
-            </div>
-          </dl>
+                  <dt class="text-muted-foreground">{label}</dt>
+                  <dd
+                    title={key === 'context.compactor/estimated_tokens_removed'
+                      ? 'Cumulative checkpoint estimates; not provider-reported token savings or current memory size.'
+                      : undefined}
+                  >
+                    {key === 'context.compactor/estimated_tokens_removed' ? '≈ ' : ''}{count(
+                      key,
+                    ).toLocaleString()}
+                  </dd>
+                </div>{/each}
+              <div class="flex justify-between gap-3">
+                <dt class="text-muted-foreground">Embedding chunks</dt>
+                <dd>{embeddingChunks.toLocaleString()}</dd>
+              </div>
+            </dl>
+          </Disclosure>
         </section>
       {/if}
     {/if}

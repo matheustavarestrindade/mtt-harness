@@ -1,18 +1,22 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { Bot, Power, RefreshCw, Settings2 } from 'lucide-svelte';
+  import { Bot, RefreshCw } from 'lucide-svelte';
   import type { Instance, Model } from '../atoms/types';
   import type { SidekickConfiguration } from '../atoms/plugins';
   import { Button } from '../atoms/ui/button';
   import { Input } from '../atoms/ui/input';
   import { Label } from '../atoms/ui/label';
-  import { costLabel, formatTokenCount, workspaceName } from '../atoms/format';
+  import { costLabel, formatTokenCount } from '../atoms/format';
   import { totalAgentUsage, agentTokenCount } from '../atoms/memory';
   import type { HarnessApi } from '../molecules/api/client';
   import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
-  import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import WorkerUsageBreakdown from '../molecules/WorkerUsageBreakdown.svelte';
+  import MetricChart from '../molecules/charts/MetricChart.svelte';
+  import { chartColors } from '../atoms/usage';
+  import Disclosure from '../molecules/Disclosure.svelte';
   import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
+  import PluginHeaderControls from '../molecules/PluginHeaderControls.svelte';
   import * as ToggleGroup from '../atoms/ui/toggle-group';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
 
@@ -141,46 +145,35 @@
     description="Useful workspace context for the agent’s current DOING activity."
   >
     {#snippet actions()}
-      {#if panel.state}<span role="status" class="text-xs text-muted-foreground"
-          >{panel.state.Pending
+      {#if panel.state}<PluginHeaderControls
+          enabled={panel.state.RequestedEnabled}
+          status={panel.state.Pending
             ? 'Updating…'
             : !panel.state.Available
               ? 'Unavailable'
               : panel.state.Enabled
                 ? 'On'
-                : 'Off'}</span
-        >{/if}
+                : 'Off'}
+          toggleLabel="Sidekick enabled"
+          configureLabel="Configure Sidekick"
+          {disabled}
+          toggleDisabled={!panel.state.Available && !panel.state.RequestedEnabled}
+          expanded={editing}
+          onToggle={() => void toggleSidekick()}
+          onConfigure={() => openConfiguration()}
+        />{/if}
     {/snippet}
   </SettingsPageTitle>
   {#if !instance}<p class="text-sm text-muted-foreground">
       Select a workspace to configure Sidekick.
     </p>
   {:else}
-    <p class="break-words text-xs text-muted-foreground" title={instance.Workspace}>
-      {workspaceName(instance.Workspace)} · Workspace settings
-    </p>
     {#if panel.error}<p role="alert" class="break-words text-sm text-destructive">
         {panel.error}
       </p>{/if}
     {#if panel.state?.Error}<p role="status" class="break-words text-xs text-muted-foreground">
         {panel.state.Error}
       </p>{/if}
-    {#if panel.state}
-      <div class="flex flex-wrap gap-2">
-        <Button
-          variant={panel.state.RequestedEnabled ? 'secondary' : 'default'}
-          class="h-11"
-          disabled={disabled || (!panel.state.Available && !panel.state.RequestedEnabled)}
-          onclick={toggleSidekick}
-          ><Power class="size-4" />{panel.state.RequestedEnabled
-            ? 'Disable Sidekick'
-            : 'Enable Sidekick'}</Button
-        >
-        <Button variant="outline" class="h-11" {disabled} onclick={() => openConfiguration()}
-          ><Settings2 class="size-4" />Configure Sidekick</Button
-        >
-      </div>
-    {/if}
     {#if editing}
       <form
         class="space-y-4 border-y border-border py-5"
@@ -322,40 +315,53 @@
           </dd>
         </div>
       </dl>
-      <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-        <dt class="text-muted-foreground">Memory results</dt>
-        <dd class="text-right tabular-nums">{formatTokenCount(count('sources/memories'))}</dd>
-        <dt class="text-muted-foreground">File excerpts</dt>
-        <dd class="text-right tabular-nums">{formatTokenCount(count('sources/files'))}</dd>
-        <dt class="text-muted-foreground">Duplicate sources skipped</dt>
-        <dd class="text-right tabular-nums">{formatTokenCount(count('sources/duplicates'))}</dd>
-        <dt class="text-muted-foreground">Already in context</dt>
-        <dd class="text-right tabular-nums">
-          {formatTokenCount(count('sources/already_present'))}
-        </dd>
-        <dt class="text-muted-foreground">Runs with no useful note</dt>
-        <dd class="text-right tabular-nums">{formatTokenCount(count('jobs/skipped'))}</dd>
-        <dt class="text-muted-foreground">Stale results discarded</dt>
-        <dd class="text-right tabular-nums">
-          {formatTokenCount(count('jobs/stale') + count('hints/stale'))}
-        </dd>
-        <dt class="text-muted-foreground">Cancelled runs</dt>
-        <dd class="text-right tabular-nums">{formatTokenCount(count('jobs/cancelled'))}</dd>
-        <dt class="text-muted-foreground">Added request input</dt>
-        <dd class="text-right tabular-nums">
-          {count('hints/estimated_tokens') ? '≈ ' : ''}{formatTokenCount(
-            count('hints/input_tokens'),
-          )}
-        </dd>
-      </dl>
+      {#if count('sources/memories') || count('sources/files')}<MetricChart
+          title="Retrieved sources"
+          description="All-time workspace retrieval results."
+          data={[
+            { label: 'Workspace memory', value: count('sources/memories') },
+            { label: 'Project files', value: count('sources/files') },
+          ]}
+          series={[{ key: 'value', label: 'Results', color: chartColors[0] }]}
+          metric="calls"
+          horizontal
+          legend={false}
+          height={116}
+        />{:else}<p class="text-sm text-muted-foreground">No retrieved sources yet.</p>{/if}
+      <Disclosure title="Retrieval details"
+        ><dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <dt class="text-muted-foreground">Memory results</dt>
+          <dd class="text-right tabular-nums">{formatTokenCount(count('sources/memories'))}</dd>
+          <dt class="text-muted-foreground">File excerpts</dt>
+          <dd class="text-right tabular-nums">{formatTokenCount(count('sources/files'))}</dd>
+          <dt class="text-muted-foreground">Duplicate sources skipped</dt>
+          <dd class="text-right tabular-nums">{formatTokenCount(count('sources/duplicates'))}</dd>
+          <dt class="text-muted-foreground">Already in context</dt>
+          <dd class="text-right tabular-nums">
+            {formatTokenCount(count('sources/already_present'))}
+          </dd>
+          <dt class="text-muted-foreground">Runs with no useful note</dt>
+          <dd class="text-right tabular-nums">{formatTokenCount(count('jobs/skipped'))}</dd>
+          <dt class="text-muted-foreground">Stale results discarded</dt>
+          <dd class="text-right tabular-nums">
+            {formatTokenCount(count('jobs/stale') + count('hints/stale'))}
+          </dd>
+          <dt class="text-muted-foreground">Cancelled runs</dt>
+          <dd class="text-right tabular-nums">{formatTokenCount(count('jobs/cancelled'))}</dd>
+          <dt class="text-muted-foreground">Added request input</dt>
+          <dd class="text-right tabular-nums">
+            {count('hints/estimated_tokens') ? '≈ ' : ''}{formatTokenCount(
+              count('hints/input_tokens'),
+            )}
+          </dd>
+        </dl>
+      </Disclosure>
       <p class="text-xs text-muted-foreground">
         Worker usage belongs to this workspace. Added hint input is already included in chat usage.
       </p>
       {#if panel.metrics.Agents.length}<div>
           <h3 class="mb-2 text-sm font-medium">Agent usage</h3>
-          {#each panel.metrics.Agents as agent (`${agent.Agent}:${agent.ModelID}`)}<MemoryAgentUsage
-              {agent}
-            />{/each}
+          <WorkerUsageBreakdown agents={panel.metrics.Agents} {models} />
         </div>{/if}
     {:else if panel.loading}<p role="status" class="text-sm text-muted-foreground">
         Loading Sidekick…

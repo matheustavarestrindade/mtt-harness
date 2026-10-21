@@ -9,7 +9,6 @@
     FolderOpen,
     MessageSquarePlus,
     Radio,
-    Settings2,
     CircleAlert,
     LoaderCircle,
     PanelLeftClose,
@@ -21,6 +20,7 @@
   import { Toaster } from '$lib/atoms/ui/sonner';
   import { Button } from '$lib/atoms/ui/button';
   import ActivityIndicator from '../atoms/ActivityIndicator.svelte';
+  import ConfigurationMenu from '../molecules/ConfigurationMenu.svelte';
   import * as Sheet from '$lib/atoms/ui/sheet';
   import Navigation from '$lib/organisms/Navigation.svelte';
   import SettingsDialog from '$lib/organisms/SettingsDialog.svelte';
@@ -42,12 +42,15 @@
   import { loadLayout, saveLayout } from '$lib/molecules/layout-storage';
   import { shortID, workspaceName } from '$lib/atoms/format';
   import type { Instance, InstanceInput, Session } from '$lib/atoms/types';
-  import type { SettingsSection } from '$lib/atoms/settings';
+  import type { SettingsSection, SettingsScope } from '$lib/atoms/settings';
 
   const workbench = new HarnessConsole();
   let preferences = $state<ConnectionPreferences>({ base: '/api', token: '' });
   let settingsOpen = $state(false);
   let settingsSection = $state<SettingsSection>('general');
+  let settingsScope = $state<SettingsScope>('harness');
+  let configurationReturnControl: HTMLElement | null = null;
+  let sessionReturnControl: HTMLElement | null = null;
   let workspaceOpen = $state(false);
   let workspaceError = $state('');
   let sessionOpen = $state(false);
@@ -145,12 +148,39 @@
         : 'Connect API',
   );
 
-  function openSettings(section?: SettingsSection) {
+  function openSettings(
+    section?: SettingsSection,
+    scope?: SettingsScope,
+    trigger?: HTMLButtonElement | null,
+  ) {
     toast.dismiss();
     menuOpen = false;
     sidePanelDrawerOpen = false;
-    settingsSection = section ?? (workbench.connection === 'connected' ? 'general' : 'connection');
+    configurationReturnControl =
+      trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    settingsScope =
+      scope ??
+      (['instructions', 'sidekick', 'watcher'].includes(section ?? '') ? 'workspace' : 'harness');
+    settingsSection =
+      section ??
+      (settingsScope === 'harness' && workbench.connection !== 'connected'
+        ? 'connection'
+        : 'general');
     settingsOpen = true;
+  }
+  function restoreConfigurationFocus(control: HTMLElement | null) {
+    void tick().then(() => {
+      if (control?.isConnected && control.getClientRects().length) {
+        control.focus();
+        return;
+      }
+      const fallback = desktopNavigation.current
+        ? document.querySelector<HTMLButtonElement>(
+            '#conversation-header [aria-label="Configuration"]',
+          )
+        : document.getElementById('mobile-navigation-toggle');
+      fallback?.focus();
+    });
   }
   function toggleSidePanel(panel: 'memory' | 'tasks') {
     toast.dismiss();
@@ -181,6 +211,7 @@
     if (
       navigationActionOpen &&
       !settingsOpen &&
+      !sessionSettingsOpen &&
       !activityOpen &&
       !sessionOpen &&
       !workspaceOpen &&
@@ -231,7 +262,9 @@
       if (busy === name) busy = '';
     }
   }
-  function openSessionSettings() {
+  function openSessionSettings(trigger?: HTMLButtonElement | null) {
+    sessionReturnControl =
+      trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     settingsSessionID = sessionID;
     pendingModel = null;
     sessionSettingsError = '';
@@ -466,7 +499,11 @@
   <Navigation
     console={workbench}
     onClose={drawer ? () => (menuOpen = false) : undefined}
-    onSettings={() => openNavigationAction(() => openSettings())}
+    onSettings={(scope, trigger) =>
+      openNavigationAction(() => openSettings(undefined, scope, trigger))}
+    onSessionSettings={workbench.session
+      ? (trigger) => openNavigationAction(() => openSessionSettings(trigger))
+      : undefined}
     onWorkspace={() => openNavigationAction(() => (workspaceOpen = true))}
     onSession={() => openNavigationAction(() => (sessionOpen = true))}
     onTasks={drawer ? () => openNavigationAction(() => toggleSidePanel('tasks')) : undefined}
@@ -591,20 +628,14 @@
             aria-expanded={memoryVisible}
             onclick={() => toggleSidePanel('memory')}><BrainCircuit class="size-4" /></Button
           >
-          <Button
-            variant="ghost"
-            class="icon-button gap-2 px-2 text-xs sm:px-3"
-            onclick={() => openSettings()}
-            title={connectionLabel}
-            aria-label="Open settings"
-            ><span
-              class="hidden size-1.5 rounded-full sm:block {workbench.connection === 'connected'
-                ? 'bg-primary'
-                : 'bg-muted-foreground'}"
-            ></span><span class="hidden sm:inline">{connectionLabel}</span><Settings2
-              class="size-4"
-            /></Button
-          >
+          <ConfigurationMenu
+            variant="toolbar"
+            {connectionLabel}
+            connected={workbench.connection === 'connected'}
+            workspaceAvailable={!!workbench.instance}
+            onSettings={(scope, trigger) => openSettings(undefined, scope, trigger)}
+            onSessionSettings={workbench.session ? openSessionSettings : undefined}
+          />
           <Button
             variant="ghost"
             size="icon"
@@ -682,7 +713,8 @@
               onCancel={() =>
                 void runWorkbenchAction('cancel', () => workbench.cancelCurrentTurn())}
               onSettings={workbench.session ? openSessionSettings : undefined}
-              settingsOpen={sessionSettingsOpen}
+              onConfiguration={(scope, trigger) => openSettings(undefined, scope, trigger)}
+              workspaceAvailable={!!workbench.instance}
             />
             <div class="mt-1 flex items-center justify-between gap-2">
               <UsageBar
@@ -752,6 +784,7 @@
   {pendingModel}
   onModelChange={(model) => void changeSessionModel(model)}
   onEffortChange={(effort) => void changeSessionEffort(effort)}
+  onClose={() => restoreConfigurationFocus(sessionReturnControl)}
   onCancel={() => {
     pendingModel = null;
     sessionSettingsError = '';
@@ -763,10 +796,13 @@
 <SettingsDialog
   bind:open={settingsOpen}
   bind:section={settingsSection}
+  bind:scope={settingsScope}
+  onClose={() => restoreConfigurationFocus(configurationReturnControl)}
   api={workbench.connection === 'connected' ? workbench.connectedAPIClient() : null}
   instance={workbench.instance}
   session={workbench.session}
   initialBase={preferences.base}
+  models={workbench.catalog}
   initialToken={preferences.token}
   busy={busy === 'connect'}
   error={workbench.connection === 'error' ? workbench.error : ''}

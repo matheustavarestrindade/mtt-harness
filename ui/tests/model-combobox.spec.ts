@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate, chooseSelectOption } from './helpers';
+import { chooseSelectOption, connectAndCreate, openSessionSettings } from './helpers';
 
 test('group and search friendly model names while submitting provider-qualified IDs', async ({
   page,
@@ -17,7 +17,7 @@ test('group and search friendly model names while submitting provider-qualified 
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await connectAndCreate(page);
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   const selector = page.getByRole('combobox', { name: 'Session model', exact: true });
   await expect(selector).toHaveAttribute('aria-haspopup', 'dialog');
   await selector.click();
@@ -81,7 +81,7 @@ test('keep the confirmed model during an API save and retain unavailable selecti
       body: JSON.stringify({ error: 'Selection failed' }),
     });
   });
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   const selector = page.getByLabel('Session model', { exact: true });
   await chooseSelectOption(selector, 'other/new-id');
   await expect(selector).toBeDisabled();
@@ -92,7 +92,7 @@ test('keep the confirmed model during an API save and retain unavailable selecti
   await expect(selector).toBeFocused();
   fixture.sessions[0].Model = 'retired/no-longer-listed';
   await page.reload();
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   await expect(selector).toContainText('Unavailable');
   await selector.click();
   await expect(

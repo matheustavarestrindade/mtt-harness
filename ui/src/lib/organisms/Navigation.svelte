@@ -2,8 +2,6 @@
   import {
     Plus,
     MessageSquare,
-    Settings2,
-    Circle,
     X,
     LoaderCircle,
     Trash2,
@@ -18,6 +16,8 @@
   import AgentStatusDot from '../atoms/AgentStatusDot.svelte';
   import { sessionChildren, sessionRoot } from '../atoms/session-tree';
   import WorkspaceSwitcher from '../molecules/WorkspaceSwitcher.svelte';
+  import ConfigurationMenu from '../molecules/ConfigurationMenu.svelte';
+  import type { SettingsScope } from '../atoms/settings';
   import type { HarnessConsole } from '$lib/organisms/console.svelte';
   import type { Instance, Session } from '$lib/atoms/types';
   import { shortID } from '$lib/atoms/format';
@@ -25,6 +25,7 @@
     console: workbench,
     onClose,
     onSettings,
+    onSessionSettings,
     onWorkspace,
     onSession,
     onSelectInstance,
@@ -40,7 +41,8 @@
   }: {
     console: HarnessConsole;
     onClose?: () => void;
-    onSettings: () => void;
+    onSettings: (scope: SettingsScope, trigger: HTMLButtonElement | null) => void;
+    onSessionSettings?: (trigger: HTMLButtonElement | null) => void;
     onWorkspace: () => void;
     onSession: () => void;
     onSelectInstance: (instance: Instance) => void;
@@ -257,34 +259,18 @@
       >
         <Radio class="size-4" />Session activity
       </Button>
-      <Button
-        variant="ghost"
-        class="h-11 w-full justify-start gap-3 px-3 text-sm"
-        onclick={onSettings}
-      >
-        <Settings2 class="size-4" />Settings
-      </Button>
+      <ConfigurationMenu
+        variant="row"
+        workspaceAvailable={!!workbench.instance}
+        {onSettings}
+        {onSessionSettings}
+      />
     </div>
-  {:else}<Button
-      variant="ghost"
-      class="h-auto min-h-16 justify-start gap-3 rounded-none border-0 border-t border-border px-5 text-left"
-      onclick={onSettings}
-    >
-      <span class="relative grid size-8 place-items-center rounded-full bg-secondary"
-        ><Settings2 class="size-4 text-muted-foreground" /><span
-          class="absolute right-0 bottom-0 size-2 rounded-full ring-2 ring-card {workbench.connection ===
-          'connected'
-            ? 'bg-primary'
-            : 'bg-muted-foreground'}"
-        ></span></span
-      >
-      <span class="flex-1"
-        ><span class="block text-xs font-medium">Settings</span><span
-          class="mt-0.5 block text-[10px] text-muted-foreground"
-          >{workbench.connection === 'connected'
-            ? 'Harness connected'
-            : 'API connection required'}</span
-        ></span
-      ><Circle class="size-3 text-muted-foreground/50" />
-    </Button>{/if}
+  {:else}<ConfigurationMenu
+      variant="footer"
+      workspaceAvailable={!!workbench.instance}
+      connected={workbench.connection === 'connected'}
+      {onSettings}
+      {onSessionSettings}
+    />{/if}
 </nav>

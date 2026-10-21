@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as Dialog from '../atoms/ui/dialog';
   import { Button } from '../atoms/ui/button';
+  import DialogTitleBar from './DialogTitleBar.svelte';
   let {
     model = '',
     currentContext = 0,
@@ -19,7 +20,7 @@
 </script>
 
 <Dialog.Header>
-  <Dialog.Title>Compact context and switch model?</Dialog.Title>
+  <DialogTitleBar title="Compact context and switch model?" closeLabel="Close session settings" />
   <Dialog.Description>
     {currentContext > 0
       ? 'This model has a smaller context window.'

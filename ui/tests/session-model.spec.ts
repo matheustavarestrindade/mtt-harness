@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
-import { connectAndCreate, chooseSelectOption, expectSelectOptions } from './helpers';
+import {
+  chooseSelectOption,
+  connectAndCreate,
+  expectSelectOptions,
+  openSessionSettings,
+} from './helpers';
 
 test('configure the session through its cog and confirm smaller context switches in one dialog', async ({
   page,
@@ -24,11 +29,13 @@ test('configure the session through its cog and confirm smaller context switches
   const model = page.getByLabel('Session model', { exact: true });
   const thinking = page.getByLabel('Thinking effort', { exact: true });
   await composer.fill('Keep this draft');
-  const cog = page.getByRole('button', { name: 'Session settings', exact: true });
+  const cog = page
+    .getByRole('form', { name: 'Message composer' })
+    .getByRole('button', { name: 'Configuration', exact: true });
   await expect(model).toHaveCount(0);
   await expect(thinking).toHaveCount(0);
-  await expect(cog).toHaveAttribute('aria-haspopup', 'dialog');
-  await cog.click();
+  await expect(cog).toHaveAttribute('aria-haspopup', 'menu');
+  await openSessionSettings(page);
   await expect(page.getByRole('dialog', { name: 'Session settings', exact: true })).toBeVisible();
   await chooseSelectOption(thinking, 'high');
   await expect(thinking).toHaveAttribute('data-value', 'high');
@@ -66,7 +73,7 @@ test('configure the session through its cog and confirm smaller context switches
   await expect(composer).toHaveValue('Keep this draft');
   await page.screenshot({ path: testInfo.outputPath('compact-composer.png'), fullPage: true });
   await page.reload();
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   await expect(page.getByLabel('Session model', { exact: true })).toHaveAttribute(
     'data-value',
     'test/smaller',
@@ -91,7 +98,7 @@ test('retain history and the selected model if a model change fails', async ({ p
       body: JSON.stringify({ error: 'Cannot change this model' }),
     }),
   );
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   await chooseSelectOption(page.getByLabel('Session model', { exact: true }), 'test/other');
   await expect(page.getByText('Cannot change this model', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Session model', { exact: true })).toHaveAttribute(

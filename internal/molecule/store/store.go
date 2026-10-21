@@ -95,6 +95,7 @@ type PermissionStore interface {
 
 type UsageStore interface {
 	Save(operationContext context.Context, record atom.UsageRecord) error
+	Report(operationContext context.Context, query atom.UsageQuery) (atom.UsageReport, error)
 	Session(operationContext context.Context, sessionID atom.SessionID) (atom.Statistics, error)
 	Instance(operationContext context.Context, identifier string) (atom.Statistics, error)
 	All(operationContext context.Context) (atom.Statistics, error)

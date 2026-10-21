@@ -398,6 +398,7 @@ type PluginActivityEntry = {
   Title: string; CreatedAt: string; Notes: { Text: string; References: string[] | null }[];
   InputTokens?: number; Estimated: boolean;
   Outcome?: string; Decision?: string; Trigger?: string; DefinitionID?: string;
+  ContinueChat?: boolean;
   WorkerSessionID?: string; DurationMS?: number; Error?: string;
   InputPreview?: string; InputTruncated?: boolean;
 };
@@ -422,6 +423,7 @@ See `plugins/context/README.md`, `plugins/spaced_repetition/README.md`, `plugins
 |---|---|---|---|---|
 | POST | `/permissions/{id}` | `PermissionInput` | `200`, `{"status":"resolved"}` | `400`, `404` |
 | GET | `/statistics` | none | `200`, `Statistics` | `500` |
+| GET | `/usage` | query below | `200`, `UsageReport` | `400`, `500` |
 | GET | `/health` | none | `200`, `{"status":"ok"}` | none |
 | GET | `/processes/{id}/output` | WebSocket upgrade | output frames | `404`, upgrade error |
 ```
@@ -437,6 +439,40 @@ Session events give permission requests and decisions. The session view snapshot
 Session statistics include the usage of child agents. The cost list has an entry for a currency. A `null` cost value does not show free usage. It shows that cost data is not available.
 
 The `Input` value does not include `CacheRead` or `CacheWrite`. The cache ratio is `CacheRead / (Input + CacheRead + CacheWrite)`. The cache ratio is 0 when the total input is 0.
+
+### Usage Report
+
+`GET /usage` gives usage buckets by UTC day and model. The date range includes `from` and `to`. The default date range is the last 30 UTC days. The database gives usage buckets in one read snapshot. `Statistics` uses the usage buckets. The usage report does not contain API key IDs.
+
+```text
+from=YYYY-MM-DD                  optional inclusive first UTC day
+to=YYYY-MM-DD                    optional inclusive last UTC day
+instance_id=ID                  optional workspace scope
+session_id=ID                   optional conversation-tree scope
+agent_prefix=context.           optional worker-name prefix; needs instance_id
+
+instance_id and session_id are mutually exclusive.
+Maximum date range: 366 days.
+Maximum groups: 10000 day/model/currency groups.
+Invalid queries or an excessive group count: HTTP 400.
+```
+
+```typescript
+type UsageReport = {
+  From: string; To: string; Timezone: 'UTC'; Statistics: Statistics;
+  PricedCalls: number; FailedCalls: number;
+  Buckets: {
+    Date: string; ModelID: string; Statistics: Statistics;
+    PricedCalls: number; FailedCalls: number;
+  }[];
+};
+```
+
+The `PricedCalls` value gives the number of requests with a recorded cost. A cost of 0 is known. If cost data is not available, the cost stays unknown. Currencies and `Estimated` values stay the same. An empty usage report has an empty `Buckets` array.
+
+Session usage includes child agents. Workspace and harness usage also include workspace agents. See `docs/usage-analytics.md`.
+
+### Process Output
 
 The `/health` route gives a liveness response. It does not examine the provider or database. The output route uses a harness process ID, not an OS PID.
 

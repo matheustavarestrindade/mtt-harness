@@ -28,7 +28,9 @@ Vite uses the URL for HTTP and WebSocket requests. The browser uses `/api` on th
 
 ## Docker and Tailscale
 
-The Docker image and Docker Compose file are in `ui/`. The image contains the UI and an nginx proxy. It uses the harness API on the host computer.
+The Docker image and Docker Compose file are in `ui/`. The image contains the UI and an nginx proxy. Run `../start.sh` for PostgreSQL, the harness, and the UI. The Docker Compose file uses an internal API connection.
+
+Use the subsequent command for a different UI with a harness on the host computer.
 
 ```sh
 # From ui/
@@ -51,7 +53,6 @@ Container configuration in `ui/.env`:
 UI_BIND_ADDRESS=0.0.0.0
 UI_PORT=18081
 HARNESS_UPSTREAM=http://host.docker.internal:18080
-UI_DOCKER_SUBNET=172.16.1.0/24
 ```
 
 Set `UI_BIND_ADDRESS` to the host Tailscale IP to select one interface. The value `0.0.0.0` selects the host interfaces. Authentication is necessary for the API.
@@ -75,7 +76,7 @@ The message composer starts with one text line. More text increases the composer
 
 On a large screen, use `Collapse navigation` or `Expand navigation` in the header. The browser keeps the setting. On a small screen, use the navigation drawer.
 
-On a small screen, the header shows the workspace name and model. The navigation drawer contains `Tasks`, `Memory`, `Session activity`, and `Settings`. The `New session` action is above the session list. A panel selection closes the navigation drawer and opens the selected panel.
+On a small screen, the header shows the workspace name and model. The navigation drawer contains `Tasks`, `Memory`, `Session activity`, and `Configuration`. The `New session` action is above the session list. A panel selection closes the navigation drawer and opens the selected panel.
 
 The sidebar shows the session list for the selected workspace. The `Switch workspace` button opens a `DropdownMenu` with workspaces and a `New workspace` action. The sidebar keeps the session list. A navigation drawer stays open until session selection.
 
@@ -89,7 +90,7 @@ The directory path is on the harness server, not on the browser device. The dire
 
 The workspace form starts with an empty directory field. The form does not expand `~`. A path with `~` shows an error before the request. For a container server, use the directory path that is available in the container.
 
-Open `Settings`, then `Providers`, to connect a provider. The API contracts are in `../routes.md`.
+Open `Configuration → Settings → Providers` to connect a provider. The API contracts are in `../routes.md`.
 
 Open the workspace menu. Use `Unlink workspace` to remove the workspace reference. The dialog shows the path. Files and directories stay the same. The harness keeps session data, memory records, and usage records. Active work can prevent the unlink operation.
 
@@ -178,13 +179,13 @@ The model context limit comes from the model for the last response. A model chan
 
 The UI changes the values after a provider response. The UI does not count subsequent messages or tool results until the provider gives new usage data. `Total` gives available cost data for the conversation and child agents. The `≈` symbol identifies a cost estimate. Context compaction does not change token or cost statistics.
 
-The settings dialog has 4 sections: `General`, `Usage`, `Providers`, and `Connection`. The UI keeps the conversation and message draft when the dialog closes. Use the button with the label `Close`, or use the `Escape` key.
+The `ConfigurationMenu` component gives `Settings` and `Workspace settings`. `Settings` has `General`, `Usage`, `Providers`, and `Connection`. `Workspace settings` has `General`, `Instructions`, `Sidekick`, `Watchers`, and `Usage`. `Model and thinking` opens session settings when a session is selected. The UI keeps the conversation and message draft when the dialog closes. Use `Close settings` or the `Escape` key.
 
-The general section sets the agent depth limit and process limit. Select the harness or workspace scope. Supply an integer of 0 or more. Select the button with the label `Save`.
+The general section sets the agent depth limit and process limit. The `Settings` section sets harness defaults. The `Workspace settings` section sets workspace values. Supply an integer of 0 or more. Select the button with the label `Save`.
 
 A value of 0 prevents new child agents or processes. An empty field removes the selected setting. The harness then uses the default value.
 
-The usage section shows model calls, input tokens, output tokens, reasoning tokens, cache data, and cost data. Select the harness, workspace, or session scope. Session usage data includes child agents. Select the button with the label `Refresh usage` to get new usage data.
+The usage section shows model calls, input tokens, output tokens, reasoning tokens, cache data, and cost data. Harness settings gives harness usage. Workspace settings gives workspace or session usage. Session usage data includes child agents. Select the button with the label `Refresh usage` to get new usage data.
 
 The usage section uses `Input`. The UI shows `CacheRead` and `CacheWrite` in different fields. The worker usage value is `Input + Output`.
 
@@ -194,13 +195,13 @@ Select a model name in the provider section to read token prices and reasoning e
 
 ## Instruction Reminders
 
-Open `Settings`, then `Instructions`, or use `Instruction reminders` in the Memory panel. Select a workspace. The UI controls set the plugin state, interval, reminder pattern, and recovery worker model.
+Open `Configuration → Workspace settings → Instructions`, or use `Instruction reminders` in the Memory panel. The UI controls set the plugin state, interval, reminder pattern, and recovery worker model.
 
 The panel shows `low`, `medium`, `high`, and `deferred` reminders. It also shows added input tokens and worker usage. Automatic reminders do not make worker model calls. A worker model is necessary for the `remember_instructions` tool.
 
 ## Sidekick
 
-The `Sidekick` section is in the settings dialog. The task panel also has a `Sidekick settings` button. A worker model is necessary before the plugin state can be `ON`.
+The `Sidekick` section is in `Workspace settings`. The task panel also has a `Sidekick settings` button. A worker model is necessary before the plugin state can be `ON`.
 
 The panel shows `Notes delivered` and worker usage. Workspace memory and project files are different retrieval sources. The harness gives Sidekick notes to the agent in a model request.
 
@@ -216,7 +217,7 @@ See `docs/memory.md` for usage data and API limits.
 
 ## Reasoning
 
-The session form has a control with the label `Thinking`. In the message composer, use the button with the label `Session settings` to open the dialog. The dialog has fields with the labels `Model` and `Thinking`. The available reasoning efforts come from the selected model.
+The session form has a control with the label `Thinking`. In the message composer, use `Configuration → Model and thinking` to open the dialog. The dialog has fields with the labels `Model` and `Thinking`. The available reasoning efforts come from the selected model.
 
 To use the model default, select the value with the label `Default`. The database keeps the selection. A change applies to the next model request. The dialog shows the result of a change.
 

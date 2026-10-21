@@ -1,5 +1,11 @@
 export type SettingsSection =
   'general' | 'usage' | 'providers' | 'connection' | 'instructions' | 'sidekick' | 'watcher';
+export type SettingsScope = 'harness' | 'workspace';
+
+export const settingsPages: Record<SettingsScope, readonly SettingsSection[]> = {
+  harness: ['general', 'usage', 'providers', 'connection'],
+  workspace: ['general', 'instructions', 'sidekick', 'watcher', 'usage'],
+};
 export type RuntimeSettingKey = 'agent_depth_limit' | 'process_limit';
 export type RuntimeSettings = Partial<Record<RuntimeSettingKey, string>>;
 

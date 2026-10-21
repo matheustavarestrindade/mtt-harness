@@ -35,6 +35,7 @@ export interface WatcherConfiguration {
   watchers: WatcherDefinition[];
 }
 export interface WatcherRun {
+  continue_chat?: boolean;
   id: string;
   workspace_id: string;
   session_id: string;

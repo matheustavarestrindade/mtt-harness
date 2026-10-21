@@ -10,9 +10,10 @@ import (
 
 func (agentLoop *Loop) finishReviewSession(session atom.Session, call atom.ToolCall) atom.ToolResult {
 	var decision struct {
-		Kind    string `json:"kind"`
-		Message string `json:"message,omitempty"`
-		Reason  string `json:"reason,omitempty"`
+		Kind         string `json:"kind"`
+		Message      string `json:"message,omitempty"`
+		Reason       string `json:"reason,omitempty"`
+		ContinueChat *bool  `json:"continue_chat,omitempty"`
 	}
 	if operationError := json.Unmarshal(call.Input, &decision); operationError != nil {
 		return failedToolResult(call, operationError)

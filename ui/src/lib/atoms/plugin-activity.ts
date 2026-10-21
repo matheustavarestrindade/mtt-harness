@@ -7,6 +7,7 @@ export interface PluginActivityNote {
 export interface PluginActivityEntry {
   Outcome?: string;
   Decision?: string;
+  ContinueChat?: boolean;
   Trigger?: string;
   DefinitionID?: string;
   WorkerSessionID?: string;

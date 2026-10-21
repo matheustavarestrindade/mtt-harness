@@ -1,20 +1,24 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { LoaderCircle, Repeat2, Power, Settings2 } from 'lucide-svelte';
+  import { LoaderCircle, Repeat2 } from 'lucide-svelte';
   import type { Instance, Model } from '../atoms/types';
   import type { RepetitionConfiguration } from '../atoms/plugins';
   import { Button } from '../atoms/ui/button';
   import { Input } from '../atoms/ui/input';
   import { Label } from '../atoms/ui/label';
-  import { costLabel, formatTokenCount, workspaceName } from '../atoms/format';
+  import { costLabel, formatTokenCount } from '../atoms/format';
   import { totalAgentUsage, agentTokenCount, durationLabel } from '../atoms/memory';
   import type { HarnessApi } from '../molecules/api/client';
   import SelectField from '../molecules/SelectField.svelte';
   import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
-  import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import WorkerUsageBreakdown from '../molecules/WorkerUsageBreakdown.svelte';
+  import MetricChart from '../molecules/charts/MetricChart.svelte';
+  import { chartColors } from '../atoms/usage';
   import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
   import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
+  import FieldHelp from '../molecules/FieldHelp.svelte';
+  import PluginHeaderControls from '../molecules/PluginHeaderControls.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
 
   let { api, instance }: { api: HarnessApi; instance: Instance | null } = $props();
@@ -39,6 +43,15 @@
     panel.saving || !!panel.state?.Pending || !panel.state || !!instance?.Stopped,
   );
   const count = (name: string) => panel.metrics?.Counters[name] ?? 0;
+  const recoveries = $derived(
+    [
+      ['Running', 'recovery/running'],
+      ['Completed', 'recovery/completed'],
+      ['Failed', 'recovery/failed'],
+      ['Cancelled', 'recovery/cancelled'],
+      ['Interrupted', 'recovery/interrupted'],
+    ].map(([label, key]) => ({ label, value: count(key) })),
+  );
   const usage = $derived(totalAgentUsage(panel.metrics?.Agents ?? []));
   const estimatedCost = $derived(usage.statistics.Costs?.some((cost) => cost.Estimated));
   const selectedModel = $derived(models.find((model) => model.ID === workerModel));
@@ -143,8 +156,19 @@
   <SettingsPageTitle
     icon={Repeat2}
     title="Instructions"
-    description={`Instruction reminders and recovery for ${instance ? workspaceName(instance.Workspace) : 'the selected workspace'}.`}
-  />
+    description="Instruction reminders and recovery."
+    >{#snippet actions()}{#if panel.state}<PluginHeaderControls
+          enabled={panel.state.RequestedEnabled}
+          status={stateLabel}
+          toggleLabel="Instruction reminders enabled"
+          configureLabel="Configure reminders"
+          {disabled}
+          toggleDisabled={!panel.state.RequestedEnabled && !panel.state.Available}
+          expanded={editing}
+          onToggle={(enabled) => void panel.configure({ enabled })}
+          onConfigure={openConfiguration}
+        />{/if}{/snippet}</SettingsPageTitle
+  >
   {#if !instance}
     <p class="text-sm text-muted-foreground">
       Select a workspace to configure instruction reminders.
@@ -157,29 +181,6 @@
         {panel.error}
       </p>{/if}
     {#if panel.state}
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-        <div>
-          <p class="text-sm font-medium" role="status">{stateLabel}</p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Changes apply after the active tool group.
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            class="h-11 gap-2"
-            disabled={disabled || (!panel.state.RequestedEnabled && !panel.state.Available)}
-            aria-label={panel.state.RequestedEnabled
-              ? 'Disable instruction reminders'
-              : 'Enable instruction reminders'}
-            onclick={() => panel.configure({ enabled: !panel.state!.RequestedEnabled })}
-            ><Power class="size-4" />{panel.state.RequestedEnabled ? 'Turn off' : 'Turn on'}</Button
-          >
-          <Button variant="outline" class="h-11 gap-2" {disabled} onclick={openConfiguration}
-            ><Settings2 class="size-4" />Configure reminders</Button
-          >
-        </div>
-      </div>
       {#if panel.state.Error}<p class="text-sm text-muted-foreground">{panel.state.Error}</p>{/if}
       {#if editing}
         <form
@@ -307,15 +308,23 @@
         {panel.actionError}
       </p>{/if}
     {#if panel.metrics}
-      <dl class="grid grid-cols-2 gap-5 sm:grid-cols-4">
-        {#each [{ label: 'Low reminders', key: 'reminders/low' }, { label: 'Medium reminders', key: 'reminders/medium' }, { label: 'High recoveries', key: 'reminders/high' }, { label: 'Deferred reminders', key: 'reminders/deferred' }] as item}<div
-          >
-            <dt class="text-xs text-muted-foreground">{item.label}</dt>
-            <dd class="mt-1 text-xl font-medium tabular-nums">
-              {formatTokenCount(count(item.key))}
-            </dd>
-          </div>{/each}
-      </dl>
+      {#if count('reminders/low') || count('reminders/medium') || count('reminders/high')}<MetricChart
+          title="Delivered reminders"
+          description="All-time workspace deliveries by reminder level."
+          data={[
+            ['Low', 'reminders/low'],
+            ['Medium', 'reminders/medium'],
+            ['High', 'reminders/high'],
+          ].map(([label, key]) => ({ label, value: count(key) }))}
+          series={[{ key: 'value', label: 'Reminders', color: chartColors[0] }]}
+          metric="calls"
+          horizontal
+          legend={false}
+          height={144}
+        />{:else}<p class="text-sm text-muted-foreground">No reminders delivered yet.</p>{/if}
+      {#if count('reminders/deferred')}<p class="text-xs text-muted-foreground">
+          {formatTokenCount(count('reminders/deferred'))} deferred reminders
+        </p>{/if}
       <div class="grid grid-cols-1 gap-4 border-y border-border py-4 sm:grid-cols-3">
         <div>
           <p class="text-xs text-muted-foreground">Reminder input added</p>
@@ -337,47 +346,43 @@
           </p>
         </div>
         <div>
-          <p class="text-xs text-muted-foreground">Recovery worker cost</p>
+          <p class="flex items-center gap-1 text-xs text-muted-foreground">
+            Recovery worker cost
+            <FieldHelp
+              label="About instruction recovery usage"
+              text="Automatic reminders make no worker-model calls. Their input is already counted in session usage. Recovery costs cover calls with recorded prices."
+            />
+          </p>
           <p class="mt-1 text-sm tabular-nums">
             {estimatedCost ? '≈ ' : ''}{costLabel(usage.statistics)}
           </p>
         </div>
       </div>
-      <p class="text-xs leading-5 text-muted-foreground">
-        Automatic reminders make no worker-model calls. Their input is already counted in session
-        usage. Recovery costs cover calls with recorded prices.
-      </p>
-      <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-        <div>
-          <dt class="text-muted-foreground">Running recoveries</dt>
-          <dd class="mt-1 tabular-nums">{count('recovery/running')}</dd>
-        </div>
-        <div>
-          <dt class="text-muted-foreground">Completed recoveries</dt>
-          <dd class="mt-1 tabular-nums">{count('recovery/completed')}</dd>
-        </div>
-        <div>
-          <dt class="text-muted-foreground">Failed / cancelled / interrupted</dt>
-          <dd class="mt-1 tabular-nums">
-            {count('recovery/failed')} / {count('recovery/cancelled')} / {count(
-              'recovery/interrupted',
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-muted-foreground">Memory searches</dt>
-          <dd class="mt-1 tabular-nums">{count('recovery/queries')}</dd>
-        </div>
-        <div>
-          <dt class="text-muted-foreground">Recovery time</dt>
-          <dd class="mt-1 tabular-nums">{durationLabel(count('recovery/duration_ms'))}</dd>
-        </div>
-      </dl>
+      <div class="min-w-0 space-y-2">
+        <MetricChart
+          title="Recovery activity"
+          description="Recorded recoveries by status."
+          data={recoveries.some((recovery) => recovery.value > 0) ? recoveries : []}
+          series={[{ key: 'value', label: 'Recoveries', color: chartColors[0] }]}
+          metric="calls"
+          horizontal
+          categoryLabels="below"
+          legend={false}
+          height={180}
+          emptyMessage="No recovery activity yet."
+        />
+        <p
+          class="text-xs leading-5 text-muted-foreground tabular-nums"
+          aria-label="Recovery context"
+        >
+          {count('recovery/queries').toLocaleString()} memory searches · {durationLabel(
+            count('recovery/duration_ms'),
+          )} recovery time
+        </p>
+      </div>
       {#if panel.metrics.Agents.length}<div>
           <h3 class="mb-2 text-sm font-medium">Recovery agents</h3>
-          {#each panel.metrics.Agents as agent (`${agent.Agent}/${agent.ModelID}`)}<MemoryAgentUsage
-              {agent}
-            />{/each}
+          <WorkerUsageBreakdown agents={panel.metrics.Agents} {models} />
         </div>{/if}
     {/if}
     <PluginPanelFooter

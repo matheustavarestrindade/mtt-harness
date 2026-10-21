@@ -744,6 +744,36 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
         return reply(state);
       }
       if (path === '/statistics') return reply(harnessUsage);
+      if (path === '/usage') {
+        const query = new URL(request.url()).searchParams;
+        const statistics = query.has('session_id')
+          ? sessionUsage
+          : query.has('instance_id')
+            ? workspaceUsage
+            : harnessUsage;
+        const to = query.get('to') ?? new Date().toISOString().slice(0, 10),
+          from = query.get('from') ?? to;
+        const priced = statistics.Cost || statistics.Costs?.length ? statistics.Calls : 0;
+        return reply({
+          From: from,
+          To: to,
+          Timezone: 'UTC',
+          Statistics: statistics,
+          PricedCalls: priced,
+          FailedCalls: 0,
+          Buckets: statistics.Calls
+            ? [
+                {
+                  Date: to,
+                  ModelID: 'test/test-model',
+                  Statistics: statistics,
+                  PricedCalls: priced,
+                  FailedCalls: 0,
+                },
+              ]
+            : [],
+        });
+      }
       if (parts[0] === 'settings' || (parts[0] === 'instances' && parts[2] === 'settings')) {
         const scope = parts[0] === 'settings' ? '' : parts[1];
         const key = parts[0] === 'settings' ? parts[1] : parts[3];

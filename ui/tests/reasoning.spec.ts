@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { mockHarness } from './api-fixture';
 import {
-  connectAndCreate,
   chooseSelectOption,
+  connectAndCreate,
   expectSelectOptions,
+  openSessionSettings,
   openWorkbenchAction,
 } from './helpers';
 import type { Message } from '../src/lib/atoms/types';
@@ -108,13 +109,13 @@ test('use model-specific effort choices and show model prices before creating a 
   };
   await connectAndCreate(page);
   const effort = page.getByLabel('Thinking effort', { exact: true });
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   await expectSelectOptions(effort, ['Default (Low)', 'Off', 'Low', 'High']);
   await chooseSelectOption(effort, 'high');
   await expect.poll(() => fixture.sessions[0].ReasoningEffort).toBe('high');
   await expect(effort).toHaveAttribute('data-value', 'high');
   await page.reload();
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveAttribute(
     'data-value',
     'high',
@@ -134,7 +135,7 @@ test('use model-specific effort choices and show model prices before creating a 
   await dialog.getByRole('button', { name: 'Create session', exact: true }).click();
   await expect.poll(() => fixture.sessions[1]?.ReasoningEffort).toBe('none');
   await expect(dialog).toHaveCount(0);
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   await expect(page.getByLabel('Thinking effort', { exact: true })).toHaveAttribute(
     'data-value',
     'none',
@@ -151,7 +152,7 @@ test('keep an effort selection after an older snapshot arrives and recover from 
   fixture.model.ReasoningEfforts = ['low', 'high'];
   await connectAndCreate(page);
   const previous = { ...fixture.sessions[0] };
-  await page.getByRole('button', { name: 'Session settings', exact: true }).click();
+  await openSessionSettings(page);
   await chooseSelectOption(page.getByLabel('Thinking effort', { exact: true }), 'high');
   await expect.poll(() => fixture.sessions[0].ReasoningEffort).toBe('high');
   fixture.state(fixture.sessions[0], { Session: previous });
@@ -185,10 +186,16 @@ test('show subscription access without API rates and label estimated usage', asy
   await expect(page.getByRole('dialog')).toContainText('Subscription access');
   await expect(page.getByRole('dialog')).not.toContainText('$90');
   await page.keyboard.press('Escape');
-  await openWorkbenchAction(page, 'Settings');
+  await openWorkbenchAction(page, 'Workspace settings');
   await page
     .getByRole('navigation', { name: 'Settings sections' })
     .getByRole('tab', { name: 'Usage', exact: true })
     .click();
-  await expect(page.getByRole('dialog')).toContainText('Estimated cost');
+  const usage = page.getByRole('region', { name: 'Usage overview' });
+  await chooseSelectOption(usage.getByLabel('Scope', { exact: true }), 'session');
+  await expect(usage.getByLabel('Usage totals')).toContainText('≈ $0.001');
+  await usage.getByRole('tab', { name: 'Cost', exact: true }).click();
+  await expect(usage.getByRole('region', { name: 'Daily cost', exact: true })).toContainText(
+    'includes estimates',
+  );
 });
