@@ -94,6 +94,7 @@
               ID: typeof call.ID === 'string' ? call.ID : '',
               Name: call.Name,
               Input: call.Input,
+              InputError: typeof call.InputError === 'string' ? call.InputError : undefined,
             }}
           />
         </section>
@@ -172,6 +173,7 @@
                 ID: typeof call.ID === 'string' ? call.ID : '',
                 Name: call.Name,
                 Input: call.Input,
+                InputError: typeof call.InputError === 'string' ? call.InputError : undefined,
               }}
             />
           {:else if event}

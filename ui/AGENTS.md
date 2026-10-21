@@ -1,5 +1,7 @@
 # UI contributor rules
 
+- `ToolCall.InputError` marks rejected tool input. In that case `Input` is the original malformed argument text as a JSON string; display it literally through CodeBlock, identify that it was not executed, and preserve the syntax diagnostic and history/reload behavior. Do not parse, repair, or offer execution of that text. Normal structured tool input remains unchanged.
+
 - Usage charts use the supplied shadcn Chart container/tooltip and LayerChart renderer. Keep the renderer lazy and release it when the view closes. Use the shadcn range calendar for dates; the server's date range is inclusive UTC, not local time.
 - Memory job-status and worker/model comparison charts put category labels BELOW the plot with colors matching their bars, plus full names and values on hover/tap and in View data. Do not reserve a left-hand category-label column for these charts. Axis-label mode for other horizontal charts still sizes its gutter from the container (up to 130px / 25%), with explicit ticks and pixel-aware truncation. Verify plot width, label position, matching colors, and resize behavior in the sidebar and mobile drawer.
 - Usage tokens are uncached `Input + Output`, with reasoning already in output. Cache has its own metric. Preserve null prices versus explicit zero and separate currencies. Graphs use API aggregates or documented plugin counters; never fabricate daily history, key attribution, or convert cumulative counters into trends. Top-model limits must retain remaining usage in `Other models`; provide exact accessible data tables.

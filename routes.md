@@ -657,7 +657,7 @@ type Content = {
   Type: 'text' | 'image' | 'audio' | 'video' | 'file'; Text: string;
   Data: string | null; MIME: string; URL: string; Filename: string; AudioID: string;
 };
-type ToolCall = { ID: string; Name: string; Input: unknown };
+type ToolCall = { ID: string; Name: string; Input: unknown; InputError?: string };
 type ToolResult = {
   CallID: string; Status: 'ok' | 'denied' | 'error'; Content: Content[] | null;
   Error: string; Duration: number;

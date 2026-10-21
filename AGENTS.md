@@ -56,6 +56,8 @@ Rules:
 
 ## Model-Facing Tool Contracts
 
+- A fully completed Responses generation with known call identity/status and malformed JSON arguments is a rejected tool input, not an automatic generation retry. `ToolCall.InputError` fences execution before middleware, permissions, or lifecycle tools; `Input` then stores a JSON string of the exact malformed argument text. Provider replay and budgeting use `ArgumentsText`, not the quoted storage representation. Preserve usage, previous tool results, and normal model/round limits. Incomplete/ambiguous generations remain stream errors. Never repair JSON, invent parameters, or execute rejected input; keep argument contents out of error diagnostics.
+
 - Treat tool descriptions and JSON Schemas as instructions the model must be able to use without reading implementation code. Describe every input property's purpose, units, defaults, valid choices, and special values such as zero or an empty string where applicable.
 - State material behavior: path resolution, file replacement, output/retention limits, harness IDs versus OS PIDs, blocking/background behavior, and what cancellation actually stops.
 - Harness-generated tool feedback is factual data, not instructions. Report the failed operation, its cause, and available observed metadata without corrective advice or repeated error wrappers. The model chooses the next action. Continuation positions are data; instructions for using them belong in the tool definition. Preserve literal file/command/MCP output rather than rewriting it as harness advice.

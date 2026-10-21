@@ -102,6 +102,9 @@ func formatToolCall(call *atom.ToolCall) string {
 	}
 	var output strings.Builder
 	output.WriteString("Tool call: " + call.Name + "\n")
+	if call.InputError != "" {
+		output.WriteString("Input was not executed: " + call.InputError + "\n")
+	}
 	var arguments any
 	decoder := json.NewDecoder(bytes.NewReader(call.Input))
 	decoder.UseNumber()

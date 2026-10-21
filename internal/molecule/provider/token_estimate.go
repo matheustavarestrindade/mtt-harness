@@ -48,7 +48,11 @@ func (standardProvider *Standard) EstimateTokens(operationContext context.Contex
 			estimate.InputTokens += 16384
 		}
 		for _, call := range message.ToolCalls {
-			estimate.InputTokens += 8 + estimateTextTokens(len(call.Name)+len(call.Input))
+			arguments, operationError := call.ArgumentsText()
+			if operationError != nil {
+				return estimate, operationError
+			}
+			estimate.InputTokens += 8 + estimateTextTokens(len(call.Name)+len(arguments))
 		}
 		state := message.ProviderState
 		if state == nil || state.Provider != standardProvider.Name() || message.Role != atom.RoleAssistant {

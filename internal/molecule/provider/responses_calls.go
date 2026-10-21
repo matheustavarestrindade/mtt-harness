@@ -2,6 +2,7 @@ package provider
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -174,19 +175,41 @@ func (decoder *responsesDecoder) consumeFunctionItem(item responseItem, index *i
 	if !allowDelivery || !call.ready() {
 		return true, nil
 	}
-	return decoder.deliverFunctionCall(call), nil
+	return decoder.deliverFunctionCall(call)
 }
 
 func (call *responsesFunctionCall) ready() bool {
-	return call.itemDone && (call.status == "" || call.status == "completed") && call.callID != "" && call.name != "" && json.Valid([]byte(call.arguments.String()))
+	return call.finished() && json.Valid([]byte(call.arguments.String()))
 }
 
-func (decoder *responsesDecoder) deliverFunctionCall(call *responsesFunctionCall) bool {
+func (call *responsesFunctionCall) finished() bool {
+	return call.itemDone && (call.status == "" || call.status == "completed") && call.callID != "" && call.name != ""
+}
+
+func (decoder *responsesDecoder) deliverFunctionCall(call *responsesFunctionCall) (bool, error) {
 	if call.emitted {
-		return true
+		return true, nil
+	}
+	toolCall := atom.ToolCall{ID: call.callID, Name: call.name, Input: json.RawMessage(call.arguments.String())}
+	if !json.Valid(toolCall.Input) {
+		// Only completeFunctionCalls reaches this path, after response.completed.
+		// Preserve the original text as data and require a failed tool result.
+		var raw json.RawMessage
+		inputError := json.Unmarshal(toolCall.Input, &raw)
+		encoded, operationError := json.Marshal(call.arguments.String())
+		if operationError != nil {
+			return false, operationError
+		}
+		toolCall.Input = encoded
+		var syntaxError *json.SyntaxError
+		if errors.As(inputError, &syntaxError) {
+			toolCall.InputError = fmt.Sprintf("invalid JSON arguments at byte %d (%d bytes): %s", syntaxError.Offset, call.arguments.Len(), syntaxError.Error())
+		} else {
+			toolCall.InputError = fmt.Sprintf("invalid JSON arguments (%d bytes)", call.arguments.Len())
+		}
 	}
 	call.emitted = true
-	return decoder.send(atom.ResponsePart{ToolIndex: call.index, ToolCall: &atom.ToolCall{ID: call.callID, Name: call.name, Input: json.RawMessage(call.arguments.String())}})
+	return decoder.send(atom.ResponsePart{ToolIndex: call.index, ToolCall: &toolCall}), nil
 }
 
 func (decoder *responsesDecoder) completeFunctionCalls() (bool, error) {
@@ -196,15 +219,15 @@ func (decoder *responsesDecoder) completeFunctionCalls() (bool, error) {
 		}
 		// A successful response may omit redundant output snapshots. It can close
 		// an explicitly finished arguments stream, but never an unfinished delta.
-		if call.argumentsDone && !call.itemDone && call.status != "incomplete" {
+		if call.argumentsDone && !call.itemDone && (call.status == "" || call.status == "in_progress" || call.status == "completed") {
 			call.itemDone = true
 			call.status = "completed"
 		}
-		if !call.ready() {
+		if !call.finished() {
 			return false, fmt.Errorf("%s Responses response.completed has an incomplete function call; response_id=%q; %s", decoder.providerName, boundedProviderDetail(decoder.responseID), call.diagnostic())
 		}
-		if !decoder.deliverFunctionCall(call) {
-			return false, nil
+		if keepReading, operationError := decoder.deliverFunctionCall(call); operationError != nil || !keepReading {
+			return keepReading, operationError
 		}
 	}
 	return true, nil

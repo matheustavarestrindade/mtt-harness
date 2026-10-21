@@ -50,6 +50,9 @@ func removeTool(specifications []atom.ToolSpec, name string) []atom.ToolSpec {
 	return output
 }
 func (agentLoop *Loop) runValidatedToolCall(operationContext context.Context, session atom.Session, call atom.ToolCall) atom.ToolResult {
+	if call.InputError != "" {
+		return failedToolResult(call, fmt.Errorf("%s input was not executed: %s", call.Name, call.InputError))
+	}
 	if session.Execution != nil {
 		if _, allowed := session.Execution.Grant(call.Name); !allowed {
 			return failedToolResult(call, fmt.Errorf("tool %q is not enabled for this session", call.Name))

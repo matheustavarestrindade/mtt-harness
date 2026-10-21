@@ -57,6 +57,22 @@ response.failed
 
 The `call_id`, `name`, and `arguments` values must stay the same after a tool call is sent. For `previous_response_id`, the last response must have the tool call data.
 
+### Rejected Tool Input
+
+A `response.completed` event can have JSON data that is not correct. The adapter can keep the tool input as an error only with the supplied `call_id`, `name`, and `status: completed`.
+
+```text
+InputError: syntax diagnostic, without argument contents
+Input: JSON string containing the exact malformed argument text
+ArgumentsText: original provider-visible argument text
+```
+
+For `InputError`, the runtime stops the tool input before tool middleware and permission decisions. It does not run the tool. The model receives a tool error and can supply new tool input on the next request. The tool results stay in the request. The limits do not change.
+
+The harness does not repair JSON. The provider adapters use the supplied text in requests. A `response.incomplete` or `response.failed` event gives a stream error.
+
+The UI uses `CodeBlock` for tool input with `InputError`. A response with rejected input cannot start `previous_response_id` continuation.
+
 ## Continuation
 
 The connection can keep the last response ID and input fingerprints. The next request can use `previous_response_id` with only new input. The previous input, response output, and request parameters must be the same. The adapter compares tool argument JSON as data.

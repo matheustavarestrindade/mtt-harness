@@ -61,7 +61,11 @@ func encodeMessages(messages []atom.Message, providerName string) ([]map[string]
 			if len(message.ToolCalls) > 0 {
 				var calls []map[string]any
 				for _, call := range message.ToolCalls {
-					calls = append(calls, map[string]any{"id": call.ID, "type": "function", "function": map[string]any{"name": call.Name, "arguments": string(call.Input)}})
+					arguments, operationError := call.ArgumentsText()
+					if operationError != nil {
+						return nil, operationError
+					}
+					calls = append(calls, map[string]any{"id": call.ID, "type": "function", "function": map[string]any{"name": call.Name, "arguments": arguments}})
 				}
 				item["tool_calls"] = calls
 			}
