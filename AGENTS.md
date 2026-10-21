@@ -141,6 +141,10 @@ go test ./...
 
 ## Docker
 
+`./build.sh` is the native Linux workflow: build the full `semantic,gemma` binary and the standalone UI on the host, start only PostgreSQL in Docker, and run native API/UI processes with host PATH and user permissions. Source bootstrap/provider/MCP/prompt files stay authoritative; generated private files and versioned binaries live under `bin/native`, and native UI output stays under `ui/dist`. Ports are deployment settings in `.env`; Postgres is loopback-only. Prefer user services where available, support foreground operation, and stop/restart only services owned by this launcher. Never take over occupied ports, reset/restore data, or rewrite saved workspace paths. Test with isolated projects and ports. See `docs/native-start.md`.
+
+Native and Docker builds share checksum-verified, atomically published model assets. Reuse valid cached assets and archives. Keep pinned model revisions, native library versions, and licenses consistent; never silently substitute a model or use an unverified cached file.
+
 Run `./start.sh` for PostgreSQL, the harness, and the UI in Docker Compose. It prepares only missing local bootstrap files, waits for health, preserves data, and uses host UID/GID unless configured. The standard image includes local embeddings. By default only `./workspace` is mounted read/write at `/workspace`, not the repository. `MTT_WORKSPACE_DIR` can select another host parent. Explicit `MTT_HOST_ROOT` enables `docker/compose.host-files.yaml` and adds `/host`; it is never enabled implicitly. Bootstrap/provider/MCP/prompt files remain read-only under `/etc/mtt`. Commands still run inside the container. See `docs/docker-start.md`.
 
 For a new checkout, prepare the local files and directory:

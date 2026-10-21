@@ -18,6 +18,8 @@ scripts/*
 !scripts/format/**
 !scripts/download-context-model.py
 !scripts/download-embedding-runtime.py
+!scripts/download-tool-search-model.py
+!scripts/verified_download.py
 workspace/
 ui/
 result

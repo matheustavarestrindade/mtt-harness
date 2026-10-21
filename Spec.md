@@ -1626,6 +1626,18 @@ One registry must control one function of the harness. The code must not have 2 
 
 The behavior must stay the same after a change to the code structure. The test must examine the behavior after a change to the code structure.
 
+### 16.5 Native Installation
+
+The `build.sh` procedure makes a native build of the harness and UI. PostgreSQL runs in Docker. Commands use the host `PATH` and user permissions. Workspaces use host paths.
+
+The procedure keeps source configuration files and database data. Native binaries are in `bin/native`. The UI files are in `ui/dist`. PostgreSQL uses a loopback port.
+
+The host ports are in `.env`. The Go program does not read `.env`.
+
+The full native build uses `semantic,gemma`. The model assets and SHA-256 checks are the same for `build.sh` and `start.sh`. The procedure uses a cache file only when the SHA-256 value is correct.
+
+User services can keep the API and UI active. A foreground run uses the terminal. The procedure must not stop a different program or replace workspace paths. See `docs/native-start.md`.
+
 ## 17. Interfaces
 
 Section 17 gives the interfaces for the code. Sections 6, 9, and 10 give the `Provider`, `Plugin`, and `Tool` interfaces.

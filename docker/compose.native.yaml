@@ -1,0 +1,5 @@
+# Native API/UI use the same database service and volume, through loopback.
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:${MTT_POSTGRES_PORT:-15432}:5432"

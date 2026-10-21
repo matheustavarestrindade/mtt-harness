@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Fetch the pinned text-only model at image build time; verify every asset."""
 
-import hashlib
 from pathlib import Path
 import sys
-import urllib.request
+
+from verified_download import download_verified, write_asset
 
 REVISION = "daa72c51243991dfcaf9f9137d2c573d8f7790c0"
 BASE = f"https://huggingface.co/onnx-community/embeddinggemma-2-ONNX/resolve/{REVISION}"
@@ -23,21 +23,9 @@ def main():
     destination = Path(sys.argv[1])
     for name, expected in ASSETS.items():
         output = destination / name
-        output.parent.mkdir(parents=True, exist_ok=True)
-        temporary = output.with_suffix(output.suffix + ".download")
-        digest = hashlib.sha256()
         url = "https://www.apache.org/licenses/LICENSE-2.0.txt" if name == "LICENSE" else f"{BASE}/{name}"
-        with urllib.request.urlopen(url, timeout=120) as response:
-            with temporary.open("wb") as stream:
-                while chunk := response.read(1024 * 1024):
-                    digest.update(chunk)
-                    stream.write(chunk)
-        if digest.hexdigest() != expected:
-            temporary.unlink()
-            raise RuntimeError(f"checksum mismatch for {name}")
-        temporary.replace(output)
-        print(f"verified {name}", flush=True)
-    (destination / "REVISION").write_text(REVISION + "\n")
+        download_verified(url, output, expected)
+    write_asset(destination / "REVISION", (REVISION + "\n").encode())
 
 
 if __name__ == "__main__":
