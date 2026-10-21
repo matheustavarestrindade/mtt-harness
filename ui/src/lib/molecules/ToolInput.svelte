@@ -67,7 +67,17 @@
   };
 </script>
 
-{#if command !== null}
+{#if call.InputError}
+  <p class="text-xs text-destructive" role="status">Input was not executed: {call.InputError}</p>
+  <CodeBlock
+    text={typeof call.Input === 'string' ? call.Input : JSON.stringify(call.Input)}
+    language="json"
+    label="Rejected tool arguments"
+    embedded
+    compact
+    wrap
+  />
+{:else if command !== null}
   <CodeBlock text={command} language="bash" embedded compact />
   {#if Object.keys(options).length}<div
       class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground"

@@ -53,6 +53,7 @@ export interface ToolCall {
   ID: string;
   Name: string;
   Input: unknown;
+  InputError?: string;
 }
 export interface Message {
   ID: string;

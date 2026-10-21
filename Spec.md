@@ -620,6 +620,10 @@ A WebSocket request uses `response.create`. The event `response.completed` can s
 
 The adapter uses supplied tool call fields from stream events. A tool item with `status: incomplete` does not start a tool. The adapter waits for the last provider event. The cause and usage stay available. A tool call is sent one time. A response without the full output data cannot start continuation.
 
+For `response.completed`, JSON data that is not correct can give a tool input error. The runtime keeps the supplied text as a JSON string in `ToolCall.Input` and sets `ToolCall.InputError`.
+
+For `InputError`, the runtime stops the tool input before tool middleware and permission decisions. The model receives a tool error and can supply new input through the loop. The harness does not repair JSON. The tool results stay in the request.
+
 Continuation is available when the previous input, response output, and request parameters are the same. The adapter then sends only new input. A history change or a model change can make full input necessary. Context measurement and usage use the full logical request, not the transport delta.
 
 WebSocket connections have workspace, session, and credential scope. A connection has a maximum of 1 active response. A stream with an error cannot supply a continuation. Cancellation closes the connection. The provider can have work in progress after a connection closes.

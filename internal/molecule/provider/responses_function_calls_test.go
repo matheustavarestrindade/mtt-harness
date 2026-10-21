@@ -102,10 +102,9 @@ func TestResponsesDefersInvalidItemUntilCompletedSnapshot(testingHandle *testing
 	}
 }
 
-func TestResponsesNeverDeliversExplicitlyIncompleteOrMalformedCalls(testingHandle *testing.T) {
+func TestResponsesNeverDeliversUnfinishedOrUnidentifiableCalls(testingHandle *testing.T) {
 	for _, item := range []string{
 		`{"type":"function_call","id":"item","call_id":"call","name":"inspect","arguments":"{}","status":"incomplete"}`,
-		`{"type":"function_call","id":"item","call_id":"call","name":"inspect","arguments":"{","status":"completed"}`,
 		`{"type":"function_call","id":"item","name":"inspect","arguments":"{}","status":"completed"}`,
 	} {
 		parts, operationError := decodeFunctionCallFixture(`{"type":"response.output_item.done","output_index":0,"item":`+item+`}`, `{"type":"response.completed","response":{"id":"invalid-call","output":[`+item+`],"usage":{"input_tokens":10,"output_tokens":5,"cost":0.25}}}`)
@@ -123,6 +122,62 @@ func TestResponsesNeverDeliversExplicitlyIncompleteOrMalformedCalls(testingHandl
 		}
 		if usage == nil || usage.Cost == nil || usage.Cost.Value != 0.25 {
 			testingHandle.Fatalf("failure lost reported usage/cost: %+v", usage)
+		}
+	}
+}
+
+func TestCompletedMalformedArgumentsBecomeRejectedToolInput(testingHandle *testing.T) {
+	stream := &providerStream{parts: make(chan atom.ResponsePart, 64)}
+	decoder := newResponsesDecoder(context.Background(), stream, "synthetic")
+	item := `{"type":"function_call","id":"item","call_id":"bad-call","name":"inspect","arguments":"{\"path\":","status":"completed"}`
+	if _, operationError := decoder.consumeEvent([]byte(`{"type":"response.output_item.done","output_index":1,"item":` + item + `}`)); operationError != nil {
+		testingHandle.Fatal(operationError)
+	}
+	if len(stream.parts) != 0 {
+		testingHandle.Fatal("malformed input was delivered before a successful terminal event")
+	}
+	if _, operationError := decoder.consumeEvent([]byte(`{"type":"response.completed","response":{"id":"complete-bad-input","output":[{"type":"reasoning","id":"thought","encrypted_content":"opaque"},` + item + `],"usage":{"input_tokens":20,"output_tokens":15}}}`)); operationError != nil {
+		testingHandle.Fatal(operationError)
+	}
+	var call *atom.ToolCall
+	var usage *atom.Usage
+	for len(stream.parts) > 0 {
+		part := <-stream.parts
+		if part.ToolCall != nil {
+			if call != nil {
+				testingHandle.Fatal("rejected call repeated")
+			}
+			call = part.ToolCall
+		}
+		if part.Usage != nil {
+			usage = part.Usage
+		}
+	}
+	if call == nil || call.ID != "bad-call" || call.InputError == "" || !json.Valid(call.Input) {
+		testingHandle.Fatalf("missing persistent input error: %+v", call)
+	}
+	arguments, operationError := call.ArgumentsText()
+	if operationError != nil || arguments != `{"path":` {
+		testingHandle.Fatalf("original argument text changed: %q %v", arguments, operationError)
+	}
+	if usage == nil || usage.Output != 15 {
+		testingHandle.Fatal("completed malformed call lost usage")
+	}
+	if captureResponsesContinuation(map[string]any{"input": []any{}}, decoder.completed, "synthetic") != nil {
+		testingHandle.Fatal("malformed arguments established a continuation baseline")
+	}
+	for _, protocol := range []string{"responses", "openai"} {
+		standardProvider := New(atom.ProviderSpec{Name: "synthetic", Protocol: protocol})
+		request := atom.Request{Model: "test", Messages: []atom.Message{{Role: atom.RoleAssistant, ToolCalls: []atom.ToolCall{*call}}}}
+		before, operationError := standardProvider.EstimateTokens(context.Background(), request)
+		if operationError != nil {
+			testingHandle.Fatal(operationError)
+		}
+		request.Messages[0].ToolCalls[0].Input = json.RawMessage(arguments)
+		request.Messages[0].ToolCalls[0].InputError = ""
+		after, operationError := standardProvider.EstimateTokens(context.Background(), request)
+		if operationError != nil || before.InputTokens != after.InputTokens {
+			testingHandle.Fatal("quoted storage bytes were counted as input")
 		}
 	}
 }

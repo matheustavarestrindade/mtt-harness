@@ -63,3 +63,27 @@ func TestProviderAuthenticationAndReasoningPersistence(test *testing.T) {
 		test.Fatal("disconnect left OAuth tokens in the database")
 	}
 }
+
+func TestRejectedToolArgumentsSurviveJSONB(testingHandle *testing.T) {
+	database := regressionStore(testingHandle)
+	operationContext := context.Background()
+	identifier := fmt.Sprintf("rejected-tool-%d", time.Now().UnixNano())
+	session := atom.Session{ID: atom.SessionID(identifier), InstanceID: identifier, CreatedAt: time.Now()}
+	testutil.RequireNoError(testingHandle, database.Sessions().Save(operationContext, session))
+	raw := "{\"path\":\"例.txt\",\n"
+	encoded, operationError := json.Marshal(raw)
+	testutil.RequireNoError(testingHandle, operationError)
+	call := atom.ToolCall{ID: "rejected", Name: "file_actions", Input: encoded, InputError: "invalid JSON"}
+	testutil.RequireNoError(testingHandle, database.Sessions().Append(operationContext, atom.Message{ID: identifier, SessionID: session.ID, Role: atom.RoleAssistant, ToolCalls: []atom.ToolCall{call}, CreatedAt: time.Now()}))
+	messages, operationError := database.Sessions().Messages(operationContext, session.ID)
+	testutil.RequireNoError(testingHandle, operationError)
+	if len(messages) != 1 || len(messages[0].ToolCalls) != 1 {
+		testingHandle.Fatal("tool history was not retained")
+	}
+	restored := messages[0].ToolCalls[0]
+	text, operationError := restored.ArgumentsText()
+	testutil.RequireNoError(testingHandle, operationError)
+	if text != raw || restored.InputError != call.InputError {
+		testingHandle.Fatal("JSONB changed rejected source input")
+	}
+}

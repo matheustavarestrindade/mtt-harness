@@ -182,7 +182,11 @@ func countTokens(operationContext context.Context, request atom.Request, provide
 			count += 16384
 		}
 		for _, call := range message.ToolCalls {
-			count += len(call.Name) + len(call.Input) + 8
+			arguments, operationError := call.ArgumentsText()
+			if operationError != nil {
+				arguments = string(call.Input)
+			}
+			count += len(call.Name) + len(arguments) + 8
 		}
 	}
 	return count, operationContext.Err()

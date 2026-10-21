@@ -52,7 +52,11 @@ func encodeResponsesAPIInput(messages []atom.Message, providerName string) ([]an
 			input = append(input, map[string]any{"role": string(role), "content": content})
 		}
 		for _, call := range message.ToolCalls {
-			input = append(input, map[string]any{"type": "function_call", "call_id": call.ID, "name": call.Name, "arguments": string(call.Input)})
+			arguments, operationError := call.ArgumentsText()
+			if operationError != nil {
+				return nil, "", operationError
+			}
+			input = append(input, map[string]any{"type": "function_call", "call_id": call.ID, "name": call.Name, "arguments": arguments})
 		}
 	}
 	return input, strings.Join(instructions, "\n\n"), nil
