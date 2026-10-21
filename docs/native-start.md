@@ -83,11 +83,22 @@ The native launcher sets the API port and database URL in `bin/native/mtt.json`.
 
 Provider URLs, models, and prices stay in the selected providers file. The `bin/native/providers.json` file changes the default `/opt/mtt` asset paths to host paths. User paths and provider settings do not change. The source files selected by `mcp_file`, `start_prompt_file`, `spaced_repetition_prompts`, and `sidekick_prompt_file` stay the same.
 
-Provider secrets and runtime settings stay in PostgreSQL. Use `Configuration → Settings → Providers` in the UI. The initial harness output contains the new `API token`.
+Provider secrets and runtime settings stay in PostgreSQL. Use `Configuration → Settings → Providers` in the UI. The native launcher shows the `API token` after the API and UI are available.
+
+```text
+UI API address: /api
+API token: <your-token>
+
+Initial successful launch: read the current database token and show it once
+Existing installation without a display marker: show it on the next successful start
+Subsequent launches with the same database: do not display the token again
+Display marker: api_token_displayed in bin/native/runtime.json
+Token value: retained in PostgreSQL, not copied into the display marker
+```
 
 ```text
 Generated configuration and log-file permissions: 0600
-Database identity: Compose project, volume name, and volume creation time
+Database identity: Compose project, volume name/creation time, and database name
 Missing/replaced saved database volume: stop with an error
 Automatic database restore/reset: none
 Workspace path conversion: none

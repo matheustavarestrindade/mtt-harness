@@ -208,6 +208,9 @@ class NativeRuntime:
             raise RuntimeError("PostgreSQL container is unavailable")
         container = json.loads(command(["docker", "inspect", identifier], self.root, capture=True).stdout)[0]
         volume = json.loads(command(["docker", "volume", "inspect", self.database_volume], self.root, capture=True).stdout)[0]
+        database_environment = dict(value.split("=", 1) for value in container["Config"]["Env"] if "=" in value)
+        database = {"project": self.database_project, "volume": self.database_volume,
+                    "created_at": volume["CreatedAt"], "name": database_environment["POSTGRES_DB"]}
         self.prepare_runtime_files(manifest, container)
         compiler = shlex.split(os.environ.get("CC", "gcc"))
         from shutil import which
@@ -247,22 +250,32 @@ class NativeRuntime:
                         self.processes.append(subprocess.Popen(arguments, cwd=directory, env=environment,
                                                                stdout=output, stderr=subprocess.STDOUT, start_new_session=True))
             self.wait_for_health()
-            write_private_json(self.directory / "runtime.json", {"root": str(self.root), "api_port": self.api_port,
-                               "ui_port": self.ui_port, "service_mode": self.service_mode, "units": self.units,
-                               "database": {"project": self.database_project, "volume": self.database_volume,
-                                            "created_at": volume["CreatedAt"]}})
+            token = self.read_first_launch_token(container, database)
+            runtime_state = {"root": str(self.root), "api_port": self.api_port,
+                             "ui_port": self.ui_port, "service_mode": self.service_mode, "units": self.units,
+                             "database": database, "api_token_displayed": token is None}
+            write_private_json(self.directory / "runtime.json", runtime_state)
         except BaseException:
             self.stop_started()
             self.show_log_tail(offsets)
             raise
-        self.show_log_tail({"api": offsets["api"]})
-        print(f"\nNative API: {self.api_url}\nNative UI: {self.ui_url}\nLogs: {self.directory}\n"
-              "Workspaces use host paths. Agent commands inherit the host PATH and user permissions.", flush=True)
+        self.show_log_tail({"api": offsets["api"]}, include_api_token=False)
+        self.show_connection_summary(runtime_state, token)
         if self.service_mode:
             print("User services are running in the background. Use build.sh --stop to stop them.\n"
                   "After a reboot, build.sh --no-build starts them again.", flush=True)
         else:
             print("Running in this terminal. Ctrl+C stops the API and UI; PostgreSQL stays running.", flush=True)
+
+    def show_connection_summary(self, runtime_state, token):
+        print(f"\nNative API: {self.api_url}\nNative UI: {self.ui_url}\nLogs: {self.directory}\n"
+              "Workspaces use host paths. Agent commands inherit the host PATH and user permissions.", flush=True)
+        if token is not None:
+            print(f"\nUI API address: /api\nAPI token: {token}\nUse this token to connect the UI.\n", flush=True)
+            # Record only after the successful display. The token itself remains
+            # in the authoritative database, not in this launch-state record.
+            runtime_state["api_token_displayed"] = True
+            write_private_json(self.directory / "runtime.json", runtime_state)
 
     def wait_for_health(self):
         deadline = time.monotonic() + 180
@@ -274,14 +287,42 @@ class NativeRuntime:
             time.sleep(0.25)
         raise RuntimeError("The native API/UI health check did not become ready within 180 seconds")
 
-    def show_log_tail(self, offsets):
+    def read_first_launch_token(self, container, database):
+        previous_path = self.directory / "runtime.json"
+        previous = read_json(previous_path) if previous_path.is_file() else {}
+        if previous.get("api_token_displayed") is True and previous.get("database") == database:
+            return None
+        environment = dict(value.split("=", 1) for value in container["Config"]["Env"] if "=" in value)
+        query = "SELECT to_json(value) FROM settings WHERE scope = '' AND key = 'api_token'"
+        result = command(["docker", "exec", container["Id"], "psql", "--no-psqlrc", "--tuples-only", "--no-align",
+                          "--set=ON_ERROR_STOP=1", "--username", environment["POSTGRES_USER"],
+                          "--dbname", environment["POSTGRES_DB"], "--command", query], self.root, capture=True)
+        try:
+            token = json.loads(result.stdout)
+        except ValueError as failure:
+            raise RuntimeError("The database did not return an API token after startup") from failure
+        if not isinstance(token, str) or not token:
+            raise RuntimeError("The database did not return an API token after startup")
+        return token
+
+    def show_log_tail(self, offsets, include_api_token=True):
         for name, offset in offsets.items():
             path = self.logs[name]
             if not path.is_file():
                 continue
             with path.open("rb") as stream:
-                stream.seek(max(offset, path.stat().st_size - 65536))
+                start = max(offset, path.stat().st_size - 65536)
+                if start > offset:
+                    stream.seek(start - 1)
+                line_boundary = start == offset or stream.read(1) == b"\n"
+                stream.seek(start)
                 text = stream.read(65536).decode("utf-8", errors="replace")
+                if not include_api_token and not line_boundary:
+                    # A bounded tail can start inside a token or diagnostic line.
+                    text = text.partition("\n")[2]
+            if not include_api_token:
+                text = "".join(line for line in text.splitlines(keepends=True)
+                               if not line.startswith("mtt API token:"))
             if text:
                 print(text, end="" if text.endswith("\n") else "\n", flush=True)
 

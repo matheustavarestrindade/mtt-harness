@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -88,8 +89,8 @@ func TestNativeBuildAndLaunch(testingHandle *testing.T) {
 	}
 	deployment := fmt.Sprintf("COMPOSE_PROJECT_NAME=%s\nMTT_HOST_PORT=%d\nUI_PORT=%d\nUI_BIND_ADDRESS=127.0.0.1\nMTT_POSTGRES_PORT=0\nMTT_TEST_PROVIDER=false\n", project, apiPort, uiPort)
 	testutil.RequireNoError(testingHandle, os.WriteFile(filepath.Join(checkout, ".env.example"), []byte(deployment), 0600))
-	const token = "synthetic-native-launch-token"
-	bootstrap := map[string]any{"api_token": token, "port": 8080, "providers_file": "providers.json", "mcp_file": "mcp.json"}
+	var token string
+	bootstrap := map[string]any{"api_token": "", "port": 8080, "providers_file": "providers.json", "mcp_file": "mcp.json"}
 	encoded, operationError := json.Marshal(bootstrap)
 	testutil.RequireNoError(testingHandle, operationError)
 	testutil.RequireNoError(testingHandle, os.WriteFile(filepath.Join(checkout, "mtt.example.json"), encoded, 0600))
@@ -192,6 +193,20 @@ func TestNativeBuildAndLaunch(testingHandle *testing.T) {
 		}
 		testingHandle.Fatal("native API/UI did not become ready")
 	}
+	waitForegroundOutput := func() []byte {
+		testingHandle.Helper()
+		deadline := time.Now().Add(15 * time.Second)
+		for time.Now().Before(deadline) {
+			output, readError := os.ReadFile(filepath.Join(temporary, "launcher.log"))
+			testutil.RequireNoError(testingHandle, readError)
+			if bytes.Contains(output, []byte("Running in this terminal.")) {
+				return output
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		testingHandle.Fatal("native launcher did not finish its startup summary")
+		return nil
+	}
 	requestJSON := func(method, path string, body, result any) {
 		testingHandle.Helper()
 		var payload []byte
@@ -217,6 +232,22 @@ func TestNativeBuildAndLaunch(testingHandle *testing.T) {
 	}
 	startForeground()
 	waitReady()
+	firstOutput := waitForegroundOutput()
+	tokenMatch := regexp.MustCompile(`(?m)^API token: ([0-9a-f]{64})$`).FindSubmatch(firstOutput)
+	if len(tokenMatch) != 2 {
+		testingHandle.Fatal("first native launch did not display its generated API token")
+	}
+	token = string(tokenMatch[1])
+	if bytes.Count(firstOutput, []byte(token)) != 1 || !bytes.Contains(firstOutput, []byte("UI API address: /api")) {
+		testingHandle.Fatal("first-start credentials were missing or duplicated in log output")
+	}
+	stateBytes, readError := os.ReadFile(filepath.Join(stateDirectory, "runtime.json"))
+	testutil.RequireNoError(testingHandle, readError)
+	var launchState map[string]any
+	testutil.RequireNoError(testingHandle, json.Unmarshal(stateBytes, &launchState))
+	if launchState["api_token_displayed"] != true || bytes.Contains(stateBytes, []byte(token)) {
+		testingHandle.Fatal("launch state did not record display, or stored a duplicate credential")
+	}
 	runningServices := strings.TrimSpace(string(execute(checkout, []string{hostPath}, append([]string{"docker"}, append(compose, "ps", "--services", "--status", "running")...)...)))
 	if runningServices != "postgres" {
 		testingHandle.Fatalf("unexpected Docker services in native mode: %s", runningServices)
@@ -295,13 +326,30 @@ func TestNativeBuildAndLaunch(testingHandle *testing.T) {
 	testingHandle.Log("Native API/UI, embeddings, host PATH/Python/UID, host files and WebSocket passed")
 	stopForeground()
 	execute(checkout, []string{hostPath}, append([]string{"docker"}, append(compose, "stop", "postgres")...)...)
+	// An existing installation from before this feature has no display marker.
+	// A configured token is also not printed by the harness's generation logger.
+	delete(launchState, "api_token_displayed")
+	stateBytes, operationError = json.Marshal(launchState)
+	testutil.RequireNoError(testingHandle, operationError)
+	testutil.RequireNoError(testingHandle, os.WriteFile(filepath.Join(stateDirectory, "runtime.json"), stateBytes, 0600))
+	bootstrap["api_token"] = token
+	encoded, operationError = json.Marshal(bootstrap)
+	testutil.RequireNoError(testingHandle, operationError)
+	testutil.RequireNoError(testingHandle, os.WriteFile(filepath.Join(checkout, "mtt.json"), encoded, 0600))
 	serviceAvailable := exec.Command("systemctl", "--user", "show-environment").Run() == nil
+	var upgradeOutput []byte
 	if serviceAvailable {
-		execute(temporary, []string{hostPath}, "bash", filepath.Join(checkout, "build.sh"), "--no-build")
+		upgradeOutput = execute(temporary, []string{hostPath}, "bash", filepath.Join(checkout, "build.sh"), "--no-build")
 	} else {
 		startForeground()
 	}
 	waitReady()
+	if !serviceAvailable {
+		upgradeOutput = waitForegroundOutput()
+	}
+	if bytes.Count(upgradeOutput, []byte(token)) != 1 || !bytes.Contains(upgradeOutput, []byte("API token: "+token)) {
+		testingHandle.Fatal("legacy native state did not display the existing configured token once")
+	}
 	if serviceAvailable {
 		var runtimeState struct{ Units map[string]string }
 		stateBytes, readError := os.ReadFile(filepath.Join(stateDirectory, "runtime.json"))
@@ -319,12 +367,23 @@ func TestNativeBuildAndLaunch(testingHandle *testing.T) {
 	if saved.ID != session.ID || settings["agent_depth_limit"] != "4" {
 		testingHandle.Fatal("native restart changed saved data")
 	}
+	var repeatedOutput []byte
 	if serviceAvailable {
-		execute(temporary, []string{hostPath}, "bash", filepath.Join(checkout, "build.sh"), "--no-build", "--restart")
-		waitReady()
+		repeatedOutput = execute(temporary, []string{hostPath}, "bash", filepath.Join(checkout, "build.sh"), "--no-build", "--restart")
+	} else {
+		stopForeground()
+		startForeground()
 	}
+	waitReady()
+	if !serviceAvailable {
+		repeatedOutput = waitForegroundOutput()
+	}
+	if bytes.Contains(repeatedOutput, []byte(token)) || bytes.Contains(repeatedOutput, []byte("API token:")) {
+		testingHandle.Fatal("repeat native startup displayed the token again")
+	}
+	requestJSON("GET", "/sessions/"+session.ID, nil, &saved)
 	response, operationError := client.Get(apiURL + "/health")
 	testutil.RequireNoError(testingHandle, operationError)
 	response.Body.Close()
-	testingHandle.Log("Foreground shutdown, database restart/persistence and owned user-service restart passed")
+	testingHandle.Log("First-launch token, legacy/configured-token display, repeat suppression, and restart persistence passed")
 }
