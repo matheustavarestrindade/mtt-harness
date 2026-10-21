@@ -6,6 +6,8 @@ The UI is a client of the harness API. The harness keeps the sessions, queue, to
 
 The minimum Node.js version is `22.12`. Start the harness with the commands in `../AGENTS.md`. The default harness URL is `http://localhost:18080`.
 
+Run `../build.sh` for the native harness and UI, with PostgreSQL in Docker. The native UI uses the Vite proxy and port `18081`. The UI files are in `ui/dist`. See `../docs/native-start.md`.
+
 Run the commands from `ui/`:
 
 ```sh

@@ -18,6 +18,8 @@ coverage.html
 
 .cortexkit/
 /workspace/
+__pycache__/
+*.pyc
 
 # editor and system
 .DS_Store

@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Fetch pinned CPU inference and tokenizer binaries for the optional adapter."""
 
-import hashlib
-import io
 from pathlib import Path
 import sys
 import tarfile
-import urllib.request
+
+from verified_download import download_verified, write_asset
 
 VERSIONS = {"runtime": "1.30.0", "tokenizers": "1.26.0"}
 PLATFORMS = {
@@ -21,12 +20,9 @@ PLATFORMS = {
 }
 
 
-def fetch_archive(url, expected):
-    with urllib.request.urlopen(url, timeout=120) as response:
-        payload = response.read()
-    if hashlib.sha256(payload).hexdigest() != expected:
-        raise RuntimeError(f"checksum mismatch for {url}")
-    return tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz")
+def fetch_archive(url, expected, cache):
+    archive = download_verified(url, cache / url.rsplit("/", 1)[-1], expected)
+    return tarfile.open(archive, mode="r:gz")
 
 
 def main():
@@ -37,20 +33,20 @@ def main():
     runtime_version = VERSIONS["runtime"]
     runtime_name = f"onnxruntime-linux-{runtime_architecture}-{runtime_version}"
     runtime_url = f"https://github.com/microsoft/onnxruntime/releases/download/v{runtime_version}/{runtime_name}.tgz"
-    with fetch_archive(runtime_url, runtime_hash) as archive:
+    with fetch_archive(runtime_url, runtime_hash, target / ".archives") as archive:
         for member in archive.getmembers():
             name = Path(member.name).name
             if not member.isfile() or name not in {f"libonnxruntime.so.{runtime_version}", "LICENSE", "ThirdPartyNotices.txt"}:
                 continue
             output = target / (name if name.startswith("libonnxruntime") else f"onnxruntime-{name}")
             with archive.extractfile(member) as source:
-                output.write_bytes(source.read())
+                write_asset(output, source.read())
     tokenizer_architecture, tokenizer_hash = selected["tokenizers"]
     tokenizer_version = VERSIONS["tokenizers"]
     tokenizer_url = f"https://github.com/daulet/tokenizers/releases/download/v{tokenizer_version}/libtokenizers.linux-{tokenizer_architecture}.tar.gz"
-    with fetch_archive(tokenizer_url, tokenizer_hash) as archive:
+    with fetch_archive(tokenizer_url, tokenizer_hash, target / ".archives") as archive:
         with archive.extractfile("libtokenizers.a") as source:
-            (target / "libtokenizers.a").write_bytes(source.read())
+            write_asset(target / "libtokenizers.a", source.read())
     if not (target / f"libonnxruntime.so.{runtime_version}").is_file():
         raise RuntimeError("native runtime archive did not contain the shared library")
     print(f"verified native runtime and tokenizer for {architecture}", flush=True)

@@ -2,6 +2,151 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "native installation",
+      "category": "technical_noun",
+      "approved_forms": [
+        "native installations"
+      ],
+      "meaning": "harness and UI running directly on the host",
+      "source": "docs/native-start.md"
+    },
+    {
+      "term": "native build",
+      "category": "technical_noun",
+      "approved_forms": [
+        "native builds"
+      ],
+      "meaning": "host-compiled harness and UI artifacts",
+      "source": "docs/native-start.md"
+    },
+    {
+      "term": "native launcher",
+      "category": "technical_noun",
+      "approved_forms": [
+        "native launchers"
+      ],
+      "meaning": "build.sh startup and lifecycle mechanism",
+      "source": "build.sh"
+    },
+    {
+      "term": "user service",
+      "category": "technical_noun",
+      "approved_forms": [
+        "user services"
+      ],
+      "meaning": "service managed within a user's systemd session",
+      "source": "docs/native-start.md"
+    },
+    {
+      "term": "native binary",
+      "category": "technical_noun",
+      "approved_forms": [
+        "native binaries"
+      ],
+      "meaning": "host executable produced by Go",
+      "source": "docs/native-start.md"
+    },
+    {
+      "term": "native API",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "harness API running on the host",
+      "source": "docs/native-start.md"
+    },
+    {
+      "term": "native UI",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "UI and proxy running on the host",
+      "source": "docs/native-start.md"
+    },
+    {
+      "term": "native harness",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "host harness process",
+      "source": "docs/native-start.md"
+    },
+    {
+      "term": "asset cache",
+      "category": "technical_noun",
+      "approved_forms": [
+        "asset caches"
+      ],
+      "meaning": "local checksum-verified model and library assets",
+      "source": "scripts/verified_download.py"
+    },
+    {
+      "term": "asset path",
+      "category": "technical_noun",
+      "approved_forms": [
+        "asset paths"
+      ],
+      "meaning": "filesystem path of a model or native library asset",
+      "source": "docs/native-start.md"
+    },
+    {
+      "term": "build directory",
+      "category": "technical_noun",
+      "approved_forms": [
+        "build directories"
+      ],
+      "meaning": "directory containing one compiled artifact version",
+      "source": "scripts/native_build.py"
+    },
+    {
+      "term": "build output",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "generated executable and UI assets",
+      "source": "docs/native-start.md"
+    },
+    {
+      "term": "build manifest",
+      "category": "technical_noun",
+      "approved_forms": [
+        "build manifests"
+      ],
+      "meaning": "generated native artifact and library path metadata",
+      "source": "scripts/native_build.py"
+    },
+    {
+      "term": "launch environment",
+      "category": "technical_noun",
+      "approved_forms": [
+        "launch environments"
+      ],
+      "meaning": "environment variables inherited by the native processes",
+      "source": "scripts/native_runtime.py"
+    },
+    {
+      "term": "foreground run",
+      "category": "technical_noun",
+      "approved_forms": [
+        "foreground runs"
+      ],
+      "meaning": "native processes owned by the invoking terminal",
+      "source": "docs/native-start.md"
+    },
+    {
+      "term": "loopback port",
+      "category": "technical_noun",
+      "approved_forms": [
+        "loopback ports"
+      ],
+      "meaning": "port bound only to the host loopback interface",
+      "source": "docker/compose.native.yaml"
+    },
+    {
+      "term": "Docker deployment",
+      "category": "technical_noun",
+      "approved_forms": [
+        "Docker deployments"
+      ],
+      "meaning": "the full containerized harness stack",
+      "source": "docs/docker-start.md"
+    },
+    {
       "term": "Docker Engine",
       "category": "technical_noun",
       "approved_forms": [],
