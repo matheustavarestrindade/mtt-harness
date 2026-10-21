@@ -86,7 +86,10 @@ test('open category-specific file pickers from the attachment menu', async ({ pa
   }
 });
 
-test('send a UTF-8 text attachment with a text-only model', async ({ page }) => {
+test('send a UTF-8 text attachment without randomUUID with a text-only model', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window.crypto, 'randomUUID', { value: undefined, configurable: true });
+  });
   const fixture = await setup(page);
   const input = page.getByLabel('Attach files', { exact: true });
   await expect(input).toHaveAttribute('accept', /\.txt/);

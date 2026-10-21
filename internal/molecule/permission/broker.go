@@ -54,6 +54,15 @@ func (permissionBroker *Broker) Request(operationContext context.Context, reques
 }
 
 func (permissionBroker *Broker) Resolve(identifier string, decision atom.PermissionDecision) bool {
+	return permissionBroker.resolve(identifier, "", decision)
+}
+
+// ResolveSession consumes a pending decision only for its owning session.
+func (permissionBroker *Broker) ResolveSession(identifier string, sessionID atom.SessionID, decision atom.PermissionDecision) bool {
+	return permissionBroker.resolve(identifier, sessionID, decision)
+}
+
+func (permissionBroker *Broker) resolve(identifier string, sessionID atom.SessionID, decision atom.PermissionDecision) bool {
 	if decision.Scope == "" {
 		decision.Scope = atom.ScopeOnce
 	}
@@ -62,6 +71,9 @@ func (permissionBroker *Broker) Resolve(identifier string, decision atom.Permiss
 	}
 	permissionBroker.mutex.Lock()
 	channel, found := permissionBroker.pending[identifier]
+	if found && sessionID != "" && permissionBroker.requests[identifier].SessionID != sessionID {
+		found = false
+	}
 	if found {
 		delete(permissionBroker.pending, identifier)
 		delete(permissionBroker.requests, identifier)

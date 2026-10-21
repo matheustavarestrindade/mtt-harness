@@ -3,7 +3,11 @@ import type { MemoryMetrics, MemoryPluginState } from './memory';
 export type WorkspacePluginState<Configuration> = Omit<
   MemoryPluginState,
   'Configuration' | 'Override'
-> & { Configuration: Configuration; Override: Partial<Configuration> | null };
+> & {
+  Configuration: Configuration;
+  Override: Partial<Configuration> | null;
+  Schema?: { JSON: Record<string, unknown> };
+};
 
 export type WorkspacePluginMetrics = MemoryMetrics;
 

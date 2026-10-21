@@ -95,7 +95,7 @@ test('show one reported request instead of cumulative input, output, or cache to
   });
 
   await openWorkbenchAction(page, 'Settings');
-  await page.getByRole('dialog').getByRole('button', { name: 'Usage', exact: true }).click();
+  await page.getByRole('dialog').getByRole('tab', { name: 'Usage', exact: true }).click();
   const overview = page.getByRole('region', { name: 'Usage overview' });
   await expect(overview).toContainText('Total input tokens');
   await expect(

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { LoaderCircle, RefreshCw, Repeat2, Power, Settings2 } from 'lucide-svelte';
+  import { LoaderCircle, Repeat2, Power, Settings2 } from 'lucide-svelte';
   import type { Instance, Model } from '../atoms/types';
   import type { RepetitionConfiguration } from '../atoms/plugins';
   import { Button } from '../atoms/ui/button';
@@ -13,6 +13,8 @@
   import ModelCombobox from '../molecules/ModelCombobox.svelte';
   import ReasoningSelect from '../molecules/ReasoningSelect.svelte';
   import MemoryAgentUsage from '../molecules/MemoryAgentUsage.svelte';
+  import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
+  import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
 
   let { api, instance }: { api: HarnessApi; instance: Instance | null } = $props();
@@ -137,28 +139,12 @@
   }
 </script>
 
-<section aria-label="Spaced repetition" class="mx-auto min-w-0 max-w-2xl space-y-6">
-  <header class="flex min-w-0 flex-wrap items-start justify-between gap-3">
-    <div class="min-w-0">
-      <h2 class="flex items-center gap-2 text-xl font-medium">
-        <Repeat2 class="size-5 shrink-0" />Spaced repetition
-      </h2>
-      <p class="mt-2 text-sm text-muted-foreground">
-        Instruction reminders and recovery for {instance
-          ? workspaceName(instance.Workspace)
-          : 'the selected workspace'}.
-      </p>
-    </div>
-    {#if workspaceID}<Button
-        variant="ghost"
-        size="icon"
-        class="icon-button"
-        aria-label="Refresh instruction usage"
-        disabled={panel.loading || panel.saving}
-        onclick={() => panel.refresh()}
-        ><RefreshCw class={panel.loading ? 'size-4 animate-spin' : 'size-4'} /></Button
-      >{/if}
-  </header>
+<section aria-label="Spaced repetition" class="min-w-0 w-full space-y-5">
+  <SettingsPageTitle
+    icon={Repeat2}
+    title="Instructions"
+    description={`Instruction reminders and recovery for ${instance ? workspaceName(instance.Workspace) : 'the selected workspace'}.`}
+  />
   {#if !instance}
     <p class="text-sm text-muted-foreground">
       Select a workspace to configure instruction reminders.
@@ -394,8 +380,12 @@
             />{/each}
         </div>{/if}
     {/if}
-    {#if panel.updatedAt}<p class="text-xs text-muted-foreground">
-        Last update {panel.updatedAt.toLocaleTimeString()}. Workspace totals across sessions.
-      </p>{/if}
+    <PluginPanelFooter
+      refreshLabel="Refresh Instructions"
+      updatedAt={panel.updatedAt}
+      refreshing={panel.loading}
+      disabled={panel.saving}
+      onRefresh={() => void panel.refresh()}
+    />
   {/if}
 </section>

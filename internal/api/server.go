@@ -89,6 +89,7 @@ func (server *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /sessions/{id}/task-state", server.sessionTaskState)
 	mux.HandleFunc("POST /sessions/{id}/revert", server.revertSession)
 	mux.HandleFunc("GET /sessions/{id}/agents", server.sessionAgents)
+	mux.HandleFunc("POST /instances/{id}/plugins/{plugin}/actions/{action}", server.pluginAction)
 	mux.HandleFunc("GET /sessions/{id}/statistics", server.sessionStatistics)
 	mux.HandleFunc("GET /sessions/{id}/processes", server.sessionProcesses)
 	mux.HandleFunc("GET /sessions/{id}/events", server.sessionEvents)

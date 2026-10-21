@@ -5,6 +5,15 @@ export interface PluginActivityNote {
   References: string[] | null;
 }
 export interface PluginActivityEntry {
+  Outcome?: string;
+  Decision?: string;
+  Trigger?: string;
+  DefinitionID?: string;
+  WorkerSessionID?: string;
+  DurationMS?: number;
+  Error?: string;
+  InputPreview?: string;
+  InputTruncated?: boolean;
   ID: string;
   SessionID: string;
   AnchorID: string;

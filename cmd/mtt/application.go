@@ -54,6 +54,7 @@ func runApplication(configuration config.File) (operationError error) {
 	defer func() {
 		// HTTP has its own shutdown deadline. Resource owners must finish before
 		// the deferred database close, even when an earlier caller stopped waiting.
+		cancelApplication()
 		shutdownContext := context.Background()
 		if messageQueue != nil {
 			operationError = errors.Join(operationError, messageQueue.Close(shutdownContext))
@@ -119,6 +120,7 @@ func runApplication(configuration config.File) (operationError error) {
 	mcpCleanup, mcpError := loadMCP(operationContext, configuration.MCPFile, toolRegistry)
 	requireStartupSuccess(mcpError, "connect MCP servers")
 	closeMCP = mcpCleanup
+	requireStartupSuccess(attachWatcher(operationContext, pluginHost, database, instanceManager, modelGateway, agentLoop, messageQueue, eventBus, configuration.DatabaseURL), "attach Watcher plugin")
 	requireStartupSuccess(messageQueue.Restore(operationContext), "restore pending messages")
 	server := &http.Server{
 		Addr: ":" + strconv.Itoa(configuration.Port),

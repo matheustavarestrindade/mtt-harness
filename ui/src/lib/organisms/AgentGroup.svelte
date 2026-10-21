@@ -4,6 +4,7 @@
   import type { ToolActivity } from '../atoms/transcript';
   import type { Model, Session } from '../atoms/types';
   import MessageContent from '../molecules/content/MessageContent.svelte';
+  import Disclosure from '../molecules/Disclosure.svelte';
   import AgentPanel from './AgentPanel.svelte';
   import type { AgentMonitor } from './agent-monitor.svelte';
 
@@ -47,10 +48,7 @@
     {/each}
   {/if}
   {#if sessions.length && activities.some((activity) => activity.result)}
-    <details class="text-xs text-muted-foreground">
-      <summary class="min-h-8 cursor-pointer py-2 pointer-coarse:min-h-11"
-        >Delegation results</summary
-      >
+    <Disclosure class="text-xs text-muted-foreground" title="Delegation results">
       <div class="max-h-40 space-y-2 overflow-y-auto overscroll-contain">
         {#each activities.filter((activity) => activity.result) as activity (activity.call.ID)}
           <div class="min-w-0 border-l border-border pl-2">
@@ -61,6 +59,6 @@
           </div>
         {/each}
       </div>
-    </details>
+    </Disclosure>
   {/if}
 </section>

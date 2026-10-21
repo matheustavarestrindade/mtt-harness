@@ -2,6 +2,7 @@
   import { FileText, Film, Image, Music, Paperclip } from 'lucide-svelte';
   import * as DropdownMenu from '../atoms/ui/dropdown-menu';
   import { buttonVariants } from '../atoms/ui/button';
+  import { Input } from '../atoms/ui/input';
   import {
     attachmentAccept,
     attachmentCapabilities,
@@ -43,13 +44,13 @@
   }
 </script>
 
-<input
-  bind:this={fileInput}
+<Input
+  bind:ref={fileInput}
   type="file"
   multiple
   {accept}
-  class="sr-only"
-  tabindex="-1"
+  class="hidden"
+  tabindex={-1}
   aria-label="Attach files"
   {disabled}
   onchange={(event) => {

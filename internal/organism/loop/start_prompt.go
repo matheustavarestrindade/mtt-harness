@@ -14,6 +14,9 @@ import (
 // middleware and budgeting. It never appends to durable history, so subsequent
 // tool rounds, resumed sessions and child agents each receive one fresh copy.
 func (agentLoop *Loop) prependStartPrompt(operationContext context.Context, session atom.Session, messages []atom.Message) ([]atom.Message, error) {
+	if session.Execution != nil {
+		return append([]atom.Message{{SessionID: session.ID, Role: atom.RoleSystem, Ephemeral: true, Content: []atom.Content{{Type: atom.Text, Text: session.Execution.SystemPrompt}}}}, messages...), nil
+	}
 	if agentLoop.configuration.StartPrompt == nil {
 		return messages, nil
 	}
@@ -42,6 +45,24 @@ func (agentLoop *Loop) renderPromptTemplate(operationContext context.Context, se
 	if toolRegistry := agentLoop.configuration.Registry; toolRegistry != nil {
 		var references []atom.ToolReference
 		for _, tool := range toolRegistry.All() {
+			if session.Execution != nil {
+				available, operationError := harness.ToolAvailable(operationContext, tool)
+				if operationError != nil {
+					return "", operationError
+				}
+				if !available {
+					continue
+				}
+			}
+			if private, found := tool.(harness.SessionTool); found && private.SessionOnly() {
+				available, operationError := harness.ToolAvailable(operationContext, tool)
+				if operationError != nil {
+					return "", operationError
+				}
+				if !available {
+					continue
+				}
+			}
 			// The registered catalog is stable across runtime enable/disable.
 			// Discovery and callable definitions enforce request availability.
 			references = append(references, atom.ToolReference{Name: tool.Name(), Categories: tool.Categories()})
@@ -61,7 +82,10 @@ func (agentLoop *Loop) renderPromptTemplate(operationContext context.Context, se
 			if !available {
 				return atom.ToolSpec{}, fmt.Errorf("tool %q is not available for this workspace", name)
 			}
-			specification := describeTool(tool)
+			specification, operationError := harness.ToolSpecification(operationContext, tool)
+			if operationError != nil {
+				return atom.ToolSpec{}, operationError
+			}
 			if name == "agent" {
 				return agentLoop.addAgentModelChoices(session, specification)
 			}

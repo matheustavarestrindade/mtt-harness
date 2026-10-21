@@ -3,6 +3,7 @@
   import { Button } from '../atoms/ui/button';
   import { Input } from '../atoms/ui/input';
   import { Label } from '../atoms/ui/label';
+  import SettingsPageTitle from './SettingsPageTitle.svelte';
   let {
     initialBase = '/api',
     initialToken = '',
@@ -30,20 +31,14 @@
   });
 </script>
 
-<section aria-label="API connection" class="mx-auto w-full max-w-xl">
-  <header>
-    <div
-      class="mb-3 grid size-11 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary"
-    >
-      <Cable class="size-5" />
-    </div>
-    <h2 class="text-xl font-medium tracking-tight">Connection</h2>
-    <p class="mt-2 text-sm leading-6 text-muted-foreground">
-      Use your harness API token. This console connects through the UI-side proxy.
-    </p>
-  </header>
+<section aria-label="API connection" class="min-w-0 w-full space-y-5">
+  <SettingsPageTitle
+    icon={Cable}
+    title="Connection"
+    description="Use your harness API token. This console connects through the UI-side proxy."
+  />
   <form
-    class="mt-6 space-y-5"
+    class="space-y-5"
     onsubmit={(event) => {
       event.preventDefault();
       void onConnect(base, token);

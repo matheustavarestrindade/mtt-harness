@@ -127,6 +127,8 @@ type PluginServices struct {
 	Memory        WorkspaceMemory
 	Tasks         TaskStateReader
 	Files         WorkspaceFiles
+	Sessions      SessionWorkers
+	Events        EventPublisher
 }
 
 type WorkspaceUsage interface {

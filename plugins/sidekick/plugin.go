@@ -153,6 +153,9 @@ func (plugin *Plugin) observeTaskEvent(operationContext context.Context, event a
 	if session.InstanceID != event.InstanceID {
 		return
 	}
+	if session.IsWatcher() {
+		return
+	}
 	plugin.observeTaskState(session, state)
 }
 

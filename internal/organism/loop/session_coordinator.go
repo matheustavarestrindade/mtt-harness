@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 	"github.com/matheustavarestrindade/mtt-harness/internal/molecule/store"
 )
 
@@ -39,10 +40,13 @@ type sessionCoordinator struct {
 	lastError       string
 	publishedStatus QueueStatus
 	publishedMode   sessionMode
+	controlEpoch    string
+	inputRevision   uint64
 }
 
 func newSessionCoordinator(agentLoop *Loop, session atom.Session, pending []atom.Message, stopped bool) *sessionCoordinator {
 	coordinator := &sessionCoordinator{loop: agentLoop, session: session, pending: pending, commands: make(chan sessionCommand, commandBufferSize), completed: make(chan operationCompletion, 1), runFinished: make(chan runCompletion, 1), done: make(chan struct{})}
+	coordinator.controlEpoch = newID()
 	if stopped {
 		coordinator.mode = sessionStopped
 	}
@@ -97,6 +101,32 @@ func (coordinator *sessionCoordinator) handleSessionCommand(command sessionComma
 		return
 	}
 	switch command.kind {
+	case readControlToken:
+		pendingUser := false
+		for _, message := range coordinator.pending {
+			pendingUser = pendingUser || message.Role == atom.RoleUser
+		}
+		for _, mutation := range coordinator.mutations {
+			pendingUser = pendingUser || mutation.kind == submitMessage && mutation.message.Role == atom.RoleUser
+		}
+		if coordinator.working != nil {
+			pendingUser = pendingUser || coordinator.working.command.kind == submitMessage && coordinator.working.command.message.Role == atom.RoleUser
+		}
+		if coordinator.mode != sessionAccepting {
+			command.respond(sessionReply{operationError: ErrSessionBusy})
+			return
+		}
+		command.respond(sessionReply{control: harness.SessionControlToken{Epoch: coordinator.controlEpoch, Revision: coordinator.inputRevision, PendingUser: pendingUser}})
+	case confirmControlToken, applyPermissionDecision:
+		if !coordinator.matchesControl(command.control) {
+			command.respond(sessionReply{operationError: harness.ErrReviewStale})
+			return
+		}
+		applied := true
+		if command.kind == applyPermissionDecision {
+			applied = coordinator.loop.configuration.Broker != nil && coordinator.loop.configuration.Broker.ResolveSession(command.permission.RequestID, coordinator.session.ID, command.permission)
+		}
+		command.respond(sessionReply{applied: applied})
 	case prepareSessionDeletion, releaseSessionDeletion:
 		coordinator.handleDeletion(command)
 	case readStatus:
@@ -110,13 +140,14 @@ func (coordinator *sessionCoordinator) handleSessionCommand(command sessionComma
 		}
 		command.respond(sessionReply{status: QueueStatus{Running: coordinator.active != nil, Messages: identifiers, Error: coordinator.lastError, Previews: previews}})
 	case cancelCurrent:
+		coordinator.invalidateReviews()
 		cancelled := coordinator.loop.CancelRun(coordinator.session.ID)
 		if coordinator.active != nil {
 			coordinator.active.cancel()
 			cancelled = true
 		}
 		command.respond(sessionReply{cancelled: cancelled})
-	case submitMessage, cancelPending:
+	case submitMessage, cancelPending, submitFencedRuntime:
 		coordinator.handleMutation(command)
 	case admitQueuedMessages:
 		if coordinator.mode != sessionAccepting || coordinator.active == nil {
@@ -145,6 +176,10 @@ func (coordinator *sessionCoordinator) handleSessionCommand(command sessionComma
 }
 
 func (coordinator *sessionCoordinator) handleMutation(command sessionCommand) {
+	if command.kind == submitFencedRuntime && !coordinator.matchesControl(command.control) {
+		command.respond(sessionReply{operationError: harness.ErrReviewStale})
+		return
+	}
 	if coordinator.mode == sessionClosing {
 		command.respond(sessionReply{operationError: ErrQueueClosed})
 		return
@@ -153,18 +188,18 @@ func (coordinator *sessionCoordinator) handleMutation(command sessionCommand) {
 		command.respond(sessionReply{operationError: ErrSessionBusy})
 		return
 	}
-	if command.kind == submitMessage {
+	if command.kind == submitMessage || command.kind == submitFencedRuntime {
 		if coordinator.mode == sessionStopped || !coordinator.instanceRunning() {
 			command.respond(sessionReply{operationError: ErrInstanceStopped})
 			return
 		}
 		waiting := len(coordinator.pending)
 		for _, mutation := range coordinator.mutations {
-			if mutation.kind == submitMessage {
+			if mutation.kind == submitMessage || mutation.kind == submitFencedRuntime {
 				waiting++
 			}
 		}
-		if coordinator.working != nil && coordinator.working.command.kind == submitMessage {
+		if coordinator.working != nil && (coordinator.working.command.kind == submitMessage || coordinator.working.command.kind == submitFencedRuntime) {
 			waiting++
 		}
 		if waiting >= pendingMessageLimit {
@@ -181,6 +216,9 @@ func (coordinator *sessionCoordinator) handleMutation(command sessionCommand) {
 		return
 	}
 	coordinator.mutations = append(coordinator.mutations, command)
+	if command.kind == cancelPending || command.kind == submitMessage && command.message.Role == atom.RoleUser {
+		coordinator.invalidateReviews()
+	}
 }
 
 func (coordinator *sessionCoordinator) handleRevert(command sessionCommand) {
@@ -193,11 +231,13 @@ func (coordinator *sessionCoordinator) handleRevert(command sessionCommand) {
 		return
 	}
 	coordinator.mode = sessionReverting
+	coordinator.invalidateReviews()
 	coordinator.revert = &command
 	coordinator.rejectMutations(ErrSessionBusy)
 }
 
 func (coordinator *sessionCoordinator) handleStop(command sessionCommand) {
+	coordinator.invalidateReviews()
 	if command.kind == closeSession {
 		coordinator.mode = sessionClosing
 	}
@@ -216,6 +256,14 @@ func (coordinator *sessionCoordinator) handleStop(command sessionCommand) {
 	}
 	coordinator.rejectMutations(ErrSessionBusy)
 	coordinator.waiters = append(coordinator.waiters, command)
+}
+
+func (coordinator *sessionCoordinator) invalidateReviews() {
+	coordinator.inputRevision++
+	coordinator.loop.NotifySessionState(coordinator.session.ID)
+}
+func (coordinator *sessionCoordinator) matchesControl(control harness.SessionControlToken) bool {
+	return coordinator.mode == sessionAccepting && control.Epoch == coordinator.controlEpoch && control.Revision == coordinator.inputRevision
 }
 
 func (coordinator *sessionCoordinator) rejectMutations(operationError error) {

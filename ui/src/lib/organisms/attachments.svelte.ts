@@ -10,6 +10,7 @@ import {
   type DraftAttachment,
 } from '../atoms/attachments';
 import type { Model } from '../atoms/types';
+import { createClientID } from '../atoms/identifiers';
 
 export class AttachmentDrafts {
   drafts = $state<Record<string, DraftAttachment[]>>({});
@@ -34,7 +35,7 @@ export class AttachmentDrafts {
           );
         if (file.size === 0) throw new Error(`${file.name}: the file is empty.`);
         const item: DraftAttachment = {
-          id: crypto.randomUUID(),
+          id: createClientID(),
           name: file.name,
           size: file.size,
           ...format,

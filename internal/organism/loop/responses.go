@@ -26,13 +26,20 @@ func waitForTools(tasks []*toolTask) []atom.ToolResult {
 	return results
 }
 
-func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, session atom.Session, modelCall *preparedModelCall) (atom.Message, []*toolTask, error) {
+func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, session atom.Session, modelCall *preparedModelCall) (response atom.Message, toolTasks []*toolTask, responseError error) {
 	session = modelCall.session
 	operationContext = harness.WithSession(operationContext, session)
 	messageID := newID()
 	agentLoop.beginLiveResponse(session, messageID, modelCall.modelID)
 	if operationError := agentLoop.emitSessionEvent(operationContext, session, atom.EventModelCall, map[string]any{"model": modelCall.modelID, "message_id": messageID, "reasoning_effort": modelCall.request.ReasoningEffort}); operationError != nil {
 		return atom.Message{}, nil, operationError
+	}
+	var usage *atom.Usage
+	started := time.Now()
+	if session.Execution != nil {
+		defer func() {
+			responseError = errors.Join(responseError, agentLoop.recordWorkerAttempt(operationContext, session, modelCall.model, modelCall.modelID, messageID, started, usage, responseError))
+		}()
 	}
 	responseStream, operationError := modelCall.provider.Stream(operationContext, modelCall.request)
 	if operationError != nil {
@@ -42,11 +49,13 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 	var reasoning strings.Builder
 	var tasks []*toolTask
 	var content []atom.Content
-	var usage *atom.Usage
 	var providerState *atom.ProviderState
 	var streamError error
 	for {
 		part, operationError := responseStream.Recv(operationContext)
+		if part.Usage != nil {
+			usage = part.Usage
+		}
 		if errors.Is(operationError, io.EOF) {
 			break
 		}
@@ -86,9 +95,6 @@ func (agentLoop *Loop) receiveModelResponse(operationContext context.Context, se
 		content = append(content, part.Content...)
 		if part.ProviderState != nil {
 			providerState = part.ProviderState
-		}
-		if part.Usage != nil {
-			usage = part.Usage
 		}
 	}
 	sort.SliceStable(tasks, func(first, second int) bool {

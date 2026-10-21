@@ -358,6 +358,26 @@ The plugin name `sidekick` uses the same settings and statistics routes. The def
 
 The usage counters include `jobs/active`, `hints/delivered`, `hints/input_tokens`, `hints/estimated_tokens`, `sources/memories`, `sources/files`, and `sources/duplicates`. The text from a Sidekick note is not in the statistics response.
 
+The plugin name `watcher` uses the same settings and statistics routes. The default plugin state is `OFF`. Settings contain watcher definitions with models, prompt templates, watcher triggers, and tool selections. `Schema.JSON` includes `x-tools` and `x-default-definition` for the workspace UI. The agent name for worker usage is `watcher.ID`.
+
+### Workspace Plugin Actions
+
+```text
+POST /instances/{id}/plugins/{plugin}/actions/{action}
+```
+
+The optional `PluginActions` interface gives actions for a plugin. Authentication and a workspace ID are necessary. An unknown action or plugin gives `404`. A parameter error gives `400`.
+
+```typescript
+// Watcher action inputs
+type WatcherPreviewInput = { session_id: string; watcher: object; trigger: string };
+type WatcherRunsInput = { session_id?: string; cursor?: string; limit?: number };
+type WatcherCancelInput = { run_id: string };
+// actions: preview, runs, cancel
+```
+
+The preview operation measures input without a model call. The `runs` operation gives a maximum of 100 watcher run records from the workspace or session. The `cancel` operation stops the active review group for the run ID. The actions apply only to the selected workspace.
+
 ### Session Plugin Data
 
 ```text
@@ -377,6 +397,9 @@ type PluginActivityEntry = {
   ID: string; SessionID: string; AnchorID: string; AnchorSequence: number;
   Title: string; CreatedAt: string; Notes: { Text: string; References: string[] | null }[];
   InputTokens?: number; Estimated: boolean;
+  Outcome?: string; Decision?: string; Trigger?: string; DefinitionID?: string;
+  WorkerSessionID?: string; DurationMS?: number; Error?: string;
+  InputPreview?: string; InputTruncated?: boolean;
 };
 ```
 
@@ -388,7 +411,9 @@ A plugin state change increases `Revision`. A history change makes a new `Histor
 
 A parameter error or cursor scope error gives `400`. A missing session, plugin, or `SessionActivityPlugin` interface gives `404`. A history change in progress or a previous history revision gives `409`. A storage error gives `500`.
 
-See `plugins/context/README.md`, `plugins/spaced_repetition/README.md`, and `plugins/sidekick/README.md` for configuration and behavior.
+Watcher run records include `Outcome` and `Decision`. The `InputPreview` limit is `16384 bytes`. Worker reasoning is not in the response. The session event `plugin.activity` gives change metadata. The UI can then refresh the watcher run records.
+
+See `plugins/context/README.md`, `plugins/spaced_repetition/README.md`, `plugins/sidekick/README.md`, and `plugins/watcher/doc.md` for configuration and behavior.
 
 ## Permission and Process Routes
 
@@ -590,6 +615,7 @@ type Session = {
   Model: string; ReasoningEffort?: string; CreatedAt: string; Completed: boolean;
   HistoryRevision?: number; SelectionRevision?: number;
   ParentMessageID?: string; ParentToolCallID?: string;
+  Kind?: string; // watcher for worker sessions; private execution profiles are not returned
 };
 type Content = {
   Type: 'text' | 'image' | 'audio' | 'video' | 'file'; Text: string;

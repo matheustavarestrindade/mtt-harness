@@ -63,6 +63,17 @@ func (server *Server) sessionAgents(responseWriter http.ResponseWriter, request 
 	if respondToError(responseWriter, http.StatusInternalServerError, operationError) {
 		return
 	}
+	visible := agents[:0]
+	for _, identifier := range agents {
+		session, lookupError := server.store.Sessions().Get(request.Context(), identifier)
+		if respondToError(responseWriter, http.StatusInternalServerError, lookupError) {
+			return
+		}
+		if session.Execution == nil {
+			visible = append(visible, identifier)
+		}
+	}
+	agents = visible
 	if agents == nil {
 		agents = []atom.SessionID{}
 	}

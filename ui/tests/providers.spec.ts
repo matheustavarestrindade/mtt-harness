@@ -201,7 +201,7 @@ async function openProviders(page: Page, mobile: boolean) {
       .getByRole('button', { name: /^Settings/ })
       .click();
   else await page.getByRole('button', { name: 'Open settings', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Providers', exact: true }).click();
+  await page.getByRole('dialog').getByRole('tab', { name: 'Providers', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Providers', exact: true })).toBeVisible();
 }
 
@@ -291,7 +291,9 @@ test('configure API providers, refresh catalogs, and remove a key', async ({ pag
   );
   await openai.getByRole('button', { name: /^Models/ }).click();
   await expect(
-    openai.getByRole('region', { name: 'OpenAI model names', exact: true }).locator('summary code'),
+    openai
+      .getByRole('region', { name: 'OpenAI model names', exact: true })
+      .locator('[data-slot="collapsible-trigger"] code'),
   ).toHaveText(['openai/gpt-6-luna', 'openai/gpt-6-sol']);
   await page
     .getByRole('region', { name: 'OpenAI coding plan setup', exact: true })
@@ -300,7 +302,7 @@ test('configure API providers, refresh catalogs, and remove a key', async ({ pag
   await expect(
     page
       .getByRole('region', { name: 'OpenAI coding plan model names', exact: true })
-      .locator('summary code'),
+      .locator('[data-slot="collapsible-trigger"] code'),
   ).toHaveText(['openai-codex/gpt-5.5', 'openai-codex/gpt-6-sol']);
   await page
     .getByRole('region', { name: 'Test provider setup', exact: true })
@@ -317,7 +319,7 @@ test('configure API providers, refresh catalogs, and remove a key', async ({ pag
   expect(fixture.keys.get('openai')).toBe('openai-example-key');
   const deepseek = page.getByRole('region', { name: 'DeepSeek API setup', exact: true });
   await deepseek.getByRole('button', { name: /^Models/ }).click();
-  await expect(deepseek.locator('summary code')).toHaveText([
+  await expect(deepseek.locator('[data-slot="collapsible-trigger"] code')).toHaveText([
     'deepseek/deepseek-flash',
     'deepseek/deepseek-v4-pro',
   ]);
@@ -329,7 +331,7 @@ test('configure API providers, refresh catalogs, and remove a key', async ({ pag
   fixture.modelIDs.deepseek = ['deepseek-flash', newModel];
   await deepseek.getByRole('button', { name: /^Models/ }).click();
   await deepseek.getByRole('button', { name: 'Refresh models', exact: true }).click();
-  await expect(deepseek.locator('summary code')).toHaveText([
+  await expect(deepseek.locator('[data-slot="collapsible-trigger"] code')).toHaveText([
     'deepseek/deepseek-flash',
     `deepseek/${newModel}`,
   ]);

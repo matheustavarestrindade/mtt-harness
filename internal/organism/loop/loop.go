@@ -174,7 +174,11 @@ func (agentLoop *Loop) runSession(operationContext context.Context, session atom
 		return operationError
 	}
 	finished := false
-	for round := 0; round < agentLoop.configuration.MaxRounds; round++ {
+	roundLimit := agentLoop.configuration.MaxRounds
+	if session.Execution != nil && session.Execution.MaxRounds > 0 {
+		roundLimit = min(roundLimit, session.Execution.MaxRounds)
+	}
+	for round := 0; round < roundLimit; round++ {
 		if operationError := operationContext.Err(); operationError != nil {
 			return operationError
 		}

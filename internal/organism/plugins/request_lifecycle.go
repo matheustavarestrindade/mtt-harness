@@ -13,6 +13,9 @@ import (
 )
 
 func (pluginHost *Host) BeginRequest(operationContext context.Context, session atom.Session) (context.Context, func(), error) {
+	if session.Execution != nil {
+		return operationContext, func() {}, nil
+	}
 	var releases []func()
 	var once sync.Once
 	release := func() {
@@ -44,6 +47,9 @@ func (pluginHost *Host) BeginRequest(operationContext context.Context, session a
 
 func (pluginHost *Host) PrepareContext(operationContext context.Context, input harness.ContextRequest) (harness.ContextSelection, error) {
 	selection := harness.ContextSelection{Request: input.Request}
+	if input.Session.Execution != nil {
+		return selection, nil
+	}
 	managedBy := ""
 	for _, registered := range pluginHost.All() {
 		plugin, supported := registered.(harness.ContextPolicyPlugin)
@@ -94,6 +100,9 @@ func requestInvariants(request atom.Request) ([]byte, error) {
 }
 
 func (pluginHost *Host) EndTurn(operationContext context.Context, session atom.Session, status string) error {
+	if session.Execution != nil {
+		return nil
+	}
 	var operationError error
 	for _, registered := range pluginHost.All() {
 		if plugin, supported := registered.(harness.TurnLifecyclePlugin); supported {

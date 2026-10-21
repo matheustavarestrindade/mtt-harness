@@ -5,9 +5,14 @@ import (
 	"fmt"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
+	"github.com/matheustavarestrindade/mtt-harness/harness"
 )
 
 func (agentLoop *Loop) resolvePermissionVerdict(operationContext context.Context, session atom.Session, name string, verdict atom.Verdict) (bool, error) {
+	return agentLoop.resolvePermissionCall(operationContext, session, name, verdict, nil)
+}
+
+func (agentLoop *Loop) resolvePermissionCall(operationContext context.Context, session atom.Session, name string, verdict atom.Verdict, call *atom.ToolCall) (bool, error) {
 	if operationError := operationContext.Err(); operationError != nil {
 		return false, operationError
 	}
@@ -32,6 +37,14 @@ func (agentLoop *Loop) resolvePermissionVerdict(operationContext context.Context
 		return decision.Kind == atom.VerdictAllow, nil
 	}
 	request := atom.PermissionRequest{ID: newID(), InstanceID: session.InstanceID, SessionID: session.ID, Target: target, Why: verdict.Why}
+	if call != nil {
+		copyCall := *call
+		copyCall.Input = append([]byte(nil), call.Input...)
+		request.ToolCall = &copyCall
+	}
+	if origin, found := harness.ToolOriginFrom(operationContext); found {
+		request.MessageID = origin.MessageID
+	}
 	decision, operationError = agentLoop.configuration.Broker.Request(operationContext, request, func() error {
 		return agentLoop.emitSessionEvent(operationContext, session, atom.EventPermissionRequest, request)
 	})

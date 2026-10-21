@@ -30,6 +30,7 @@ var ErrSessionNotFound = errors.New("session is not in the store")
 var ErrConversationBusy = errors.New("session or child session has active or queued work; stop it before deleting")
 
 type SessionStore interface {
+	LatestUserMessageID(context.Context, atom.SessionID) (string, error)
 	// Save initializes a new session's model selection. Lifecycle saves retain
 	// the stored selection; SetModelSelection owns subsequent changes.
 	Save(operationContext context.Context, session atom.Session) error

@@ -10,7 +10,7 @@ test('configure workspace repetition with themed selectors and keep the draft', 
   await page.getByLabel('Message', { exact: true }).fill('Keep this draft');
   await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'Instructions', exact: true }).click();
+  await dialog.getByRole('tab', { name: 'Instructions', exact: true }).click();
   const panel = dialog.getByRole('region', { name: 'Spaced repetition', exact: true });
   await expect(panel.getByRole('status')).toHaveText('Off');
   await panel.getByRole('button', { name: 'Enable instruction reminders' }).click();
@@ -78,7 +78,7 @@ test('show recorded repetition metrics and recovery costs at narrow widths', asy
   });
   await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'Instructions', exact: true }).click();
+  await dialog.getByRole('tab', { name: 'Instructions', exact: true }).click();
   const panel = dialog.getByRole('region', { name: 'Spaced repetition', exact: true });
   await expect(
     panel.getByText('Recovery worker cost', { exact: true }).locator('..'),
@@ -106,8 +106,6 @@ test('open instruction controls directly from the memory panel', async ({ page }
     await openWorkbenchAction(page, 'Memory');
   await page.getByRole('button', { name: 'Instruction reminders', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await expect(
-    dialog.getByRole('heading', { name: 'Spaced repetition', exact: true }),
-  ).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Instructions', exact: true })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(1);
 });

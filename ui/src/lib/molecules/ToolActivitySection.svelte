@@ -5,6 +5,7 @@
   import { toolActivityLabel } from '../atoms/file-actions';
   import ToolInput from './ToolInput.svelte';
   import ToolOutput from './ToolOutput.svelte';
+  import * as Collapsible from '../atoms/ui/collapsible';
   let {
     activity,
     running = false,
@@ -19,23 +20,17 @@
     status?: string;
   } = $props();
   let open = $state(false);
-  const identifier = $props.id();
   const label = $derived(toolActivityLabel(activity.call));
 </script>
 
-<section
+<Collapsible.Root
+  bind:open
   class="assistant-section tool-activity flex min-w-0 flex-col"
   role="group"
   aria-label={`Tool ${activity.call.Name}`}
   data-call-id={activity.call.ID}
 >
-  <button
-    type="button"
-    class="activity-toggle w-full shrink-0"
-    aria-expanded={open}
-    aria-controls={identifier}
-    onclick={() => (open = !open)}
-  >
+  <Collapsible.Trigger class="activity-toggle w-full shrink-0">
     <ChevronRight
       class="size-3.5 shrink-0 text-tool-call-accent transition-transform {open ? 'rotate-90' : ''}"
     /><span
@@ -45,12 +40,11 @@
     <span class="shrink-0 text-[10px] text-muted-foreground"
       >{status ?? (activity.result ? 'Result' : running ? 'Waiting' : 'No result')}</span
     >
-  </button>
-  {#if open}
-    <div
-      id={identifier}
-      class="tool-details mt-1 min-w-0 space-y-2 border border-border bg-card/70 p-2"
-    >
+  </Collapsible.Trigger>
+  <Collapsible.Content
+    class="tool-details mt-1 min-w-0 space-y-2 border border-border bg-card/70 p-2"
+  >
+    {#if open}
       {#if unmatched}<p class="mt-2 text-xs text-muted-foreground">
           The original tool call is not in this history.
         </p>
@@ -83,6 +77,6 @@
       <p class="mt-2 break-all font-mono text-[10px] text-muted-foreground">
         {activity.call.ID}
       </p>
-    </div>
-  {/if}
-</section>
+    {/if}
+  </Collapsible.Content>
+</Collapsible.Root>

@@ -382,7 +382,7 @@ test('keep colored inactivity output and the later completion details when buffe
   await expect(
     shell.locator('.xterm-screen span').filter({ hasText: /^COLORED_SAVED_TAIL$/ }),
   ).toHaveCSS('color', 'rgb(18, 171, 99)');
-  await shell.locator('summary').filter({ hasText: 'Completion output' }).click();
+  await shell.getByRole('button', { name: 'Completion output', exact: true }).click();
   await expect(shell).toContainText('Later build failure');
 });
 

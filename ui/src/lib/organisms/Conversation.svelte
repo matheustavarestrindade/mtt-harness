@@ -22,6 +22,9 @@
   import AgentGroup from './AgentGroup.svelte';
   import MessageCard from '../molecules/MessageCard.svelte';
   import QueuedMessage from '../molecules/QueuedMessage.svelte';
+  import Disclosure from '../molecules/Disclosure.svelte';
+  import WatcherSection from '../molecules/WatcherSection.svelte';
+  import { watcherRuntimeIDs } from '../atoms/watcher';
   import PermissionCard from '../molecules/PermissionCard.svelte';
   import { HistoryScroll } from './history-scroll.svelte';
   let {
@@ -48,18 +51,26 @@
   let feed: HTMLDivElement;
   const scroll = new HistoryScroll(untrack(() => workbench.history));
   $effect(() => () => scroll.dispose());
+  const knownWatcherRuns = $derived(new Set(workbench.watchers.entries.map((entry) => entry.ID)));
+  const transcriptMessages = $derived(
+    (workbench.liveMessage && workbench.history.tailAttached
+      ? [...workbench.messages, workbench.liveMessage]
+      : workbench.messages
+    ).filter((message) => {
+      const identifiers = watcherRuntimeIDs(message);
+      return (
+        !identifiers.length || !identifiers.every((identifier) => knownWatcherRuns.has(identifier))
+      );
+    }),
+  );
   const entries = $derived(
-    buildConversationEntries(
-      workbench.liveMessage && workbench.history.tailAttached
-        ? [...workbench.messages, workbench.liveMessage]
-        : workbench.messages,
-      workbench.processes.records.values(),
-    ),
+    buildConversationEntries(transcriptMessages, workbench.processes.records.values()),
   );
   const unplacedAgents = $derived(
     workbench.agents.unplaced(new Set(entries.map((entry) => entry.message.ID))),
   );
   const sidekick = $derived(placePluginActivity(entries, workbench.sidekick.entries));
+  const watcherActivity = $derived(placePluginActivity(entries, workbench.watchers.entries));
   const queued = $derived(
     queuedMessageViews(
       workbench.receipts,
@@ -73,6 +84,7 @@
     const changes =
       workbench.messages.length +
       workbench.sidekick.entries.length +
+      workbench.watchers.entries.length +
       workbench.permissions.length +
       queued.length +
       workbench.agents.children(workbench.session?.ID ?? '').length +
@@ -117,7 +129,7 @@
             ><LoaderCircle class="size-4 animate-spin" />Loading conversation…</span
           >
         </div>
-      {:else if !workbench.messages.length && !queued.length && !workbench.liveMessage && !unplacedAgents.length && !workbench.sidekick.entries.length && !workbench.sidekick.error}
+      {:else if !workbench.messages.length && !queued.length && !workbench.liveMessage && !unplacedAgents.length && !workbench.sidekick.entries.length && !workbench.sidekick.error && !workbench.watchers.entries.length && !workbench.watchers.error}
         <section class="flex flex-1 flex-col items-center justify-center py-8 text-center sm:py-12">
           <div
             class="quiet-grid mb-6 grid size-28 place-items-center rounded-3xl border border-border/50 bg-muted/30"
@@ -164,13 +176,14 @@
                 ><MessageSquarePlus class="size-4" />New session</Button
               >
             {:else}<div class="grid w-full max-w-xl gap-3 text-left sm:grid-cols-2">
-                {#each [{ title: 'Explore the project', text: 'Read the project instructions and summarize the code structure.' }, { title: 'Find a starting point', text: 'Inspect the project and suggest one small, testable improvement. Explain it before making changes.' }] as suggestion}<button
+                {#each [{ title: 'Explore the project', text: 'Read the project instructions and summarize the code structure.' }, { title: 'Find a starting point', text: 'Inspect the project and suggest one small, testable improvement. Explain it before making changes.' }] as suggestion}<Button
+                    variant="outline"
                     onclick={() => onPrompt(suggestion.text)}
-                    class="group rounded-xl border border-border bg-card/50 p-4 text-left transition-colors hover:border-primary/30 hover:bg-accent/40"
+                    class="group block h-auto whitespace-normal rounded-xl border border-border bg-card/50 p-4 text-left transition-colors hover:border-primary/30 hover:bg-accent/40"
                     ><span class="mb-2 flex items-center gap-2 text-xs font-medium"
                       ><Sparkles class="size-3.5 text-primary/70" />{suggestion.title}</span
                     ><span class="text-xs leading-5 text-muted-foreground">{suggestion.text}</span
-                    ></button
+                    ></Button
                   >{/each}
               </div>{/if}
           </div>
@@ -233,8 +246,29 @@
               {#each sidekick.anchored.get(entry.message.ID) ?? [] as hint (hint.ID)}<SidekickSection
                   entry={hint}
                 />{/each}
+              {#each watcherActivity.anchored.get(entry.message.ID) ?? [] as review (review.ID)}<WatcherSection
+                  entry={review}
+                />{/each}
             </div>
           {/each}
+          {#if workbench.watchers.error}<p
+              role="alert"
+              class="break-words text-xs text-muted-foreground"
+            >
+              {workbench.watchers.error}
+            </p>{/if}
+          {#if watcherActivity.unplaced.length}<Disclosure
+              class="section-content"
+              title={`Watcher reviews · ${watcherActivity.unplaced.length}`}
+            >
+              {#each watcherActivity.unplaced as review (review.ID)}<WatcherSection
+                  entry={review}
+                />{/each}{#if workbench.watchers.nextCursor}<Button
+                  variant="ghost"
+                  class="h-11 text-xs"
+                  onclick={() => void workbench.watchers.more()}>Load earlier reviews</Button
+                >{/if}
+            </Disclosure>{/if}
           {#if workbench.history.hasNewer}<Button
               variant="ghost"
               class="h-11 self-center text-xs"

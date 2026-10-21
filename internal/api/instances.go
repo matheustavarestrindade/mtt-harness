@@ -153,6 +153,13 @@ func (server *Server) listSessions(responseWriter http.ResponseWriter, request *
 	if respondToError(responseWriter, http.StatusInternalServerError, operationError) {
 		return
 	}
+	visible := sessions[:0]
+	for _, session := range sessions {
+		if session.Execution == nil {
+			visible = append(visible, session)
+		}
+	}
+	sessions = visible
 	if sessions == nil {
 		sessions = []atom.Session{}
 	}

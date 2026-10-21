@@ -19,7 +19,7 @@ test('show zero cost for a new chat while preserving unknown and reported costs'
 
   await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'Usage', exact: true }).click();
+  await dialog.getByRole('tab', { name: 'Usage', exact: true }).click();
   await expect(dialog.getByText('0.0', { exact: true })).toBeVisible();
 
   Object.assign(fixture.sessionUsage, { Calls: 1, Input: 20, Output: 12 });
@@ -46,7 +46,7 @@ test('settings stay in a modal, preserve the draft, and show real usage scopes',
   await openWorkbenchAction(page, 'Settings');
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Usage', exact: true }).click();
+  await dialog.getByRole('tab', { name: 'Usage', exact: true }).click();
   await expect(dialog.getByLabel('Usage scope')).toHaveAttribute('data-value', 'session');
   await expect(dialog.getByRole('region', { name: 'Usage overview' })).toContainText('Unavailable');
   await chooseSelectOption(dialog.getByLabel('Usage scope'), 'workspace');
@@ -62,7 +62,7 @@ test('settings stay in a modal, preserve the draft, and show real usage scopes',
   if (testInfo.project.name === 'mobile') await page.setViewportSize({ width: 320, height: 700 });
   for (const button of await dialog
     .getByRole('navigation', { name: 'Settings sections' })
-    .getByRole('button')
+    .getByRole('tab')
     .all()) {
     await expect(button).toBeInViewport();
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
@@ -145,7 +145,7 @@ test('failed usage and settings requests remain visible and recover on retry', a
       body: JSON.stringify({ error: 'Usage temporarily unavailable' }),
     }),
   );
-  await dialog.getByRole('button', { name: 'Usage', exact: true }).click();
+  await dialog.getByRole('tab', { name: 'Usage', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Usage temporarily unavailable');
   await chooseSelectOption(dialog.getByLabel('Usage scope'), 'workspace');
   await expect(dialog.getByRole('alert')).toHaveCount(0);
