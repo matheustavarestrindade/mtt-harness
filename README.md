@@ -31,7 +31,7 @@ PostgreSQL: 127.0.0.1:15432
 Provider setup: Configuration → Settings → Providers
 ```
 
-The harness makes an `API token` on the initial start. The token is in the harness output. The test provider is off by default.
+The native launcher shows the `API token` after the API and UI are available. The API URL for the UI is `/api`. The token is shown one time for the same database. The test provider is off by default.
 
 Workspaces use host paths, for example `/home/me/projects/project`. Commands use the host `PATH` and user permissions. A bind mount is not necessary.
 

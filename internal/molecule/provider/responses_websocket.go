@@ -189,7 +189,7 @@ func (standardProvider *Standard) receiveResponsesWebSocket(lease *responsesWebs
 		for {
 			data, operationError := socket.nextEvent(lease.context)
 			if operationError != nil {
-				stream.operationError = fmt.Errorf("%s Responses WebSocket receive before response.completed: %w", standardProvider.Name(), incompleteWebSocketError(operationError))
+				stream.operationError = fmt.Errorf("%s Responses WebSocket receive before response.completed; response_id=%q%s: %w", standardProvider.Name(), boundedProviderDetail(decoder.responseID), decoder.pendingFunctionDetails(), incompleteWebSocketError(operationError))
 				break
 			}
 			var event responseEvent

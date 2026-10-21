@@ -108,6 +108,29 @@ export function watcherStatusLabel(status: string): string {
   );
 }
 
+export function watcherReviewBecameInactive(
+  previous: string | undefined,
+  current: string | undefined,
+): boolean {
+  return (
+    previous === 'running' &&
+    [
+      'reviewed',
+      'completed',
+      'intervened',
+      'user_input_requested',
+      'deferred_for_user',
+      'cancelled',
+      'interrupted',
+      'stale',
+      'limited',
+      'error',
+      'failed',
+      'not_applied',
+    ].includes(current ?? '')
+  );
+}
+
 export function watcherObject(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -136,7 +159,12 @@ export function watcherEventFields(event: Record<string, unknown>): [string, str
     fields.push(['Phase', phases[event.source_phase] ?? event.source_phase]);
   if (trigger === 'context_growth') {
     if (typeof event.context_tokens === 'number' && Number.isFinite(event.context_tokens))
-      fields.push(['Context at trigger', `${event.context_tokens.toLocaleString()} tokens`]);
+      fields.push([
+        event.context_basis === 'visible_input'
+          ? 'Visible context at trigger'
+          : 'Context at trigger',
+        `${event.context_estimated === true ? '≈ ' : ''}${event.context_tokens.toLocaleString()} tokens`,
+      ]);
     if (typeof event.source_active === 'boolean')
       fields.push(['Source active', event.source_active ? 'Yes' : 'No']);
   }

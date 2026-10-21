@@ -54,13 +54,14 @@ func (plugin *Plugin) filterSources(operationContext context.Context, session at
 		remaining -= len(text)
 	}
 	data, operationError := json.Marshal(struct {
-		Doing     *atom.DoingState `json:"doing"`
-		User      string           `json:"user_request"`
-		Recent    []recentMessage  `json:"recent_context_excerpt"`
-		Visible   string           `json:"selected_request_excerpt"`
-		Sources   []sourceData     `json:"sources"`
-		HintBytes int              `json:"max_hint_bytes"`
-	}{task.Doing, boundedText(messageText(user), configuration.SourceBytes), recent, plugin.currentModelView(session.ID, user.ID), sources, configuration.HintBytes})
+		Doing             *atom.DoingState `json:"doing"`
+		User              string           `json:"user_request"`
+		LanguageReference []string         `json:"user_language_reference"`
+		Recent            []recentMessage  `json:"recent_context_excerpt"`
+		Visible           string           `json:"selected_request_excerpt"`
+		Sources           []sourceData     `json:"sources"`
+		HintBytes         int              `json:"max_hint_bytes"`
+	}{task.Doing, boundedText(messageText(user), configuration.SourceBytes), buildUserLanguageReference(user, messages), recent, plugin.currentModelView(session.ID, user.ID), sources, configuration.HintBytes})
 	if operationError != nil {
 		return "", nil, operationError
 	}

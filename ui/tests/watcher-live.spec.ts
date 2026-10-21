@@ -190,7 +190,156 @@ test('stream reviewer text, thinking and tools, release closed views, and surfac
   await expect(review).toContainText('Which account should be used?');
   await expect(review.getByText('Needs your input', { exact: true }).first()).toBeVisible();
   await expect(review).toContainText('Off — user input requested');
+  await expect(live).toHaveCount(0);
   expect(fixture.running.has(parent.ID)).toBe(false);
   await review.screenshot({ path: testInfo.outputPath('watcher-live-output.png') });
   expect(errors).toEqual([]);
+});
+
+test('collapse finished reviews and release their live socket while allowing history to reopen', async ({
+  page,
+}) => {
+  const fixture = await mockHarness(page, { replayEvents: true }),
+    watchers = await mockWatchers(page);
+  await connectAndCreate(page);
+  const parent = fixture.sessions[0];
+  const worker: Session = {
+    ...parent,
+    ID: 'completion-worker',
+    Parent: parent.ID,
+    Depth: 1,
+    Completed: false,
+  };
+  fixture.sessions.push(worker);
+  fixture.running.add(worker.ID);
+  fixture.histories.set(worker.ID, [message(worker, 'prompt', 'user', 'Private review task')]);
+  fixture.histories.set(parent.ID, [message(parent, 'anchor', 'assistant', 'Finished answer.')]);
+  const entry = {
+    ID: 'auto-close-review',
+    SessionID: parent.ID,
+    AnchorID: 'anchor',
+    AnchorSequence: 1,
+    Title: 'Completion reviewer',
+    Notes: [],
+    CreatedAt: new Date().toISOString(),
+    Estimated: true,
+    Outcome: 'running',
+    Trigger: 'end_turn',
+    WorkerSessionID: worker.ID,
+  };
+  const update = (revision: number, outcome: string) => {
+    watchers.activity.set(parent.ID, {
+      Name: 'watcher',
+      SessionID: parent.ID,
+      Revision: revision,
+      HistoryRevision: 0,
+      Entries: [
+        {
+          ...entry,
+          Outcome: outcome,
+          Decision: 'continue',
+          Notes: [{ Text: 'The saved review is complete.', References: [] }],
+        },
+      ],
+    });
+    fixture.event(parent, 'plugin.activity', {
+      plugin: 'watcher',
+      run_id: entry.ID,
+      status: outcome,
+    });
+  };
+  update(1, 'running');
+  fixture.state(parent);
+  const review = page.locator('[data-watcher-run="auto-close-review"]');
+  const toggle = review.locator('.activity-toggle').first();
+  await expect(
+    review.getByRole('region', { name: 'Watcher live activity', exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      [...fixture.openSockets].some((socket) => socket.url().includes(`/sessions/${worker.ID}/`)),
+    )
+    .toBe(true);
+  update(2, 'reviewed');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  worker.Completed = true;
+  fixture.running.delete(worker.ID);
+  fixture.histories
+    .get(worker.ID)!
+    .push(message(worker, 'finished', 'assistant', 'Completed worker output.'));
+  fixture.event(worker, 'turn.end', { status: 'completed' });
+  update(3, 'completed');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(
+    review.getByRole('region', { name: 'Watcher live activity', exact: true }),
+  ).toHaveCount(0);
+  await expect
+    .poll(() =>
+      [...fixture.openSockets].some((socket) => socket.url().includes(`/sessions/${worker.ID}/`)),
+    )
+    .toBe(false);
+  await toggle.click();
+  await expect(review).toContainText('The saved review is complete.');
+  await expect(
+    review.getByRole('region', { name: 'Watcher live activity', exact: true }),
+  ).toHaveCount(0);
+  update(4, 'completed');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await review.getByRole('button', { name: 'Reviewer activity', exact: true }).click();
+  await expect(review).toContainText('Completed worker output.');
+});
+
+test('close terminal review states without collapsing a question that needs the user', async ({
+  page,
+}) => {
+  const fixture = await mockHarness(page),
+    watchers = await mockWatchers(page);
+  await connectAndCreate(page);
+  const session = fixture.sessions[0];
+  fixture.histories.set(session.ID, [message(session, 'answer', 'assistant', 'Answer.')]);
+  fixture.state(session);
+  let revision = 0;
+  for (const outcome of [
+    'completed',
+    'intervened',
+    'error',
+    'cancelled',
+    'interrupted',
+    'stale',
+    'limited',
+    'not_applied',
+    'deferred_for_user',
+    'user_input_requested',
+  ]) {
+    const entry = {
+      ID: `terminal-${outcome}`,
+      SessionID: session.ID,
+      AnchorID: 'answer',
+      AnchorSequence: 1,
+      Title: `Review ${outcome}`,
+      Notes: [{ Text: 'Review feedback.', References: [] }],
+      CreatedAt: new Date().toISOString(),
+      Estimated: true,
+      Trigger: 'end_turn',
+      Outcome: 'running',
+    };
+    const update = (status: string) => {
+      watchers.activity.set(session.ID, {
+        Name: 'watcher',
+        SessionID: session.ID,
+        Revision: ++revision,
+        HistoryRevision: 0,
+        Entries: [{ ...entry, Outcome: status }],
+      });
+      fixture.event(session, 'plugin.activity', { plugin: 'watcher', run_id: entry.ID, status });
+    };
+    update('running');
+    const toggle = page.locator(`[data-watcher-run="${entry.ID}"] .activity-toggle`).first();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    update(outcome);
+    await expect(toggle).toHaveAttribute(
+      'aria-expanded',
+      outcome === 'user_input_requested' ? 'true' : 'false',
+    );
+  }
 });

@@ -191,6 +191,9 @@ func TestContextGrowthSchedulesAtCommittedModelRequest(test *testing.T) {
 	if !strings.HasPrefix(runs[0].InputPreview, "<watcher_event>") || !strings.Contains(runs[0].InputPreview, `"source_phase":"active_request"`) {
 		test.Fatal("custom watcher prompt omitted required event metadata")
 	}
+	if !strings.Contains(runs[0].InputPreview, `"context_basis":"visible_input"`) || !strings.Contains(runs[0].InputPreview, `"context_estimated":true`) {
+		test.Fatal("watcher input did not identify its visible-context estimate")
+	}
 }
 
 func TestDisablingWatchersCancelsTheReviewWithoutRestartingMain(test *testing.T) {

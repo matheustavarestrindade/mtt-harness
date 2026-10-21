@@ -39,6 +39,22 @@ A model request is necessary only when file retrieval or memory retrieval gives 
 
 The worker also receives text from the selected model request. The text includes the memory snapshot. The same memory text does not start a model request again.
 
+The worker receives `user_language_reference` with the source data.
+
+```text
+Language reference:
+  At most 3 human message texts, 512 UTF-8 bytes per text
+  Newest user request first, then preceding human messages
+  No assistant text, thinking, tool output, runtime data, or later messages
+
+Note language:
+  Honor an explicit output-language request from the user
+  Otherwise match the human language in user_language_reference
+  Use preceding human messages when the latest input is only an acknowledgement
+  Do not infer language from retrieved data, task state, or previous hints
+  Preserve technical identifiers and literal source names
+```
+
 The primary agent continues while the worker runs. A Sidekick note is supplied in the next model request. The harness completes the tool group before the request. The input limit includes the Sidekick note. The plugin keeps the Sidekick note until a model request has sufficient space.
 
 ```text

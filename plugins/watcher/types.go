@@ -50,6 +50,7 @@ type observation struct {
 	Trigger    string
 	Permission *atom.PermissionRequest
 	Tokens     int
+	Estimated  bool
 	Model      string
 	Visible    []string
 	Fence      *harness.ReviewFence
@@ -63,6 +64,7 @@ type schedule struct {
 	Visible       []string `json:"visible"`
 	Continuations int      `json:"continuations"`
 	LimitReported bool     `json:"limit_reported"`
+	GrowthBasis   string   `json:"growth_basis,omitempty"`
 }
 type sessionState struct {
 	Revision       int64               `json:"revision"`

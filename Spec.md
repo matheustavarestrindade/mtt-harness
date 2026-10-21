@@ -618,6 +618,8 @@ The provider file selects `http`, `websocket`, or `auto` transport. The default 
 
 A WebSocket request uses `response.create`. The event `response.completed` can supply `previous_response_id` for the next request.
 
+The adapter uses supplied tool call fields from stream events. A tool item with `status: incomplete` does not start a tool. The adapter waits for the last provider event. The cause and usage stay available. A tool call is sent one time. A response without the full output data cannot start continuation.
+
 Continuation is available when the previous input, response output, and request parameters are the same. The adapter then sends only new input. A history change or a model change can make full input necessary. Context measurement and usage use the full logical request, not the transport delta.
 
 WebSocket connections have workspace, session, and credential scope. A connection has a maximum of 1 active response. A stream with an error cannot supply a continuation. Cancellation closes the connection. The provider can have work in progress after a connection closes.
@@ -851,6 +853,18 @@ The watcher uses `continue` or `interfere` to give a decision. For a permission 
 With `continue_chat: false`, the UI shows watcher feedback for the user. The plugin does not put a primary turn in the queue. It does not resolve a permission request. Active work stays active. The user question stays at the reminder anchor for the next primary request. If a user question and a correction are in the same review group, the group waits for the user.
 
 The `EndTurn` event callback starts the watcher after a completed primary turn. A runtime continuation can start a new primary turn through the session queue. It does not make a user message. Continuation limits apply across primary turns. The harness examines user input, task state, configuration, and history through source fences before a decision is used.
+
+The watcher uses `visible_input` for `context_growth`.
+
+```text
+Excluded from the growth measurement:
+  Message.Reasoning
+  ProviderState, including reasoning-inclusive ContextUsage anchors
+  Usage
+  Thinking-only assistant message overhead and history IDs
+```
+
+The model request and usage values do not change. With `include_reasoning`, the reference data can include `Message.Reasoning`. The plugin starts a new interval when `growth_basis` is different.
 
 The prompt template uses `{todo}`, `{doing}`, and context window variables such as `{last_32k_context}`. Variable values are not examined for more variables. Conversation data is not system instructions. The source does not include `ProviderState`, `Content.Data`, or `data:` URLs.
 

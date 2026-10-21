@@ -163,9 +163,15 @@ func (plugin *Plugin) renderInput(operationContext context.Context, value defini
 	eventText := "Trigger: " + event.Trigger + "\nSource phase: " + phase
 	if event.Trigger == "context_growth" {
 		metadata["context_tokens"] = event.Tokens
+		metadata["context_basis"] = "visible_input"
+		metadata["context_estimated"] = event.Estimated
 		metadata["model"] = event.Model
 		metadata["source_active"] = source.Active
-		eventText += fmt.Sprintf("\nContext at trigger: %d tokens\nReviewed model: %s\nSource active: %t", event.Tokens, event.Model, source.Active)
+		countKind := ""
+		if event.Estimated {
+			countKind = " (estimate)"
+		}
+		eventText += fmt.Sprintf("\nVisible context at trigger (thinking excluded): %d tokens%s\nReviewed model: %s\nSource active: %t", event.Tokens, countKind, event.Model, source.Active)
 	}
 	eventJSON, _ := json.Marshal(metadata)
 	todo, doing := taskReferences(source.Tasks)

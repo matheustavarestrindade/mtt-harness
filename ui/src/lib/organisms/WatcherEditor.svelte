@@ -144,7 +144,7 @@
           <Label for={`${identifier}-interval`}>Context interval (tokens)</Label>
           <FieldHelp
             label="About context interval"
-            text="How often this watcher runs as the main conversation grows. For example, 32,768 means one check after each additional 32k tokens of context. The review context setting controls how much conversation it receives."
+            text="How often this watcher runs as visible request content grows: messages, tool data and media. Thinking and private reasoning state never count, even when thinking is included in the review input. For example, 32,768 means one check after each additional 32k visible-context tokens. The model's counter or estimate is used."
           />
         </div>
         <Input
@@ -207,9 +207,15 @@
       />
     </div>
     <div class="flex min-h-11 items-center justify-between gap-4">
-      <Label for={`${identifier}-thinking`} class="leading-relaxed"
-        >Include provider-exposed thinking</Label
-      >
+      <div class="flex min-w-0 items-center gap-1">
+        <Label for={`${identifier}-thinking`} class="leading-relaxed"
+          >Include provider-exposed thinking</Label
+        >
+        <FieldHelp
+          label="About thinking in review input"
+          text="Adds available thinking text to the reviewer's reference input. This does not change the context-growth trigger: thinking is always excluded from that count."
+        />
+      </div>
       <Switch
         id={`${identifier}-thinking`}
         bind:checked={draft.include_reasoning}

@@ -86,6 +86,88 @@ class NativeLauncherTests(unittest.TestCase):
             runtime.show_log_tail({"api": 0, "ui": 0})
         self.assertIn("startup failed before UI launch", output.getvalue())
 
+    def test_first_launch_reads_the_effective_database_token_without_rotating_it(self):
+        runtime = NativeRuntime(self.root, self.state, self.root / "mtt.json")
+        container = {"Id": "native-postgres", "Config": {"Env": ["POSTGRES_USER=custom user", "POSTGRES_DB=custom database"]}}
+        database = {"project": "test", "volume": "test_pgdata", "created_at": "first"}
+        # A reused database may have a different token from an earlier log entry.
+        (self.state / "api.log").write_text("mtt API token: obsolete-token\n")
+        result = subprocess.CompletedProcess([], 0, json.dumps("current-token") + "\n", "")
+        with patch("native_runtime.command", return_value=result) as execute:
+            self.assertEqual(runtime.read_first_launch_token(container, database), "current-token")
+        arguments = execute.call_args.args[0]
+        self.assertEqual(arguments[:3], ["docker", "exec", "native-postgres"])
+        self.assertEqual(arguments[arguments.index("--username") + 1], "custom user")
+        self.assertEqual(arguments[arguments.index("--dbname") + 1], "custom database")
+        self.assertEqual(arguments[-1], "SELECT to_json(value) FROM settings WHERE scope = '' AND key = 'api_token'")
+        self.assertNotIn("current-token", arguments)
+        self.assertFalse((self.state / "runtime.json").exists())
+
+    def test_token_display_is_once_per_current_database_and_upgrades_legacy_state(self):
+        runtime = NativeRuntime(self.root, self.state, self.root / "mtt.json")
+        database = {"project": "test", "volume": "test_pgdata", "created_at": "first"}
+        container = {"Id": "native-postgres", "Config": {"Env": ["POSTGRES_USER=mtt", "POSTGRES_DB=mtt"]}}
+        result = subprocess.CompletedProcess([], 0, '"current-token"\n', "")
+        for displayed in (None, False):
+            previous = {"database": database}
+            if displayed is not None:
+                previous["api_token_displayed"] = displayed
+            (self.state / "runtime.json").write_text(json.dumps(previous))
+            with patch("native_runtime.command", return_value=result) as execute:
+                self.assertEqual(runtime.read_first_launch_token(container, database), "current-token")
+                execute.assert_called_once()
+        (self.state / "runtime.json").write_text(json.dumps({"database": database, "api_token_displayed": True}))
+        with patch("native_runtime.command") as execute:
+            self.assertIsNone(runtime.read_first_launch_token(container, database))
+            execute.assert_not_called()
+        different_database = {"project": "different", "volume": "different_pgdata", "created_at": "second"}
+        with patch("native_runtime.command", return_value=result):
+            self.assertEqual(runtime.read_first_launch_token(container, different_database), "current-token")
+            self.assertEqual(runtime.read_first_launch_token(container, dict(database, name="different-database")), "current-token")
+
+    def test_unavailable_token_does_not_record_success_or_generate_another_token(self):
+        runtime = NativeRuntime(self.root, self.state, self.root / "mtt.json")
+        container = {"Id": "native-postgres", "Config": {"Env": ["POSTGRES_USER=mtt", "POSTGRES_DB=mtt"]}}
+        database = {"project": "test", "volume": "test_pgdata", "created_at": "first"}
+        for value in ("", "null", '""', "42", "[]"):
+            with self.subTest(value=value), patch("native_runtime.command", return_value=subprocess.CompletedProcess([], 0, value, "")):
+                with self.assertRaisesRegex(RuntimeError, "did not return an API token"):
+                    runtime.read_first_launch_token(container, database)
+            self.assertFalse((self.state / "runtime.json").exists())
+
+    def test_startup_log_excerpt_does_not_duplicate_the_token(self):
+        runtime = NativeRuntime(self.root, self.state, self.root / "mtt.json")
+        runtime.logs = {"api": self.state / "api.log"}
+        for prefix in ("", "x" * 70000 + "\n"):
+            runtime.logs["api"].write_text(prefix + "mtt API token: current-token\nready\n")
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                runtime.show_log_tail({"api": 0}, include_api_token=False)
+            self.assertEqual(output.getvalue(), "ready\n")
+
+    def test_display_marker_follows_successful_output_and_contains_no_token(self):
+        runtime = NativeRuntime(self.root, self.state, self.root / "mtt.json")
+        runtime.api_url, runtime.ui_url = "http://127.0.0.1:18080", "http://127.0.0.1:18081"
+        state = {"database": {"project": "test"}, "api_token_displayed": False}
+        state_path = self.state / "runtime.json"
+        state_path.write_text(json.dumps(state))
+
+        def failing_output(message, **options):
+            if "API token:" in message:
+                raise BrokenPipeError("output closed")
+
+        with patch("builtins.print", side_effect=failing_output):
+            with self.assertRaises(BrokenPipeError):
+                runtime.show_connection_summary(state, "current-token")
+        self.assertFalse(json.loads(state_path.read_text())["api_token_displayed"])
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            runtime.show_connection_summary(state, "current-token")
+        self.assertIn("API token: current-token", output.getvalue())
+        self.assertIn("UI API address: /api", output.getvalue())
+        self.assertTrue(json.loads(state_path.read_text())["api_token_displayed"])
+        self.assertNotIn("current-token", state_path.read_text())
+
     def test_busy_ports_are_not_taken_over(self):
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
