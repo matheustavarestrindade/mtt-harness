@@ -100,7 +100,7 @@ func (baseline *responsesContinuation) incrementalInput(payload map[string]any) 
 // reasoning items, tool IDs, arguments, content, and ordering remain significant.
 // Unknown server-side output kinds cannot establish a continuation baseline.
 func captureResponsesContinuation(payload map[string]any, completed *responseEvent, providerName string) *responsesContinuation {
-	if completed == nil || completed.Response.ID == "" {
+	if completed == nil || completed.Response.ID == "" || completed.continuationIncomplete {
 		return nil
 	}
 	input, valid := payload["input"].([]any)
@@ -118,7 +118,10 @@ func captureResponsesContinuation(payload map[string]any, completed *responseEve
 		case "reasoning":
 			message.ProviderState.Reasoning = append(message.ProviderState.Reasoning, raw)
 		case "function_call":
-			message.ToolCalls = append(message.ToolCalls, atom.ToolCall{ID: item.CallID, Name: item.Name, Input: json.RawMessage(item.Arguments)})
+			if item.CallID == "" || item.Name == "" || item.Arguments == nil || !json.Valid([]byte(*item.Arguments)) {
+				return nil
+			}
+			message.ToolCalls = append(message.ToolCalls, atom.ToolCall{ID: item.CallID, Name: item.Name, Input: json.RawMessage(*item.Arguments)})
 		case "message":
 			for _, content := range item.Content {
 				switch content.Type {

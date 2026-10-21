@@ -1,13 +1,21 @@
 <script lang="ts">
   import type { HarnessApi } from '../molecules/api/client';
-  import type { WatcherReview } from '../atoms/watcher-presentation';
+  import { watcherReviewBecameInactive, type WatcherReview } from '../atoms/watcher-presentation';
   import Disclosure from '../molecules/Disclosure.svelte';
   import WatcherReviewDetails from '../molecules/WatcherReviewDetails.svelte';
   import WatcherLiveOutput from './WatcherLiveOutput.svelte';
   let { api, review }: { api: HarnessApi | null; review: WatcherReview } = $props();
   let liveOpen = $state(false),
     activated = false;
+  let previousStatus: string | undefined;
   $effect(() => {
+    const status = review.status;
+    const finished = watcherReviewBecameInactive(previousStatus, status);
+    previousStatus = status;
+    if (finished) {
+      liveOpen = false;
+      return;
+    }
     if (!activated && review.status === 'running') {
       activated = true;
       liveOpen = true;

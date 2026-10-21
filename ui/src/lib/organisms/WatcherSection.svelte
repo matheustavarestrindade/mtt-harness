@@ -3,18 +3,28 @@
   import type { PluginActivityEntry } from '../atoms/plugin-activity';
   import ActivityIndicator from '../atoms/ActivityIndicator.svelte';
   import * as Collapsible from '../atoms/ui/collapsible';
-  import { watcherReviewFromActivity, watcherStatusLabel } from '../atoms/watcher-presentation';
+  import {
+    watcherReviewFromActivity,
+    watcherReviewBecameInactive,
+    watcherStatusLabel,
+  } from '../atoms/watcher-presentation';
   import WatcherReviewView from './WatcherReviewView.svelte';
   import type { HarnessApi } from '../molecules/api/client';
   let { entry, api }: { entry: PluginActivityEntry; api: HarnessApi | null } = $props();
   let open = $state(false);
   let activated = false,
     questionShown = false;
+  let previousOutcome: string | undefined;
   $effect(() => {
-    if (entry.Outcome === 'user_input_requested' && !questionShown) {
+    const outcome = entry.Outcome;
+    const finished = watcherReviewBecameInactive(previousOutcome, outcome);
+    previousOutcome = outcome;
+    if (outcome === 'user_input_requested' && !questionShown) {
       questionShown = true;
       open = true;
-    } else if (!activated && entry.Outcome === 'running') {
+    } else if (finished && outcome !== 'user_input_requested') {
+      open = false;
+    } else if (!activated && outcome === 'running') {
       activated = true;
       open = true;
     }

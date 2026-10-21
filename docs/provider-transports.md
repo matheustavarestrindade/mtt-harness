@@ -33,6 +33,30 @@ The HTTP and WebSocket paths use one event decoder. Text, reasoning summaries, t
 
 A connection EOF before `response.completed` is an error. The harness keeps available text and usage. An HTTP 503 response does not identify a cause. Provider error text can supply more information. The request ID can also be available.
 
+## Tool Call Events
+
+The adapter collects tool call data from the subsequent events:
+
+```text
+response.output_item.added
+response.function_call_arguments.delta
+response.function_call_arguments.done
+response.output_item.done
+```
+
+The adapter uses `item_id`, `call_id`, and `output_index`. It does not make a new ID, tool name, or tool input value. The adapter can complete a tool call with supplied event data. A tool call is sent one time.
+
+The `status` can be `incomplete`. The adapter does not run a tool for `incomplete`. It waits for the last provider event. The event can give the cause and usage.
+
+```text
+Terminal events:
+response.completed
+response.incomplete
+response.failed
+```
+
+The `call_id`, `name`, and `arguments` values must stay the same after a tool call is sent. For `previous_response_id`, the last response must have the tool call data.
+
 ## Continuation
 
 The connection can keep the last response ID and input fingerprints. The next request can use `previous_response_id` with only new input. The previous input, response output, and request parameters must be the same. The adapter compares tool argument JSON as data.
@@ -60,6 +84,7 @@ Cancellation closes the local socket. The provider can continue work after the c
 - The connection age limit is 55 minutes. A new request uses a new connection after the limit.
 - The handshake time limit is 15 seconds. Model requests use the request cancellation context.
 - A response event has an 8 MiB limit. The reader can keep 1 event before the decoder.
+- A response can have a maximum of 1024 tool calls. The total tool input limit is 8 MiB.
 - Input fingerprints have a maximum of 16384 request items. A larger request uses full input.
 
 The harness stops model workers, connection readers, and catalog workers before it closes storage. Catalog workers stop before the harness closes the credential store.
@@ -70,9 +95,20 @@ The provider log identifies the transport. It also gives the request byte count 
 
 HTTP error data can include the request ID and `Retry-After` value. Provider error text has a limit of 2048 bytes. The adapter removes credential values from the text.
 
+Error data can include the subsequent fields:
+
+```text
+response_id, item_id, call_id, output_index
+tool, item_status, arguments_bytes, arguments_valid_json
+```
+
+Tool input text is not in error data. The provider can give `reason=max_output_tokens`. The adapter does not send the model request again after a tool call.
+
 ## Source Documents
 
 - [OpenAI WebSocket mode](https://developers.openai.com/api/docs/guides/websocket-mode)
 - [Codex client](https://github.com/openai/codex/blob/main/codex-rs/core/src/client.rs)
 - [Codex WebSocket endpoint](https://github.com/openai/codex/blob/main/codex-rs/codex-api/src/endpoint/responses_websocket.rs)
 - [WebSocket library](https://github.com/coder/websocket/tree/v1.8.15)
+- [DeepSeek Responses stream](https://api-docs.deepseek.com/guides/responses_api)
+- [OpenAI event type](https://github.com/openai/openai-python/blob/main/src/openai/types/responses/response_function_call_arguments_done_event.py)

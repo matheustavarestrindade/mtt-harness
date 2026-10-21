@@ -151,6 +151,11 @@ test('format saved and live watcher reviews and preserve original input on deman
     run_id: record.id,
     status: 'completed',
   });
+  await expect(review.locator('.activity-toggle').first()).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await review.locator('.activity-toggle').first().click();
   await expect(review.getByRole('heading', { name: 'Review result' })).toBeVisible();
   await expect(review.locator('strong').filter({ hasText: 'Run the tests' })).toBeVisible();
   await expect(review.getByText('AI finish', { exact: true })).toBeVisible();

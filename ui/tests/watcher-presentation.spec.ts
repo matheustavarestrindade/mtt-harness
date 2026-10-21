@@ -25,6 +25,15 @@ test('project the real completion envelope without treating defaults as usage', 
   );
   expect(growth.fields).toContainEqual(['Context at trigger', '0 tokens']);
   expect(growth.fields).toContainEqual(['Reviewed model', 'provider/model']);
+  const visibleGrowth = parseWatcherInput(
+    '<watcher_event>{"type":"context_growth","context_tokens":1024,"context_basis":"visible_input","context_estimated":true}</watcher_event>',
+  );
+  expect(visibleGrowth.fields).toContainEqual(['Visible context at trigger', '≈ 1,024 tokens']);
+  expect(visibleGrowth.fields.some(([label]) => label === 'Context at trigger')).toBe(false);
+  const countedGrowth = parseWatcherInput(
+    '<watcher_event>{"type":"context_growth","context_tokens":0,"context_basis":"visible_input","context_estimated":false}</watcher_event>',
+  );
+  expect(countedGrowth.fields).toContainEqual(['Visible context at trigger', '0 tokens']);
 });
 
 test('preserve malformed metadata and literal or quoted tags', () => {

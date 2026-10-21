@@ -179,6 +179,8 @@ The UI uses `AnchorID` to put a watcher run with the correct message. `Workspace
 
 `WatcherReviewView` and `WatcherLiveOutput` show the reviewer session. They use `AgentFeed`, the session WebSocket, and history pages. The panel shows text, `Message.Reasoning`, and tool output. When the user closes the view, the UI removes view resources. A user question with `ContinueChat: false` has status `Needs your input` in the UI.
 
+When the reviewer session stops, the live panel closes. The `WatcherSection` also closes. The `user_input_requested` status keeps the view open. The user can open `WatcherSection` again. A data refresh with the same status does not close the view.
+
 The UI uses the watcher run record for a runtime continuation when the `run_ids` values agree. Responses from a previous workspace or session must not replace new data.
 
 ## API Data

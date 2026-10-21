@@ -59,6 +59,18 @@ for (const nativeUUID of [true, false]) {
       'true',
     );
     await page.keyboard.press('Escape');
+    await editor.getByRole('button', { name: 'About context interval', exact: true }).click();
+    await expect(page.getByRole('tooltip')).toContainText(
+      'Thinking and private reasoning state never count',
+    );
+    await page.keyboard.press('Escape');
+    await editor
+      .getByRole('button', { name: 'About thinking in review input', exact: true })
+      .click();
+    await expect(page.getByRole('tooltip')).toContainText(
+      'thinking is always excluded from that count',
+    );
+    await page.keyboard.press('Escape');
     await editor.getByRole('switch', { name: 'Only paths outside the workspace' }).click();
     await editor.getByRole('button', { name: 'Select watcher tools' }).click();
     const selector = page.getByRole('menu', { name: 'Watcher tools', exact: true });
