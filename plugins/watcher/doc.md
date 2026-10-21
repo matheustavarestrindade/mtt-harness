@@ -43,11 +43,24 @@ Missing or empty prompt: use the default template
 
 ## Watcher Triggers
 
-- `context_growth`: The plugin starts a watcher run after the token interval. The interval uses context growth, not `Statistics.Input`. Context removal or a model change starts a new interval.
+- `context_growth`: The plugin starts a watcher run after the token interval. The interval uses `visible_input`, not `Statistics.Input`. Context removal, a model change, or a change in `growth_basis` starts a new interval.
 - `permission_request`: The watcher examines a permission request before the tool runs. The watcher definition has `permission_tools` and `outside_workspace_only` fields.
 - `end_turn`: `EndTurn` starts a watcher run after a primary turn with status `completed`. A runtime continuation can start a new primary turn through the runtime queue.
 
 Watcher sessions and the child sessions of a watcher cannot start watcher runs. A primary turn started by a runtime continuation stays a primary turn.
+
+```text
+Context-growth counting:
+  Include: selected messages, instructions, tool calls/results, schemas, and media
+  Exclude: thinking text, private reasoning continuation, and aggregate usage anchors
+  Thinking-only assistant messages: no token overhead or context-removal boundary
+  Counter: selected model's counter/estimator on a reasoning-free request copy
+  context_basis: visible_input
+  context_estimated: true for estimates, false for exact counters
+  Legacy schedules: rebase once on the visible count, keeping continuation limits
+```
+
+The model request and usage values do not change. With `include_reasoning`, the reference data can include `Message.Reasoning`.
 
 ## Tool Access
 

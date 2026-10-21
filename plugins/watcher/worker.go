@@ -141,6 +141,7 @@ func selectDefinitions(state *sessionState, configuration configuration, source 
 				progress.Next = value.IntervalTokens
 				progress.Signature = signature
 				progress.Model = event.Model
+				progress.GrowthBasis = contextGrowthBasis
 			}
 			removed := false
 			for _, identifier := range progress.Visible {
@@ -149,11 +150,12 @@ func selectDefinitions(state *sessionState, configuration configuration, source 
 					break
 				}
 			}
-			if removed || progress.Signature != signature || progress.Model != event.Model {
+			if removed || progress.Signature != signature || progress.Model != event.Model || progress.GrowthBasis != contextGrowthBasis {
 				progress.Next = event.Tokens + value.IntervalTokens
 				progress.HighWater = event.Tokens
 				progress.Signature = signature
 				progress.Model = event.Model
+				progress.GrowthBasis = contextGrowthBasis
 			}
 			progress.Visible = slices.Clone(event.Visible)
 			progress.HighWater = max(progress.HighWater, event.Tokens)

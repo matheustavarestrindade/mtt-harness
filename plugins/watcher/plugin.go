@@ -180,7 +180,16 @@ func (plugin *Plugin) PrepareReminder(operationContext context.Context, input ha
 			visible = append(visible, message.ID)
 		}
 	}
-	value := observation{Session: input.Session, Trigger: "context_growth", Tokens: input.Budget.InputTokens, Model: input.ModelID, Visible: visible}
+	value := observation{Session: input.Session, Trigger: "context_growth", Model: input.ModelID}
+	if observeGrowth {
+		measurement, growthVisible, operationError := measureContextGrowth(operationContext, input)
+		if operationError != nil {
+			return harness.ReminderContribution{}, operationError
+		}
+		value.Tokens = measurement.InputTokens
+		value.Estimated = measurement.Estimated
+		value.Visible = growthVisible
+	}
 	retired := map[string]bool{}
 	for _, notice := range frozen.state.Notices {
 		if !slices.Contains(visible, notice.AnchorID) {
