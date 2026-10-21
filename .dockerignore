@@ -19,3 +19,5 @@ scripts/*
 !scripts/download-context-model.py
 !scripts/download-embedding-runtime.py
 workspace/
+ui/
+result

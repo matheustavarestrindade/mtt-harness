@@ -2,6 +2,250 @@
   "format_version": "1",
   "terms": [
     {
+      "term": "Docker Engine",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "Docker container runtime",
+      "source": "docs/docker-start.md"
+    },
+    {
+      "term": "Docker Desktop",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "Docker application for desktop operating systems",
+      "source": "docs/docker-start.md"
+    },
+    {
+      "term": "Docker daemon",
+      "category": "technical_noun",
+      "approved_forms": [
+        "Docker daemons"
+      ],
+      "meaning": "background Docker runtime process",
+      "source": "docs/docker-start.md"
+    },
+    {
+      "term": "Docker context",
+      "category": "technical_noun",
+      "approved_forms": [
+        "Docker contexts"
+      ],
+      "meaning": "selected Docker endpoint and client configuration",
+      "source": "docs/docker-start.md"
+    },
+    {
+      "term": "Compose project",
+      "category": "technical_noun",
+      "approved_forms": [
+        "Compose projects"
+      ],
+      "meaning": "named group of Compose services and storage",
+      "source": "compose.yaml"
+    },
+    {
+      "term": "container",
+      "category": "technical_noun",
+      "approved_forms": [
+        "containers"
+      ],
+      "meaning": "isolated operating-system process environment",
+      "source": "compose.yaml"
+    },
+    {
+      "term": "bind mount",
+      "category": "technical_noun",
+      "approved_forms": [
+        "bind mounts"
+      ],
+      "meaning": "host filesystem path exposed in a container",
+      "source": "compose.yaml"
+    },
+    {
+      "term": "named volume",
+      "category": "technical_noun",
+      "approved_forms": [
+        "named volumes"
+      ],
+      "meaning": "persistent storage managed by Docker",
+      "source": "compose.yaml"
+    },
+    {
+      "term": "database backup",
+      "category": "technical_noun",
+      "approved_forms": [
+        "database backups"
+      ],
+      "meaning": "saved database contents for recovery or migration",
+      "source": "docs/docker-start.md"
+    },
+    {
+      "term": "host filesystem",
+      "category": "technical_noun",
+      "approved_forms": [
+        "host filesystems"
+      ],
+      "meaning": "files and directories outside the application container",
+      "source": "docs/docker-start.md"
+    },
+    {
+      "term": "Bash",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "shell used by the startup launcher",
+      "source": "start.sh"
+    },
+    {
+      "term": "Git Bash",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "Bash environment distributed with Git for Windows",
+      "source": "README.md"
+    },
+    {
+      "term": "Linux",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "operating-system kernel used by the containers",
+      "source": "Dockerfile"
+    },
+    {
+      "term": "macOS",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "Apple desktop operating system",
+      "source": "README.md"
+    },
+    {
+      "term": "Windows",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "Microsoft desktop operating system",
+      "source": "README.md"
+    },
+    {
+      "term": "WSL2",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "Windows Subsystem for Linux version 2",
+      "source": "README.md"
+    },
+    {
+      "term": "Python",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "programming language used by build-time asset downloads",
+      "source": "scripts/download-context-model.py"
+    },
+    {
+      "term": "PostgreSQL",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "database server used by the harness",
+      "source": "compose.yaml"
+    },
+    {
+      "term": "user question",
+      "category": "technical_noun",
+      "approved_forms": [
+        "user questions"
+      ],
+      "meaning": "watcher feedback requesting a human answer or action",
+      "source": "plugins/watcher/user_feedback.go"
+    },
+    {
+      "term": "user reply",
+      "category": "technical_noun",
+      "approved_forms": [
+        "user replies"
+      ],
+      "meaning": "human response following a watcher question",
+      "source": "plugins/watcher/user_feedback.go"
+    },
+    {
+      "term": "watcher feedback",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "review correction or user-directed question",
+      "source": "plugins/watcher/worker.go"
+    },
+    {
+      "term": "conversation transcript",
+      "category": "technical_noun",
+      "approved_forms": [
+        "conversation transcripts"
+      ],
+      "meaning": "readable conversation and tool text supplied to reviewers",
+      "source": "plugins/watcher/transcript.go"
+    },
+    {
+      "term": "speaker label",
+      "category": "technical_noun",
+      "approved_forms": [
+        "speaker labels"
+      ],
+      "meaning": "role heading for a transcript message",
+      "source": "plugins/watcher/transcript.go"
+    },
+    {
+      "term": "reviewer session",
+      "category": "technical_noun",
+      "approved_forms": [
+        "reviewer sessions"
+      ],
+      "meaning": "normal harness session executing a watcher",
+      "source": "plugins/watcher/doc.md"
+    },
+    {
+      "term": "view resource",
+      "category": "technical_noun",
+      "approved_forms": [
+        "view resources"
+      ],
+      "meaning": "socket or rendering resource owned by an open UI view",
+      "source": "ui/src/lib/organisms/WatcherLiveOutput.svelte"
+    },
+    {
+      "term": "live output",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "streamed text and tool activity from an active session",
+      "source": "ui/src/lib/organisms/WatcherLiveOutput.svelte"
+    },
+    {
+      "term": "worker prompt",
+      "category": "technical_noun",
+      "approved_forms": [
+        "worker prompts"
+      ],
+      "meaning": "instructions and references sent to a background model",
+      "source": "internal/organism/loop/session_workers.go"
+    },
+    {
+      "term": "reference data",
+      "category": "technical_noun",
+      "approved_forms": [],
+      "meaning": "quoted task and source material for model use",
+      "source": "plugins/watcher/doc.md"
+    },
+    {
+      "term": "completion review",
+      "category": "technical_noun",
+      "approved_forms": [
+        "completion reviews"
+      ],
+      "meaning": "watcher review following a finished primary turn",
+      "source": "plugins/watcher/doc.md"
+    },
+    {
+      "term": "context review",
+      "category": "technical_noun",
+      "approved_forms": [
+        "context reviews"
+      ],
+      "meaning": "watcher review triggered by context growth",
+      "source": "plugins/watcher/doc.md"
+    },
+    {
       "term": "usage analytics",
       "category": "technical_noun",
       "approved_forms": [],

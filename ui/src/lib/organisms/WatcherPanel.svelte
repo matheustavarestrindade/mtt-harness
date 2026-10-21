@@ -16,12 +16,14 @@
     WatcherPreview,
   } from '../atoms/watcher';
   import { watcherTriggers } from '../atoms/watcher';
+  import { watcherReviewFromRun, watcherStatusLabel } from '../atoms/watcher-presentation';
   import type { HarnessApi } from '../molecules/api/client';
   import WorkerUsageBreakdown from '../molecules/WorkerUsageBreakdown.svelte';
   import PluginPanelFooter from '../molecules/PluginPanelFooter.svelte';
   import SettingsPageTitle from '../molecules/SettingsPageTitle.svelte';
   import PluginHeaderControls from '../molecules/PluginHeaderControls.svelte';
   import Disclosure from '../molecules/Disclosure.svelte';
+  import WatcherReviewView from './WatcherReviewView.svelte';
   import WatcherEditor from './WatcherEditor.svelte';
   import { WorkspacePluginPanelState } from './plugin-panel.svelte';
   let {
@@ -385,34 +387,21 @@
                 class="min-w-0 rounded-md border border-border p-3"
                 triggerClass="min-h-8 py-1 text-sm pointer-coarse:min-h-11"
               >
-                {#snippet heading()}<span class="min-w-0 break-words">{run.name}</span><span
-                    class="ml-2 text-xs text-muted-foreground"
-                    >{run.status} · {watcherTriggers.find((value) => value.value === run.trigger)
-                      ?.label ?? run.trigger}</span
+                {#snippet heading()}<span class="min-w-0 break-words" data-watcher-activity={run.id}
+                    >{run.name}</span
+                  ><span class="ml-2 text-xs text-muted-foreground"
+                    >{watcherStatusLabel(run.status)} · {watcherTriggers.find(
+                      (value) => value.value === run.trigger,
+                    )?.label ?? run.trigger}</span
                   >{/snippet}
                 <div class="mt-3 min-w-0 space-y-3 text-xs">
-                  <p class="text-muted-foreground">
-                    {new Date(run.created_at).toLocaleString()} · {run.duration_ms} ms{run.decision
-                      ? ` · ${run.decision}`
-                      : ''}
-                  </p>
-                  {#if run.message || run.reason}<p class="whitespace-pre-wrap break-words">
-                      {run.message || run.reason}
-                    </p>{/if}{#if run.error}<p class="break-words text-destructive">
-                      {run.error}
-                    </p>{/if}
+                  <WatcherReviewView {api} review={watcherReviewFromRun(run)} />
                   {#if run.status === 'running'}<Button
                       variant="outline"
                       class="h-11"
                       onclick={() => void cancelRun(run.id)}
                       ><X class="size-4" />Cancel review</Button
                     >{/if}
-                  <Disclosure
-                    title={`Input · ${run.estimated ? '≈ ' : ''}${run.input_tokens.toLocaleString()} tokens${run.input_truncated ? ' · excerpt' : ''}`}
-                  >
-                    <pre
-                      class="max-h-72 overflow-auto whitespace-pre-wrap break-words">{run.input_preview}</pre>
-                  </Disclosure>
                 </div>
               </Disclosure>{/each}
           </div>

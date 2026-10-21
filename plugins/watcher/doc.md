@@ -2,7 +2,7 @@
 
 ## Status
 
-The plugin is on `feat/watcher-plugin`. The harness loop runs watcher sessions.
+The harness loop runs watcher sessions.
 
 ## Workspace Settings
 
@@ -67,21 +67,29 @@ Child agents keep the same tool selection and use `finish`. Worker sessions are 
 
 The tool `continue` stops a watcher run. For a permission review, the decision is `allow` with `scope:once`. For other watcher triggers, the primary agent can continue.
 
-The tool `interfere` stops a watcher run and gives a correction. For a permission review, the decision is `deny`. For a completed primary turn, the correction becomes runtime input for a new turn. The correction is not a user message.
+The tool `interfere` stops a watcher run and gives watcher feedback. The optional `continue_chat` value is `true` by default. With `true`, a permission review gives `deny`. For a completed primary turn, the correction becomes runtime input for a new turn. The correction is not a user message.
+
+Set `continue_chat` to `false` when a user reply or action is necessary. The UI shows the user question. The plugin does not put a primary turn in the queue. It does not resolve a permission request. Active work stays active.
+
+```json
+{"message":"Which environment should be used: staging or production?","continue_chat":false}
+```
+
+The user question stays at the reminder anchor for the next primary request. After a completion review or context review, watcher work waits for a new user reply. A user question does not change `continuations`. If a user question and a correction are in the same review group, the group waits for the user.
 
 The startup prompt tells the agent to use watcher decisions for the user's task. The user request controls the work.
 
-A permission request has approval only if the watcher decisions are `continue`. An `interfere` decision gives `deny`. An error status cannot give approval. A user decision cannot be changed by a subsequent watcher decision. The queue controls the correction and the permission decision in one operation.
+A permission request has approval only if the watcher decisions are `continue`. An automatic `interfere` decision gives `deny`. With `continue_chat: false`, the user makes the permission decision. An error status cannot give approval. A user decision cannot be changed by a subsequent watcher decision.
 
 ## Template Variables
 
 ```text
-{todo}                    TODO items with IDs and statuses
+{todo}                    readable TODO titles and statuses
 {doing}                   DOING title and description
-{event}                   trigger metadata
+{event}                   readable trigger metadata
 {workspace}               workspace path
-{permission_request}      pending permission details, or null
-{tool_call}               exact tool call, or null
+{permission_request}      target and reason, or no pending request
+{tool_call}               tool name and readable arguments, or no pending call
 {last_context}            configured default context window
 {last_32k_context}        explicit 32768-token window
 {last_65536_context}      explicit token window
@@ -90,12 +98,13 @@ A permission request has approval only if the watcher decisions are `continue`. 
 
 Variable values are not examined for more variables. Conversation and task data are not system instructions for the watcher. The source does not include `ProviderState`, `Content.Data`, or `data:` URLs. The `input_tokens` field gives the token estimate. The `InputTruncated` value is `true` if content is not included.
 
+The conversation transcript contains text, not `Message` JSON. It has speaker labels, tool arguments, and tool output. It does not include message IDs, timestamps, empty fields, or usage values. The worker prompt identifies the text as reference data.
+
 The input starts with `<watcher_event>` metadata.
 
 ```text
 source_phase: active_request | pending_permission | completed_turn
-in_progress_message_id: current response ID, when available
-InProgress: true marks a partial transcript response
+Assistant (in progress): marks a partial transcript response
 Empty streaming placeholders are omitted
 Event metadata is supplied even when {event} is absent from the template
 ```
@@ -105,6 +114,7 @@ Review progress against the user's instructions.
 Use memory or file reads when needed.
 Call continue if the normal flow can proceed.
 Call interfere with a concrete correction otherwise.
+Use continue_chat:false when progress needs the user.
 
 <todo>{todo}</todo>
 <doing>{doing}</doing>
@@ -128,6 +138,7 @@ Model rounds: default 12; range 1-100
 Output reservation: default 2048 tokens; range 128-65536
 Automatic interventions: default 3 per watcher and user-instruction chain
 Runtime correction: at most 65536 bytes
+Retained user questions: at most 32 per session, 65536 bytes per question group
 ```
 
 The `max_continuations` limit applies across primary turns. After new user input, the `continuations` value is `0`. A watcher run with status `limited` identifies the limit. The `timeout_ms` value applies only to a watcher run. The harness waits for user permission without a timeout.
@@ -146,7 +157,9 @@ On program start, a watcher run with status `running` gets status `interrupted`.
 
 Workspace usage includes watcher model calls. The agent name is `watcher.ID`. Primary conversation cost does not include worker usage. Input tokens from a runtime continuation are part of primary request usage.
 
-The UI gives watcher decisions and an input preview through disclosure controls. The `SessionActivity` API does not give `Message.Reasoning` from worker sessions. The API uses activity pages and history revisions.
+The UI gives watcher decisions and an input preview through disclosure controls. The `SessionActivity` API does not give `Message.Reasoning` from worker sessions. The API uses activity pages and history revisions. A user question has status `user_input_requested`. The status is `deferred_for_user` for other watcher run records in the group.
+
+The `Reviewer activity` view uses the worker session's history and WebSocket APIs. It shows text, `Message.Reasoning`, and tool output in a 320px panel. When the user closes the view, the UI removes view resources. It does not stop the watcher. The input preview and watcher decision are different from the live output.
 
 ## API
 

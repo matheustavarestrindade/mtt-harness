@@ -2,6 +2,7 @@ name: mtt-harness
 
 services:
   postgres:
+    restart: unless-stopped
     image: mtt-postgres-vector:16-0.8.1
     build:
       context: .
@@ -13,16 +14,18 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${MTT_DB_USER:-mtt}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 2s
       timeout: 3s
       retries: 30
 
   mtt:
     init: true
+    restart: unless-stopped
+    stop_grace_period: 60s
     build: .
     user: "${MTT_UID:-1000}:${MTT_GID:-1000}"
-    # Compose reads this benchmark switch from the local .env file.
+    # Deployment values and the benchmark switch come from the local .env file.
     environment:
       MTT_READ_LINE_NUMBERS: ${MTT_READ_LINE_NUMBERS:-false}
     command:
@@ -42,12 +45,12 @@ services:
       - postgres://${MTT_DB_USER:-mtt}:${MTT_DB_PASSWORD:-mtt}@postgres:5432/${MTT_DB_NAME:-mtt}?sslmode=disable
       - --port
       - "8080"
-      - --test-provider=${MTT_TEST_PROVIDER:-true}
+      - --test-provider=${MTT_TEST_PROVIDER:-false}
     ports:
       - "${MTT_HOST_PORT:-18080}:8080"
     volumes:
       - type: bind
-        source: ./workspace
+        source: ${MTT_WORKSPACE_DIR:-./workspace}
         target: /workspace
         bind:
           create_host_path: false
@@ -90,11 +93,27 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 5s
       timeout: 3s
       retries: 12
+      start_period: 60s
+
+  ui:
+    extends:
+      file: ui/compose.yaml
+      service: ui
+    # Keep the UI image/proxy owned by ui/, with explicit root-relative context.
+    build:
+      context: ./ui
+    environment:
+      HARNESS_UPSTREAM: http://mtt:8080
+    depends_on:
+      mtt:
+        condition: service_healthy
 
   postgres-test:
     profiles: ["test"]
@@ -133,9 +152,3 @@ services:
 
 volumes:
   pgdata:
-
-networks:
-  default:
-    ipam:
-      config:
-        - subnet: ${MTT_DOCKER_SUBNET:-172.16.0.0/24}

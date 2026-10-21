@@ -173,6 +173,12 @@ Use `New watcher`, `Edit`, `Duplicate`, or `Remove`. An input preview uses the s
 
 The `SessionActivity` API and `plugin.activity` events give watcher run records. The view gives `Decision`, `Outcome`, and `InputPreview`. The API does not give `Message.Reasoning` from worker sessions.
 
+The view uses `WatcherReviewDetails` and `WatcherReviewInput`. The `watcher_event` data gives `type` and `source_phase`. It is not the watcher result. The view uses `RichText`, `StructuredData`, and `ToolInput`. `ContentActions` gives `Show original preview`, `Copy original preview`, and `Download original preview`.
+
+The UI uses `AnchorID` to put a watcher run with the correct message. `Workspace settings → Watchers → Activity` gives watcher run records. The UI does not show a `Watcher reviews` group. The `InputTruncated` value controls the `Excerpt` label. The UI does not change conversation data.
+
+`WatcherReviewView` and `WatcherLiveOutput` show the reviewer session. They use `AgentFeed`, the session WebSocket, and history pages. The panel shows text, `Message.Reasoning`, and tool output. When the user closes the view, the UI removes view resources. A user question with `ContinueChat: false` has status `Needs your input` in the UI.
+
 The UI uses the watcher run record for a runtime continuation when the `run_ids` values agree. Responses from a previous workspace or session must not replace new data.
 
 ## API Data

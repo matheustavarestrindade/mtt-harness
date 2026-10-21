@@ -12,9 +12,3 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
-
-networks:
-  default:
-    ipam:
-      config:
-        - subnet: ${UI_DOCKER_SUBNET:-172.16.1.0/24}

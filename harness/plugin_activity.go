@@ -47,6 +47,7 @@ type PluginActivityEntry struct {
 	Error           string         `json:",omitempty"`
 	InputPreview    string         `json:",omitempty"`
 	InputTruncated  bool           `json:",omitempty"`
+	ContinueChat    *bool          `json:",omitempty"`
 }
 
 type PluginActivityPage struct {

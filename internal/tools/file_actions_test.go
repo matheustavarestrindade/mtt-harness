@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/matheustavarestrindade/mtt-harness/atom"
 	"github.com/matheustavarestrindade/mtt-harness/harness"
@@ -64,6 +65,10 @@ func TestFileActionsStopAtFailureAndDiscardStagedOutput(test *testing.T) {
 	path := filepath.Join(workspace, "source.txt")
 	original := "original\nsecond\n"
 	testutil.RequireNoError(test, os.WriteFile(path, []byte(original), 0o600))
+	// The observed modification time may contain the same digits as a later
+	// action's range. Assert the operation label rather than arbitrary digits.
+	modified := time.Unix(0, 999999999)
+	testutil.RequireNoError(test, os.Chtimes(path, modified, modified))
 	result, operationError := NewFileActions(true).Run(harness.WithWorkspace(context.Background(), workspace), fileCall(test, map[string]any{
 		"path": "source.txt",
 		"actions": []any{
@@ -78,7 +83,7 @@ func TestFileActionsStopAtFailureAndDiscardStagedOutput(test *testing.T) {
 	if operationError == nil || result.Status != atom.StatusError || !strings.Contains(result.Error, "action 3") || !strings.Contains(result.Error, `text "missing" was not found`) {
 		test.Fatalf("failed edit lost status/cause: %+v %v", result, operationError)
 	}
-	if len(result.Content) != 0 || result.Text() != result.Error || strings.Contains(result.Text(), "UNCOMMITTED") || strings.Contains(result.Text(), "999") || strings.Contains(result.Text(), "MUST NOT RUN") {
+	if len(result.Content) != 0 || result.Text() != result.Error || strings.Contains(result.Text(), "UNCOMMITTED") || strings.Contains(result.Text(), "line 999") || strings.Contains(result.Text(), "action 4") || strings.Contains(result.Text(), "MUST NOT RUN") {
 		test.Fatalf("failed call returned other action output: %s", result.Text())
 	}
 	actual, operationError := os.ReadFile(path)

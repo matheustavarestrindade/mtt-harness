@@ -1,0 +1,10 @@
+# Optional host-file access. start.sh includes this only when MTT_HOST_ROOT is set.
+# --project-directory keeps relative paths anchored to the checkout.
+services:
+  mtt:
+    volumes:
+      - type: bind
+        source: ${MTT_HOST_ROOT:-./workspace}
+        target: /host
+        bind:
+          create_host_path: false

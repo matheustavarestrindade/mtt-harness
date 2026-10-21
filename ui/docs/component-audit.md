@@ -28,6 +28,8 @@ Plugin switch/settings gear     PluginHeaderControls + Switch + Button
 Modal title and aligned close   DialogTitleBar + Dialog.Close
 Date range                      shadcn RangeCalendar + Popover
 Settings pages, Watcher sections -> Tabs
+Watcher review details -> WatcherReviewDetails, WatcherReviewInput
+Live watcher output -> WatcherReviewView, WatcherLiveOutput, AgentFeed
 Thinking, tools, agents, task state, activity, usage -> Collapsible, Disclosure
 Retrieval sources -> ToggleGroup
 Agent task selection -> Toggle

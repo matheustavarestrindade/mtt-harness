@@ -60,6 +60,8 @@ type WorkerSessionResult struct {
 	Decision  string
 	Message   string
 	Reason    string
+	// Nil preserves the historical automatic-continuation behavior.
+	ContinueChat *bool
 }
 
 // SessionWorkers exposes existing loop, queue and permission owners. It is not a

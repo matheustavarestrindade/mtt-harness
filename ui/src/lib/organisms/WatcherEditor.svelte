@@ -14,6 +14,7 @@
   import MultiSelectField from '../molecules/MultiSelectField.svelte';
   import FieldHelp from '../molecules/FieldHelp.svelte';
   import Disclosure from '../molecules/Disclosure.svelte';
+  import WatcherReviewInput from '../molecules/WatcherReviewInput.svelte';
   let {
     value,
     models,
@@ -301,8 +302,9 @@
       class="rounded border border-border p-3"
       title={`Input preview · ${preview.estimated ? '≈ ' : ''}${preview.input_tokens.toLocaleString()} tokens${preview.truncated ? ' · excerpt' : ''}`}
     >
-      <pre
-        class="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs">{preview.prompt}</pre>
+      <div class="mt-2">
+        <WatcherReviewInput input={preview.prompt} truncated={preview.truncated} />
+      </div>
     </Disclosure>{/if}
   <div class="flex flex-wrap gap-2 border-t border-border pt-4">
     <Button type="submit" class="h-11" disabled={saving}

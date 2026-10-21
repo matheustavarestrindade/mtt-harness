@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -285,6 +286,15 @@ func (database *postgresRepository) RetireHistory(operationContext context.Conte
 	state.Deleted = deleted
 	state.HistoryEpoch++
 	state.Schedules = map[string]schedule{}
+	state.WaitingForUser = false
+	state.WaitingUserID = ""
+	retainedNotices := state.Notices[:0]
+	for _, notice := range state.Notices {
+		if !deleted && slices.Contains(anchors, notice.AnchorID) {
+			retainedNotices = append(retainedNotices, notice)
+		}
+	}
+	state.Notices = retainedNotices
 	if _, operationError = transaction.Exec(operationContext, `DELETE FROM watcher.runs WHERE workspace_id=$1 AND session_id=$2 AND ($3 OR NOT(COALESCE(data->>'anchor_id','')=ANY($4::text[])))`, workspaceID, sessionID, deleted, anchors); operationError != nil {
 		return operationError
 	}

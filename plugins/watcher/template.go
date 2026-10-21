@@ -96,36 +96,22 @@ func templateMaximumTokens(value definition) int {
 	return maximum
 }
 
-func transcriptMessages(source harness.ReviewSource, includeReasoning bool) []string {
-	var rows []string
-	for _, message := range source.Messages {
-		message.ProviderState = nil
-		message.Usage = nil
-		if !includeReasoning {
-			message.Reasoning = ""
-		}
-		data, _ := json.Marshal(struct {
-			atom.Message
-			InProgress bool `json:",omitempty"`
-		}{message, message.ID == source.LiveMessageID})
-		rows = append(rows, string(data))
-	}
-	return rows
-}
-
 // selectTranscript measures candidate text through the configured provider's
 // counter/estimator. Complete message rows win; a too-large final row becomes an
 // explicitly marked UTF-8 excerpt rather than silently violating the token limit.
 func selectTranscript(rows []string, limit int, measure func(string) (int, error)) (string, bool, error) {
 	if len(rows) == 0 {
-		return "[]", false, nil
+		return "", false, nil
 	}
 	first, last := 0, len(rows)
-	best := "[]"
+	best := ""
 	omitted := false
 	for first <= last {
 		middle := (first + last) / 2
-		text := "[" + strings.Join(rows[middle:], ",\n") + "]"
+		text := strings.Join(rows[middle:], "\n\n")
+		if middle > 0 && middle < len(rows) {
+			text = "Context excerpt: earlier messages omitted.\n\n" + text
+		}
 		tokens, operationError := measure(text)
 		if operationError != nil {
 			return "", false, operationError
@@ -138,10 +124,17 @@ func selectTranscript(rows []string, limit int, measure func(string) (int, error
 			first = middle + 1
 		}
 	}
-	if best != "[]" {
+	if best != "" {
 		return best, omitted, nil
 	}
 	text := rows[len(rows)-1]
+	header, body, hasHeader := strings.Cut(text, "\n")
+	if hasHeader {
+		text = body
+		header += "\n"
+	} else {
+		header = ""
+	}
 	lower, upper := 0, len(text)
 	for lower <= upper {
 		length := (lower + upper) / 2
@@ -149,13 +142,13 @@ func selectTranscript(rows []string, limit int, measure func(string) (int, error
 		for start < len(text) && !utf8.RuneStart(text[start]) {
 			start++
 		}
-		data, _ := json.Marshal(map[string]any{"truncated": true, "message_excerpt": text[start:]})
-		tokens, operationError := measure(string(data))
+		excerpt := header + "[Earlier content omitted; message excerpt]\n" + text[start:]
+		tokens, operationError := measure(excerpt)
 		if operationError != nil {
 			return "", false, operationError
 		}
 		if tokens <= limit {
-			best = string(data)
+			best = excerpt
 			lower = length + 1
 		} else {
 			upper = length - 1
@@ -165,11 +158,20 @@ func selectTranscript(rows []string, limit int, measure func(string) (int, error
 }
 
 func (plugin *Plugin) renderInput(operationContext context.Context, value definition, source harness.ReviewSource, event observation) (string, harness.RequestBudget, bool, error) {
-	encode := func(value any) string { data, _ := json.Marshal(value); return string(data) }
 	phase := map[string]string{"context_growth": "active_request", "permission_request": "pending_permission", "end_turn": "completed_turn"}[event.Trigger]
-	variables := map[string]string{"todo": encode(source.Tasks.Todo), "doing": encode(source.Tasks.Doing), "workspace": encode(source.Workspace.Workspace), "event": encode(map[string]any{"type": event.Trigger, "source_phase": phase, "source_active": source.Active, "in_progress_message_id": source.LiveMessageID, "permission_id": permissionID(event.Permission), "context_tokens": event.Tokens, "model": event.Model}), "permission_request": encode(event.Permission), "tool_call": "null"}
+	metadata := map[string]any{"type": event.Trigger, "source_phase": phase}
+	eventText := "Trigger: " + event.Trigger + "\nSource phase: " + phase
+	if event.Trigger == "context_growth" {
+		metadata["context_tokens"] = event.Tokens
+		metadata["model"] = event.Model
+		metadata["source_active"] = source.Active
+		eventText += fmt.Sprintf("\nContext at trigger: %d tokens\nReviewed model: %s\nSource active: %t", event.Tokens, event.Model, source.Active)
+	}
+	eventJSON, _ := json.Marshal(metadata)
+	todo, doing := taskReferences(source.Tasks)
+	variables := map[string]string{"todo": todo, "doing": doing, "workspace": source.Workspace.Workspace, "event": eventText, "permission_request": permissionReference(event.Permission), "tool_call": "No pending tool call."}
 	if event.Permission != nil {
-		variables["tool_call"] = encode(event.Permission.ToolCall)
+		variables["tool_call"] = formatToolCall(event.Permission.ToolCall)
 	}
 	rows := transcriptMessages(source, value.IncludeReasoning)
 	truncated := source.Truncated
@@ -201,16 +203,13 @@ func (plugin *Plugin) renderInput(operationContext context.Context, value defini
 			return "", selectionError
 		}
 		truncated = truncated || omitted
-		if omitted {
-			text = "Context excerpt: earlier content omitted.\n" + text
-		}
 		cache[name] = text
 		return text, nil
 	})
 	if operationError != nil {
 		return "", harness.RequestBudget{}, false, operationError
 	}
-	prompt = "<watcher_event>" + variables["event"] + "</watcher_event>\n" + prompt
+	prompt = "<watcher_event>" + string(eventJSON) + "</watcher_event>\n" + prompt
 	budget, operationError := plugin.services.Sessions.Measure(operationContext, source.Workspace.ID, value.Model, value.ReasoningEffort, prompt, value.MaxOutputTokens)
 	if operationError == nil && budget.InputLimit > 0 && budget.InputTokens > budget.InputLimit {
 		operationError = fmt.Errorf("watcher input uses %d tokens; input limit is %d", budget.InputTokens, budget.InputLimit)

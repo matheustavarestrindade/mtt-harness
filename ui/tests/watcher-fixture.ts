@@ -99,7 +99,7 @@ export async function mockWatchers(page: Page) {
       if (action === 'preview')
         return reply({
           prompt:
-            '<todo>Saved TODO</todo>\n<conversation_to_analize>Supplied context</conversation_to_analize>',
+            '<watcher_event>{"type":"end_turn","source_phase":"completed_turn","context_tokens":0,"model":"","permission_id":"","source_active":false,"in_progress_message_id":""}</watcher_event>\n<todo>Saved TODO</todo>\n<conversation_to_analize>Supplied context</conversation_to_analize>',
           input_tokens: 1500,
           input_limit: 32000,
           estimated: true,

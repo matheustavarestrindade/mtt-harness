@@ -846,13 +846,17 @@ The Watcher plugin uses the harness loop to examine task state, permission reque
 
 Worker sessions have an execution profile. The execution profile applies to `search_tool` and tool calls. The user can select file operations for `file_actions`. Tool grants do not use the permission pipeline. The harness examines input and model limits. Watcher sessions and the child sessions of a watcher cannot start watcher runs.
 
-The watcher uses `continue` or `interfere` to give a decision. For a permission request, `continue` gives `allow` with `scope:once`. The tool `interfere` gives a `deny` decision and a correction. A user decision cannot be changed by a subsequent watcher decision.
+The watcher uses `continue` or `interfere` to give a decision. For a permission request, `continue` gives `allow` with `scope:once`. The `continue_chat` input of `interfere` is `true` by default. With `true`, a permission review gives `deny` and a correction. A user decision cannot be changed by a subsequent watcher decision.
+
+With `continue_chat: false`, the UI shows watcher feedback for the user. The plugin does not put a primary turn in the queue. It does not resolve a permission request. Active work stays active. The user question stays at the reminder anchor for the next primary request. If a user question and a correction are in the same review group, the group waits for the user.
 
 The `EndTurn` event callback starts the watcher after a completed primary turn. A runtime continuation can start a new primary turn through the session queue. It does not make a user message. Continuation limits apply across primary turns. The harness examines user input, task state, configuration, and history through source fences before a decision is used.
 
 The prompt template uses `{todo}`, `{doing}`, and context window variables such as `{last_32k_context}`. Variable values are not examined for more variables. Conversation data is not system instructions. The source does not include `ProviderState`, `Content.Data`, or `data:` URLs.
 
 The plugin uses the `watcher` Postgres schema for watcher schedules and watcher run records. Workspace usage includes worker model calls. Worker usage does not increase primary conversation cost. See `plugins/watcher/doc.md` for configuration, limits, and API data.
+
+The conversation transcript contains text, not `Message` JSON. It has speaker labels, tool arguments, and tool output. It does not include message IDs, timestamps, empty fields, or usage values. The `input_tokens` field gives the token estimate. The UI uses the worker session's WebSocket and history APIs for live output.
 
 ## 10. Tools
 

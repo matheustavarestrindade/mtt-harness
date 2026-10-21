@@ -141,7 +141,7 @@ go test ./...
 
 ## Docker
 
-Run the harness and Postgres in containers. The standard harness image includes local embeddings. Only `./workspace` is mounted read/write at `/workspace`; it is not the harness repository. Bootstrap, provider/MCP, and startup-prompt files are mounted read-only under `/etc/mtt`.
+Run `./start.sh` for PostgreSQL, the harness, and the UI in Docker Compose. It prepares only missing local bootstrap files, waits for health, preserves data, and uses host UID/GID unless configured. The standard image includes local embeddings. By default only `./workspace` is mounted read/write at `/workspace`, not the repository. `MTT_WORKSPACE_DIR` can select another host parent. Explicit `MTT_HOST_ROOT` enables `docker/compose.host-files.yaml` and adds `/host`; it is never enabled implicitly. Bootstrap/provider/MCP/prompt files remain read-only under `/etc/mtt`. Commands still run inside the container. See `docs/docker-start.md`.
 
 For a new checkout, prepare the local files and directory:
 
@@ -152,10 +152,10 @@ cp -n mcp.example.json mcp.json
 cp -n .env.example .env
 ```
 
-Then start Compose:
+Or let the launcher prepare missing files and start Compose:
 
 ```sh
-docker compose up --build
+./start.sh
 ```
 
 The API is on `http://localhost:18080`. The health path `/health` is open; the other paths need the API token (from the initial-start log or `mtt.json`).
@@ -174,11 +174,12 @@ Stop the containers:
 docker compose down
 ```
 
-The compose service includes the test provider. Configure OpenAI or DeepSeek in the UI Providers screen, or use the provider-key API. A real provider works without changing Docker flags. Set `MTT_TEST_PROVIDER=false` only to remove the optional test model.
+The test provider defaults OFF. Set `MTT_TEST_PROVIDER=true` only when the synthetic model is wanted. Configure real providers in Configuration → Settings → Providers or through the provider-key API. The launcher never resets/restores a database or removes volumes. Use isolated Compose projects for startup tests; never change the running native deployment's data or ports to test the launcher.
 
 ## Runtime Ownership and Recovery
 
 - The optional `plugins/watcher/` plugin owns workspace definitions at `plugin.watcher` and the `watcher` Postgres schema. It defaults OFF and has no Go worker-model default. Watchers use normal harness sessions with immutable private execution profiles. Discovery, schemas, tool chains, and file-action return selections enforce the configured tool/operation grants; allowed watcher capabilities bypass permission decisions, caches, and prompts. Descendants inherit the profile, use `finish`, and never trigger watchers. Main-session continuations remain main sessions.
+- Watcher transcripts are readable speaker/tool text, not serialized Message objects. Preserve literal content, exact argument numbers, optional supplied reasoning, partial-output labels, and measured UTF-8 excerpts. `interfere.continue_chat` defaults true; false publishes user feedback without queued continuation or permission resolution and does not cancel current work. A user question wins over automatic corrections in the same group. Anchor the question as immutable RoleRuntime request context so the later user reply is intelligible, count it during fitting, retire it with its anchor, and do not charge a continuation. Context/completion questions suppress repeat reviews until a new user message; permission questions leave the normal human decision path open. The live reviewer UI reads the worker session through existing bounded history/view streams, not private provider continuation data.
 - Watcher context-growth observations commit at dispatch without changing request bytes or adding tokens. Permission reviews consume exact pending requests, and all matching reviewers must approve; manual decisions supersede late watcher decisions. `EndTurn` schedules completion reviews, and interventions use fenced `RoleRuntime` queue input to bootstrap a new main turn. Queue owners only compare control tokens and perform bounded broker operations; workers do I/O and inference. User input, cancellation, task/history/configuration changes, and shutdown fence obsolete decisions. Runtime guidance and a permission denial commit through one queue-controlled path. Worker usage is workspace/run/request attributed, including interrupted reported usage, without parent-chat billing. Configuration and activity APIs must not start inference. See `plugins/watcher/doc.md`.
 
 - Event persistence is ordered per session, with cancellable in-memory admission and PostgreSQL transaction-scoped session gates. Never hold the global event-bus mutex across database I/O. Session WebSocket replay uses `EventStore.SinceSession`; a cursor must not advance on another session's independently committed events. Callbacks run after the persistence gate is released.

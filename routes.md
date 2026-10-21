@@ -398,6 +398,7 @@ type PluginActivityEntry = {
   Title: string; CreatedAt: string; Notes: { Text: string; References: string[] | null }[];
   InputTokens?: number; Estimated: boolean;
   Outcome?: string; Decision?: string; Trigger?: string; DefinitionID?: string;
+  ContinueChat?: boolean;
   WorkerSessionID?: string; DurationMS?: number; Error?: string;
   InputPreview?: string; InputTruncated?: boolean;
 };

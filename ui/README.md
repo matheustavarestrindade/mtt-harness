@@ -28,7 +28,9 @@ Vite uses the URL for HTTP and WebSocket requests. The browser uses `/api` on th
 
 ## Docker and Tailscale
 
-The Docker image and Docker Compose file are in `ui/`. The image contains the UI and an nginx proxy. It uses the harness API on the host computer.
+The Docker image and Docker Compose file are in `ui/`. The image contains the UI and an nginx proxy. Run `../start.sh` for PostgreSQL, the harness, and the UI. The Docker Compose file uses an internal API connection.
+
+Use the subsequent command for a different UI with a harness on the host computer.
 
 ```sh
 # From ui/
@@ -51,7 +53,6 @@ Container configuration in `ui/.env`:
 UI_BIND_ADDRESS=0.0.0.0
 UI_PORT=18081
 HARNESS_UPSTREAM=http://host.docker.internal:18080
-UI_DOCKER_SUBNET=172.16.1.0/24
 ```
 
 Set `UI_BIND_ADDRESS` to the host Tailscale IP to select one interface. The value `0.0.0.0` selects the host interfaces. Authentication is necessary for the API.
@@ -216,7 +217,7 @@ See `docs/memory.md` for usage data and API limits.
 
 ## Reasoning
 
-The session form has a control with the label `Thinking`. In the message composer, use the button with the label `Session settings` to open the dialog. The dialog has fields with the labels `Model` and `Thinking`. The available reasoning efforts come from the selected model.
+The session form has a control with the label `Thinking`. In the message composer, use `Configuration → Model and thinking` to open the dialog. The dialog has fields with the labels `Model` and `Thinking`. The available reasoning efforts come from the selected model.
 
 To use the model default, select the value with the label `Default`. The database keeps the selection. A change applies to the next model request. The dialog shows the result of a change.
 

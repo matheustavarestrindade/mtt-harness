@@ -111,11 +111,16 @@ func permissionMatches(value definition, source harness.ReviewSource, request *a
 func selectDefinitions(state *sessionState, configuration configuration, source harness.ReviewSource, event observation) []definition {
 	if state.UserID != source.Fence.UserMessageID {
 		state.UserID = source.Fence.UserMessageID
+		state.WaitingForUser = false
+		state.WaitingUserID = ""
 		for identifier, progress := range state.Schedules {
 			progress.Continuations = 0
 			progress.LimitReported = false
 			state.Schedules[identifier] = progress
 		}
+	}
+	if state.WaitingForUser && state.WaitingUserID == source.Fence.UserMessageID {
+		return nil
 	}
 	var selected []definition
 	for _, value := range configuration.Watchers {
@@ -212,7 +217,7 @@ func (plugin *Plugin) reviewGroup(operationContext context.Context, event observ
 	var selected, limited []definition
 	operationError = plugin.database.UpdateSession(operationContext, source.Workspace.ID, string(source.Session.ID), func(state *sessionState) error {
 		selected = selectDefinitions(state, configuration, source, event)
-		if event.Trigger != "permission_request" {
+		if event.Trigger != "permission_request" && !state.WaitingForUser {
 			for _, value := range configuration.Watchers {
 				progress := state.Schedules[value.ID]
 				if value.Enabled && slices.Contains(value.Triggers, event.Trigger) && progress.Continuations >= value.MaxContinuations && !progress.LimitReported {
@@ -267,6 +272,7 @@ func (plugin *Plugin) reviewGroup(operationContext context.Context, event observ
 	defer func() { stopMonitor(); <-monitorDone }()
 	var runs []runRecord
 	allContinue := true
+	needsUser := false
 	var corrections []map[string]string
 	for _, value := range selected {
 		if operationContext.Err() != nil {
@@ -279,6 +285,7 @@ func (plugin *Plugin) reviewGroup(operationContext context.Context, event observ
 		}
 		if run.Status == "reviewed" && run.Decision == "interfere" {
 			corrections = append(corrections, map[string]string{"id": value.ID, "name": value.Name, "message": run.Message})
+			needsUser = needsUser || (run.ContinueChat != nil && !*run.ContinueChat)
 		}
 	}
 	if operationContext.Err() != nil {
@@ -298,7 +305,19 @@ func (plugin *Plugin) reviewGroup(operationContext context.Context, event observ
 		return
 	}
 	var applied bool
-	if event.Trigger == "permission_request" {
+	if needsUser {
+		if event.Permission != nil {
+			var pending *atom.PermissionRequest
+			pending, operationError = plugin.services.Sessions.Permission(operationContext, source.Session.ID, event.Permission.ID)
+			if operationError == nil && pending == nil {
+				operationError = harness.ErrReviewStale
+			}
+		}
+		if operationError == nil {
+			operationError = plugin.saveUserFeedback(operationContext, source, runs, corrections, event.Trigger != "permission_request")
+			applied = operationError == nil
+		}
+	} else if event.Trigger == "permission_request" {
 		if len(corrections) > 0 {
 			applied, operationError = plugin.services.Sessions.ResolvePermission(operationContext, source, event.Permission.ID, false, "watcher", interventionText(runs, corrections))
 		} else if allContinue {
@@ -349,6 +368,9 @@ func (plugin *Plugin) reviewGroup(operationContext context.Context, event observ
 	if len(corrections) > 0 {
 		status = "intervened"
 	}
+	if needsUser {
+		status = "user_input_requested"
+	}
 	if operationError != nil || !applied {
 		status = "stale"
 		if operationError != nil && !errors.Is(operationError, harness.ErrReviewStale) {
@@ -384,6 +406,7 @@ func (plugin *Plugin) runReview(operationContext context.Context, source harness
 		operationError = workerError
 		run.WorkerSessionID = result.SessionID
 		run.Decision, run.Message, run.Reason = result.Decision, result.Message, result.Reason
+		run.ContinueChat = result.ContinueChat
 	}
 	run.FinishedAt = time.Now()
 	run.DurationMS = time.Since(run.CreatedAt).Milliseconds()
@@ -447,6 +470,13 @@ func (plugin *Plugin) finishGroup(runs []runRecord, status string, operationErro
 			continue
 		}
 		run.Status = status
+		if status == "user_input_requested" {
+			if run.Decision == "continue" {
+				run.Status = "completed"
+			} else if run.ContinueChat == nil || *run.ContinueChat {
+				run.Status = "deferred_for_user"
+			}
+		}
 		if operationError != nil {
 			run.Error = operationError.Error()
 		}

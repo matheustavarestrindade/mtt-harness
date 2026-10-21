@@ -36,7 +36,6 @@ ALTER TABLE sessions ADD COLUMN IF NOT EXISTS selection_revision bigint NOT NULL
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS parent_message_id text NOT NULL DEFAULT '';
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS parent_tool_call_id text NOT NULL DEFAULT '';
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS execution_profile jsonb;
-CREATE INDEX IF NOT EXISTS messages_session_user ON messages(session_id,seq DESC) WHERE role='user';
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS session_task_state (
 	session_id text PRIMARY KEY REFERENCES sessions(id),
@@ -68,6 +67,7 @@ CREATE INDEX IF NOT EXISTS message_queue_session ON message_queue (session_id, s
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS provider_state jsonb;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS reasoning text NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS messages_session_sequence ON messages(session_id,seq);
+CREATE INDEX IF NOT EXISTS messages_session_user ON messages(session_id,seq DESC) WHERE role='user';
 CREATE INDEX IF NOT EXISTS messages_session_assistant ON messages(session_id,seq DESC) WHERE role='assistant';
 CREATE TABLE IF NOT EXISTS events (
 	seq bigserial PRIMARY KEY,
