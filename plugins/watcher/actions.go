@@ -89,6 +89,9 @@ func (plugin *Plugin) SessionActivity(operationContext context.Context, session 
 	result.NextCursor = page.NextCursor
 	for _, run := range page.Runs {
 		entry := harness.PluginActivityEntry{ID: run.ID, SessionID: session.ID, AnchorID: run.AnchorID, AnchorSequence: run.AnchorSequence, Title: run.Name, CreatedAt: run.CreatedAt, Outcome: run.Status, Decision: run.Decision, Trigger: run.Trigger, DefinitionID: run.DefinitionID, WorkerSessionID: run.WorkerSessionID, DurationMS: run.DurationMS, Error: run.Error, Estimated: run.Estimated, InputPreview: run.InputPreview, InputTruncated: run.InputTruncated, Notes: []harness.PluginActivityNote{}}
+		if run.InputPreview != "" {
+			entry.InputTokens = &run.InputTokens
+		}
 		entry.ContinueChat = run.ContinueChat
 		text := run.Message
 		if text == "" {

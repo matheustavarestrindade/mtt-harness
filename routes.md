@@ -543,13 +543,17 @@ type HistoryPage = {
   Models: Record<string,string>; Sizes: Record<string,number>; Processes?: ProcessRecord[];
   FirstSeq: number; LastSeq: number; HeadSeq: number; HasOlder: boolean; HasNewer: boolean;
   LatestResponse?: { MessageID: string; Seq: number; Model: string; Usage: Usage | null; CreatedAt: string };
-  Task?: string;
+  Task?: string; TaskMessageID?: string; TaskSeq?: number;
 };
 ```
 
 The history query accepts a `before` or `after` position. It cannot accept the 2 parameters together. The message at the specified position is not in the history page. The default `limit` is `50` and the maximum is `100`. A different `revision` gives `409`.
 
 The `metadata=true` mode has an empty history window. The byte limit for message content is `2 MiB`. The API can give one larger message. The message bytes stay the same.
+
+For a child session, `TaskMessageID` and `TaskSeq` identify the initial user message. `Task` stays a short label. Read the metadata, then use `before=TaskSeq+1`, `limit=1`, and the supplied `revision` to read the message.
+
+The client must compare `SessionID`, `Message.ID`, and `Message.Seq` with the metadata.
 
 The last response usage does not change with the history page. See `docs/session-views.md`.
 

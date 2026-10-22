@@ -275,10 +275,10 @@ test('show bounded truncated input clearly and render legacy reviews without an 
   await expect(reportedError).toContainText('Review interrupted');
   expect((await reportedError.boundingBox())!.height).toBeLessThanOrEqual(208);
   expect(await reportedError.textContent()).toContain(record.error);
-  await details.getByRole('button', { name: 'Review input · excerpt', exact: true }).click();
+  await details.getByRole('button', { name: 'Review input', exact: true }).click();
   await expect(details.getByText('Complete source message', { exact: true })).toBeVisible();
   await expect(
-    details.getByText('The saved preview ends inside a message.', { exact: false }),
+    details.getByText('This preview ends inside a message.', { exact: false }),
   ).toBeVisible();
   await panel.getByRole('button', { name: /Legacy reviewer/ }).click();
   const earlier = panel.locator('[data-watcher-details="legacy-review"]');

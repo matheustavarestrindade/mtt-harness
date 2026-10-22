@@ -4,6 +4,7 @@
   import Disclosure from '../molecules/Disclosure.svelte';
   import WatcherReviewDetails from '../molecules/WatcherReviewDetails.svelte';
   import WatcherLiveOutput from './WatcherLiveOutput.svelte';
+  import WatcherInputInspector from './WatcherInputInspector.svelte';
   let { api, review }: { api: HarnessApi | null; review: WatcherReview } = $props();
   let liveOpen = $state(false),
     activated = false;
@@ -23,8 +24,15 @@
   });
 </script>
 
+{#snippet inputContent()}<WatcherInputInspector
+    {api}
+    sessionID={review.workerSessionID}
+    preview={review.input}
+    truncated={review.inputTruncated}
+  />{/snippet}
+
 <div class="min-w-0 space-y-2">
-  <WatcherReviewDetails {review} />
+  <WatcherReviewDetails {review} {inputContent} />
   {#if api && review.workerSessionID}<Disclosure
       bind:open={liveOpen}
       title="Reviewer activity"

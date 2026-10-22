@@ -147,6 +147,13 @@ func TestEndTurnInterferenceStartsOneRuntimeTurnWithoutRecursiveWatchers(test *t
 	if len(activity.Entries) != 2 || len(activity.Entries[1].Notes) != 1 {
 		test.Fatal("read-only activity did not preserve decisions")
 	}
+	for _, entry := range activity.Entries {
+		for _, run := range runs {
+			if entry.ID == run.ID && (entry.InputTokens == nil || *entry.InputTokens != run.InputTokens || entry.Estimated != run.Estimated) {
+				test.Fatal("activity lost the saved initial request measurement")
+			}
+		}
+	}
 }
 
 func TestPermissionWatcherApprovesPendingCallAndOwnReadsNeverAsk(test *testing.T) {

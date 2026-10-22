@@ -3,6 +3,11 @@ import type { WatcherRun } from './watcher';
 import { watcherTriggers } from './watcher';
 
 export const watcherPreviewLimit = 100_000;
+
+export function clipWatcherInput(input: string): string {
+  const text = input.slice(0, watcherPreviewLimit);
+  return /[\uD800-\uDBFF]$/.test(text) ? text.slice(0, -1) : text;
+}
 const eventOpen = '<watcher_event>';
 const eventClose = '</watcher_event>';
 const referenceNames = {
@@ -198,8 +203,7 @@ function fencedRanges(text: string): [number, number][] {
 }
 
 export function parseWatcherInput(input: string, truncated = false) {
-  let text = input.slice(0, watcherPreviewLimit);
-  if (/[\uD800-\uDBFF]$/.test(text)) text = text.slice(0, -1);
+  let text = clipWatcherInput(input);
   const limited = text.length < input.length;
   let event: Record<string, unknown> | null = null;
   let eventSource = '';

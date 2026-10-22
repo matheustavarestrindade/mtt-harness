@@ -1356,6 +1356,8 @@ The history route uses message sequence positions. The default history page has 
 
 The `Context` field connects a tool result to the tool owner. The `revert` operation increases `Revision`. A request with a different revision gives `409`. The history page does not include `ProviderState`.
 
+For a child session, `TaskMessageID` and `TaskSeq` identify the initial user message. `Task` stays a short label. The UI can read the metadata and then one input message with `before=TaskSeq+1`, `limit=1`, and the supplied `revision`. The operation does not start a model request.
+
 The UI uses a history window with a limit of 150 messages. The byte limit is 8 MiB. The UI can keep one larger message. The scrollbar gives access to history pages. The `Latest` control puts the view at the end of the conversation. The history window then contains 50 messages.
 
 The UI removes previous views with `URL.revokeObjectURL`, `Terminal.dispose`, and `WebSocket.close`. See `docs/session-views.md` for limits and connection rules.

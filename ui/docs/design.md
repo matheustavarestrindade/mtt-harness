@@ -181,6 +181,19 @@ The UI uses `AnchorID` to put a watcher run with the correct message. `Workspace
 
 When the reviewer session stops, the live panel closes. The `WatcherSection` also closes. The `user_input_requested` status keeps the view open. The user can open `WatcherSection` again. A data refresh with the same status does not close the view.
 
+`WatcherInputInspector` uses `Load full prompt` for the input text. It uses `TaskMessageID`, `TaskSeq`, and `Revision` from the history API. It reads one message.
+
+```text
+Saved preview: first 16 KiB of the rendered prompt
+Full saved prompt: exact text from the initial user message
+Size labels: UTF-8 bytes of the displayed source
+Initial request tokens: input plus worker instructions and tools
+Long fixed prompt text: Disclosure control
+Maximum rendered text: 100000 characters
+Copy/download: full source text, not only the rendered part
+On close: cancel the read, reject late results, and release the full text
+```
+
 The UI uses the watcher run record for a runtime continuation when the `run_ids` values agree. Responses from a previous workspace or session must not replace new data.
 
 ## API Data

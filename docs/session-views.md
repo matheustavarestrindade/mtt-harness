@@ -58,12 +58,27 @@ The query cannot use `before` and `after` together. The API does not remove byte
 HistoryPage fields
 SessionID, Revision, Messages, Context, Models, Sizes,
 FirstSeq, LastSeq, HeadSeq, HasOlder, HasNewer, LatestResponse,
-Processes, Task
+Processes, Task, TaskMessageID, TaskSeq
 ```
 
 The `metadata=true` mode has an empty body window. Head position and last response usage stay available. Usage does not change to a previous response when the user reads a previous history page. `ProviderState` is not in a history page.
 
 The `revert` operation increases `Revision`. A request with a different revision gives `409`. The database keeps history and model-selection revisions during session updates. Session deletion gives `404`.
+
+### Task Input
+
+For a child session, the history metadata includes `TaskMessageID` and `TaskSeq` from the initial user message. The short `Task` label is not the full input. The metadata uses one read snapshot.
+
+```text
+1. GET /sessions/{id}/history?metadata=true
+2. GET /sessions/{id}/history?before=TASK_SEQ_PLUS_ONE&limit=1&revision=REVISION
+
+Required comparisons: SessionID, Revision, Message.ID, Message.Seq, Role=user
+TaskSeq+1 permits a direct read, including a task at sequence 1.
+Existing history byte limits and the intact-message exception still apply.
+```
+
+A history request does not start a model request or change history. The UI uses `TaskMessageID` and `TaskSeq` for the input text. Tool output is not necessary for the operation.
 
 ## Browser Data
 

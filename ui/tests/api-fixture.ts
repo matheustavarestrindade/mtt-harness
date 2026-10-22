@@ -159,6 +159,11 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
     }
     const latest = [...all].reverse().find((message) => message.Role === 'assistant');
     const ids = new Set([...messages, ...context].map((message) => message.ID));
+    const task = session.Parent ? all.find((message) => message.Role === 'user') : undefined;
+    const taskText =
+      task?.Content?.filter((content) => content.Type === 'text')
+        .map((content) => content.Text)
+        .join('\n') ?? '';
     return {
       SessionID: session.ID,
       Revision: session.HistoryRevision ?? 0,
@@ -185,13 +190,9 @@ export async function mockHarness(page: Page, options: { replayEvents?: boolean 
       Processes: [...processes.values()].filter(
         (process) => process.SessionID === session.ID && ids.has(process.Spec.ToolMessageID ?? ''),
       ),
-      Task: session.Parent
-        ? all
-            .find((message) => message.Role === 'user')
-            ?.Content?.filter((content) => content.Type === 'text')
-            .map((content) => content.Text)
-            .join('\n')
-        : '',
+      Task: Array.from(taskText).slice(0, 4096).join(''),
+      TaskMessageID: task?.ID,
+      TaskSeq: task?.Seq,
     };
   }
   function viewState(session: Session, details = true): SessionViewState {
