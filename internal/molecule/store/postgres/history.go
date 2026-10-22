@@ -35,7 +35,7 @@ func (sessionStore *sessions) History(operationContext context.Context, sessionI
 	}
 	if parentID != "" {
 		var task string
-		taskError := transaction.QueryRow(operationContext, `SELECT COALESCE(left(content->0->>'Text',4096),'') FROM messages WHERE session_id=$1 AND role='user' ORDER BY seq LIMIT 1`, string(sessionID)).Scan(&task)
+		taskError := transaction.QueryRow(operationContext, `SELECT id,seq,COALESCE(left(content->0->>'Text',4096),'') FROM messages WHERE session_id=$1 AND role='user' ORDER BY seq LIMIT 1`, string(sessionID)).Scan(&page.TaskMessageID, &page.TaskSeq, &task)
 		if taskError != nil && !errors.Is(taskError, pgx.ErrNoRows) {
 			return page, taskError
 		}

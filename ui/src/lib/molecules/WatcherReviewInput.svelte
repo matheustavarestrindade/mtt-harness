@@ -5,11 +5,11 @@
   import { dataLabel, structuredJSON } from '../atoms/structured-data';
   import {
     parseWatcherInput,
+    clipWatcherInput,
     watcherConversation,
     watcherEvent,
     watcherEventFields,
     watcherObject,
-    watcherPreviewLimit,
   } from '../atoms/watcher-presentation';
   import ContentActions from './ContentActions.svelte';
   import Disclosure from './Disclosure.svelte';
@@ -23,13 +23,17 @@
     input,
     truncated = false,
     showEvent = true,
+    source = 'preview',
   }: {
     input: string;
     truncated?: boolean;
     showEvent?: boolean;
+    source?: 'preview' | 'saved' | 'draft';
   } = $props();
   let original = $state(false);
   const preview = $derived(parseWatcherInput(input, truncated));
+  const sourceBytes = $derived(new TextEncoder().encode(input).byteLength);
+  const saved = $derived(source === 'saved');
   async function copyOriginal() {
     try {
       await copyToClipboard(input);
@@ -41,7 +45,7 @@
     const url = URL.createObjectURL(new Blob([input], { type: 'text/plain;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'watcher-input-preview.txt';
+    link.download = saved ? 'watcher-input.txt' : 'watcher-input-preview.txt';
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -108,20 +112,31 @@
   </article>
 {/snippet}
 
-<section aria-label="Watcher input preview" class="min-w-0 text-xs">
+<section
+  aria-label={saved ? 'Watcher saved prompt' : 'Watcher input preview'}
+  class="min-w-0 text-xs"
+>
   <div class="flex min-w-0 items-start justify-between gap-2">
     <p class="min-w-0 py-1 text-[10px] text-muted-foreground">
-      Supplied to the reviewer{truncated || preview.limited ? ' · Excerpt' : ''}
+      {saved ? 'Full saved prompt' : source === 'draft' ? 'Prompt preview' : 'Saved preview'} · {sourceBytes.toLocaleString()}
+      bytes
     </p>
     <ContentActions
       label="Review input actions"
       actions={[
         {
-          label: original ? 'Show formatted input' : 'Show original preview',
+          label: original
+            ? 'Show formatted input'
+            : saved
+              ? 'Show original prompt'
+              : 'Show original preview',
           select: () => (original = !original),
         },
-        { label: 'Copy original preview', select: copyOriginal },
-        { label: 'Download original preview', select: downloadOriginal },
+        { label: saved ? 'Copy full prompt' : 'Copy original preview', select: copyOriginal },
+        {
+          label: saved ? 'Download full prompt' : 'Download original preview',
+          select: downloadOriginal,
+        },
       ]}
     />
   </div>
@@ -129,7 +144,9 @@
     {#if original}
       <pre
         class="whitespace-pre-wrap break-words font-mono leading-5"
-        aria-label="Original watcher input preview">{input.slice(0, watcherPreviewLimit)}</pre>
+        aria-label={saved
+          ? 'Original watcher prompt'
+          : 'Original watcher input preview'}>{clipWatcherInput(input)}</pre>
     {:else}
       {#if showEvent && preview.fields.length}
         <StructuredData
@@ -154,12 +171,11 @@
               {#each conversation.messages as message}{@render referenceMessage(message)}{/each}
             </div>
             {#if conversation.partial}<p class="text-[10px] text-muted-foreground">
-                The saved preview ends inside a message. Its remaining source is available in the
-                original preview.
+                This preview ends inside a message. The original preview preserves the available
+                text.
               </p>{/if}
             {#if conversation.omitted}<p class="text-[10px] text-muted-foreground">
-                Showing the first 40 messages in this preview. The original preview retains the
-                remaining data.
+                Showing the first 40 reference messages. Copy and download retain the loaded text.
               </p>{/if}
             {#if !conversation.messages.length && !conversation.partial}<p
                 class="text-muted-foreground"
@@ -190,6 +206,10 @@
               controls={false}
               compact
             />
+          {:else if part.kind === 'text' && part.text.length > 1000}
+            <Disclosure title="Prompt text"
+              ><RichText text={part.text} embedded compact /></Disclosure
+            >
           {:else}
             <RichText text={part.text} embedded compact />
           {/if}
@@ -200,9 +220,11 @@
         </p>{/if}
     {/if}
   </div>
-  {#if truncated || preview.limited}<p class="mt-2 text-[10px] text-muted-foreground">
+  {#if preview.limited || (truncated && source === 'draft')}<p
+      class="mt-2 text-[10px] text-muted-foreground"
+    >
       {preview.limited
-        ? 'Display limited to 100,000 characters. Copy and download retain the supplied preview.'
+        ? 'Display limited to 100,000 characters. Copy and download retain the loaded text.'
         : 'This is an input excerpt; it may omit earlier context or end before the full input.'}
     </p>{/if}
 </section>

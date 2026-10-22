@@ -137,4 +137,40 @@ func verifyBoundedHistory(test *testing.T, database store.Store) {
 	if len(bounded.Messages) != 1 || len(bounded.Messages[0].Content[0].Text) != store.HistoryPageBytes+1 {
 		test.Fatal("oversized message was lost or truncated")
 	}
+	verifyTaskInputReference(test, database, session)
+}
+
+func verifyTaskInputReference(testingHandle *testing.T, database store.Store, parent atom.Session) {
+	testingHandle.Helper()
+	operationContext := context.Background()
+	child := atom.Session{ID: atom.SessionID(string(parent.ID) + "-input-child"), Parent: parent.ID, InstanceID: parent.InstanceID, CreatedAt: time.Now()}
+	testutil.RequireNoError(testingHandle, database.Sessions().Save(operationContext, child))
+	text := strings.Repeat("Literal input 🌍.\n", 3000) + "FINAL INPUT MARKER"
+	input := atom.Message{ID: string(child.ID) + "-input", SessionID: child.ID, Role: atom.RoleUser, Content: []atom.Content{{Type: atom.Text, Text: text}}, ProviderState: &atom.ProviderState{Provider: "private", ChatReasoning: "PRIVATE_TASK_STATE"}, CreatedAt: time.Now()}
+	testutil.RequireNoError(testingHandle, database.Sessions().Append(operationContext, input))
+	for index := 0; index < 130; index++ {
+		testutil.RequireNoError(testingHandle, database.Sessions().Append(operationContext, atom.Message{ID: fmt.Sprintf("%s-result-%d", child.ID, index), SessionID: child.ID, Role: atom.RoleAssistant, Content: []atom.Content{{Type: atom.Text, Text: "later output"}}, CreatedAt: time.Now()}))
+	}
+	metadata, operationError := database.Sessions().History(operationContext, child.ID, store.HistoryQuery{MetadataOnly: true})
+	testutil.RequireNoError(testingHandle, operationError)
+	if metadata.TaskMessageID != input.ID || metadata.TaskSeq <= 0 || len(metadata.Messages) != 0 || len(metadata.Task) >= len(text) {
+		testingHandle.Fatalf("task reference did not retain bounded metadata: id=%q seq=%d messages=%d", metadata.TaskMessageID, metadata.TaskSeq, len(metadata.Messages))
+	}
+	page, operationError := database.Sessions().History(operationContext, child.ID, store.HistoryQuery{Before: metadata.TaskSeq + 1, Limit: 1, Revision: &metadata.Revision})
+	testutil.RequireNoError(testingHandle, operationError)
+	if len(page.Messages) != 1 || page.Messages[0].ID != input.ID || page.Messages[0].Content[0].Text != text || page.Messages[0].ProviderState != nil {
+		testingHandle.Fatal("direct task input read changed or exposed its source")
+	}
+	public, operationError := json.Marshal(page)
+	testutil.RequireNoError(testingHandle, operationError)
+	if strings.Contains(string(public), "PRIVATE_TASK_STATE") {
+		testingHandle.Fatal("task read exposed private continuation")
+	}
+	oldRevision := metadata.Revision
+	_, operationError = database.Sessions().DeleteAfter(operationContext, child.ID, input.ID)
+	testutil.RequireNoError(testingHandle, operationError)
+	_, operationError = database.Sessions().History(operationContext, child.ID, store.HistoryQuery{Before: metadata.TaskSeq + 1, Limit: 1, Revision: &oldRevision})
+	if !errors.Is(operationError, store.ErrHistoryChanged) {
+		testingHandle.Fatal("old task reference survived a history revision")
+	}
 }

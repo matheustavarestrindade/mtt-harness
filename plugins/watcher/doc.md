@@ -111,6 +111,27 @@ A permission request has approval only if the watcher decisions are `continue`. 
 
 Variable values are not examined for more variables. Conversation and task data are not system instructions for the watcher. The source does not include `ProviderState`, `Content.Data`, or `data:` URLs. The `input_tokens` field gives the token estimate. The `InputTruncated` value is `true` if content is not included.
 
+```text
+Conversation-window measurement:
+  Count the formatted transcript after applying include_reasoning.
+  With include_reasoning=false, exclude Message.Reasoning and private thinking.
+  Prefer whole message rows; the selected text can be below context_tokens.
+  Use the selected model's token counter or estimator, not output-token usage.
+
+Separate sizes:
+  context_tokens       conversation-window budget, not total request size
+  input_tokens         initial reviewer request, including instructions/tools
+  InputPreview         first 16384 UTF-8 bytes of the rendered prompt for the UI
+  InputTruncated       source context or preview omitted some data
+```
+
+The preview limit does not change the model input. The worker session keeps the full task text. The UI uses `TaskMessageID` and `TaskSeq` from the history API.
+
+```text
+Load full prompt: read the exact first input message on user selection
+Copy full prompt / Download full prompt: keep the full input text
+```
+
 The conversation transcript contains text, not `Message` JSON. It has speaker labels, tool arguments, and tool output. It does not include message IDs, timestamps, empty fields, or usage values. The worker prompt identifies the text as reference data.
 
 The input starts with `<watcher_event>` metadata.

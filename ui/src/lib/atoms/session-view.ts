@@ -33,6 +33,8 @@ export interface HistoryPage {
   LatestResponse: ResponseUsageSnapshot | null;
   Processes: ProcessRecord[];
   Task?: string;
+  TaskMessageID?: string;
+  TaskSeq?: number;
 }
 export interface HistoryQuery {
   before?: number;

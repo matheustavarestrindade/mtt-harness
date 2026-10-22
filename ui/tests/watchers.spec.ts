@@ -312,7 +312,9 @@ test('explain review context and support keyboard selection in shadcn menus', as
   const tooltip = page.getByRole('tooltip');
   await expect(tooltip).toBeVisible();
   await expect(tooltip).toContainText('{last_context}');
-  await expect(tooltip).toContainText('Context interval controls how often');
+  await expect(tooltip).toContainText('Context interval controls');
+  await expect(tooltip).toContainText('counter or estimate');
+  await expect(tooltip).toContainText('thinking option is applied');
   await expect(tooltip).toBeInViewport();
   // A tapped help control must remain readable after hover/pointer transitions.
   await page.waitForTimeout(400);

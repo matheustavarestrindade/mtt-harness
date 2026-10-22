@@ -32,6 +32,8 @@ func (sessionStore *sessions) History(operationContext context.Context, sessionI
 	if session.Parent != "" {
 		for _, message := range messages {
 			if message.Role == atom.RoleUser {
+				page.TaskMessageID = message.ID
+				page.TaskSeq = database.messageSequences[message.ID]
 				for _, content := range message.Content {
 					if content.Type == atom.Text {
 						page.Task = content.Text

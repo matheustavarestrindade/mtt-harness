@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { ArrowLeftFromLine, Clock3 } from 'lucide-svelte';
   import {
     parseWatcherInput,
@@ -12,7 +13,7 @@
   import Disclosure from './Disclosure.svelte';
   import WatcherReviewInput from './WatcherReviewInput.svelte';
 
-  let { review }: { review: WatcherReview } = $props();
+  let { review, inputContent }: { review: WatcherReview; inputContent?: Snippet } = $props();
   const input = $derived(parseWatcherInput(review.input, review.inputTruncated));
   const fields = $derived.by(() => {
     const trigger = review.trigger || String(input.event?.type ?? input.event?.kind ?? '');
@@ -71,12 +72,12 @@
       {review.error}
     </p>{/if}
   {#if review.input}<div class="min-w-0 border-t border-border pt-1">
-      <Disclosure title={`Review input${review.inputTruncated ? ' · excerpt' : ''}`}>
-        <WatcherReviewInput
-          input={review.input}
-          truncated={review.inputTruncated}
-          showEvent={!input.event}
-        />
+      <Disclosure title="Review input">
+        {#if inputContent}{@render inputContent()}{:else}<WatcherReviewInput
+            input={review.input}
+            truncated={review.inputTruncated}
+            showEvent={!input.event}
+          />{/if}
       </Disclosure>
     </div>{/if}
   <div
@@ -89,8 +90,8 @@
         ><Clock3 class="size-3" />{durationLabel(review.durationMS)}</span
       >{/if}
     {#if review.inputTokens !== undefined}<span
-        title="Reviewer input size, separate from recorded usage"
-        >{review.estimated ? '≈ ' : ''}{review.inputTokens.toLocaleString()} input tokens</span
+        title="Initial reviewer request size, including instructions and tools. This is not the conversation-window size or the visible preview length."
+        >Initial request: {review.estimated ? '≈ ' : ''}{review.inputTokens.toLocaleString()} tokens</span
       >{/if}
   </div>
 </div>

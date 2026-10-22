@@ -192,7 +192,7 @@
         <Label for={`${identifier}-context`}>Conversation to review (tokens)</Label>
         <FieldHelp
           label="About conversation to review"
-          text={'The maximum amount of recent conversation supplied through {last_context}. 32,768 tokens means up to 32k of conversation. An explicit variable such as {last_8k_context} uses its own window. This setting controls review input; Context interval controls how often a review runs.'}
+          text={"The ceiling for {last_context}, using the model's counter or estimate after the thinking option is applied. Whole messages may use less. Instructions and tools are extra. An explicit {last_8k_context} has its own limit; Context interval controls when reviews run."}
         />
       </div>
       <Input
@@ -309,7 +309,7 @@
       title={`Input preview · ${preview.estimated ? '≈ ' : ''}${preview.input_tokens.toLocaleString()} tokens${preview.truncated ? ' · excerpt' : ''}`}
     >
       <div class="mt-2">
-        <WatcherReviewInput input={preview.prompt} truncated={preview.truncated} />
+        <WatcherReviewInput input={preview.prompt} truncated={preview.truncated} source="draft" />
       </div>
     </Disclosure>{/if}
   <div class="flex flex-wrap gap-2 border-t border-border pt-4">

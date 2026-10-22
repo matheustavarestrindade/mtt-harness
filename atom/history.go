@@ -30,4 +30,9 @@ type HistoryPage struct {
 	LatestResponse *ResponseUsageSnapshot
 	Processes      []ProcessRecord
 	Task           string `json:",omitempty"`
+	// TaskMessageID and TaskSeq identify the first saved user input of a child
+	// session. Task remains a bounded label. Use Revision and a one-message
+	// history read before TaskSeq+1 to retrieve the exact public input.
+	TaskMessageID string `json:",omitempty"`
+	TaskSeq       int64  `json:",omitempty"`
 }
